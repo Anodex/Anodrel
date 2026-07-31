@@ -1,6 +1,6 @@
 # Anodrel
 
-Anodrel is the working name for a reusable native application platform.
+Anodrel is a reusable native application platform.
 It will provide the runtime, security boundaries, platform services, and
 communication protocol that multiple desktop applications can use.
 
@@ -10,11 +10,15 @@ platform has a stable contract and a working host.
 
 ## Status
 
-**Phase:** Foundation and architecture
+**Phase:** Foundation implementation
 
-This repository currently contains the project structure and design documents.
-Implementation should begin only after the boundaries in
-docs/ARCHITECTURE.md are reviewed and accepted.
+The first implementation slice defines the transport-neutral protocol, client
+SDK, mock host, sample application, shared contract tests, a bounded native
+transport engine, an authenticated direct Windows named-pipe adapter, and an
+owned direct Windows host. The Windows host proves the native window lifecycle
+and protocol core without a runtime framework or a webview. It exposes no
+privileged operating-system capability and does not yet accept application
+content.
 
 ## Goals
 
@@ -31,7 +35,8 @@ docs/ARCHITECTURE.md are reviewed and accepted.
 - Rebuilding an operating system.
 - Rebuilding a browser engine.
 - Rewriting all of Anodex in one large migration.
-- Removing every external library or operating-system dependency.
+- Avoiding every external development tool; the restriction applies to shipped
+  runtime dependencies, not compilers and test tooling.
 - Designing a platform around Anodex-only concepts.
 
 ## Planned architecture
@@ -52,10 +57,12 @@ Native Host
     └── Linux
 ~~~
 
-The initial implementation is expected to use Rust for the native host and
-platform-sensitive code, while existing TypeScript and React applications can
-connect through a stable protocol. This is a design direction, not yet a
-locked implementation decision; see the decision records for changes.
+The current Windows host uses Anodrel-owned modules over direct User32 and
+Kernel32 APIs. The direct pipe adapter is restricted to the current Windows
+logon session and requires host-created credentials. Existing TypeScript and
+React applications remain UI clients through the SDK rather than importing
+native APIs; their private bootstrap and content-hosting boundary remain a
+separate documented step.
 
 ## Repository map
 
@@ -80,8 +87,29 @@ Anodrel/
 - docs/DEVELOPMENT.md — local workflow and verification.
 - docs/decisions/ — durable decisions and their reasoning.
 
+`docs/TRANSPORT.md` defines the native frame and session contract.
+`docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
+
+The repository's GitHub Pages landing page lives in `docs/index.html` and uses
+only hand-authored HTML and CSS.
+
 ## Working rule
 
 Every substantial architectural change must update the relevant documentation
 in the same change. The code, tests, and documentation should describe the same
 system at all times.
+
+## Current foundation commands
+
+After installing the workspace dependencies, run:
+
+~~~text
+npm run check
+npm test
+npm run demo
+~~~
+
+See docs/DEVELOPMENT.md for prerequisites and the expected verification order.
+
+The public interface and security baseline are documented in docs/PROTOCOL.md
+and docs/THREAT_MODEL.md.

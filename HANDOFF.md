@@ -2,7 +2,9 @@
 
 **Date:** 2026-07-31  
 **Project path:** C:\Users\Owner\Desktop\Platform X  
-**Status:** Foundation repository created; implementation has not started.
+**Status:** Protocol-first foundation implementation underway; owned wire,
+authenticated named-pipe, and direct Windows host modules prove bounded
+protocol handling, local session protection, and window lifecycle.
 
 ## What this project is
 
@@ -14,8 +16,8 @@ application/runtime boundary.
 Anodex is the first planned application that may use Anodrel. Anodex is not
 part of this repository and has not been modified.
 
-The final product name is intentionally undecided. “Anodrel” is only a
-working name.
+The product name is Anodrel. The local workspace still uses its original folder
+name while this task is open.
 
 ## What has been created
 
@@ -37,6 +39,19 @@ This repository has its own Git history root and currently contains:
 - tests/README.md — cross-component test ownership.
 - .gitignore — exclusions for source control, build output, secrets, logs, and
   local runtime data.
+- package.json and TypeScript project configuration — workspace build and
+  verification commands.
+- packages/protocol — versioned JSON-compatible protocol types and validation.
+- packages/sdk — application-facing client over an abstract transport.
+- packages/mock-host — policy-driven in-memory host for contract tests.
+- apps/sample — a small application using only the public SDK.
+- tests/contract — protocol compatibility checks shared with future hosts.
+- docs/PROTOCOL.md, docs/TRANSPORT.md, docs/THREAT_MODEL.md, and
+  docs/PERFORMANCE.md — public contracts, security baseline, and performance
+  measurement rules for future native work.
+- native/ — owned Rust JSON, protocol, core, wire, transport, authenticated
+  Windows named-pipe, and direct Win32 window modules;
+  the deployed dependency graph contains no third-party runtime library.
 
 ## Current architectural direction
 
@@ -81,31 +96,30 @@ decisions are listed in docs/ARCHITECTURE.md.
 
 ## Immediate next milestone
 
-Complete Phase 0 from ROADMAP.md:
+Complete the remaining Phase 0 decisions from ROADMAP.md:
 
-1. Choose Windows as the first supported platform.
-2. Decide the first native host language/framework.
-3. Decide whether the first UI uses a system webview or a native UI.
-4. Decide the first local transport.
-5. Write the threat model before exposing filesystem, process, or credential
+1. Define the first application-content hosting model.
+2. Define private invitation delivery from the host to a launched application
+   around the bounded direct Windows named-pipe adapter.
+3. Extend the threat model before exposing filesystem, process, or credential
    capabilities.
-6. Record those choices as numbered decision records.
+4. Record those choices as numbered decision records.
 
-The first implementation should be a small sample application and mock host,
-not an Anodex migration.
+The initial implementation is a small sample application and mock host, not an
+Anodex migration. Its v1 protocol is documented in docs/PROTOCOL.md.
 
 ## Recommended first implementation sequence
 
-1. Define protocol envelopes, request IDs, typed errors, events, and
-   cancellation.
-2. Define platform capability interfaces.
-3. Build a mock host for contract tests.
-4. Build a minimal Windows native host.
-5. Exercise lifecycle, window creation, logging, and shutdown.
-6. Add one capability at a time: paths, dialogs, external links, clipboard,
+1. Complete the application-content, private-invitation, and threat-model decisions.
+2. Connect a launched application to the authenticated direct Windows named-pipe
+   adapter without exposing bootstrap material.
+3. Exercise lifecycle, window creation, logging, and shutdown through that
+   transport.
+4. Add one capability at a time: paths, dialogs, external links, clipboard,
    secure storage, notifications, and child processes.
-7. Build a small sample application against the public interface.
-8. Only then design the Anodex adapter.
+5. Run the shared contract suite against the native host and add native
+   integration and manual tests.
+6. Only then design the Anodex adapter.
 
 ## How to resume this project
 
@@ -122,11 +136,15 @@ Read these files in order:
 3. ROADMAP.md
 4. docs/ARCHITECTURE.md
 5. docs/DEVELOPMENT.md
-6. docs/decisions/
+6. docs/PROTOCOL.md
+7. docs/TRANSPORT.md
+8. docs/PERFORMANCE.md
+9. docs/THREAT_MODEL.md
+10. docs/decisions/
 
-Before implementation begins, review the open decisions and update the roadmap
-with the selected first milestone. The repository currently has uncommitted
-foundation files and has not been pushed or published.
+Before adding application content or privileged native behavior, review the
+open decisions and extend the threat model. The repository currently has
+uncommitted foundation files and has not been pushed or published.
 
 ## Relationship to Anodex
 

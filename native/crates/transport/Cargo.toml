@@ -1,0 +1,10 @@
+[package]
+name = "anodrel-transport"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../core" }
+anodrel-protocol = { path = "../protocol" }
+anodrel-wire = { path = "../wire" }

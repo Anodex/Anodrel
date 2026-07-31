@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Anodrel is an owned, native desktop application platform.">
+    <title>Anodrel — Native application platform</title>
+    <link rel="stylesheet" href="site.css">
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <p class="eyebrow">Native desktop platform</p>
+        <h1>Anodrel</h1>
+        <p class="lede">
+          A modular, security-first foundation for desktop applications built
+          directly on operating-system APIs.
+        </p>
+        <a class="button" href="https://github.com/merlinshaw/Anodrel">View the project</a>
+      </header>
+
+      <section aria-labelledby="principles-title">
+        <p class="eyebrow">Design principles</p>
+        <h2 id="principles-title">Own the important boundaries.</h2>
+        <div class="grid">
+          <article>
+            <h3>Native by design</h3>
+            <p>Production runtime code uses Anodrel-owned modules, language standard libraries, and direct operating-system APIs.</p>
+          </article>
+          <article>
+            <h3>Explicit trust</h3>
+            <p>Capabilities, protocol versions, and host communication are documented, bounded, and tested at their trust boundaries.</p>
+          </article>
+          <article>
+            <h3>Small modules</h3>
+            <p>Platform services are narrow, testable components—never a framework-sized global dependency.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="status" aria-labelledby="status-title">
+        <p class="eyebrow">Current foundation</p>
+        <h2 id="status-title">Windows host and private local transport.</h2>
+        <p>
+          Anodrel currently includes a direct Win32 host, owned protocol and JSON layers,
+          bounded framing, and an authenticated named-pipe adapter limited to the current
+          Windows logon session. Application-content hosting remains intentionally separate.
+        </p>
+      </section>
+
+      <section aria-labelledby="learn-title">
+        <p class="eyebrow">Project knowledge</p>
+        <h2 id="learn-title">Built in the open, documented as it grows.</h2>
+        <nav class="links" aria-label="Documentation">
+          <a href="ARCHITECTURE.md">Architecture <span>System boundaries and layers</span></a>
+          <a href="TRANSPORT.md">Transport contract <span>Frames, sessions, and limits</span></a>
+          <a href="THREAT_MODEL.md">Threat model <span>Current security assumptions</span></a>
+          <a href="PERFORMANCE.md">Performance plan <span>How comparisons will be earned</span></a>
+          <a href="../ROADMAP.md">Roadmap <span>Sequenced platform work</span></a>
+          <a href="decisions/README.md">Architecture decisions <span>Durable technical choices</span></a>
+        </nav>
+      </section>
+
+      <footer>
+        <span>Anodrel</span>
+        <a href="https://github.com/merlinshaw/Anodrel">GitHub</a>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-windows-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-protocol = { path = "../../crates/protocol" }

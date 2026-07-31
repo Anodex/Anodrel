@@ -1,0 +1,10 @@
+{
+  "name": "@anodrel/sample-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anodrel/mock-host": "0.1.0",
+    "@anodrel/sdk": "0.1.0"
+  }
+}

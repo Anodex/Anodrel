@@ -1,0 +1,13 @@
+[package]
+name = "anodrel-windows-pipe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-transport = { path = "../../crates/transport" }
+anodrel-wire = { path = "../../crates/wire" }
+
+[dev-dependencies]
+anodrel-protocol = { path = "../../crates/protocol" }

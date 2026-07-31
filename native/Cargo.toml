@@ -1,0 +1,16 @@
+[workspace]
+members = [
+  "crates/json",
+  "crates/protocol",
+  "crates/core",
+  "crates/wire",
+  "crates/transport",
+  "adapters/windows-pipe",
+  "hosts/windows",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"

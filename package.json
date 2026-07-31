@@ -1,0 +1,25 @@
+{
+  "name": "anodrel",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reusable native application platform foundation",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "check": "tsc --build --pretty false",
+    "clean": "tsc --build --clean",
+    "demo": "npm run build && node apps/sample/dist/main.js",
+    "test": "npm run build && node --test tests/contract/dist/protocol-contract.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "typescript": "^5.9.3"
+  }
+}

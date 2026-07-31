@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@anodrel/protocol": ["packages/protocol/src/index.ts"],
+      "@anodrel/sdk": ["packages/sdk/src/index.ts"],
+      "@anodrel/mock-host": ["packages/mock-host/src/index.ts"]
+    }
+  }
+}

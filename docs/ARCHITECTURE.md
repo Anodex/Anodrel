@@ -74,11 +74,42 @@ The native host owns operating-system integration:
 The first host is expected to target Windows. Other operating systems should be
 added as adapters behind the same service contracts.
 
+The current Windows host uses Anodrel-owned modules over direct User32 and
+Kernel32 APIs. Its raw FFI is isolated from the portable protocol and policy
+layers. It paints an internal diagnostics view only; it has no webview or
+application-content transport. macOS and Linux hosts will follow the same
+ownership rule through their respective operating-system APIs.
+
+## Modularity and performance
+
+The dependency direction is one-way: protocol types sit at the center; SDKs and
+test hosts depend on the protocol; applications depend only on SDKs and an
+injected transport. A mock host must not depend on the SDK at runtime, and no
+application may import native host internals.
+
+Public packages should have no import-time side effects, avoid framework-wide
+global state, and keep their dependency surface minimal. Production runtime
+packages use only Anodrel-owned code, language standard libraries, and direct
+operating-system APIs. Validate messages at a trust boundary rather than
+repeatedly in internal layers. The native wire limits encoded messages to 64 KiB
+before UTF-8 or JSON parsing and accepts at most four complete frames from one
+receive operation; the JSON codec limits nesting to 64 levels. The session
+engine runs messages in arrival order and owns a policy-bound core. The Windows
+adapter adds logon-SID access control, CNG session credentials, and worker-thread
+I/O. Application launch must still add private invitation delivery, queue timeout,
+and cancellation limits before rendered content can connect.
+
 ## Communication model
 
 The application-to-host boundary must use a documented, versioned protocol.
 The initial transport may be a local message channel, but the application must
 not depend on transport-specific details.
+
+The initial protocol contract is documented in `docs/PROTOCOL.md`. Its SDK,
+mock host, and contract tests are transport-neutral; the mock does not select a
+native transport implementation. `docs/TRANSPORT.md` defines the owned bounded
+frame/session engine and its direct one-client Windows named-pipe adapter. The
+adapter is not yet connected to application launch or rendered content.
 
 Every request should have:
 
@@ -115,6 +146,10 @@ Security is a platform responsibility, not a UI convention.
 
 The detailed threat model will be added before the first host exposes filesystem,
 process, or credential operations.
+
+`docs/THREAT_MODEL.md` establishes the current protocol baseline. It must be
+extended with the selected native-host, UI, and transport controls before any
+privileged capability is implemented.
 
 ## Data and storage
 
@@ -160,9 +195,5 @@ repository unbuildable.
 The following choices remain intentionally open and must be recorded before
 implementation locks them in:
 
-- native host language and framework;
-- first transport implementation;
-- webview versus native UI strategy;
-- Windows-only first release scope;
 - packaging, signing, and update strategy;
 - license and contribution model.

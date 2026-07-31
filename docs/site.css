@@ -1,0 +1,63 @@
+:root {
+  color-scheme: dark;
+  --ink: #edf1f7;
+  --muted: #9ba9bc;
+  --line: #273247;
+  --surface: #111927;
+  --accent: #7be6bd;
+  --background: #080d16;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.55;
+}
+
+main { width: min(1080px, calc(100% - 48px)); margin: 0 auto; }
+
+.hero { padding: 15vh 0 11vh; max-width: 760px; }
+
+.eyebrow {
+  margin: 0 0 0.7rem;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+h1, h2, h3, p { margin-top: 0; }
+h1 { margin-bottom: 0.5rem; font-size: clamp(4rem, 13vw, 8rem); letter-spacing: -0.08em; line-height: 0.92; }
+h2 { max-width: 740px; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -0.05em; line-height: 1.04; }
+h3 { margin-bottom: 0.5rem; font-size: 1.1rem; }
+
+.lede { max-width: 630px; color: var(--muted); font-size: clamp(1.15rem, 2.5vw, 1.45rem); }
+.button { display: inline-block; margin-top: 1.1rem; padding: 0.7rem 1rem; border-radius: 0.35rem; background: var(--accent); color: #06251b; font-weight: 750; text-decoration: none; }
+
+section { padding: 5.5rem 0; border-top: 1px solid var(--line); }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+article, .status { border-radius: 0.7rem; background: var(--surface); }
+article { padding: 1.4rem; }
+article p, .status p { margin-bottom: 0; color: var(--muted); }
+.status { padding: 2rem; }
+
+.links { display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--line); }
+.links a { padding: 1.25rem 0; border-bottom: 1px solid var(--line); color: var(--ink); font-weight: 700; text-decoration: none; }
+.links a:nth-child(odd) { padding-right: 1rem; }
+.links a:nth-child(even) { padding-left: 1rem; border-left: 1px solid var(--line); }
+.links span { display: block; color: var(--muted); font-size: 0.88rem; font-weight: 400; }
+
+footer { display: flex; justify-content: space-between; padding: 2.5rem 0; color: var(--muted); font-size: 0.9rem; }
+footer a { color: var(--muted); }
+
+@media (max-width: 650px) {
+  main { width: min(100% - 32px, 1080px); }
+  .hero { padding: 12vh 0 9vh; }
+  .grid, .links { grid-template-columns: 1fr; }
+  .links a:nth-child(n) { padding: 1rem 0; border-left: 0; }
+}

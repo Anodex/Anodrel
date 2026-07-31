@@ -11,15 +11,21 @@ Status: **In progress**
 - Establish folder ownership and documentation rules.
 - Define the initial architecture and security boundaries.
 - Record the repository-separation decision.
-- Choose the first supported operating system.
-- Decide the initial native host and protocol implementation.
+- Choose the first supported operating system. **Completed: Windows.**
+- Define the first direct Windows API host. **Completed:** an owned Win32
+  window, JSON codec, protocol core, and lifecycle smoke test (Decision 0006).
+- Define a bounded application-to-host frame and session engine. **Completed:**
+  owned wire framing and host session limits (Decision 0007).
+- Implement the authenticated Windows named-pipe adapter. **Completed:**
+  logon-SID-restricted one-client adapter with CNG invitation (Decision 0008).
+- Define controlled application-content hosting and private invitation delivery.
 
 Acceptance gate: the project has an agreed architecture, a documented first
 milestone, and no dependency on Anodex source code.
 
 ## Phase 1 — Contracts and protocol
 
-Status: **Planned**
+Status: **Foundation slice in progress**
 
 - Define the platform service interfaces.
 - Define protocol envelopes, request IDs, errors, cancellation, and events.
@@ -30,9 +36,14 @@ Status: **Planned**
 Acceptance gate: a small sample application can communicate with the mock host
 using only documented interfaces.
 
+The initial protocol, SDK, mock host, sample application, contract suite, and
+bounded native session engine are established. Phase 2 does not begin until the
+remaining Phase 0 adapter/content decisions and the threat-model gate are
+complete.
+
 ## Phase 2 — Native host
 
-Status: **Planned**
+Status: **Direct Windows host in progress**
 
 - Create the first native host, beginning with Windows.
 - Implement lifecycle and single-instance behavior.
@@ -43,6 +54,13 @@ Status: **Planned**
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
+
+The direct Windows host creates and paints an Anodrel-owned Win32 window and
+validates the core protocol shape under Decision 0006. Decision 0007 adds the
+bounded framing and session engine. Decision 0008 adds the authenticated direct
+Windows named-pipe adapter. Remaining acceptance work begins with controlled
+application-content hosting, private invitation delivery, and operation-specific
+native tests.
 
 ## Phase 3 — Reusable SDK and tooling
 

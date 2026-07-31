@@ -2,12 +2,65 @@
 
 ## Current state
 
-Anodrel is in the documentation and architecture phase. There is no build
-toolchain or runtime implementation yet.
+Anodrel has a TypeScript workspace for the versioned protocol, SDK, mock host,
+sample application, and contract tests. It also has an owned bounded wire and
+host-session engine plus a direct Windows host for native window lifecycle and
+the core protocol handlers.
 
-Do not invent commands that are not present in the repository. Once the first
-language and host are selected, this guide becomes the source of truth for
-installation, development, testing, packaging, and release commands.
+The native-host toolchain, packaging, and release commands will be documented
+after their decisions are recorded. Do not invent those commands.
+
+## Foundation workspace
+
+Prerequisites:
+
+- Node.js 22 or newer;
+- npm 10 or newer.
+- Rust 1.95 or newer for the direct Windows host.
+
+Install dependencies from the repository root:
+
+~~~text
+npm install
+~~~
+
+Use the following commands while working on the foundation packages:
+
+~~~text
+npm run check   # Type-check and build all referenced projects
+npm test        # Run protocol compatibility tests against the mock host
+npm run demo    # Run the sample application through the public SDK
+~~~
+
+The workspace uses TypeScript project references to keep package dependencies
+explicit and build them in dependency order. Generated `dist/` folders are not
+tracked.
+
+## Direct Windows host
+
+The Rust workspace is under `native/`. It has no third-party runtime
+dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
+`anodrel-wire`, `anodrel-transport`, `anodrel-windows-pipe`, and the Windows
+host are all owned source modules. The host calls User32 and Kernel32 directly
+for its window lifecycle and drawing; the pipe adapter uses direct Win32 and
+CNG APIs on a worker thread:
+
+~~~text
+cargo fmt --manifest-path native/Cargo.toml --all --check
+cargo test --manifest-path native/Cargo.toml
+cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
+cargo tree --manifest-path native/Cargo.toml
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-pipe
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
+~~~
+
+The last command is a manual smoke check: an **Anodrel Windows host** window
+must show a successful internal `platform.health` response and close normally.
+It needs Windows but does not require WebView2. Do not add privileged
+capabilities or new third-party runtime dependencies. The named-pipe adapter
+already binds a logon-SID DACL and a host-generated credential; the next step is
+private invitation delivery to a launched application, not a public pipe name or
+client-provided context.
 
 ## Working process
 
