@@ -1,0 +1,33 @@
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node / TypeScript
+node_modules/
+dist/
+out/
+coverage/
+.npm/
+*.tsbuildinfo
+
+# Rust
+target/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local test and runtime data
+.anodrel/
+tmp/
+logs/
+
+# Generated documentation and reports
+docs/generated/
