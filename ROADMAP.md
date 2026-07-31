@@ -57,6 +57,10 @@ Status: **Direct Windows host in progress**
   instance claim, bounded readiness, and no-data activation request (Decision
   0011). A verified product executable lifecycle remains required.
 - Implement window creation and controlled application content loading.
+  **Completed for host-owned Windows surfaces:** per-window immutable view
+  routing, final-window shutdown, a two-window diagnostic, and the verified
+  no-script text package surface (Decision 0012). A public application window
+  capability remains deferred.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
 - Implement secure credential storage through the operating system.
 - Add logging, crash reporting boundaries, and shutdown behavior.

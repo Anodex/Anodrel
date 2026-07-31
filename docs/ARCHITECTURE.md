@@ -98,6 +98,12 @@ so it does not collide with the application text surface. See
 `docs/INSTANCE_LIFECYCLE.md`; product executable identity and a public
 second-instance protocol remain separate work.
 
+The direct Win32 host also owns a per-window view registry. Each native handle
+maps to one immutable host-created view, and the UI message loop exits only
+after the final registered window closes. The `--window-lab` diagnostic proves
+this two-window lifecycle without creating a public window-management API. See
+`docs/WINDOW_LIFECYCLE.md`.
+
 ## Modularity and performance
 
 The dependency direction is one-way: protocol types sit at the center; SDKs and

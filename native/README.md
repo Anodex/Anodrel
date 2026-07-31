@@ -40,7 +40,7 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
 - `adapters/windows-instance` owns the bounded current-session mutex,
   readiness event, and no-data activation request for one package identity.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
-  client-area drawing.
+  handle-keyed view registry, client-area drawing, and final-window shutdown.
 
 The initial window displays a host-created `platform.health` response. With
 `--application <manifest>`, it can also display the documented, digest-verified
@@ -63,6 +63,10 @@ package identity. A second invocation sends no data and makes only a bounded
 best-effort activation request to the primary window. Startup Lab uses a
 separate diagnostic scope. See `docs/INSTANCE_LIFECYCLE.md`.
 
+`--window-lab` opens two static host-owned windows to verify the multi-window
+registry. Closing one leaves the other open; closing the final window exits the
+message loop. It is a lifecycle diagnostic, not a public window API.
+
 Verify from the repository root:
 
 ~~~text
@@ -74,6 +78,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-lab
 ~~~
 
 The final two commands are manual Windows smoke checks: confirm that an

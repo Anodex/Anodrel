@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 
 mod paint;
+mod registry;
 mod startup_lab;
 
 use std::{io, ptr, sync::OnceLock};
@@ -110,14 +111,34 @@ struct Msg {
     lPrivate: Dword,
 }
 
+#[derive(Clone)]
 pub(super) struct StartupLab {
     pub(super) display_name: String,
     pub(super) application_id: String,
 }
 
+#[derive(Clone)]
 enum View {
     Text(Vec<u16>),
     StartupLab(StartupLab),
+}
+
+struct WindowDefinition {
+    title: String,
+    width: i32,
+    height: i32,
+    view: View,
+}
+
+impl WindowDefinition {
+    fn text(title: &str, text: &str, width: i32, height: i32) -> Self {
+        Self {
+            title: title.to_owned(),
+            width,
+            height,
+            view: View::Text(to_wide_null(text)),
+        }
+    }
 }
 
 #[link(name = "kernel32")]
@@ -146,6 +167,7 @@ unsafe extern "system" {
     fn ShowWindow(window: Hwnd, command: i32) -> Bool;
     fn UpdateWindow(window: Hwnd) -> Bool;
     fn SetForegroundWindow(window: Hwnd) -> Bool;
+    fn DestroyWindow(window: Hwnd) -> Bool;
     fn GetMessageW(message: *mut Msg, window: Hwnd, minimum: Uint, maximum: Uint) -> Bool;
     fn TranslateMessage(message: *const Msg) -> Bool;
     fn DispatchMessageW(message: *const Msg) -> Lresult;
@@ -156,21 +178,20 @@ unsafe extern "system" {
     fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
 }
 
-static VIEW: OnceLock<View> = OnceLock::new();
 static ACTIVATION_MESSAGE: OnceLock<Uint> = OnceLock::new();
+static WINDOW_CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
 
 /// Opens the simple host-owned text surface.
 pub fn run(title: &str, text: &str) -> io::Result<()> {
-    VIEW.set(View::Text(to_wide_null(text)))
-        .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window view was already set"))?;
-    run_window(title, 880, 520, None)
+    run_windows(vec![WindowDefinition::text(title, text, 880, 520)], None)
 }
 
 /// Opens the validated application text surface as the primary host instance.
 pub fn run_application(title: &str, text: &str, instance: &PrimaryInstance) -> io::Result<()> {
-    VIEW.set(View::Text(to_wide_null(text)))
-        .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window view was already set"))?;
-    run_window(title, 880, 520, Some(instance))
+    run_windows(
+        vec![WindowDefinition::text(title, text, 880, 520)],
+        Some(instance),
+    )
 }
 
 /// Opens the branded Startup Lab after the caller has completed its checks.
@@ -179,20 +200,51 @@ pub fn run_startup_lab(
     application_id: &str,
     instance: &PrimaryInstance,
 ) -> io::Result<()> {
-    VIEW.set(View::StartupLab(StartupLab {
-        display_name: display_name.to_owned(),
-        application_id: application_id.to_owned(),
-    }))
-    .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window view was already set"))?;
-    run_window("Anodrel Startup Lab", 1_160, 760, Some(instance))
+    run_windows(
+        vec![WindowDefinition {
+            title: "Anodrel Startup Lab".to_owned(),
+            width: 1_160,
+            height: 760,
+            view: View::StartupLab(StartupLab {
+                display_name: display_name.to_owned(),
+                application_id: application_id.to_owned(),
+            }),
+        }],
+        Some(instance),
+    )
 }
 
-fn run_window(
-    title: &str,
-    width: i32,
-    height: i32,
+/// Opens two static host-owned windows to exercise the multi-window lifecycle.
+pub fn run_window_lab() -> io::Result<()> {
+    run_windows(
+        vec![
+            WindowDefinition::text(
+                "Anodrel Window Lab - Primary",
+                "Anodrel Window Lab\n\nThis primary window proves that the direct host can keep multiple host-owned windows alive on one User32 message loop.\n\nClose this window first: the companion window remains available. Close the final window to end the host process.",
+                760,
+                420,
+            ),
+            WindowDefinition::text(
+                "Anodrel Window Lab - Companion",
+                "Anodrel Window Lab\n\nThis companion has its own immutable host view. Its paint messages are routed by the real Win32 window handle, not a process-global surface.\n\nClose either window in any order. The host exits only after the last one closes.",
+                760,
+                420,
+            ),
+        ],
+        None,
+    )
+}
+
+fn run_windows(
+    definitions: Vec<WindowDefinition>,
     primary_instance: Option<&PrimaryInstance>,
 ) -> io::Result<()> {
+    if definitions.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "host requires at least one window",
+        ));
+    }
     if let Some(primary_instance) = primary_instance {
         ACTIVATION_MESSAGE
             .set(primary_instance.activation_message())
@@ -200,13 +252,39 @@ fn run_window(
     }
     let instance = module_handle()?;
     let class_name = to_wide_null("Anodrel.DirectWindowsHost");
-    register_window_class(instance, &class_name)?;
-    let title = to_wide_null(title);
-    let window = create_window(instance, &class_name, &title, width, height)?;
-    if let Some(primary_instance) = primary_instance {
-        primary_instance.mark_ready()?;
+    ensure_window_class(instance, &class_name)?;
+    let mut windows = Vec::with_capacity(definitions.len());
+    for definition in definitions {
+        let title = to_wide_null(&definition.title);
+        let window = match create_window(
+            instance,
+            &class_name,
+            &title,
+            definition.width,
+            definition.height,
+        ) {
+            Ok(window) => window,
+            Err(error) => {
+                destroy_windows(&windows);
+                return Err(error);
+            }
+        };
+        if let Err(error) = registry::insert(window, definition.view) {
+            destroy_window(window);
+            destroy_windows(&windows);
+            return Err(error);
+        }
+        windows.push(window);
     }
-    show_and_update(window);
+    if let Some(primary_instance) = primary_instance
+        && let Err(error) = primary_instance.mark_ready()
+    {
+        destroy_windows(&windows);
+        return Err(error);
+    }
+    for window in windows {
+        show_and_update(window);
+    }
     message_loop()
 }
 
@@ -225,7 +303,10 @@ fn module_handle() -> io::Result<Hinstance> {
     }
 }
 
-fn register_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<()> {
+fn ensure_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<()> {
+    if WINDOW_CLASS_REGISTERED.get().is_some() {
+        return Ok(());
+    }
     // SAFETY: IDC_ARROW is a documented integer resource identifier, converted
     // to the pointer representation required by LoadCursorW.
     let cursor = unsafe { LoadCursorW(0, IDC_ARROW as *const u16) };
@@ -246,6 +327,7 @@ fn register_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<
     if unsafe { RegisterClassW(&window_class) } == 0 {
         Err(io::Error::last_os_error())
     } else {
+        let _ = WINDOW_CLASS_REGISTERED.set(());
         Ok(())
     }
 }
@@ -289,6 +371,20 @@ fn show_and_update(window: Hwnd) {
     unsafe {
         ShowWindow(window, SW_SHOW);
         UpdateWindow(window);
+    }
+}
+
+fn destroy_windows(windows: &[Hwnd]) {
+    for &window in windows.iter().rev() {
+        destroy_window(window);
+    }
+}
+
+fn destroy_window(window: Hwnd) {
+    // SAFETY: window belongs to this host process. Destruction synchronously
+    // routes WM_DESTROY, which removes the matching registry entry.
+    unsafe {
+        DestroyWindow(window);
     }
 }
 
@@ -346,9 +442,11 @@ unsafe extern "system" fn window_proc(
                 unsafe {
                     GetClientRect(window, &mut rect);
                 }
-                match VIEW.get().expect("window view is initialized") {
-                    View::Text(text) => paint::draw_text_surface(device_context, rect, text),
-                    View::StartupLab(lab) => startup_lab::draw(device_context, rect, lab),
+                if let Ok(Some(view)) = registry::view_for(window) {
+                    match view {
+                        View::Text(text) => paint::draw_text_surface(device_context, rect, &text),
+                        View::StartupLab(lab) => startup_lab::draw(device_context, rect, &lab),
+                    }
                 }
                 // SAFETY: BeginPaint initialized paint for this exact window.
                 unsafe {
@@ -358,9 +456,11 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_DESTROY => {
-            // SAFETY: this only posts a quit message to the current thread's
-            // queue after the owned top-level window is being destroyed.
-            unsafe { PostQuitMessage(0) };
+            if registry::remove(window).is_ok_and(|remaining| remaining == 0) {
+                // SAFETY: this only posts a quit message after the final
+                // host-owned top-level window is being destroyed.
+                unsafe { PostQuitMessage(0) };
+            }
             0
         }
         _ => {

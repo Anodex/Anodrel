@@ -81,6 +81,16 @@ create another application window; it waits at most one second for the primary
 window and requests that Windows restore and foreground it. The second process
 forwards no data. See `docs/INSTANCE_LIFECYCLE.md` for the exact boundary.
 
+To verify the owned multi-window lifecycle, run:
+
+~~~text
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-lab
+~~~
+
+Two **Anodrel Window Lab** windows must open. Closing one must leave the other
+open; closing the final window must exit the host. See
+`docs/WINDOW_LIFECYCLE.md`.
+
 For the quickest Windows smoke test, double-click `start.bat` in the repository
 root. It checks for Cargo, builds the host if necessary, validates the sample
 package and internal protocol core, completes one owned private IPC loopback,

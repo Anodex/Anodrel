@@ -59,6 +59,7 @@ authority for permissions.
 | Rendered text acquires script or native authority. | Support only `anodrel.text.v1`: bounded UTF-8 plain text with no scripts, navigation, URLs, resource loads, or native bridge. |
 | Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
 | A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
+| Two native windows render each other's state or one close ends the host early. | Keep immutable host-created views in a handle-keyed registry and exit the UI loop only after the final registered window is destroyed. |
 
 ## Security invariants
 
@@ -106,6 +107,11 @@ cannot forward arguments or application data; it only sends a bounded
 best-effort User32 activation message after the primary has created its window.
 This preserves one-window coordination without treating the named object as an
 identity or authorization mechanism.
+
+The direct window host routes painting through its own handle-keyed registry;
+the current package and Startup Lab surfaces cannot supply entries to it. A
+failed multi-window creation is rolled back before the message loop starts, and
+closing one window does not end the host while another registered window exists.
 
 The development sample exercises this private path with a developer-supplied
 Node.js executable and an owned sample script. It has no executable identity

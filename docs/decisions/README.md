@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0012 — Windows host owns per-window state and final-window shutdown.
+
 - 0011 — Windows host uses a bounded single-instance lifecycle.
 
 - 0010 — Application hosting starts with a verified owned text package.

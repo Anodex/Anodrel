@@ -100,6 +100,7 @@ Anodrel/
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
+`docs/WINDOW_LIFECYCLE.md` defines the owned multi-window host foundation.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
