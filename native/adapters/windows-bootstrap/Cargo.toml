@@ -1,0 +1,19 @@
+[package]
+name = "anodrel-windows-bootstrap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-bootstrap = { path = "../../crates/bootstrap" }
+
+[dev-dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-windows-pipe = { path = "../windows-pipe" }
+
+[[bin]]
+name = "anodrel-bootstrap-fixture"
+path = "fixtures/bootstrap_fixture.rs"
+test = false
+bench = false

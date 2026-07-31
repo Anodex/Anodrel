@@ -40,10 +40,12 @@ tracked.
 
 The Rust workspace is under `native/`. It has no third-party runtime
 dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
-`anodrel-wire`, `anodrel-transport`, `anodrel-windows-pipe`, and the Windows
-host are all owned source modules. The host calls User32 and Kernel32 directly
-for its window lifecycle and drawing; the pipe adapter uses direct Win32 and
-CNG APIs on a worker thread:
+`anodrel-wire`, `anodrel-transport`, `anodrel-bootstrap`,
+`anodrel-windows-pipe`, `anodrel-windows-bootstrap`, and the Windows host are
+all owned source modules. The host calls User32 and Kernel32 directly for its
+window lifecycle and drawing; the pipe adapter uses direct Win32 and CNG APIs
+on a worker thread, while the bootstrap adapter uses an explicit Windows child
+handle list:
 
 ~~~text
 cargo fmt --manifest-path native/Cargo.toml --all --check
@@ -51,6 +53,7 @@ cargo test --manifest-path native/Cargo.toml
 cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-pipe
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 ~~~
 
@@ -58,9 +61,26 @@ The last command is a manual smoke check: an **Anodrel Windows host** window
 must show a successful internal `platform.health` response and close normally.
 It needs Windows but does not require WebView2. Do not add privileged
 capabilities or new third-party runtime dependencies. The named-pipe adapter
-already binds a logon-SID DACL and a host-generated credential; the next step is
-private invitation delivery to a launched application, not a public pipe name or
-client-provided context.
+already binds a logon-SID DACL and a host-generated credential; the bootstrap
+adapter performs one-time delivery through child standard input. Content hosting,
+executable trust, and application lifecycle policy remain separate work.
+
+### Windows end-to-end development sample
+
+After `npm run build`, run this PowerShell command from the repository root:
+
+~~~powershell
+$nodePath = (Get-Command node).Source
+$clientPath = (Resolve-Path apps/sample/dist/native-client.js).Path
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-client $nodePath $clientPath
+~~~
+
+It launches the compiled sample through the direct Windows bootstrap adapter.
+The sample reads its private standard-input invitation, authenticates to the
+real named pipe, calls `platform.health`, and exits with code zero. The host
+prints only a safe success summary. This is a development diagnostic—not a
+packaged application launcher, trusted content host, or replacement for the
+future application-identity policy.
 
 ## Working process
 

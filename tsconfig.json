@@ -4,6 +4,7 @@
     { "path": "./packages/protocol" },
     { "path": "./packages/sdk" },
     { "path": "./packages/mock-host" },
+    { "path": "./packages/windows-transport" },
     { "path": "./apps/sample" },
     { "path": "./tests/contract" }
   ]

@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anodrel-bootstrap = { path = "../../crates/bootstrap" }
 anodrel-core = { path = "../../crates/core" }
 anodrel-transport = { path = "../../crates/transport" }
 anodrel-wire = { path = "../../crates/wire" }

@@ -16,7 +16,7 @@
     "check": "tsc --build --pretty false",
     "clean": "tsc --build --clean",
     "demo": "npm run build && node apps/sample/dist/main.js",
-    "test": "npm run build && node --test tests/contract/dist/protocol-contract.test.js"
+    "test": "npm run build && node --test packages/windows-transport/dist/strict-json.test.js packages/windows-transport/dist/bootstrap.test.js packages/windows-transport/dist/named-pipe.test.js tests/contract/dist/protocol-contract.test.js"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",

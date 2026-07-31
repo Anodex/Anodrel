@@ -10,6 +10,7 @@ mod security;
 
 use std::{fmt, io};
 
+use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_core::HostPolicy;
 use anodrel_transport::{SessionCredentials, TransportSession, authentication_message};
 
@@ -37,6 +38,14 @@ impl SessionInvitation {
         let token = std::str::from_utf8(&self.token).map_err(|_| InvitationError::InvalidToken)?;
         authentication_message(&self.session_id, token).map_err(InvitationError::Credentials)
     }
+
+    /// Converts this pipe invitation into the bounded one-use child-bootstrap
+    /// record. The token remains private and is never exposed through a getter.
+    pub fn bootstrap_invitation(&self) -> Result<BootstrapInvitation, InvitationError> {
+        let token = std::str::from_utf8(&self.token).map_err(|_| InvitationError::InvalidToken)?;
+        BootstrapInvitation::new(&self.pipe_name, &self.session_id, token)
+            .map_err(InvitationError::Bootstrap)
+    }
 }
 
 impl fmt::Debug for SessionInvitation {
@@ -60,6 +69,7 @@ impl Drop for SessionInvitation {
 pub enum InvitationError {
     InvalidToken,
     Credentials(anodrel_transport::CredentialsError),
+    Bootstrap(anodrel_bootstrap::BootstrapError),
 }
 
 impl fmt::Display for InvitationError {
@@ -67,6 +77,7 @@ impl fmt::Display for InvitationError {
         match self {
             Self::InvalidToken => write!(formatter, "session invitation token became invalid"),
             Self::Credentials(error) => write!(formatter, "session invitation is invalid: {error}"),
+            Self::Bootstrap(error) => write!(formatter, "bootstrap invitation is invalid: {error}"),
         }
     }
 }
@@ -231,5 +242,22 @@ mod tests {
             .join()
             .expect("server thread does not panic")
             .expect("server completes after client closes");
+    }
+
+    #[test]
+    fn converts_a_pipe_invitation_into_a_private_bootstrap_record() {
+        let policy = HostPolicy::new(
+            "test.application",
+            vec![Capability::DiagnosticsRead],
+            "test-host",
+        )
+        .expect("test policy is valid");
+        let (_server, invitation) =
+            WindowsPipeServer::create(policy, "test-session").expect("pipe server creates");
+        let bootstrap = invitation
+            .bootstrap_invitation()
+            .expect("bootstrap invitation is valid");
+        assert_eq!(bootstrap.pipe_name(), invitation.pipe_name());
+        assert_eq!(bootstrap.session_id(), invitation.session_id());
     }
 }

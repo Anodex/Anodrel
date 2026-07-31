@@ -27,10 +27,10 @@ handshake, and only then dispatches public protocol requests through `CoreHost`.
 Any framing or authentication failure ends the one-client connection.
 
 The adapter offers synchronous `serve_one` specifically for a dedicated worker
-thread. It must not execute on the Win32 UI thread. The host will not publish an
-endpoint or launch application content until a future bootstrap design can hand
-the invitation to the intended application without putting the token in command
-lines, environment variables, logs, or predictable files.
+thread. It must not execute on the Win32 UI thread. Decision 0009 defines the
+separate private bootstrap adapter that can hand the invitation to the intended
+child without putting the token in command lines, environment variables, logs,
+or predictable files. Controlled application content remains a later boundary.
 
 ## Consequences
 
@@ -46,8 +46,8 @@ Tradeoffs:
 
 - The current adapter proves one authenticated client only; multi-client,
   cancellation, concurrent work, and application launch remain later work.
-- Bootstrap secrecy is an explicit unresolved design requirement, not a hidden
-  implementation detail.
+- The pipe adapter delegates child process creation and bootstrap delivery to
+  Decision 0009 rather than mixing process control into stream I/O.
 
 ## Revisit conditions
 

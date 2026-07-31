@@ -1,0 +1,10 @@
+[package]
+name = "anodrel-bootstrap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-json = { path = "../json" }
+anodrel-protocol = { path = "../protocol" }
+anodrel-transport = { path = "../transport" }

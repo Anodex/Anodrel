@@ -3,6 +3,15 @@
 version = 4
 
 [[package]]
+name = "anodrel-bootstrap"
+version = "0.1.0"
+dependencies = [
+ "anodrel-json",
+ "anodrel-protocol",
+ "anodrel-transport",
+]
+
+[[package]]
 name = "anodrel-core"
 version = "0.1.0"
 dependencies = [
@@ -30,17 +39,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-bootstrap"
+version = "0.1.0"
+dependencies = [
+ "anodrel-bootstrap",
+ "anodrel-core",
+ "anodrel-protocol",
+ "anodrel-windows-pipe",
+]
+
+[[package]]
 name = "anodrel-windows-host"
 version = "0.1.0"
 dependencies = [
  "anodrel-core",
  "anodrel-protocol",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-pipe",
 ]
 
 [[package]]
 name = "anodrel-windows-pipe"
 version = "0.1.0"
 dependencies = [
+ "anodrel-bootstrap",
  "anodrel-core",
  "anodrel-protocol",
  "anodrel-transport",

@@ -1,13 +1,31 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod sample;
 mod win32;
 
-use std::{error::Error, io};
+use std::{env, error::Error, io};
 
 use anodrel_core::{CoreHost, HostPolicy};
 use anodrel_protocol::{Capability, JsonValue};
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let arguments = env::args().skip(1).collect::<Vec<_>>();
+    if let [command, node_path, client_path] = arguments.as_slice()
+        && command == "--sample-client"
+    {
+        return sample::run(node_path, client_path);
+    }
+    if !arguments.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "usage: anodrel-windows-host --sample-client <node.exe> <native-client.js>",
+        )
+        .into());
+    }
+    run_diagnostics_window()
+}
+
+fn run_diagnostics_window() -> Result<(), Box<dyn Error>> {
     let host = CoreHost::new(HostPolicy::new(
         "anodrel.windows-host",
         vec![Capability::DiagnosticsRead],

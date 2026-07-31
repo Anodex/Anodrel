@@ -15,10 +15,13 @@ platform has a stable contract and a working host.
 The first implementation slice defines the transport-neutral protocol, client
 SDK, mock host, sample application, shared contract tests, a bounded native
 transport engine, an authenticated direct Windows named-pipe adapter, and an
-owned direct Windows host. The Windows host proves the native window lifecycle
-and protocol core without a runtime framework or a webview. It exposes no
-privileged operating-system capability and does not yet accept application
-content.
+owned direct Windows host. The native layer also has a bounded, private
+host-to-child bootstrap adapter for delivering a named-pipe invitation without
+command-line or environment-variable secrets. The Windows host proves the
+native window lifecycle and protocol core without a runtime framework or a
+webview. A development-only Node sample exercises that private pipe path end to
+end; it exposes no privileged operating-system capability and does not yet
+accept application content.
 
 ## Goals
 
@@ -59,10 +62,11 @@ Native Host
 
 The current Windows host uses Anodrel-owned modules over direct User32 and
 Kernel32 APIs. The direct pipe adapter is restricted to the current Windows
-logon session and requires host-created credentials. Existing TypeScript and
-React applications remain UI clients through the SDK rather than importing
-native APIs; their private bootstrap and content-hosting boundary remain a
-separate documented step.
+logon session and requires host-created credentials; a separate direct launcher
+delivers those credentials once through a child-only anonymous standard-input
+handle. Existing TypeScript and React applications remain UI clients through
+the SDK rather than importing native APIs; content hosting and application
+identity remain separate documented steps.
 
 ## Repository map
 

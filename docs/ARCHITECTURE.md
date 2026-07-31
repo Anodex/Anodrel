@@ -95,9 +95,10 @@ repeatedly in internal layers. The native wire limits encoded messages to 64 KiB
 before UTF-8 or JSON parsing and accepts at most four complete frames from one
 receive operation; the JSON codec limits nesting to 64 levels. The session
 engine runs messages in arrival order and owns a policy-bound core. The Windows
-adapter adds logon-SID access control, CNG session credentials, and worker-thread
-I/O. Application launch must still add private invitation delivery, queue timeout,
-and cancellation limits before rendered content can connect.
+adapter adds logon-SID access control, CNG session credentials, worker-thread
+I/O, and a separate bounded one-use bootstrap launcher. The launcher passes
+the invitation only over a restricted inherited standard-input handle; it does
+not verify application identity, host rendered content, or own a restart policy.
 
 ## Communication model
 
@@ -108,8 +109,12 @@ not depend on transport-specific details.
 The initial protocol contract is documented in `docs/PROTOCOL.md`. Its SDK,
 mock host, and contract tests are transport-neutral; the mock does not select a
 native transport implementation. `docs/TRANSPORT.md` defines the owned bounded
-frame/session engine and its direct one-client Windows named-pipe adapter. The
-adapter is not yet connected to application launch or rendered content.
+frame/session engine, direct one-client Windows named-pipe adapter, and the
+separate private child-bootstrap format. The bootstrap adapter can launch a
+caller-selected executable but is not yet integrated with controlled application
+hosting or rendered content. The repository's Node-based development sample
+uses this path to exercise a real authenticated health request; it remains a
+diagnostic client, not a trusted application host.
 
 Every request should have:
 

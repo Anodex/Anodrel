@@ -1,8 +1,8 @@
 # Anodrel Native Transport v1
 
 **Status:** Foundation contract. The frame codec, authenticated host session,
-and one-client Windows named-pipe adapter are implemented. Application launch
-and content hosting are not implemented yet.
+one-client Windows named-pipe adapter, and private child-bootstrap adapter are
+implemented. Application content hosting is not implemented yet.
 
 ## Purpose
 
@@ -18,9 +18,9 @@ local byte stream -> anodrel-wire -> anodrel-transport -> anodrel-core
 ~~~
 
 The first operating-system adapter is a direct Windows named pipe. It accepts
-one client on a worker thread and receives an invitation that the host must hand
-to a launched application through a future private bootstrap mechanism. A pipe
-name alone is never authentication.
+one client on a worker thread. A private bootstrap adapter can hand its
+invitation to one launched child process. A pipe name alone is never
+authentication.
 
 ## Frame format
 
@@ -85,9 +85,9 @@ or failed handshake, a public request before authentication, or a second
 authentication attempt ends the connection without a public-protocol response.
 The host compares the token without an early exit.
 
-The invitation is sensitive bootstrap material. The future application launcher
-must not pass it through command-line arguments, environment variables, logs,
-or a predictable on-disk location.
+The invitation is sensitive bootstrap material. It must not pass through
+command-line arguments, environment variables, logs, or a predictable on-disk
+location.
 
 ## Windows named-pipe adapter
 
@@ -101,6 +101,68 @@ synchronization rights required for a client; it deliberately excludes
 The adapter uses a 4 KiB fixed read buffer and passes chunks to the bounded
 session engine. It performs blocking pipe I/O only in the caller's worker
 thread; the Windows message loop must never call `serve_one` directly.
+
+## Private child bootstrap
+
+`anodrel-windows-bootstrap` delivers one pipe invitation to a child process
+over an inherited anonymous standard-input handle. It does not expose that
+handle to the protocol surface and it is not a second request channel.
+
+The host creates the anonymous pipe, marks only the child read endpoint as
+inheritable, and passes an explicit three-handle inheritance list to
+`CreateProcessW`: bootstrap standard input and `NUL` standard output/error.
+The write endpoint never becomes inheritable. The host writes exactly one
+bootstrap frame and closes its endpoint. End-of-file is part of the contract:
+the child must reject a truncated frame and must not wait for a second message.
+
+The bootstrap frame is intentionally distinct from the `ANDR` application
+transport frame:
+
+~~~text
+0                   4                   8                  12
++-------------------+-------------------+-------------------+
+| magic: "ANBI"      | major: u16 LE     | minor: u16 LE     |
++-------------------+-------------------+-------------------+
+| payload length: u32 LE                                  |
++----------------------------------------------------------+
+| UTF-8 JSON payload (at most 2,048 bytes)                 |
++----------------------------------------------------------+
+~~~
+
+Version `1.0` payload fields are exact; unknown, missing, duplicate, or
+wrongly typed fields are rejected:
+
+~~~json
+{
+  "kind": "bootstrap.invitation",
+  "pipeName": "\\\\.\\pipe\\anodrel.v1.<random suffix>",
+  "protocolVersion": { "major": 1, "minor": 0 },
+  "sessionId": "host-created session ID",
+  "token": "64 lowercase hexadecimal characters"
+}
+~~~
+
+The payload is secret material. It may be read only from the child standard
+input, used to authenticate the first named-pipe frame, and then discarded.
+It must never be echoed to stdout/stderr, a log, telemetry, crash reporting,
+or a durable file. The current launcher has no application trust policy,
+content host, restart manager, or privilege boundary beyond the selected child
+executable; those controls remain required before a product application is
+launched by the Windows host.
+
+## Development sample path
+
+The repository includes a Windows-only development probe that proves the full
+private path: the direct host creates a real pipe session, launches the sample
+with an `ANBI` invitation, and the sample authenticates before issuing one
+`platform.health` request. Its client adapter uses only Node.js built-in stream
+and named-pipe APIs; it adds no shipped native runtime dependency.
+
+This is a protocol and lifecycle demonstration, not controlled application
+content hosting. The sample executable is supplied explicitly by the developer,
+the launcher does not verify its identity, and the host exits after the probe.
+It must not be used to launch a product application or treated as a webview,
+renderer, package verifier, update mechanism, or application sandbox.
 
 ## Security boundary
 

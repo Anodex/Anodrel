@@ -21,3 +21,4 @@ Current records:
 - 0006 â€” First production-path Windows host uses owned Win32 modules.
 - 0007 â€” Native transport starts with an owned bounded session engine.
 - 0008 â€” Windows transport uses an owned authenticated named pipe.
+- 0009 â€” Windows child bootstrap uses a one-use inherited anonymous pipe.

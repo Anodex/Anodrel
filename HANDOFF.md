@@ -3,8 +3,10 @@
 **Date:** 2026-07-31  
 **Project path:** C:\Users\Owner\Desktop\Platform X  
 **Status:** Protocol-first foundation implementation underway; owned wire,
-authenticated named-pipe, and direct Windows host modules prove bounded
-protocol handling, local session protection, and window lifecycle.
+authenticated named-pipe, private child bootstrap, and direct Windows host
+modules prove bounded protocol handling, local session protection, private
+credential delivery, window lifecycle, and a development-only end-to-end health
+probe.
 
 ## What this project is
 
@@ -98,9 +100,9 @@ decisions are listed in docs/ARCHITECTURE.md.
 
 Complete the remaining Phase 0 decisions from ROADMAP.md:
 
-1. Define the first application-content hosting model.
-2. Define private invitation delivery from the host to a launched application
-   around the bounded direct Windows named-pipe adapter.
+1. Define the first application-content hosting and application-identity model.
+2. Integrate the proven private invitation path into that controlled host
+   lifecycle without exposing bootstrap material.
 3. Extend the threat model before exposing filesystem, process, or credential
    capabilities.
 4. Record those choices as numbered decision records.
@@ -110,9 +112,9 @@ Anodex migration. Its v1 protocol is documented in docs/PROTOCOL.md.
 
 ## Recommended first implementation sequence
 
-1. Complete the application-content, private-invitation, and threat-model decisions.
-2. Connect a launched application to the authenticated direct Windows named-pipe
-   adapter without exposing bootstrap material.
+1. Complete the application-content, application-identity, and threat-model decisions.
+2. Connect a controlled launched application to the authenticated direct Windows
+   named-pipe adapter through the existing private bootstrap boundary.
 3. Exercise lifecycle, window creation, logging, and shutdown through that
    transport.
 4. Add one capability at a time: paths, dialogs, external links, clipboard,
@@ -143,8 +145,8 @@ Read these files in order:
 10. docs/decisions/
 
 Before adding application content or privileged native behavior, review the
-open decisions and extend the threat model. The repository currently has
-uncommitted foundation files and has not been pushed or published.
+open decisions and extend the threat model. The foundation is published to the
+`Anodex/Anodrel` repository; check Git status before resuming work.
 
 ## Relationship to Anodex
 

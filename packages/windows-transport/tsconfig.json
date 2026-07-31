@@ -7,9 +7,5 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../../packages/sdk" },
-    { "path": "../../packages/mock-host" },
-    { "path": "../../packages/windows-transport" }
-  ]
+  "references": [{ "path": "../protocol" }, { "path": "../sdk" }]
 }

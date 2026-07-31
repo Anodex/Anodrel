@@ -53,6 +53,7 @@ authority for permissions.
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
 | Message floods exhaust CPU or memory. | Reject frames above 64 KiB before decoding, reject more than four complete frames in one receive burst, and add authenticated-session queue, concurrency, timeout, and cancellation limits in the OS adapter. |
 | A local or remote process connects to the endpoint by guessing its name. | Create one random-suffix pipe, restrict its DACL to the current logon SID, require a 32-byte CNG-generated token as the first frame, and close on any failed handshake. |
+| A session invitation reaches another process or durable diagnostic. | Deliver one bounded record only through a child-only inherited standard-input handle; never put it in arguments, environment, logs, telemetry, crash data, or files. |
 | A hostile page or navigation acquires the bridge. | Use controlled content loading, a fixed trusted origin or asset scheme, navigation policy, and a narrowly scoped bridge. |
 
 ## Security invariants
@@ -80,11 +81,18 @@ beyond 64 levels. The session engine owns host-created capability policy, but
 does not listen on an OS endpoint. The current Win32 host renders only an
 internal startup response and has no webview, application bridge, or inbound
 transport. The one-client named-pipe adapter restricts access to the current
-logon SID and requires a CNG-generated session token, but the host does not yet
-launch an application or deliver the sensitive invitation. A future content host
-must define private bootstrap delivery plus queue, origin, and overload controls
-before accepting untrusted application content or exposing a privileged
-operation.
+logon SID and requires a CNG-generated session token. Its separate bootstrap
+adapter sends that invitation once over a child-only inherited standard-input
+handle, with output handles redirected to `NUL`; it does not yet establish
+application identity or content isolation. A future content host must define
+queue, origin, executable trust, and overload controls before accepting
+untrusted application content or exposing a privileged operation.
+
+The development sample exercises this private path with a developer-supplied
+Node.js executable and an owned sample script. It has no executable identity
+verification and ends with the host process, so it creates no production
+application-launch authority. Its output is intentionally discarded; an exit
+status is the only result used by the host.
 
 ## Before the first privileged capability
 

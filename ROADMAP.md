@@ -18,7 +18,9 @@ Status: **In progress**
   owned wire framing and host session limits (Decision 0007).
 - Implement the authenticated Windows named-pipe adapter. **Completed:**
   logon-SID-restricted one-client adapter with CNG invitation (Decision 0008).
-- Define controlled application-content hosting and private invitation delivery.
+- Implement private invitation delivery. **Completed:** bounded `ANBI` record
+  over a child-only inherited handle (Decision 0009).
+- Define controlled application-content hosting and application identity.
 
 Acceptance gate: the project has an agreed architecture, a documented first
 milestone, and no dependency on Anodex source code.
@@ -38,8 +40,8 @@ using only documented interfaces.
 
 The initial protocol, SDK, mock host, sample application, contract suite, and
 bounded native session engine are established. Phase 2 does not begin until the
-remaining Phase 0 adapter/content decisions and the threat-model gate are
-complete.
+remaining Phase 0 content-hosting, application-identity, and threat-model
+controls are complete.
 
 ## Phase 2 — Native host
 
@@ -58,9 +60,11 @@ core platform services safely.
 The direct Windows host creates and paints an Anodrel-owned Win32 window and
 validates the core protocol shape under Decision 0006. Decision 0007 adds the
 bounded framing and session engine. Decision 0008 adds the authenticated direct
-Windows named-pipe adapter. Remaining acceptance work begins with controlled
-application-content hosting, private invitation delivery, and operation-specific
-native tests.
+Windows named-pipe adapter. Decision 0009 adds private one-time invitation
+delivery. A development-only Node sample now proves the full bootstrap,
+authentication, and `platform.health` path over the real pipe. Remaining
+acceptance work begins with controlled application-content hosting, application
+identity, and operation-specific native tests.
 
 ## Phase 3 — Reusable SDK and tooling
 
