@@ -21,6 +21,10 @@ Status: **In progress**
 - Implement private invitation delivery. **Completed:** bounded `ANBI` record
   over a child-only inherited handle (Decision 0009).
 - Define controlled application-content hosting and application identity.
+  **Completed for the first no-script package surface:** strict manifest,
+  canonical containment, owned SHA-256 verification, and direct Win32 text
+  rendering (Decision 0010). Publisher trust and executable identity remain
+  required before product process launch.
 
 Acceptance gate: the project has an agreed architecture, a documented first
 milestone, and no dependency on Anodex source code.
@@ -39,16 +43,19 @@ Acceptance gate: a small sample application can communicate with the mock host
 using only documented interfaces.
 
 The initial protocol, SDK, mock host, sample application, contract suite, and
-bounded native session engine are established. Phase 2 does not begin until the
-remaining Phase 0 content-hosting, application-identity, and threat-model
-controls are complete.
+bounded native session engine are established. The minimum Phase 0 content
+boundary and associated threat-model controls are complete. Product launch,
+publisher trust, and a capability bridge remain later native-host gates.
 
 ## Phase 2 — Native host
 
 Status: **Direct Windows host in progress**
 
 - Create the first native host, beginning with Windows.
-- Implement lifecycle and single-instance behavior.
+- Implement lifecycle and single-instance behavior. **Completed for the first
+  Windows package text surface and Startup Lab:** current-session primary
+  instance claim, bounded readiness, and no-data activation request (Decision
+  0011). A verified product executable lifecycle remains required.
 - Implement window creation and controlled application content loading.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
 - Implement secure credential storage through the operating system.
@@ -61,10 +68,11 @@ The direct Windows host creates and paints an Anodrel-owned Win32 window and
 validates the core protocol shape under Decision 0006. Decision 0007 adds the
 bounded framing and session engine. Decision 0008 adds the authenticated direct
 Windows named-pipe adapter. Decision 0009 adds private one-time invitation
-delivery. A development-only Node sample now proves the full bootstrap,
+delivery. Decision 0010 adds a digest-verified, no-script application-package
+text surface. A development-only Node sample now proves the full bootstrap,
 authentication, and `platform.health` path over the real pipe. Remaining
-acceptance work begins with controlled application-content hosting, application
-identity, and operation-specific native tests.
+acceptance work includes verified executable launch bound to an application
+identity, a capability bridge, and operation-specific native tests.
 
 ## Phase 3 — Reusable SDK and tooling
 

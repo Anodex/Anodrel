@@ -16,12 +16,9 @@ const FILE_FLAG_FIRST_PIPE_INSTANCE: Dword = 0x0008_0000;
 const PIPE_TYPE_BYTE: Dword = 0x0000_0000;
 const PIPE_READMODE_BYTE: Dword = 0x0000_0000;
 const PIPE_WAIT: Dword = 0x0000_0000;
-#[cfg(test)]
 const PIPE_CLIENT_ACCESS: Dword = 0x0012_019B;
-#[cfg(test)]
 const OPEN_EXISTING: Dword = 3;
 const ERROR_PIPE_CONNECTED: i32 = 535;
-#[cfg(test)]
 const ERROR_PIPE_BUSY: i32 = 231;
 const ERROR_BROKEN_PIPE: i32 = 109;
 const BCRYPT_USE_SYSTEM_PREFERRED_RNG: Dword = 0x0000_0002;
@@ -57,7 +54,6 @@ unsafe extern "system" {
     ) -> HandleValue;
     fn ConnectNamedPipe(pipe: HandleValue, overlapped: *mut core::ffi::c_void) -> Bool;
     fn DisconnectNamedPipe(pipe: HandleValue) -> Bool;
-    #[cfg(test)]
     fn CreateFileW(
         name: *const u16,
         desired_access: Dword,
@@ -67,7 +63,6 @@ unsafe extern "system" {
         flags_and_attributes: Dword,
         template_file: HandleValue,
     ) -> HandleValue;
-    #[cfg(test)]
     fn WaitNamedPipeW(name: *const u16, timeout: Dword) -> Bool;
     fn ReadFile(
         file: HandleValue,
@@ -178,7 +173,6 @@ pub fn disconnect_server(handle: &OwnedHandle) {
     }
 }
 
-#[cfg(test)]
 pub fn connect_client(name: &[u16]) -> io::Result<OwnedHandle> {
     for _ in 0..2 {
         // SAFETY: name is a null-terminated UTF-16 pipe name. The client asks

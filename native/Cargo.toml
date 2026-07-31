@@ -6,8 +6,10 @@ members = [
   "crates/wire",
   "crates/transport",
   "crates/bootstrap",
+  "crates/application",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
+  "adapters/windows-instance",
   "hosts/windows",
 ]
 resolver = "2"

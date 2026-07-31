@@ -1,0 +1,10 @@
+{
+  "manifestVersion": { "major": 1, "minor": 0 },
+  "applicationId": "org.anodrel.sample",
+  "displayName": "Anodrel Sample",
+  "content": {
+    "format": "anodrel.text.v1",
+    "path": "content/main.txt",
+    "sha256": "45740ce86b5f7a3a1bb1a630b6b902f8f6015d2a4af4f607bdf717694330828c"
+  }
+}

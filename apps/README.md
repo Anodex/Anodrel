@@ -8,5 +8,7 @@ documented platform SDK or protocol instead of importing native host internals.
 Planned consumers include a sample application, a command-line application,
 and eventually the Anodex adapter.
 
-`sample/` is the initial SDK consumer. It uses the mock host only to show the
-public boundary; it is not a native application host.
+`sample/` is the initial SDK consumer. Its TypeScript demo uses the mock host
+to show the public boundary. The directory also contains the first static
+`anodrel.application.json` package and bounded text content for the direct
+Windows host; that package has no executable code or native bridge.

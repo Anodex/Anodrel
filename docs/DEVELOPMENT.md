@@ -41,7 +41,7 @@ tracked.
 The Rust workspace is under `native/`. It has no third-party runtime
 dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
 `anodrel-wire`, `anodrel-transport`, `anodrel-bootstrap`,
-`anodrel-windows-pipe`, `anodrel-windows-bootstrap`, and the Windows host are
+`anodrel-application`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`, and the Windows host are
 all owned source modules. The host calls User32 and Kernel32 directly for its
 window lifecycle and drawing; the pipe adapter uses direct Win32 and CNG APIs
 on a worker thread, while the bootstrap adapter uses an explicit Windows child
@@ -62,8 +62,30 @@ must show a successful internal `platform.health` response and close normally.
 It needs Windows but does not require WebView2. Do not add privileged
 capabilities or new third-party runtime dependencies. The named-pipe adapter
 already binds a logon-SID DACL and a host-generated credential; the bootstrap
-adapter performs one-time delivery through child standard input. Content hosting,
-executable trust, and application lifecycle policy remain separate work.
+adapter performs one-time delivery through child standard input.
+
+The host can also display the digest-verified, no-script sample application
+package described in `docs/APPLICATIONS.md`:
+
+~~~text
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
+~~~
+
+The window must identify `org.anodrel.sample`, report verified content
+integrity, and display the sample text. Close it normally. This is not a
+packaged process launcher: publisher trust, executable verification, and
+application lifecycle policy remain separate work.
+
+While that window is open, run the same command a second time. It must not
+create another application window; it waits at most one second for the primary
+window and requests that Windows restore and foreground it. The second process
+forwards no data. See `docs/INSTANCE_LIFECYCLE.md` for the exact boundary.
+
+For the quickest Windows smoke test, double-click `start.bat` in the repository
+root. It checks for Cargo, builds the host if necessary, validates the sample
+package and internal protocol core, completes one owned private IPC loopback,
+then opens the Anodrel Startup Lab. It pauses with a clear error if startup
+fails. See `docs/STARTUP_LAB.md` for the visual test contract.
 
 ### Windows end-to-end development sample
 

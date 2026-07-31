@@ -54,7 +54,11 @@ authority for permissions.
 | Message floods exhaust CPU or memory. | Reject frames above 64 KiB before decoding, reject more than four complete frames in one receive burst, and add authenticated-session queue, concurrency, timeout, and cancellation limits in the OS adapter. |
 | A local or remote process connects to the endpoint by guessing its name. | Create one random-suffix pipe, restrict its DACL to the current logon SID, require a 32-byte CNG-generated token as the first frame, and close on any failed handshake. |
 | A session invitation reaches another process or durable diagnostic. | Deliver one bounded record only through a child-only inherited standard-input handle; never put it in arguments, environment, logs, telemetry, crash data, or files. |
-| A hostile page or navigation acquires the bridge. | Use controlled content loading, a fixed trusted origin or asset scheme, navigation policy, and a narrowly scoped bridge. |
+| Content path traversal or a symlink escapes a package. | Canonicalize the manifest directory and declared content file, reject root/prefix and dot path components, and require the resolved content to remain below the package root. |
+| Package content is changed after its manifest is created. | Read bounded bytes and verify the manifest's lowercase SHA-256 digest before exposing text to the host surface. |
+| Rendered text acquires script or native authority. | Support only `anodrel.text.v1`: bounded UTF-8 plain text with no scripts, navigation, URLs, resource loads, or native bridge. |
+| Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
+| A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
 
 ## Security invariants
 
@@ -80,13 +84,28 @@ then rejects duplicate JSON keys, malformed Unicode, trailing bytes, and nesting
 beyond 64 levels. The session engine owns host-created capability policy, but
 does not listen on an OS endpoint. The current Win32 host renders only an
 internal startup response and has no webview, application bridge, or inbound
-transport. The one-client named-pipe adapter restricts access to the current
-logon SID and requires a CNG-generated session token. Its separate bootstrap
+transport. Before it opens its branded Startup Lab diagnostic window, the host
+does run one temporary in-process named-pipe loopback: the current-session DACL,
+CNG invitation, first-message authentication, framing, and health policy are
+exercised without rendering a secret or accepting an application client. The
+one-client named-pipe adapter restricts access to the current logon SID and
+requires a CNG-generated session token. Its separate bootstrap
 adapter sends that invitation once over a child-only inherited standard-input
-handle, with output handles redirected to `NUL`; it does not yet establish
-application identity or content isolation. A future content host must define
-queue, origin, executable trust, and overload controls before accepting
-untrusted application content or exposing a privileged operation.
+handle, with output handles redirected to `NUL`; it does not establish
+executable identity. The Windows host separately establishes a content identity
+by parsing a strict 16 KiB manifest, canonicalizing and containing the declared
+file, checking its owned SHA-256 digest, and drawing only bounded plain text.
+This detects content tampering but does not authenticate a publisher who can
+replace the entire unpackaged directory. The surface has no queue, origin,
+navigation, native bridge, or executable trust; those controls remain required
+before untrusted application code or a privileged operation is accepted.
+
+The package text surface also uses an owned current-session instance mutex and
+readiness event derived from its validated application ID. A second invocation
+cannot forward arguments or application data; it only sends a bounded
+best-effort User32 activation message after the primary has created its window.
+This preserves one-window coordination without treating the named object as an
+identity or authorization mechanism.
 
 The development sample exercises this private path with a developer-supplied
 Node.js executable and an owned sample script. It has no executable identity
@@ -98,8 +117,9 @@ status is the only result used by the host.
 
 The native-host decision must extend this model with:
 
-- the selected UI and content-loading model;
-- session-authentication and bridge bootstrap details;
+- a signed package and verified executable identity model;
+- session-authentication binding and bridge bootstrap details for any future
+  executable application;
 - the Windows named-pipe session bootstrap, authentication, and I/O scheduling;
 - the Windows permission, filesystem, process, credential-store, and update
   assumptions; and

@@ -1,0 +1,2 @@
+# Digest-verified package content must retain its exact authored bytes.
+/apps/sample/content/main.txt -text

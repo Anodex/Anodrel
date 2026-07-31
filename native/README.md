@@ -13,6 +13,10 @@ anodrel-json -> anodrel-protocol -> anodrel-core -> anodrel-windows-host
                                                      |                    |
                                       anodrel-windows-pipe -> Win32 / CNG |
                                                           anodrel-windows-bootstrap -> Kernel32
+
+anodrel-windows-instance -> Kernel32 / User32
+
+anodrel-json -> anodrel-application -> anodrel-windows-host
 ~~~
 
 - `crates/json` is Anodrel's strict JSON codec for protocol messages.
@@ -23,6 +27,9 @@ anodrel-json -> anodrel-protocol -> anodrel-core -> anodrel-windows-host
 - `crates/transport` converts complete frames to policy-bound core responses.
 - `crates/bootstrap` owns the bounded private child-invitation record and
   redacts its token from diagnostics.
+- `crates/application` validates the strict application manifest, canonical
+  package containment, owned SHA-256 content digest, and bounded no-script text
+  surface data. It does not authenticate a publisher or launch an executable.
 - `adapters/windows-pipe` creates a logon-SID-restricted, one-client named pipe
   and authenticates its first frame with a CNG-generated credential; it can
   convert that invitation directly into the bootstrap record.
@@ -30,16 +37,31 @@ anodrel-json -> anodrel-protocol -> anodrel-core -> anodrel-windows-host
   inherited handle list, provides the bootstrap record on standard input, then
   closes the parent endpoint. Its test fixture is test-only source, not a
   shipped runtime component.
+- `adapters/windows-instance` owns the bounded current-session mutex,
+  readiness event, and no-data activation request for one package identity.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
   client-area drawing.
 
-The initial window displays a host-created `platform.health` response. It has
-no webview, external content loader, or privileged platform service. Its owned
-named-pipe adapter and bootstrap launcher can deliver a private invitation to a
-child process. The Windows host's development-only sample launches the compiled
-Node client to prove the real authenticated health path. Application identity,
-controlled content loading, and a rendered content host still require separate
-threat-model work before implementation.
+The initial window displays a host-created `platform.health` response. With
+`--application <manifest>`, it can also display the documented, digest-verified
+plain-text application package. It has no webview, script runtime, navigation,
+native bridge, or privileged platform service. Its owned named-pipe adapter and
+bootstrap launcher can deliver a private invitation to a child process. The
+Windows host's development-only sample launches the compiled Node client to
+prove the real authenticated health path. Publisher trust, executable launch,
+and a capability bridge still require separate threat-model work.
+
+`--showcase <manifest>` opens the Anodrel Startup Lab. Before any window is
+created, it loads the supplied package, performs the internal protocol health
+check, and completes one temporary owned named-pipe authentication and health
+loopback. The direct GDI screen then displays only safe application identity and
+foundation status. It has no webview, renderer bridge, public pipe client, or
+application launch.
+
+`--application` claims one current-session primary instance from the validated
+package identity. A second invocation sends no data and makes only a bounded
+best-effort activation request to the primary window. Startup Lab uses a
+separate diagnostic scope. See `docs/INSTANCE_LIFECYCLE.md`.
 
 Verify from the repository root:
 
@@ -50,8 +72,13 @@ cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json
 ~~~
 
-The last command is the manual Windows smoke check: confirm that an **Anodrel
-Windows host** window opens, shows a `platform.health` success response, and
-closes normally. It requires Windows but does not require WebView2.
+The final two commands are manual Windows smoke checks: confirm that an
+**Anodrel Windows host** window shows a `platform.health` success response, and
+that the sample package window identifies `org.anodrel.sample` and displays
+verified text. The Startup Lab command must show the branded native surface,
+verified identity, and three foundation cards. Close each normally. Windows is
+required; WebView2 is not.

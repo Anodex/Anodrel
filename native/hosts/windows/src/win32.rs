@@ -1,19 +1,24 @@
-//! The small direct Win32 surface required by the first Anodrel host.
+//! Direct Win32 window lifecycle and routing for Anodrel-owned surfaces.
 //!
-//! Raw FFI is isolated in this module so the protocol and policy layers remain
-//! portable and safe Rust. Each extern call is wrapped at the narrowest useful
-//! boundary; no raw handle escapes this module.
+//! Raw window management remains here. GDI painting is split into small focused
+//! modules so the startup lab can evolve without mixing visual layout into the
+//! host's lifecycle code.
 
 #![allow(non_snake_case)]
 
+mod paint;
+mod startup_lab;
+
 use std::{io, ptr, sync::OnceLock};
+
+use anodrel_windows_instance::PrimaryInstance;
 
 type Atom = u16;
 type Bool = i32;
 type Dword = u32;
 type Hbrush = isize;
 type Hcursor = isize;
-type Hdc = isize;
+pub(super) type Hdc = isize;
 type Hinstance = isize;
 type Hwnd = isize;
 type Lparam = isize;
@@ -26,12 +31,9 @@ const CS_VREDRAW: Uint = 0x0001;
 const WS_OVERLAPPEDWINDOW: Dword = 0x00CF_0000;
 const CW_USEDEFAULT: i32 = 0x8000_0000_u32 as i32;
 const SW_SHOW: i32 = 5;
+const SW_RESTORE: i32 = 9;
 const WM_DESTROY: Uint = 0x0002;
 const WM_PAINT: Uint = 0x000F;
-const DT_LEFT: Uint = 0x0000;
-const DT_TOP: Uint = 0x0000;
-const DT_WORDBREAK: Uint = 0x0010;
-const COLOR_WINDOW: isize = 5;
 const IDC_ARROW: usize = 32_512;
 
 type WndProc = unsafe extern "system" fn(Hwnd, Uint, Wparam, Lparam) -> Lresult;
@@ -59,11 +61,30 @@ struct Point {
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-struct Rect {
-    left: i32,
-    top: i32,
-    right: i32,
-    bottom: i32,
+pub(super) struct Rect {
+    pub(super) left: i32,
+    pub(super) top: i32,
+    pub(super) right: i32,
+    pub(super) bottom: i32,
+}
+
+impl Rect {
+    pub(super) const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    pub(super) const fn width(self) -> i32 {
+        self.right - self.left
+    }
+
+    pub(super) const fn height(self) -> i32 {
+        self.bottom - self.top
+    }
 }
 
 #[repr(C)]
@@ -87,6 +108,16 @@ struct Msg {
     time: Dword,
     pt: Point,
     lPrivate: Dword,
+}
+
+pub(super) struct StartupLab {
+    pub(super) display_name: String,
+    pub(super) application_id: String,
+}
+
+enum View {
+    Text(Vec<u16>),
+    StartupLab(StartupLab),
 }
 
 #[link(name = "kernel32")]
@@ -114,6 +145,7 @@ unsafe extern "system" {
     fn DefWindowProcW(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult;
     fn ShowWindow(window: Hwnd, command: i32) -> Bool;
     fn UpdateWindow(window: Hwnd) -> Bool;
+    fn SetForegroundWindow(window: Hwnd) -> Bool;
     fn GetMessageW(message: *mut Msg, window: Hwnd, minimum: Uint, maximum: Uint) -> Bool;
     fn TranslateMessage(message: *const Msg) -> Bool;
     fn DispatchMessageW(message: *const Msg) -> Lresult;
@@ -121,28 +153,59 @@ unsafe extern "system" {
     fn BeginPaint(window: Hwnd, paint: *mut PaintStruct) -> Hdc;
     fn EndPaint(window: Hwnd, paint: *const PaintStruct) -> Bool;
     fn GetClientRect(window: Hwnd, rectangle: *mut Rect) -> Bool;
-    fn DrawTextW(
-        device_context: Hdc,
-        text: *const u16,
-        text_length: i32,
-        rectangle: *mut Rect,
-        format: Uint,
-    ) -> i32;
     fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
 }
 
-static DISPLAY_TEXT: OnceLock<Vec<u16>> = OnceLock::new();
+static VIEW: OnceLock<View> = OnceLock::new();
+static ACTIVATION_MESSAGE: OnceLock<Uint> = OnceLock::new();
 
+/// Opens the simple host-owned text surface.
 pub fn run(title: &str, text: &str) -> io::Result<()> {
-    DISPLAY_TEXT
-        .set(to_wide_null(text))
-        .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window text was already set"))?;
+    VIEW.set(View::Text(to_wide_null(text)))
+        .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window view was already set"))?;
+    run_window(title, 880, 520, None)
+}
 
+/// Opens the validated application text surface as the primary host instance.
+pub fn run_application(title: &str, text: &str, instance: &PrimaryInstance) -> io::Result<()> {
+    VIEW.set(View::Text(to_wide_null(text)))
+        .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window view was already set"))?;
+    run_window(title, 880, 520, Some(instance))
+}
+
+/// Opens the branded Startup Lab after the caller has completed its checks.
+pub fn run_startup_lab(
+    display_name: &str,
+    application_id: &str,
+    instance: &PrimaryInstance,
+) -> io::Result<()> {
+    VIEW.set(View::StartupLab(StartupLab {
+        display_name: display_name.to_owned(),
+        application_id: application_id.to_owned(),
+    }))
+    .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "window view was already set"))?;
+    run_window("Anodrel Startup Lab", 1_160, 760, Some(instance))
+}
+
+fn run_window(
+    title: &str,
+    width: i32,
+    height: i32,
+    primary_instance: Option<&PrimaryInstance>,
+) -> io::Result<()> {
+    if let Some(primary_instance) = primary_instance {
+        ACTIVATION_MESSAGE
+            .set(primary_instance.activation_message())
+            .map_err(|_| io::Error::new(io::ErrorKind::AlreadyExists, "activation message set"))?;
+    }
     let instance = module_handle()?;
     let class_name = to_wide_null("Anodrel.DirectWindowsHost");
     register_window_class(instance, &class_name)?;
     let title = to_wide_null(title);
-    let window = create_window(instance, &class_name, &title)?;
+    let window = create_window(instance, &class_name, &title, width, height)?;
+    if let Some(primary_instance) = primary_instance {
+        primary_instance.mark_ready()?;
+    }
     show_and_update(window);
     message_loop()
 }
@@ -174,7 +237,7 @@ fn register_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<
         hInstance: instance,
         hIcon: 0,
         hCursor: cursor,
-        hbrBackground: COLOR_WINDOW + 1,
+        hbrBackground: 0,
         lpszMenuName: ptr::null(),
         lpszClassName: class_name.as_ptr(),
     };
@@ -187,7 +250,13 @@ fn register_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<
     }
 }
 
-fn create_window(instance: Hinstance, class_name: &[u16], title: &[u16]) -> io::Result<Hwnd> {
+fn create_window(
+    instance: Hinstance,
+    class_name: &[u16],
+    title: &[u16],
+    width: i32,
+    height: i32,
+) -> io::Result<Hwnd> {
     // SAFETY: class_name and title are null-terminated UTF-16 strings that stay
     // live through the call. All other handles are null because this is a top-
     // level window with no menu or creation data.
@@ -199,8 +268,8 @@ fn create_window(instance: Hinstance, class_name: &[u16], title: &[u16]) -> io::
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            880,
-            520,
+            width,
+            height,
             0,
             0,
             instance,
@@ -251,6 +320,20 @@ unsafe extern "system" fn window_proc(
     lparam: Lparam,
 ) -> Lresult {
     match message {
+        message
+            if ACTIVATION_MESSAGE
+                .get()
+                .is_some_and(|expected| *expected == message) =>
+        {
+            // SAFETY: the activation message carries no data and this window is
+            // owned by the current process. Windows remains authoritative over
+            // whether the foreground request is honored.
+            unsafe {
+                ShowWindow(window, SW_RESTORE);
+                SetForegroundWindow(window);
+            }
+            0
+        }
         WM_PAINT => {
             let mut paint = PaintStruct::default();
             // SAFETY: Windows calls this procedure for a valid window, and
@@ -258,18 +341,17 @@ unsafe extern "system" fn window_proc(
             let device_context = unsafe { BeginPaint(window, &mut paint) };
             if device_context != 0 {
                 let mut rect = Rect::default();
-                // SAFETY: rect is writable stack storage; the immutable text is
-                // initialized before the window is created and remains live.
+                // SAFETY: rect is writable stack storage for the synchronous
+                // client-area query, and the selected view remains immutable.
                 unsafe {
                     GetClientRect(window, &mut rect);
-                    let text = DISPLAY_TEXT.get().expect("window text is initialized");
-                    DrawTextW(
-                        device_context,
-                        text.as_ptr(),
-                        -1,
-                        &mut rect,
-                        DT_LEFT | DT_TOP | DT_WORDBREAK,
-                    );
+                }
+                match VIEW.get().expect("window view is initialized") {
+                    View::Text(text) => paint::draw_text_surface(device_context, rect, text),
+                    View::StartupLab(lab) => startup_lab::draw(device_context, rect, lab),
+                }
+                // SAFETY: BeginPaint initialized paint for this exact window.
+                unsafe {
                     EndPaint(window, &paint);
                 }
             }

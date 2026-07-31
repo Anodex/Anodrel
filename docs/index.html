@@ -16,7 +16,7 @@
           A modular, security-first foundation for desktop applications built
           directly on operating-system APIs.
         </p>
-        <a class="button" href="https://github.com/merlinshaw/Anodrel">View the project</a>
+        <a class="button" href="https://github.com/Anodex/Anodrel">View the project</a>
       </header>
 
       <section aria-labelledby="principles-title">
@@ -40,11 +40,12 @@
 
       <section class="status" aria-labelledby="status-title">
         <p class="eyebrow">Current foundation</p>
-        <h2 id="status-title">Windows host and private local transport.</h2>
+        <h2 id="status-title">Windows host, private transport, and owned content.</h2>
         <p>
           Anodrel currently includes a direct Win32 host, owned protocol and JSON layers,
           bounded framing, and an authenticated named-pipe adapter limited to the current
-          Windows logon session. Application-content hosting remains intentionally separate.
+          Windows logon session. Its first controlled application surface verifies a
+          bounded manifest and content digest before direct Win32 text rendering.
         </p>
       </section>
 
@@ -53,6 +54,8 @@
         <h2 id="learn-title">Built in the open, documented as it grows.</h2>
         <nav class="links" aria-label="Documentation">
           <a href="ARCHITECTURE.md">Architecture <span>System boundaries and layers</span></a>
+          <a href="APPLICATIONS.md">Application packages <span>Identity, containment, and content limits</span></a>
+          <a href="STARTUP_LAB.md">Startup Lab <span>Native visual foundation test</span></a>
           <a href="TRANSPORT.md">Transport contract <span>Frames, sessions, and limits</span></a>
           <a href="THREAT_MODEL.md">Threat model <span>Current security assumptions</span></a>
           <a href="PERFORMANCE.md">Performance plan <span>How comparisons will be earned</span></a>
@@ -63,7 +66,7 @@
 
       <footer>
         <span>Anodrel</span>
-        <a href="https://github.com/merlinshaw/Anodrel">GitHub</a>
+        <a href="https://github.com/Anodex/Anodrel">GitHub</a>
       </footer>
     </main>
   </body>

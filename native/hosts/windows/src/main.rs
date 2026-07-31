@@ -5,8 +5,11 @@ mod win32;
 
 use std::{env, error::Error, io};
 
+use anodrel_application::ApplicationPackage;
 use anodrel_core::{CoreHost, HostPolicy};
 use anodrel_protocol::{Capability, JsonValue};
+use anodrel_windows_instance::{InstanceClaim, InstanceScope, claim};
+use anodrel_windows_pipe::run_health_self_test;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
@@ -15,10 +18,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return sample::run(node_path, client_path);
     }
+    if let [command, manifest_path] = arguments.as_slice()
+        && command == "--application"
+    {
+        return run_application_window(manifest_path);
+    }
+    if let [command, manifest_path] = arguments.as_slice()
+        && command == "--showcase"
+    {
+        return run_startup_lab(manifest_path);
+    }
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host --sample-client <node.exe> <native-client.js>",
+            "usage: anodrel-windows-host [--showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js>]",
         )
         .into());
     }
@@ -26,6 +39,35 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn run_diagnostics_window() -> Result<(), Box<dyn Error>> {
+    let display = check_core_health()?;
+    win32::run("Anodrel Windows host", &display)?;
+    Ok(())
+}
+
+fn run_startup_lab(manifest_path: &str) -> Result<(), Box<dyn Error>> {
+    let package = ApplicationPackage::load(manifest_path)?;
+    let instance = match claim(
+        package.identity().application_id(),
+        InstanceScope::StartupLab,
+    )? {
+        InstanceClaim::Primary(instance) => instance,
+        InstanceClaim::Existing(existing) => return Ok(existing.activate()?),
+    };
+    check_core_health()?;
+    run_health_self_test(HostPolicy::new(
+        package.identity().application_id(),
+        vec![Capability::DiagnosticsRead],
+        "anodrel-windows-host",
+    )?)?;
+    win32::run_startup_lab(
+        package.identity().display_name(),
+        package.identity().application_id(),
+        &instance,
+    )?;
+    Ok(())
+}
+
+fn check_core_health() -> Result<String, Box<dyn Error>> {
     let host = CoreHost::new(HostPolicy::new(
         "anodrel.windows-host",
         vec![Capability::DiagnosticsRead],
@@ -34,9 +76,30 @@ fn run_diagnostics_window() -> Result<(), Box<dyn Error>> {
     let response = host.handle_json(
         r#"{"protocolVersion":{"major":1,"minor":0},"kind":"request","requestId":"startup-health","operation":"platform.health","payload":{}}"#,
     );
-    let display = health_display(&response)?;
-    win32::run("Anodrel Windows host", &display)?;
+    health_display(&response)
+}
+
+fn run_application_window(manifest_path: &str) -> Result<(), Box<dyn Error>> {
+    let package = ApplicationPackage::load(manifest_path)?;
+    let instance = match claim(
+        package.identity().application_id(),
+        InstanceScope::Application,
+    )? {
+        InstanceClaim::Primary(instance) => instance,
+        InstanceClaim::Existing(existing) => return Ok(existing.activate()?),
+    };
+    let title = format!("Anodrel - {}", package.identity().display_name());
+    let display = application_display(&package);
+    win32::run_application(&title, &display, &instance)?;
     Ok(())
+}
+
+fn application_display(package: &ApplicationPackage) -> String {
+    format!(
+        "Anodrel verified application package\n\napplication: {}\ncontent integrity: verified\nformat: anodrel.text.v1\n\n{}",
+        package.identity().application_id(),
+        package.text()
+    )
 }
 
 fn health_display(response: &str) -> Result<String, Box<dyn Error>> {
@@ -80,7 +143,9 @@ fn string_field<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::health_display;
+    use anodrel_application::ApplicationPackage;
+
+    use super::{application_display, check_core_health, health_display};
 
     #[test]
     fn displays_a_valid_health_response() {
@@ -90,5 +155,37 @@ mod tests {
         .expect("response is valid");
         assert!(display.contains("status: success"));
         assert!(display.contains("protocol: 1.0"));
+    }
+
+    #[test]
+    fn startup_lab_requires_a_successful_owned_core_check() {
+        let display = check_core_health().expect("core health check is valid");
+        assert!(display.contains("status: success"));
+    }
+
+    #[test]
+    fn displays_only_host_verified_application_metadata() {
+        let manifest = r#"{
+            "manifestVersion":{"major":1,"minor":0},
+            "applicationId":"org.anodrel.sample",
+            "displayName":"Anodrel Sample",
+            "content":{"format":"anodrel.text.v1","path":"content/main.txt","sha256":"7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585"}
+        }"#;
+        let root =
+            std::env::temp_dir().join(format!("anodrel-host-display-test-{}", std::process::id()));
+        let content = root.join("content").join("main.txt");
+        std::fs::create_dir_all(content.parent().expect("content has parent"))
+            .expect("fixture directory is created");
+        std::fs::write(root.join("anodrel.application.json"), manifest)
+            .expect("fixture manifest is written");
+        std::fs::write(&content, "Verified package text.").expect("fixture content is written");
+
+        let package = ApplicationPackage::load(root.join("anodrel.application.json"))
+            .expect("fixture package is valid");
+        let display = application_display(&package);
+
+        assert!(display.contains("application: org.anodrel.sample"));
+        assert!(display.contains("Verified package text."));
+        std::fs::remove_dir_all(root).expect("fixture directory is removed");
     }
 }

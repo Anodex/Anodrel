@@ -76,9 +76,27 @@ added as adapters behind the same service contracts.
 
 The current Windows host uses Anodrel-owned modules over direct User32 and
 Kernel32 APIs. Its raw FFI is isolated from the portable protocol and policy
-layers. It paints an internal diagnostics view only; it has no webview or
-application-content transport. macOS and Linux hosts will follow the same
-ownership rule through their respective operating-system APIs.
+layers. It paints an internal diagnostics view and a bounded, digest-verified
+`anodrel.text.v1` application package surface; it has no webview, script
+runtime, navigation, or application bridge. macOS and Linux hosts will follow
+the same ownership rule through their respective operating-system APIs.
+
+The Windows host also has an Anodrel-owned Startup Lab. It validates a supplied
+application package and performs its internal protocol health check before
+drawing a branded GDI visual test surface. The lab is host-controlled
+diagnostics: it displays only safe validated identity and foundation status,
+does not render package text or open a public pipe client or privileged
+service. Before the window is created, it performs a temporary owned loopback
+through the named-pipe authentication and `platform.health` path; this is a
+transport check, not an application session.
+
+The owned Windows instance adapter gives the package text surface one bounded,
+current-session primary instance per validated application identity. A second
+host invocation sends no data: it makes only a best-effort native activation
+request to the existing window. The Startup Lab has a separate diagnostic scope
+so it does not collide with the application text surface. See
+`docs/INSTANCE_LIFECYCLE.md`; product executable identity and a public
+second-instance protocol remain separate work.
 
 ## Modularity and performance
 
@@ -98,7 +116,9 @@ engine runs messages in arrival order and owns a policy-bound core. The Windows
 adapter adds logon-SID access control, CNG session credentials, worker-thread
 I/O, and a separate bounded one-use bootstrap launcher. The launcher passes
 the invitation only over a restricted inherited standard-input handle; it does
-not verify application identity, host rendered content, or own a restart policy.
+not verify executable identity or own a restart policy. Separately,
+`anodrel-application` validates a bounded manifest, canonical package paths,
+and content digest before the host draws a plain-text application surface.
 
 ## Communication model
 
@@ -111,10 +131,12 @@ mock host, and contract tests are transport-neutral; the mock does not select a
 native transport implementation. `docs/TRANSPORT.md` defines the owned bounded
 frame/session engine, direct one-client Windows named-pipe adapter, and the
 separate private child-bootstrap format. The bootstrap adapter can launch a
-caller-selected executable but is not yet integrated with controlled application
-hosting or rendered content. The repository's Node-based development sample
-uses this path to exercise a real authenticated health request; it remains a
-diagnostic client, not a trusted application host.
+caller-selected executable but is not integrated with application package trust
+or rendered content. The repository's Node-based development sample uses this
+path to exercise a real authenticated health request; it remains a diagnostic
+client, not a trusted application host. `docs/APPLICATIONS.md` separately
+defines the no-script package surface that the Windows host can display. It has
+no native bridge or protocol session.
 
 Every request should have:
 

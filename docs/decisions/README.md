@@ -11,7 +11,11 @@ Each record should include:
 - consequences;
 - conditions that would cause the decision to be revisited.
 
-Current records:
+Current records (newest first):
+
+- 0011 — Windows host uses a bounded single-instance lifecycle.
+
+- 0010 — Application hosting starts with a verified owned text package.
 
 - 0001 â€” Anodrel lives in its own repository.
 - 0002 â€” Windows is the first supported operating system.

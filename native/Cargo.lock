@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "anodrel-application"
+version = "0.1.0"
+dependencies = [
+ "anodrel-json",
+]
+
+[[package]]
 name = "anodrel-bootstrap"
 version = "0.1.0"
 dependencies = [
@@ -52,11 +59,17 @@ dependencies = [
 name = "anodrel-windows-host"
 version = "0.1.0"
 dependencies = [
+ "anodrel-application",
  "anodrel-core",
  "anodrel-protocol",
  "anodrel-windows-bootstrap",
+ "anodrel-windows-instance",
  "anodrel-windows-pipe",
 ]
+
+[[package]]
+name = "anodrel-windows-instance"
+version = "0.1.0"
 
 [[package]]
 name = "anodrel-windows-pipe"

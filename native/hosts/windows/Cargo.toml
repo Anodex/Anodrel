@@ -5,7 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anodrel-application = { path = "../../crates/application" }
 anodrel-core = { path = "../../crates/core" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
+anodrel-windows-instance = { path = "../../adapters/windows-instance" }
 anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

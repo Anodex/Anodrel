@@ -3,10 +3,11 @@
 **Date:** 2026-07-31  
 **Project path:** C:\Users\Owner\Desktop\Platform X  
 **Status:** Protocol-first foundation implementation underway; owned wire,
-authenticated named-pipe, private child bootstrap, and direct Windows host
-modules prove bounded protocol handling, local session protection, private
-credential delivery, window lifecycle, and a development-only end-to-end health
-probe.
+authenticated named-pipe, private child bootstrap, direct Windows host, and
+strict application package modules prove bounded protocol handling, local
+session protection, private credential delivery, window lifecycle, a
+development-only end-to-end health probe, a digest-verified no-script text
+surface, and a branded native Startup Lab visual smoke test.
 
 ## What this project is
 
@@ -98,25 +99,24 @@ decisions are listed in docs/ARCHITECTURE.md.
 
 ## Immediate next milestone
 
-Complete the remaining Phase 0 decisions from ROADMAP.md:
+Continue from Decision 0010 with the next native-host security boundary:
 
-1. Define the first application-content hosting and application-identity model.
-2. Integrate the proven private invitation path into that controlled host
-   lifecycle without exposing bootstrap material.
-3. Extend the threat model before exposing filesystem, process, or credential
-   capabilities.
-4. Record those choices as numbered decision records.
+1. Define signed package distribution and verified executable identity.
+2. Bind a verified executable session to its validated application ID without
+   exposing bootstrap material.
+3. Define a narrow capability bridge and extend the threat model before any
+   filesystem, process, or credential capability.
 
 The initial implementation is a small sample application and mock host, not an
 Anodex migration. Its v1 protocol is documented in docs/PROTOCOL.md.
 
 ## Recommended first implementation sequence
 
-1. Complete the application-content, application-identity, and threat-model decisions.
-2. Connect a controlled launched application to the authenticated direct Windows
-   named-pipe adapter through the existing private bootstrap boundary.
-3. Exercise lifecycle, window creation, logging, and shutdown through that
-   transport.
+1. Define package signing and bind a verified executable identity to the
+   authenticated direct Windows named-pipe adapter through the existing private
+   bootstrap boundary.
+2. Exercise lifecycle, window creation, logging, and shutdown through that
+   bound transport.
 4. Add one capability at a time: paths, dialogs, external links, clipboard,
    secure storage, notifications, and child processes.
 5. Run the shared contract suite against the native host and add native

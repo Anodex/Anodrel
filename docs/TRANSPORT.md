@@ -2,7 +2,8 @@
 
 **Status:** Foundation contract. The frame codec, authenticated host session,
 one-client Windows named-pipe adapter, and private child-bootstrap adapter are
-implemented. Application content hosting is not implemented yet.
+implemented. A separate owned, no-script application package surface is
+implemented in `docs/APPLICATIONS.md`; it does not use this transport.
 
 ## Purpose
 
@@ -102,6 +103,23 @@ The adapter uses a 4 KiB fixed read buffer and passes chunks to the bounded
 session engine. It performs blocking pipe I/O only in the caller's worker
 thread; the Windows message loop must never call `serve_one` directly.
 
+### Startup Lab loopback
+
+The Windows Startup Lab uses a temporary private loopback only as a native
+transport smoke test. Before it creates its diagnostic window, the host creates
+one ordinary current-session pipe with a CNG-generated invitation, connects an
+owned in-process client, and runs the server on a worker thread. The client
+sends the invitation-derived `session.authenticate` frame, then one
+`platform.health` request, and the host waits for both valid responses before
+the visual card can report ready. The invitation is never rendered or logged
+and is dropped after the self-test.
+
+This is not an application transport endpoint: it does not start a public
+client, launch an executable, grant a privileged capability, or establish
+executable identity. It exists to exercise the same DACL, authentication,
+frame, decode, and policy path that a future controlled application connection
+will use.
+
 ## Private child bootstrap
 
 `anodrel-windows-bootstrap` delivers one pipe invitation to a child process
@@ -146,9 +164,11 @@ The payload is secret material. It may be read only from the child standard
 input, used to authenticate the first named-pipe frame, and then discarded.
 It must never be echoed to stdout/stderr, a log, telemetry, crash reporting,
 or a durable file. The current launcher has no application trust policy,
-content host, restart manager, or privilege boundary beyond the selected child
-executable; those controls remain required before a product application is
-launched by the Windows host.
+restart manager, or privilege boundary beyond the selected child executable.
+The host now has a separate no-script text package surface under Decision 0010,
+but that surface is not connected to this launcher or pipe. Publisher trust,
+verified executable launch, and a capability bridge remain required before a
+product application is launched by the Windows host.
 
 ## Development sample path
 

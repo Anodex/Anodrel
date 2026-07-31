@@ -19,9 +19,12 @@ owned direct Windows host. The native layer also has a bounded, private
 host-to-child bootstrap adapter for delivering a named-pipe invitation without
 command-line or environment-variable secrets. The Windows host proves the
 native window lifecycle and protocol core without a runtime framework or a
-webview. A development-only Node sample exercises that private pipe path end to
-end; it exposes no privileged operating-system capability and does not yet
-accept application content.
+webview. It also loads a first owned, digest-verified plain-text application
+package into a host-controlled Win32 surface. A development-only Node sample
+separately exercises the private pipe path end to end; it exposes no privileged
+operating-system capability. The first branded Startup Lab turns those
+foundation checks, including a temporary private IPC health loopback, into a
+direct native visual smoke test.
 
 ## Goals
 
@@ -65,8 +68,9 @@ Kernel32 APIs. The direct pipe adapter is restricted to the current Windows
 logon session and requires host-created credentials; a separate direct launcher
 delivers those credentials once through a child-only anonymous standard-input
 handle. Existing TypeScript and React applications remain UI clients through
-the SDK rather than importing native APIs; content hosting and application
-identity remain separate documented steps.
+the SDK rather than importing native APIs. The first host-validated application
+package is a deliberately limited text surface; publisher trust and executable
+launch remain separate steps.
 
 ## Repository map
 
@@ -92,6 +96,10 @@ Anodrel/
 - docs/decisions/ — durable decisions and their reasoning.
 
 `docs/TRANSPORT.md` defines the native frame and session contract.
+`docs/APPLICATIONS.md` defines the validated application-package contract.
+`docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
+`docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
+contract.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
@@ -114,6 +122,11 @@ npm run demo
 ~~~
 
 See docs/DEVELOPMENT.md for prerequisites and the expected verification order.
+
+On Windows, double-click `start.bat` from the repository root to build and open
+the Anodrel Startup Lab. It validates the sample package and host core, then
+completes a temporary private IPC health loopback before the native visual test
+surface appears.
 
 The public interface and security baseline are documented in docs/PROTOCOL.md
 and docs/THREAT_MODEL.md.

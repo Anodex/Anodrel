@@ -5,10 +5,11 @@
 //! `serve_one` performs synchronous I/O and is intentionally a worker-thread
 //! operation. It must never be called from the Win32 UI thread.
 
+mod loopback;
 mod raw;
 mod security;
 
-use std::{fmt, io};
+use std::{fmt, io, thread};
 
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_core::HostPolicy;
@@ -87,6 +88,32 @@ impl std::error::Error for InvitationError {}
 pub struct WindowsPipeServer {
     handle: raw::OwnedHandle,
     session: TransportSession,
+}
+
+/// Runs one owned local authentication and `platform.health` round trip.
+///
+/// The server remains a one-client, current-session named pipe. This helper
+/// creates a temporary endpoint, connects a private in-process client before
+/// the worker begins its accept loop, then closes both endpoints after the
+/// check. It never exposes the invitation, launches an application, or grants
+/// authority beyond the caller-supplied policy.
+pub fn run_health_self_test(policy: HostPolicy) -> io::Result<()> {
+    let (server, invitation) = WindowsPipeServer::create(policy, "startup-lab-loopback")
+        .map_err(|_| self_test_failed())?;
+    let pipe_name = wide_null(invitation.pipe_name());
+    let client = raw::connect_client(&pipe_name).map_err(|_| self_test_failed())?;
+    let server_thread = thread::spawn(move || server.serve_one());
+
+    let client_result = loopback::authenticated_health(&client, &invitation);
+    drop(client);
+    drop(invitation);
+
+    let server_result = server_thread
+        .join()
+        .map_err(|_| self_test_failed())?
+        .map_err(|_| self_test_failed());
+    client_result?;
+    server_result
 }
 
 impl WindowsPipeServer {
@@ -172,27 +199,16 @@ fn wide_null(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
+fn self_test_failed() -> io::Error {
+    io::Error::other("private IPC self-test did not complete")
+}
+
 #[cfg(test)]
 mod tests {
-    use std::thread;
-
     use anodrel_core::HostPolicy;
-    use anodrel_protocol::{Capability, JsonValue};
-    use anodrel_wire::{FrameDecoder, encode_json};
+    use anodrel_protocol::Capability;
 
     use super::*;
-
-    fn read_one_json(client: &raw::OwnedHandle) -> JsonValue {
-        let mut decoder = FrameDecoder::new();
-        let mut buffer = [0_u8; PIPE_BUFFER_BYTES];
-        loop {
-            let bytes_read = raw::read(client, &mut buffer).expect("pipe read succeeds");
-            let messages = decoder.push(&buffer[..bytes_read]).expect("frame decodes");
-            if let Some(message) = messages.into_iter().next() {
-                return JsonValue::parse(&message).expect("JSON response is valid");
-            }
-        }
-    }
 
     #[test]
     fn serves_an_authenticated_health_request_over_a_real_windows_pipe() {
@@ -202,46 +218,7 @@ mod tests {
             "test-host",
         )
         .expect("test policy is valid");
-        let (server, invitation) =
-            WindowsPipeServer::create(policy, "test-session").expect("pipe server creates");
-        let pipe_name = wide_null(invitation.pipe_name());
-        let server_thread = thread::spawn(move || server.serve_one());
-        let client = raw::connect_client(&pipe_name).expect("client connects");
-
-        raw::write_all(
-            &client,
-            &encode_json(
-                &invitation
-                    .authentication_payload()
-                    .expect("invitation creates authentication payload"),
-            )
-            .expect("authentication frame encodes"),
-        )
-        .expect("authentication writes");
-        assert_eq!(
-            read_one_json(&client)
-                .as_object()
-                .expect("authentication response object")["kind"]
-                .as_string(),
-            Some("session.authenticated")
-        );
-
-        let health = r#"{"protocolVersion":{"major":1,"minor":0},"kind":"request","requestId":"health-1","operation":"platform.health","payload":{}}"#;
-        raw::write_all(&client, &encode_json(health).expect("health frame encodes"))
-            .expect("health writes");
-        assert_eq!(
-            read_one_json(&client)
-                .as_object()
-                .expect("health response object")["status"]
-                .as_string(),
-            Some("success")
-        );
-
-        drop(client);
-        server_thread
-            .join()
-            .expect("server thread does not panic")
-            .expect("server completes after client closes");
+        run_health_self_test(policy).expect("private IPC self-test succeeds");
     }
 
     #[test]
