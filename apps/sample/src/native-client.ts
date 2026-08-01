@@ -40,6 +40,15 @@ async function run(): Promise<number> {
       return 16;
     }
 
+    if (process.argv.includes("--request-open-file")) {
+      const dialog = await client.openFileDialog([
+        { label: "Documents", extensions: ["txt", "json", "md"] },
+      ]);
+      if (dialog.status !== "selected" && dialog.status !== "cancelled") {
+        return 18;
+      }
+    }
+
     if (process.argv.includes("--wait-for-ui-event")) {
       const eventResult = await waitForSampleAction(client, update.revision);
       if (eventResult !== 0) {

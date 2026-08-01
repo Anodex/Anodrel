@@ -28,7 +28,7 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.6 accepts `{"major": 1, "minor": 0}` through
+the host's. Version 1.7 accepts `{"major": 1, "minor": 0}` through
 `{"major": 1, "minor": 7}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore

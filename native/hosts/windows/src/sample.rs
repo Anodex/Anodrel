@@ -17,12 +17,28 @@ use anodrel_windows_pipe::WindowsPipeServer;
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
-    run_with_optional_session_view(node_path, client_path, None)
+    run_with_optional_session_view(node_path, client_path, None, false)
 }
 
 /// Runs the development bootstrap sample while one native window consumes its
 /// authenticated document mailbox.
 pub fn run_ui_session(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_optional_file_dialog(node_path, client_path, false)
+}
+
+/// Runs the UI session diagnostic and asks its client to show one file picker.
+pub fn run_ui_session_with_file_dialog(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_optional_file_dialog(node_path, client_path, true)
+}
+
+fn run_ui_session_with_optional_file_dialog(
+    node_path: &str,
+    client_path: &str,
+    request_file_dialog: bool,
+) -> Result<(), Box<dyn Error>> {
     let mailbox = UiDocumentMailbox::new();
     let input_mailbox = UiInputMailbox::new();
     let close_signal = SessionCloseSignal::default();
@@ -31,6 +47,7 @@ pub fn run_ui_session(node_path: &str, client_path: &str) -> Result<(), Box<dyn 
         node_path,
         client_path,
         Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox)),
+        request_file_dialog,
     )
 }
 
@@ -43,6 +60,7 @@ fn run_with_optional_session_view(
         SessionCloseSignal,
         FileDialogMailbox,
     )>,
+    request_file_dialog: bool,
 ) -> Result<(), Box<dyn Error>> {
     let policy = HostPolicy::new(
         "anodrel.sample",
@@ -77,9 +95,14 @@ fn run_with_optional_session_view(
     let server_thread = thread::spawn(move || server.serve_one());
 
     let command = if mailboxes.is_some() {
-        BootstrapCommand::new(node_path)?
+        let command = BootstrapCommand::new(node_path)?
             .arg(client_path)?
-            .arg("--wait-for-ui-event")?
+            .arg("--wait-for-ui-event")?;
+        if request_file_dialog {
+            command.arg("--request-open-file")?
+        } else {
+            command
+        }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
     };
