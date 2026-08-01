@@ -119,7 +119,10 @@ fn filter_string(filters: &[FileDialogFilter]) -> Vec<u16> {
 }
 #[cfg(test)]
 mod tests {
-    use super::filter_string;
+    use super::{
+        OFN_FILEMUSTEXIST, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPEN_FLAGS, SAVE_FLAGS,
+        filter_string,
+    };
     use anodrel_file_dialog::FileDialogFilter;
     #[test]
     fn filter_has_double_terminal_nul() {
