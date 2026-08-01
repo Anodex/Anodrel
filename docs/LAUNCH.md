@@ -97,6 +97,12 @@ this document but does not accept a filesystem policy root, because the record
 has already come from the machine registry. That entry point is for a native
 policy adapter; it is not a public application API.
 
+The same Windows policy adapter can convert a successfully validated record
+into one host session policy through `anodrel-session-policy`. This carries
+only the record's application ID and its strict machine-selected capability
+array. The adapter does not create the pipe, bootstrap a child, launch a
+process, or make a record visible to an application.
+
 ## Compatibility and failures
 
 Records are exact at their declared version because they influence process

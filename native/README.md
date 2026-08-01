@@ -55,8 +55,9 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
   readiness event, and no-data activation request for one package identity.
 - `adapters/windows-policy` reads one bounded installed-application record
   from the fixed 64-bit `HKEY_LOCAL_MACHINE` registry location with query-only
-  access. It validates that record through `crates/application` but cannot
-  provision policy, verify a signature, or launch a process.
+  access. It validates that record through `crates/application` and can derive
+  one host session policy through `crates/session-policy`, but cannot provision
+  policy, verify a signature, launch a process, or create a pipe.
 - `crates/session-policy` maps only a validated installed record's application
   ID and machine-selected capabilities into one `anodrel-core` host policy. It
   does not select policy storage, launch a process, create a transport, or

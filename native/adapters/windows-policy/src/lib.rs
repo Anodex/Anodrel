@@ -16,6 +16,8 @@ use std::fmt;
 use anodrel_application::{
     InstalledApplication, InstalledApplicationError, is_valid_application_id,
 };
+use anodrel_core::HostPolicy;
+use anodrel_session_policy::{SessionPolicyError, host_policy_for_installed_application};
 
 /// Loads one installed application record from the fixed machine policy store.
 ///
@@ -32,6 +34,22 @@ pub fn load_installed_application(
         .map_err(PolicyStoreError::Record)
 }
 
+/// Loads machine policy and creates the policy for one authenticated host session.
+///
+/// Both the installed record and its capability grants are selected only from
+/// the fixed machine store. The caller supplies a local host label; it is not
+/// an application-facing value and is used only in protocol diagnostics.
+/// This does not create a pipe, launch a process, or expose the policy to an
+/// application surface.
+pub fn load_host_policy(
+    application_id: &str,
+    host_name: impl Into<String>,
+) -> Result<HostPolicy, PolicyStoreError> {
+    let application = load_installed_application(application_id)?;
+    host_policy_for_installed_application(&application, host_name)
+        .map_err(PolicyStoreError::SessionPolicy)
+}
+
 /// A safe failure category while reading machine policy.
 #[derive(Debug)]
 pub enum PolicyStoreError {
@@ -44,6 +62,7 @@ pub enum PolicyStoreError {
     RecordChangedDuringRead,
     RegistryUnavailable,
     Record(InstalledApplicationError),
+    SessionPolicy(SessionPolicyError),
 }
 
 impl fmt::Display for PolicyStoreError {
@@ -60,6 +79,7 @@ impl fmt::Display for PolicyStoreError {
             }
             Self::RegistryUnavailable => "Windows machine policy is unavailable",
             Self::Record(_) => "installed application policy record did not validate",
+            Self::SessionPolicy(_) => "installed application session policy could not be created",
         };
         formatter.write_str(message)
     }
@@ -69,6 +89,7 @@ impl std::error::Error for PolicyStoreError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Record(error) => Some(error),
+            Self::SessionPolicy(error) => Some(error),
             _ => None,
         }
     }
@@ -76,12 +97,20 @@ impl std::error::Error for PolicyStoreError {
 
 #[cfg(test)]
 mod tests {
-    use super::{PolicyStoreError, load_installed_application};
+    use super::{PolicyStoreError, load_host_policy, load_installed_application};
 
     #[test]
     fn rejects_an_invalid_identity_before_opening_a_registry_key() {
         assert!(matches!(
             load_installed_application("org.anodrel/escape"),
+            Err(PolicyStoreError::InvalidApplicationId)
+        ));
+    }
+
+    #[test]
+    fn rejects_an_invalid_session_identity_before_opening_a_registry_key() {
+        assert!(matches!(
+            load_host_policy("org.anodrel/escape", "windows-host"),
             Err(PolicyStoreError::InvalidApplicationId)
         ));
     }

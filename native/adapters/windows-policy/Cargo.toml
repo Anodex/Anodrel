@@ -6,3 +6,5 @@ license.workspace = true
 
 [dependencies]
 anodrel-application = { path = "../../crates/application" }
+anodrel-core = { path = "../../crates/core" }
+anodrel-session-policy = { path = "../../crates/session-policy" }

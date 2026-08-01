@@ -158,6 +158,8 @@ name = "anodrel-windows-policy"
 version = "0.1.0"
 dependencies = [
  "anodrel-application",
+ "anodrel-core",
+ "anodrel-session-policy",
 ]
 
 [[package]]
