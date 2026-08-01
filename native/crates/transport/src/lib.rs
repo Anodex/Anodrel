@@ -11,6 +11,7 @@ use std::fmt;
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
+use anodrel_file_access::{FileSelectionService, FileTextService};
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
@@ -291,15 +292,46 @@ impl TransportSession {
         external_links: impl ExternalLinkService + 'static,
         file_dialogs: impl FileDialogService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            anodrel_file_access::UnavailableFileSelectionService,
+            anodrel_file_access::UnavailableFileTextService,
+        )
+    }
+
+    /// Creates one session with explicit selection-capture and selected-file
+    /// text services in addition to the existing native service seams.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_session_components_and_all_services(
+            host: CoreHost::with_session_components_and_all_services_and_file_access(
                 policy,
                 ui_input_mailbox,
                 session_close_signal,
                 clipboard,
                 external_links,
                 file_dialogs,
+                file_selections,
+                file_text,
             ),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),

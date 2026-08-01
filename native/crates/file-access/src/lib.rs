@@ -10,7 +10,10 @@
 
 use std::fmt;
 
-use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
+use anodrel_file_dialog::{
+    FileDialogFilter, FileDialogMailbox, FileDialogSelection, FileDialogService,
+    FileDialogServiceError, SelectedFilePath,
+};
 
 pub use anodrel_file_dialog::{
     SELECTION_REFERENCE_BYTES, SelectionReference, SelectionReferenceError,
@@ -189,6 +192,42 @@ impl FileSelectionService for UnavailableFileSelectionService {
     }
 }
 
+/// Adapts the shared UI-thread dialog mailbox to selection-time identity capture.
+///
+/// This type uses the same one-request limit as ordinary open and save dialogs.
+/// The UI thread must complete its `OpenWithReference` request with a captured
+/// file; a regular selected path is rejected as unavailable.
+#[derive(Clone, Debug)]
+pub struct SelectionFileDialogMailbox {
+    dialogs: FileDialogMailbox,
+}
+
+impl SelectionFileDialogMailbox {
+    /// Binds selection capture to one supplied shared dialog mailbox.
+    #[must_use]
+    pub fn new(dialogs: FileDialogMailbox) -> Self {
+        Self { dialogs }
+    }
+}
+
+impl FileSelectionService for SelectionFileDialogMailbox {
+    fn open_file(
+        &self,
+        filters: &[FileDialogFilter],
+    ) -> Result<FileSelectionResult, FileSelectionServiceError> {
+        match self.dialogs.open_file_with_reference(filters) {
+            Ok(FileDialogSelection::Captured(path, reference)) => Ok(
+                FileSelectionResult::Selected(FileSelection::new(path, reference)),
+            ),
+            Ok(FileDialogSelection::Cancelled) => Ok(FileSelectionResult::Cancelled),
+            Ok(FileDialogSelection::Selected(_)) | Ok(FileDialogSelection::Saved(_)) => {
+                Err(FileSelectionServiceError::Unavailable)
+            }
+            Err(FileDialogServiceError::Unavailable) => Err(FileSelectionServiceError::Unavailable),
+        }
+    }
+}
+
 /// Reads bounded UTF-8 text from one session-bound selected-file reference.
 ///
 /// Implementations must never accept a path, native handle, or caller-selected
@@ -233,10 +272,15 @@ mod tests {
     use super::{
         FileSelection, FileSelectionResult, FileSelectionService, FileSelectionServiceError,
         FileSelectionStore, FileSelectionStoreError, FileTextService, FileTextServiceError,
-        MAX_SESSION_SELECTIONS, SelectionReference, SelectionReferenceError,
-        UnavailableFileSelectionService, UnavailableFileTextService,
+        MAX_SESSION_SELECTIONS, SelectionFileDialogMailbox, SelectionReference,
+        SelectionReferenceError, UnavailableFileSelectionService, UnavailableFileTextService,
     };
-    use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
+    use std::thread;
+
+    use anodrel_file_dialog::{
+        FileDialogFilter, FileDialogMailbox, FileDialogRequestKind, FileDialogSelection,
+        SelectedFilePath,
+    };
 
     const FIRST: &str = "AbCdEfGhIjKlMnOpQrStUv";
     const SECOND: &str = "ZyXwVuTsRqPoNmLkJiHgFe";
@@ -320,6 +364,36 @@ mod tests {
                 SelectedFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid"),
                 reference,
             ))
+        );
+    }
+
+    #[test]
+    fn capture_service_uses_the_shared_dialog_mailbox_and_requires_a_reference() {
+        let dialogs = FileDialogMailbox::new();
+        let service = SelectionFileDialogMailbox::new(dialogs.clone());
+        let worker = thread::spawn(move || {
+            let filter =
+                FileDialogFilter::new("Text", vec!["txt".to_owned()]).expect("filter is valid");
+            service.open_file(&[filter])
+        });
+        let request = loop {
+            if let Some(request) = dialogs.take() {
+                break request;
+            }
+            thread::yield_now();
+        };
+        assert_eq!(request.kind(), FileDialogRequestKind::OpenWithReference);
+        let path = SelectedFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid");
+        let reference = SelectionReference::new(FIRST).expect("reference is valid");
+        assert!(dialogs.complete(
+            request.id(),
+            FileDialogSelection::Captured(path.clone(), reference.clone()),
+        ));
+        assert_eq!(
+            worker.join().expect("worker did not panic"),
+            Ok(FileSelectionResult::Selected(FileSelection::new(
+                path, reference
+            )))
         );
     }
 }

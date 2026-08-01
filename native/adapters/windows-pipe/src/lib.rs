@@ -15,6 +15,7 @@ use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
 use anodrel_external_links::ExternalLinkService;
+use anodrel_file_access::{FileSelectionService, FileTextService};
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
@@ -306,8 +307,37 @@ impl WindowsPipeServer {
         external_links: impl ExternalLinkService + 'static,
         file_dialogs: impl FileDialogService + 'static,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_session_components_and_all_services_and_file_access(
+            policy,
+            session_id,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            anodrel_file_access::UnavailableFileSelectionService,
+            anodrel_file_access::UnavailableFileTextService,
+        )
+    }
+
+    /// Creates one endpoint with explicit selection-capture and selected-file
+    /// text services for its authenticated application session.
+    #[allow(clippy::too_many_arguments)] // Explicit per-session native service seams stay visible.
+    pub fn create_with_session_components_and_all_services_and_file_access(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
         Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_all_services(
+            TransportSession::with_session_components_and_all_services_and_file_access(
                 policy,
                 credentials,
                 ui_document_mailbox,
@@ -316,6 +346,8 @@ impl WindowsPipeServer {
                 clipboard,
                 external_links,
                 file_dialogs,
+                file_selections,
+                file_text,
             )
         })
     }
