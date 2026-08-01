@@ -1,6 +1,7 @@
 import {
   PROTOCOL_VERSION,
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
+  MAX_STORAGE_SNAPSHOT_REQUEST_BYTES,
   isCancellationEnvelope,
   isClipboardWritePayload,
   isExternalOpenPayload,
@@ -9,6 +10,7 @@ import {
   isEmptyPayload,
   isUiDocumentReplacePayload,
   isPingPayload,
+  isStorageStateReplacePayload,
   isSupportedProtocolVersion,
   isWireRequestEnvelope,
   protocolVersionToString,
@@ -31,6 +33,8 @@ export interface MockHostOptions {
   readonly now?: () => Date;
   /** Initial bounded text returned by a granted clipboard read. */
   readonly clipboardText?: string;
+  /** Initial bounded application state returned by a granted storage read. */
+  readonly storageSnapshot?: string;
 }
 
 /**
@@ -57,6 +61,7 @@ export class MockHost {
   private readonly hostName: string;
   private readonly now: () => Date;
   private clipboardText: string | undefined;
+  private storageSnapshot: string | undefined;
   private sessionCount = 0;
 
   constructor(options: MockHostOptions) {
@@ -69,12 +74,19 @@ export class MockHost {
     ) {
       throw new Error("MockHost clipboard text exceeds the protocol size limit.");
     }
+    if (
+      options.storageSnapshot !== undefined &&
+      new TextEncoder().encode(options.storageSnapshot).byteLength > MAX_STORAGE_SNAPSHOT_REQUEST_BYTES
+    ) {
+      throw new Error("MockHost storage snapshot exceeds the protocol size limit.");
+    }
 
     this.applicationId = options.applicationId;
     this.grantedCapabilities = [...(options.grantedCapabilities ?? [])];
     this.hostName = options.hostName ?? "anodrel-mock-host";
     this.now = options.now ?? (() => new Date());
     this.clipboardText = options.clipboardText;
+    this.storageSnapshot = options.storageSnapshot;
   }
 
   createTransport(sessionId = `mock-session-${++this.sessionCount}`): MockHostTransport {
@@ -453,6 +465,44 @@ export class MockHost {
           "file.unavailable",
           "selected file is unavailable.",
         );
+
+      case "storage.state.read":
+        if (request.protocolVersion.minor < 10) {
+          return this.failure(request.requestId, "operation.unsupported", "storage.state.read requires protocol 1.10 or later.");
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "storage.state.read requires an empty payload.");
+        }
+        if (!this.hasCapability(sessionId, "storage.state.read")) {
+          return this.failure(request.requestId, "capability.denied", "storage.state.read requires the storage.state.read capability.", { capability: "storage.state.read" });
+        }
+        return this.success("storage.state.read", request.requestId, this.storageSnapshot === undefined ? { status: "absent" } : { status: "snapshot", snapshot: this.storageSnapshot });
+
+      case "storage.state.replace":
+        if (request.protocolVersion.minor < 10) {
+          return this.failure(request.requestId, "operation.unsupported", "storage.state.replace requires protocol 1.10 or later.");
+        }
+        if (!isStorageStateReplacePayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "storage.state.replace requires one bounded snapshot.");
+        }
+        if (!this.hasCapability(sessionId, "storage.state.replace")) {
+          return this.failure(request.requestId, "capability.denied", "storage.state.replace requires the storage.state.replace capability.", { capability: "storage.state.replace" });
+        }
+        this.storageSnapshot = request.payload.snapshot;
+        return this.success("storage.state.replace", request.requestId, { status: "replaced" });
+
+      case "storage.state.clear":
+        if (request.protocolVersion.minor < 10) {
+          return this.failure(request.requestId, "operation.unsupported", "storage.state.clear requires protocol 1.10 or later.");
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "storage.state.clear requires an empty payload.");
+        }
+        if (!this.hasCapability(sessionId, "storage.state.clear")) {
+          return this.failure(request.requestId, "capability.denied", "storage.state.clear requires the storage.state.clear capability.", { capability: "storage.state.clear" });
+        }
+        this.storageSnapshot = undefined;
+        return this.success("storage.state.clear", request.requestId, { status: "cleared" });
 
       default:
         return this.failure(

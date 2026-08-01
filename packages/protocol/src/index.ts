@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 9 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 10 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -13,6 +13,7 @@ export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_FILTERS = 8;
 export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
+export const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES = 24 * 1024;
 export const SELECTION_REFERENCE_BYTES = 22;
 
 export interface ProtocolVersion {
@@ -31,7 +32,10 @@ export type Capability =
   | "external.open"
   | "dialog.open_file"
   | "dialog.save_file"
-  | "file.read_text";
+  | "file.read_text"
+  | "storage.state.read"
+  | "storage.state.replace"
+  | "storage.state.clear";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -117,6 +121,20 @@ export interface PlatformOperationMap {
     readonly payload: { readonly selectionReference: string };
     readonly result: { readonly status: "text"; readonly text: string };
   };
+  "storage.state.read": {
+    readonly payload: EmptyPayload;
+    readonly result:
+      | { readonly status: "snapshot"; readonly snapshot: string }
+      | { readonly status: "absent" };
+  };
+  "storage.state.replace": {
+    readonly payload: { readonly snapshot: string };
+    readonly result: { readonly status: "replaced" };
+  };
+  "storage.state.clear": {
+    readonly payload: EmptyPayload;
+    readonly result: { readonly status: "cleared" };
+  };
 }
 
 export type PlatformOperation = keyof PlatformOperationMap;
@@ -188,7 +206,10 @@ export type ProtocolErrorCode =
   | "dialog.unavailable"
   | "file.unavailable"
   | "file.text_invalid"
-  | "file.text_too_large";
+  | "file.text_too_large"
+  | "storage.unavailable"
+  | "storage.snapshot_invalid"
+  | "storage.snapshot_too_large";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -360,6 +381,18 @@ export function isFileTextReadPayload(
     typeof value.selectionReference === "string" &&
     value.selectionReference.length === SELECTION_REFERENCE_BYTES &&
     /^[A-Za-z0-9_-]+$/.test(value.selectionReference)
+  );
+}
+
+/** Validates an exact protocol-safe whole application-state replacement. */
+export function isStorageStateReplacePayload(
+  value: unknown,
+): value is PayloadFor<"storage.state.replace"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.snapshot === "string" &&
+    new TextEncoder().encode(value.snapshot).byteLength <= MAX_STORAGE_SNAPSHOT_REQUEST_BYTES
   );
 }
 

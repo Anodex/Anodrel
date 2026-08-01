@@ -110,6 +110,18 @@ export class PlatformClient {
     return this.request("file.read_text", { selectionReference });
   }
 
+  readStorageState(): Promise<ResultFor<"storage.state.read">> {
+    return this.request("storage.state.read", {});
+  }
+
+  replaceStorageState(snapshot: string): Promise<ResultFor<"storage.state.replace">> {
+    return this.request("storage.state.replace", { snapshot });
+  }
+
+  clearStorageState(): Promise<ResultFor<"storage.state.clear">> {
+    return this.request("storage.state.clear", {});
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,
