@@ -31,6 +31,10 @@ name = "anodrel-canvas"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-clipboard"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-core"
 version = "0.1.0"
 dependencies = [

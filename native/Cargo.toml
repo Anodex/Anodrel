@@ -16,6 +16,7 @@ members = [
   "crates/session-policy",
   "crates/paths",
   "crates/credentials",
+  "crates/clipboard",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-instance",
