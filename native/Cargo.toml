@@ -13,6 +13,7 @@ members = [
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-instance",
+  "adapters/windows-signature",
   "hosts/windows",
 ]
 resolver = "2"

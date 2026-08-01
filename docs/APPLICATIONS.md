@@ -6,7 +6,7 @@
 
 An application package gives the host one explicit, validated identity for the content it displays. The package is a local directory containing a manifest and one bounded text document. The host obtains the application ID only from the validated manifest; rendered text cannot declare or change it.
 
-This is a content-identity boundary, not publisher authentication. A person who can replace both an unpackaged manifest and its content can create a new package with a different valid digest. Production package signing, publisher trust, executable verification, updates, process launch, and permissions are intentionally deferred. The current development Node sample is not an application package and must not be treated as one.
+This is a content-identity boundary, not publisher authentication. A person who can replace both an unpackaged manifest and its content can create a new package with a different valid digest. Windows now has an isolated embedded-executable signature verifier, but it does not authenticate this mutable package or grant launch authority. Production package signing, publisher trust, executable containment and digest checks, updates, process launch, and permissions are intentionally deferred. The current development Node sample is not an application package and must not be treated as one.
 
 ## Layout
 
@@ -88,4 +88,6 @@ claim application-scoped host instance
 `docs/INSTANCE_LIFECYCLE.md` defines the exact Windows coordination behavior.
 No application code runs in this path. A later process-launch decision must
 bind a verified executable and its session to this validated application ID; it
-must not reuse the development bootstrap launcher as authority.
+must not reuse the development bootstrap launcher as authority. The Windows
+signature foundation in docs/SIGNING.md is only one input to that later
+host-controlled policy.

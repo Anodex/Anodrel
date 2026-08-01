@@ -118,6 +118,14 @@ so it does not collide with the application text surface. See
 `docs/INSTANCE_LIFECYCLE.md`; product executable identity and a public
 second-instance protocol remain separate work.
 
+The Windows signature adapter is a separate operating-system boundary. It asks
+Windows Authenticode policy to verify an embedded executable signature and
+returns only the leaf certificate fingerprint from a successful trust state.
+It neither trusts the mutable package directory nor launches the executable.
+Installed publisher policy, package containment, file digest verification, and
+tracked child lifetime remain required before the host can create a product
+process. See the Windows signature foundation document and Decision 0017.
+
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only
 after the final registered window closes. The `--window-lab` diagnostic proves

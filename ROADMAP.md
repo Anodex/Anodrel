@@ -72,6 +72,10 @@ Status: **Direct Windows host in progress**
   catalogue with no application input, persistence, export, or protocol
   surface (Decision 0016). Crash reporting and public/application logging
   remain separate work.
+- Establish verified executable identity. **In progress:** the direct Windows
+  Authenticode adapter verifies an embedded signature and returns a leaf
+  certificate fingerprint (Decision 0017). It is not a package trust policy
+  and does not enable product launch.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
