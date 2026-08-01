@@ -56,8 +56,10 @@ names are not a stable authorization primitive.
 An unpackaged directory can be replaced as a whole. A manifest inside that same
 directory cannot serve as the trust anchor for its own signer fingerprint.
 Consequently, a future launch policy must obtain the allowed publisher
-fingerprint and application identity from a signed installation record or
+fingerprint and application identity from an installation record or
 operating-system package identity outside the mutable application directory.
+`docs/LAUNCH.md` now defines the strict installation-record contract; a trusted
+Windows policy store for those records remains later work.
 
 ## Future launch gate
 
@@ -66,8 +68,8 @@ performs all of the following before CreateProcessW:
 
 1. resolves and contains the executable below the approved package root;
 2. checks its declared SHA-256 digest;
-3. calls this adapter and matches the leaf fingerprint to a publisher policy
-   held outside the package;
+3. calls this adapter and matches the leaf fingerprint to the external
+   installed application record;
 4. binds that publisher policy to the validated application ID;
 5. creates and tracks the child without shell interpretation; and
 6. uses the existing one-use private bootstrap only after identity validation.

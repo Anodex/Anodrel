@@ -13,6 +13,9 @@ Each record should include:
 
 Current records (newest first):
 
+- 0018 — Launch policy is bound through an external installed application
+  record.
+
 - 0017 — Windows Authenticode verification is isolated from launch authority.
 
 - 0016 — The first diagnostic log is typed and internal.

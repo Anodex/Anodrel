@@ -108,6 +108,8 @@ Anodrel/
 `docs/RENDERER.md` documents the renderer and brand API.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/SIGNING.md` defines the Windows executable-signature foundation.
+`docs/LAUNCH.md` defines the installed application-record contract that will
+bind executable and publisher policy before process launch.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.

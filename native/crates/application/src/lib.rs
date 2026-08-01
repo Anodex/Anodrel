@@ -7,12 +7,14 @@
 //! and returns bounded plain text for the native Windows surface. It does
 //! not verify a publisher, launch a process, or execute application code.
 
+mod installed;
 mod manifest;
 mod package;
 mod sha256;
 
 use std::{fmt, io};
 
+pub use installed::{InstalledApplication, InstalledApplicationError};
 pub use manifest::{ApplicationIdentity, ApplicationManifest};
 pub use package::{ApplicationPackage, VerifiedContent};
 
@@ -21,6 +23,13 @@ pub const MAX_MANIFEST_BYTES: usize = 16 * 1024;
 
 /// Maximum raw text-content size accepted before UTF-8 decoding.
 pub const MAX_CONTENT_BYTES: usize = 8 * 1024;
+
+/// Maximum installed application-record size accepted before UTF-8 or JSON
+/// decoding.
+pub const MAX_INSTALL_RECORD_BYTES: usize = 16 * 1024;
+
+/// Maximum executable size checked by the installed-record foundation.
+pub const MAX_EXECUTABLE_BYTES: usize = 128 * 1024 * 1024;
 
 /// The only content format supported by application package version 1.0.
 pub const TEXT_CONTENT_FORMAT: &str = "anodrel.text.v1";

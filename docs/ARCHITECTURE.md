@@ -122,9 +122,13 @@ The Windows signature adapter is a separate operating-system boundary. It asks
 Windows Authenticode policy to verify an embedded executable signature and
 returns only the leaf certificate fingerprint from a successful trust state.
 It neither trusts the mutable package directory nor launches the executable.
-Installed publisher policy, package containment, file digest verification, and
-tracked child lifetime remain required before the host can create a product
-process. See the Windows signature foundation document and Decision 0017.
+The installed application-record foundation binds the expected executable
+digest and signer fingerprint to a validated package identity in a record
+outside that package. It is not yet a trusted Windows policy store or a launch
+service. Installed policy-store access control, immediate pre-launch
+revalidation, and tracked child lifetime remain required before the host can
+create a product process. See `docs/SIGNING.md`, `docs/LAUNCH.md`, and
+Decisions 0017 and 0018.
 
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only

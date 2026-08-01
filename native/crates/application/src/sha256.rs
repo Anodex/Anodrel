@@ -1,5 +1,7 @@
 //! Small, allocation-free SHA-256 implementation built into Anodrel.
 
+use std::io::{self, Read};
+
 const INITIAL_STATE: [u32; 8] = [
     0x6A09_E667,
     0xBB67_AE85,
@@ -105,6 +107,31 @@ pub fn parse_lower_hex(input: &str) -> Option<[u8; 32]> {
         output[index] = (hex_digit(pair[0])? << 4) | hex_digit(pair[1])?;
     }
     Some(output)
+}
+
+/// Hashes a reader while stopping as soon as the configured byte limit is
+/// exceeded. The `None` result means the caller's limit was exceeded.
+pub(crate) fn digest_reader_limited<R: Read>(
+    reader: &mut R,
+    maximum: usize,
+) -> io::Result<Option<([u8; 32], usize)>> {
+    let mut hasher = Sha256::new();
+    let mut total = 0_usize;
+    let mut buffer = [0_u8; 16 * 1024];
+
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(Some((hasher.finish(), total)));
+        }
+        total = total
+            .checked_add(read)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "input length overflowed"))?;
+        if total > maximum {
+            return Ok(None);
+        }
+        hasher.update(&buffer[..read]);
+    }
 }
 
 #[cfg(test)]

@@ -74,8 +74,11 @@ Status: **Direct Windows host in progress**
   remain separate work.
 - Establish verified executable identity. **In progress:** the direct Windows
   Authenticode adapter verifies an embedded signature and returns a leaf
-  certificate fingerprint (Decision 0017). It is not a package trust policy
-  and does not enable product launch.
+  certificate fingerprint (Decision 0017). The installed application-record
+  foundation now binds the expected executable digest and publisher fingerprint
+  to a validated package identity outside the package directory (Decision
+  0018). A trusted Windows policy store and verified product launch remain
+  required.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
