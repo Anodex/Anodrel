@@ -39,6 +39,7 @@ name = "anodrel-core"
 version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
+ "anodrel-diagnostics",
  "anodrel-external-links",
  "anodrel-file-access",
  "anodrel-file-dialog",
@@ -121,6 +122,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
  "anodrel-core",
+ "anodrel-diagnostics",
  "anodrel-external-links",
  "anodrel-file-access",
  "anodrel-file-dialog",
@@ -256,6 +258,7 @@ dependencies = [
  "anodrel-bootstrap",
  "anodrel-clipboard",
  "anodrel-core",
+ "anodrel-diagnostics",
  "anodrel-external-links",
  "anodrel-file-access",
  "anodrel-file-dialog",

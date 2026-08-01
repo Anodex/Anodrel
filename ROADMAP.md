@@ -128,10 +128,11 @@ Status: **Direct Windows host in progress**
   opaque secrets, and current-user local persistence (Decision 0022). Public
   credential capabilities, session binding, and consent remain deferred.
 - Add logging, crash reporting boundaries, and shutdown behavior. **Completed
-  for the first in-memory diagnostic log:** a bounded closed event
-  catalogue with no application input, persistence, export, or protocol
-  surface (Decision 0016). Crash reporting and public/application logging
-  remain separate work.
+  for the first in-memory diagnostic log and its bounded authenticated read:**
+  a closed event catalogue has no application input, persistence, export, or
+  arbitrary error surface; Protocol 1.11 exposes only its fixed records through
+  the existing `diagnostics.read` grant (Decision 0053). Crash reporting and
+  public/application logging remain separate work.
 - Establish verified executable identity. **In progress:** the direct Windows
   Authenticode adapter verifies an embedded signature and returns a leaf
   certificate fingerprint (Decision 0017). The installed application-record

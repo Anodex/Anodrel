@@ -36,6 +36,35 @@ test("SDK and host agree on successful core operations", async () => {
   });
 });
 
+test("diagnostic reads expose only the granted closed record shape", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["diagnostics.read"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.readDiagnosticEntries(), {
+    entries: [
+      {
+        sequence: "1",
+        level: "info",
+        component: "core",
+        event: "Internal platform.health check completed.",
+      },
+    ],
+  });
+});
+
+test("diagnostic reads require the existing host-issued diagnostics grant", async () => {
+  const host = new MockHost({ applicationId: "test.application" });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  await assert.rejects(
+    () => client.readDiagnosticEntries(),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "capability.denied",
+  );
+});
+
 test("SDK and host bind UI document revisions to one granted transport session", async () => {
   const host = new MockHost({
     applicationId: "test.application",

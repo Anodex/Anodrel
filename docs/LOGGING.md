@@ -1,6 +1,6 @@
 # Anodrel Host Diagnostic Log
 
-**Status:** Windows internal foundation boundary.
+**Status:** Bounded closed catalogue with a Protocol 1.11 authenticated read.
 
 ## Purpose
 
@@ -45,21 +45,29 @@ have passed. The linked **Open Logs** tile opens a native document window
 from the log snapshot. The document can show only the four fields above and
 cannot navigate, export, write a file, or contact another process.
 
-The log is dropped with the host process. It is not written to disk, sent over
-the protocol, included in crash output, or exposed to an application session.
-Opening the document grants no capability.
+The log is dropped with the host process. It is not written to disk, included in
+crash output, exported, or writable by an application. Protocol 1.11 can expose
+the exact retained closed records to an authenticated session through
+`diagnostics.entries.read` only when its host policy grants `diagnostics.read`.
+The read accepts exactly `{}` and returns at most 64 records with only the four
+fields above. It accepts no filter, cursor, time, path, arbitrary text,
+subscription, or acknowledgement. A host without an explicitly supplied log
+service returns only `diagnostics.unavailable`.
 
 ## Compatibility
 
-This is an internal Rust contract. It has no protocol version and no SDK
-surface. Adding a new typed event is additive only when its component and text
-are reviewed as display-safe. Accepting dynamic fields, application-originated
-events, persistence, export, or a public reader requires a documented service
-contract, a capability decision, threat-model update, and compatibility tests.
+The catalogue remains a closed Rust contract; the Protocol 1.11 reader is a
+strict projection of it, not a general SDK logging API. Adding a new typed event
+is additive only when its component and text are reviewed as display-safe.
+Accepting dynamic fields, application-originated events, persistence, export,
+or a broader reader requires a documented service contract, a capability
+decision, threat-model update, and compatibility tests.
 
 ## Verification
 
 Unit tests prove that the ledger bounds itself, preserves the order of retained
-events, assigns process-local sequence numbers, and only exposes the closed event
-catalogue. Host tests prove that the linked log action produces a document and
-that no document action carries a filesystem path.
+events, assigns process-local sequence numbers, and only exposes the closed
+event catalogue. Protocol contract tests verify its exact payload, fixed record
+shape, independent grant check, and unavailable service behavior. Host tests
+prove that the linked log action produces a document and that no document action
+carries a filesystem path.

@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.10
+**Status:** Foundation contract, version 1.11
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.10 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 10}`.
+the host's. Version 1.11 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 11}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -60,6 +60,7 @@ The current operations are:
 | `platform.ping` | `{ "sentAt": string }` | host receive time and host name | none |
 | `platform.capabilities` | `{}` | application ID and current grants | none |
 | `platform.health` | `{}` | ready status, host name, and version | `diagnostics.read` |
+| `diagnostics.entries.read` | `{}` | bounded closed host diagnostic records | `diagnostics.read` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
@@ -74,6 +75,20 @@ The current operations are:
 | `storage.state.read` | `{}` | bounded saved snapshot or absence | `storage.state.read` |
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
+
+### Diagnostic entries
+
+Protocol 1.11 adds `diagnostics.entries.read`. It accepts exactly `{}` and
+requires the existing immediate `diagnostics.read` host-issued grant. The result
+is `{ "entries": [...] }`, with at most 64 records. Each record contains only
+`sequence` (a canonical nonzero decimal string), `level` (`"info"`), and the
+closed catalogue's fixed `component` and `event` strings. It accepts no filter,
+cursor, time, source, path, free text, subscription, export, or acknowledgement.
+
+A host that did not explicitly provide a bounded closed diagnostics source
+returns `diagnostics.unavailable`, with no native error, path, request data, or
+application data. The operation is a snapshot read: it does not persist, clear,
+write, or subscribe to diagnostics.
 
 ### Storage state
 

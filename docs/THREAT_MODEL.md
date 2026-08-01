@@ -13,7 +13,8 @@ The current operations are `platform.ping`, `platform.capabilities`,
 `platform.health`, `ui.document.replace`, `ui.events.read`, `session.close`,
 `clipboard.read`, `clipboard.write`, `external.open`, `dialog.open_file`,
 `dialog.open_file.v2`, `dialog.save_file`, `file.read_text`,
-`storage.state.read`, `storage.state.replace`, and `storage.state.clear`.
+`storage.state.read`, `storage.state.replace`, `storage.state.clear`, and
+`diagnostics.entries.read`.
 Clipboard, external-link, file-dialog, selection-scoped file-text, and
 application-state operations each have their own bounded values and separate
 host-issued grants. The development UI-session sample exercises these only with
@@ -66,6 +67,7 @@ authority for permissions.
 | A child process grants itself a capability. | Convert only the validated installed record's strict capability array into the host session policy; reject unknown or duplicate grants, treat version 1.0 records as grant-free, and never accept grants from package, bootstrap, pipe, protocol, or UI data. |
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
 | A host diagnostic log captures untrusted or sensitive data. | The first log accepts only a closed typed host-event enum; it has no dynamic message, payload, path, error, credential, persistence, export, or protocol input. |
+| An application uses diagnostics to obtain arbitrary host data or an unbounded event stream. | `diagnostics.entries.read` requires the existing immediate `diagnostics.read` grant, accepts only `{}`, returns at most 64 records from the closed typed catalogue, and exposes no filter, cursor, time, native detail, write, clear, export, or subscription operation. |
 | Message floods exhaust CPU or memory. | Reject frames above 64 KiB before decoding, reject more than four complete frames in one receive burst, and add authenticated-session queue, concurrency, timeout, and cancellation limits in the OS adapter. |
 | A local or remote process connects to the endpoint by guessing its name. | Create one random-suffix pipe, restrict its DACL to the current logon SID, require a 32-byte CNG-generated token as the first frame, and close on any failed handshake. |
 | A session invitation reaches another process or durable diagnostic. | Deliver one bounded record only through a child-only inherited standard-input handle; never put it in arguments, environment, logs, telemetry, crash data, or files. |

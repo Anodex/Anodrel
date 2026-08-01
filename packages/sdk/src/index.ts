@@ -60,6 +60,10 @@ export class PlatformClient {
     return this.request("platform.health", {});
   }
 
+  readDiagnosticEntries(): Promise<ResultFor<"diagnostics.entries.read">> {
+    return this.request("diagnostics.entries.read", {});
+  }
+
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {
     return this.request("ui.document.replace", { document });
   }

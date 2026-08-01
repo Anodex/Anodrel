@@ -124,6 +124,28 @@ pub struct LogBook {
     entries: VecDeque<Entry>,
 }
 
+/// Read-only source of the closed diagnostic catalogue.
+///
+/// Implementations return only copied entries from this crate's fixed event
+/// types. They cannot accept application text, native errors, or filters.
+pub trait DiagnosticsService: std::fmt::Debug + Send {
+    /// Returns the current bounded records in ascending sequence order.
+    fn entries(&self) -> Result<Vec<Entry>, DiagnosticsServiceError>;
+}
+
+/// Safe failure category for a host without a diagnostic source.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DiagnosticsServiceError {
+    /// The host intentionally did not make its closed diagnostic catalogue available.
+    Unavailable,
+}
+
+impl DiagnosticsService for LogBook {
+    fn entries(&self) -> Result<Vec<Entry>, DiagnosticsServiceError> {
+        Ok(self.entries().copied().collect())
+    }
+}
+
 impl LogBook {
     /// Creates an empty ledger with the documented retention bound.
     #[must_use]
@@ -177,7 +199,7 @@ impl Default for LogBook {
 
 #[cfg(test)]
 mod tests {
-    use super::{Event, Level, LogBook, MAX_ENTRIES};
+    use super::{DiagnosticsService, Event, Level, LogBook, MAX_ENTRIES};
 
     #[test]
     fn fixed_events_produce_the_documented_record_fields() {
@@ -241,5 +263,15 @@ mod tests {
                 .sequence(),
             (MAX_ENTRIES + 1) as u64
         );
+    }
+
+    #[test]
+    fn service_projects_only_copied_closed_entries() {
+        let mut log = LogBook::new();
+        log.record(Event::CoreHealthChecked)
+            .expect("test sequence capacity");
+        let entries = DiagnosticsService::entries(&log).expect("log is available");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].component(), "core");
     }
 }

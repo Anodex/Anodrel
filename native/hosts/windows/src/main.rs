@@ -61,6 +61,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return sample::run_ui_session_with_scroll(node_path, client_path);
     }
+    if let [command, node_path, client_path] = arguments.as_slice()
+        && command == "--sample-ui-diagnostics-client"
+    {
+        return sample::run_ui_session_with_diagnostics(node_path, client_path);
+    }
     if let [command, manifest_path] = arguments.as_slice()
         && command == "--application"
     {
@@ -85,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js>]",
         )
         .into());
     }

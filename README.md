@@ -31,7 +31,10 @@ revealed by host-retained native scrolling. The first branded Startup Lab turns
 those foundation checks, including a temporary private IPC health loopback,
 into a direct native visual smoke test.
 
-The application-state foundation now has a portable whole-snapshot contract,
+The authenticated protocol also exposes a bounded read of the host's closed
+diagnostic catalogue through its existing diagnostics grant; it accepts no
+application log text, native error, filter, or export request. The
+application-state foundation now has a portable whole-snapshot contract,
 a direct Windows adapter that keeps one recovered prior snapshot, and a
 Protocol 1.10 capability surface. The development UI-session diagnostic
 exercises its read, replace, and clear path end to end. Installed-application

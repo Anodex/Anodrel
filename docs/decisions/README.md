@@ -15,6 +15,8 @@ Current records (newest first):
 
 - 0052: Storage protocol uses independent state grants.
 
+- 0053: Diagnostic log reads stay bounded and closed.
+
 - 0051: Application state starts as one bounded atomic snapshot.
 
 - 0050: File text reads use selection references.

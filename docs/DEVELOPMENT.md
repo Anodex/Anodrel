@@ -201,6 +201,16 @@ own session. It accepts no application-supplied path and leaves no saved test
 snapshot behind. This is a development diagnostic; installed-application
 policy integration remains separate work.
 
+To exercise the bounded authenticated diagnostic-log read, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-diagnostics-client $nodePath $clientPath
+~~~
+
+The development client verifies exactly the fixed `core` and `transport` host
+events, then completes the regular semantic UI action. It has no path, free
+text, filter, write, clear, export, or subscription surface.
+
 To exercise a version 2 scroll document through that same session, run:
 
 ~~~powershell

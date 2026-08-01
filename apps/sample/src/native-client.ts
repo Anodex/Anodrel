@@ -98,6 +98,17 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-diagnostics")) {
+      const diagnostics = await client.readDiagnosticEntries();
+      if (
+        diagnostics.entries.length !== 2 ||
+        diagnostics.entries[0]?.component !== "core" ||
+        diagnostics.entries[1]?.component !== "transport"
+      ) {
+        return 22;
+      }
+    }
+
     if (process.argv.includes("--wait-for-ui-event")) {
       const eventResult = await waitForSampleAction(
         client,

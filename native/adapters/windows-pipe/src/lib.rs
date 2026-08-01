@@ -14,6 +14,7 @@ use std::{fmt, io, thread, time::Duration};
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_diagnostics::DiagnosticsService;
 use anodrel_external_links::ExternalLinkService;
 use anodrel_file_access::{FileSelectionService, FileTextService};
 use anodrel_file_dialog::{
@@ -51,6 +52,17 @@ impl StorageService for UnavailableStorage {
     }
     fn clear(&self) -> Result<(), StorageServiceError> {
         Err(StorageServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableDiagnostics;
+
+impl DiagnosticsService for UnavailableDiagnostics {
+    fn entries(
+        &self,
+    ) -> Result<Vec<anodrel_diagnostics::Entry>, anodrel_diagnostics::DiagnosticsServiceError> {
+        Err(anodrel_diagnostics::DiagnosticsServiceError::Unavailable)
     }
 }
 
@@ -382,8 +394,40 @@ impl WindowsPipeServer {
         file_text: impl FileTextService + 'static,
         storage: impl StorageService + 'static,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+            policy,
+            session_id,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            storage,
+            UnavailableDiagnostics,
+        )
+    }
+
+    /// Creates one endpoint with an explicit bounded host diagnostics source.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+        diagnostics: impl DiagnosticsService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
         Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_all_services_and_file_access_and_storage(
+            TransportSession::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
                 policy,
                 credentials,
                 ui_document_mailbox,
@@ -395,6 +439,7 @@ impl WindowsPipeServer {
                 file_selections,
                 file_text,
                 storage,
+                diagnostics,
             )
         })
     }

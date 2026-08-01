@@ -245,7 +245,10 @@ separate private child-bootstrap format. The bootstrap adapter can launch a
 caller-selected executable but is not integrated with application package trust
 or rendered content. The repository's Node-based development sample uses this
 path to exercise a real authenticated health request; it remains a diagnostic
-client, not a trusted application host. `docs/APPLICATIONS.md` separately
+client, not a trusted application host. Its Protocol 1.11 diagnostic read
+projects only the host-supplied closed catalogue through the existing
+`diagnostics.read` grant; no transport layer can manufacture dynamic diagnostic
+content. `docs/APPLICATIONS.md` separately
 defines the no-script package surface that the Windows host can display. It has
 no native bridge or protocol session.
 

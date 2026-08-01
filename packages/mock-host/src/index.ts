@@ -197,6 +197,40 @@ export class MockHost {
           protocolVersion: PROTOCOL_VERSION,
         });
 
+      case "diagnostics.entries.read":
+        if (request.protocolVersion.minor < 11) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "diagnostics.entries.read requires protocol 1.11 or later.",
+          );
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "diagnostics.entries.read does not accept a payload.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "diagnostics.read")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "diagnostics.entries.read requires the diagnostics.read capability.",
+            { capability: "diagnostics.read" },
+          );
+        }
+        return this.success("diagnostics.entries.read", request.requestId, {
+          entries: [
+            {
+              sequence: "1",
+              level: "info",
+              component: "core",
+              event: "Internal platform.health check completed.",
+            },
+          ],
+        });
+
       case "ui.document.replace":
       case "ui.document.replace.v2":
         if (request.protocolVersion.minor < (request.operation === "ui.document.replace.v2" ? 4 : 1)) {

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 10;
+pub const PROTOCOL_MINOR: u16 = 11;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -95,6 +95,7 @@ pub enum ProtocolErrorCode {
     StorageUnavailable,
     StorageSnapshotInvalid,
     StorageSnapshotTooLarge,
+    DiagnosticsUnavailable,
 }
 
 impl ProtocolErrorCode {
@@ -116,6 +117,7 @@ impl ProtocolErrorCode {
             Self::StorageUnavailable => "storage.unavailable",
             Self::StorageSnapshotInvalid => "storage.snapshot_invalid",
             Self::StorageSnapshotTooLarge => "storage.snapshot_too_large",
+            Self::DiagnosticsUnavailable => "diagnostics.unavailable",
         }
     }
 }

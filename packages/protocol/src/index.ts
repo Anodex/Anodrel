@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 10 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 11 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -57,6 +57,17 @@ export interface PlatformOperationMap {
       readonly status: "ready";
       readonly hostName: string;
       readonly protocolVersion: ProtocolVersion;
+    };
+  };
+  "diagnostics.entries.read": {
+    readonly payload: EmptyPayload;
+    readonly result: {
+      readonly entries: readonly {
+        readonly sequence: string;
+        readonly level: "info";
+        readonly component: string;
+        readonly event: string;
+      }[];
     };
   };
   "ui.document.replace": {
@@ -209,7 +220,8 @@ export type ProtocolErrorCode =
   | "file.text_too_large"
   | "storage.unavailable"
   | "storage.snapshot_invalid"
-  | "storage.snapshot_too_large";
+  | "storage.snapshot_too_large"
+  | "diagnostics.unavailable";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;

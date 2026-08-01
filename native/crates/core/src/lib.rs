@@ -17,6 +17,7 @@ use std::{
 };
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
+use anodrel_diagnostics::{DiagnosticsService, DiagnosticsServiceError};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_file_access::{
     FileSelectionResult, FileSelectionService, FileSelectionServiceError, FileTextService,
@@ -113,6 +114,7 @@ pub struct CoreHost {
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
     storage: Box<dyn StorageService>,
+    diagnostics: Box<dyn DiagnosticsService>,
 }
 
 #[derive(Debug)]
@@ -163,6 +165,15 @@ impl StorageService for UnavailableStorage {
 
     fn clear(&self) -> Result<(), StorageServiceError> {
         Err(StorageServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableDiagnostics;
+
+impl DiagnosticsService for UnavailableDiagnostics {
+    fn entries(&self) -> Result<Vec<anodrel_diagnostics::Entry>, DiagnosticsServiceError> {
+        Err(DiagnosticsServiceError::Unavailable)
     }
 }
 
@@ -297,6 +308,35 @@ impl CoreHost {
         file_text: impl FileTextService + 'static,
         storage: impl StorageService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            storage,
+            UnavailableDiagnostics,
+        )
+    }
+
+    /// Creates a host core with the bounded host-owned diagnostic source for
+    /// this authenticated session.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+        diagnostics: impl DiagnosticsService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
@@ -309,6 +349,7 @@ impl CoreHost {
             file_selections: Box::new(file_selections),
             file_text: Box::new(file_text),
             storage: Box::new(storage),
+            diagnostics: Box::new(diagnostics),
         }
     }
 
@@ -365,6 +406,9 @@ impl CoreHost {
             "platform.ping" => self.handle_ping(request),
             "platform.capabilities" => self.handle_capabilities(request),
             "platform.health" => self.handle_health(request),
+            "diagnostics.entries.read" if request.protocol_version.minor >= 11 => {
+                self.handle_diagnostics_entries_read(request)
+            }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
             }
@@ -495,6 +539,48 @@ impl CoreHost {
                 ("protocolVersion", ProtocolVersion::CURRENT.to_json()),
             ]),
         )
+    }
+
+    fn handle_diagnostics_entries_read(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "diagnostics.entries.read does not accept a payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::DiagnosticsRead) {
+            return self.capability_denied(request.request_id, "diagnostics.read");
+        }
+        match self.diagnostics.entries() {
+            Ok(entries) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([(
+                    "entries",
+                    JsonValue::Array(
+                        entries
+                            .into_iter()
+                            .map(|entry| {
+                                object([
+                                    ("sequence", JsonValue::String(entry.sequence().to_string())),
+                                    ("level", JsonValue::String(entry.level().label().to_owned())),
+                                    ("component", JsonValue::String(entry.component().to_owned())),
+                                    ("event", JsonValue::String(entry.message().to_owned())),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                )]),
+            ),
+            Err(DiagnosticsServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::DiagnosticsUnavailable,
+                "diagnostic entries are unavailable.",
+                None,
+            ),
+        }
     }
 
     fn handle_ui_document_replace(&self, request: RequestEnvelope, version_two: bool) -> JsonValue {

@@ -10,6 +10,7 @@ use std::fmt;
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
+use anodrel_diagnostics::DiagnosticsService;
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_file_access::{FileSelectionService, FileTextService};
 use anodrel_file_dialog::{
@@ -24,6 +25,17 @@ pub const MAX_SESSION_ID_BYTES: usize = 128;
 pub const SESSION_TOKEN_HEX_BYTES: usize = 64;
 const AUTHENTICATE_KIND: &str = "session.authenticate";
 const AUTHENTICATED_KIND: &str = "session.authenticated";
+
+#[derive(Debug)]
+struct TransportUnavailableDiagnostics;
+
+impl DiagnosticsService for TransportUnavailableDiagnostics {
+    fn entries(
+        &self,
+    ) -> Result<Vec<anodrel_diagnostics::Entry>, anodrel_diagnostics::DiagnosticsServiceError> {
+        Err(anodrel_diagnostics::DiagnosticsServiceError::Unavailable)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CredentialsError {
@@ -372,9 +384,41 @@ impl TransportSession {
         file_text: impl FileTextService + 'static,
         storage: impl StorageService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            storage,
+            TransportUnavailableDiagnostics,
+        )
+    }
+
+    /// Creates one session with an explicit bounded host diagnostics source.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+        diagnostics: impl DiagnosticsService + 'static,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_session_components_and_all_services_and_file_access_and_storage(
+            host: CoreHost::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
                 policy,
                 ui_input_mailbox,
                 session_close_signal,
@@ -384,6 +428,7 @@ impl TransportSession {
                 file_selections,
                 file_text,
                 storage,
+                diagnostics,
             ),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),

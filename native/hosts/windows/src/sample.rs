@@ -7,6 +7,7 @@ use std::{error::Error, io, thread};
 
 use anodrel_application::ApplicationManifest;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_access::SelectionFileDialogMailbox;
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_protocol::Capability;
@@ -29,6 +30,7 @@ enum SampleDialogRequest {
     SaveFile,
     Storage,
     Scroll,
+    Diagnostics,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -84,6 +86,14 @@ pub fn run_ui_session_with_scroll(
     client_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Scroll)
+}
+
+/// Runs the UI session diagnostic and asks its client to read closed host diagnostics.
+pub fn run_ui_session_with_diagnostics(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Diagnostics)
 }
 
 fn run_ui_session_with_dialog(
@@ -143,7 +153,7 @@ fn run_with_optional_session_view(
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
         Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) => {
-            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access_and_storage(
+            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
                 policy,
                 "sample-session",
                 mailbox.clone(),
@@ -155,6 +165,7 @@ fn run_with_optional_session_view(
                 SelectionFileDialogMailbox::new(file_dialog_mailbox.clone()),
                 file_text.clone(),
                 sample_storage()?,
+                sample_diagnostics(),
             )?
         }
         None => WindowsPipeServer::create(policy, "sample-session")?,
@@ -175,6 +186,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::SaveFile => command.arg("--request-save-file")?,
             SampleDialogRequest::Storage => command.arg("--request-storage-state")?,
             SampleDialogRequest::Scroll => command.arg("--request-scroll-document")?,
+            SampleDialogRequest::Diagnostics => command.arg("--request-diagnostics")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
@@ -214,4 +226,13 @@ fn sample_storage() -> Result<WindowsStorageService, Box<dyn Error>> {
     Ok(WindowsStorageService::new(&application_directories(
         manifest.identity(),
     )?))
+}
+
+fn sample_diagnostics() -> LogBook {
+    let mut log = LogBook::new();
+    log.record(Event::CoreHealthChecked)
+        .expect("the fixed development log cannot exhaust its sequence");
+    log.record(Event::PipeLoopbackChecked)
+        .expect("the fixed development log cannot exhaust its sequence");
+    log
 }
