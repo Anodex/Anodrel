@@ -87,6 +87,32 @@ impl SelectedFilePath {
     }
 }
 
+/// One bounded, absolute save destination selected by the user.
+///
+/// Constructing this value neither creates nor truncates a file.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SaveFilePath(PathBuf);
+
+impl SaveFilePath {
+    /// Validates one absolute save destination without accessing the filesystem.
+    pub fn new(path: impl Into<PathBuf>) -> Result<Self, FileDialogInputError> {
+        let path = path.into();
+        if !path.is_absolute()
+            || path.as_os_str().is_empty()
+            || path.to_string_lossy().len() > MAX_SELECTED_PATH_BYTES
+        {
+            return Err(FileDialogInputError::InvalidSavePath);
+        }
+        Ok(Self(path))
+    }
+
+    /// Returns the opaque selected destination.
+    #[must_use]
+    pub fn as_path(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
 fn is_extension(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 16
@@ -104,6 +130,8 @@ pub enum FileDialogInputError {
     InvalidExtension,
     /// The selected path was empty, relative, or exceeded its bound.
     InvalidSelectedPath,
+    /// The save destination was empty, relative, or exceeded its bound.
+    InvalidSavePath,
 }
 impl fmt::Display for FileDialogInputError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -114,13 +142,14 @@ impl std::error::Error for FileDialogInputError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{FileDialogFilter, FileDialogInputError, SelectedFilePath};
+    use super::{FileDialogFilter, FileDialogInputError, SaveFilePath, SelectedFilePath};
     #[test]
     fn accepts_strict_filters_and_absolute_selected_paths() {
         let filter = FileDialogFilter::new("Documents", vec!["txt".to_owned(), "json".to_owned()])
             .expect("filter is valid");
         assert_eq!(filter.extensions(), ["txt", "json"]);
         assert!(SelectedFilePath::new(r"C:\Users\Owner\document.txt").is_ok());
+        assert!(SaveFilePath::new(r"C:\Users\Owner\draft.txt").is_ok());
     }
     #[test]
     fn rejects_raw_filter_syntax_and_relative_paths() {
@@ -131,6 +160,10 @@ mod tests {
         assert_eq!(
             SelectedFilePath::new("document.txt"),
             Err(FileDialogInputError::InvalidSelectedPath)
+        );
+        assert_eq!(
+            SaveFilePath::new("draft.txt"),
+            Err(FileDialogInputError::InvalidSavePath)
         );
     }
 }

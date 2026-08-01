@@ -100,8 +100,8 @@ Status: **Direct Windows host in progress**
   through the separate Protocol 1.6 `external.open` grant (Decisions 0042 and
   0043). Rich clipboard formats, consent, subscriptions, custom link schemes,
   and non-Windows adapters remain deferred. The file-dialog foundation defines
-  strict portable filters and bounded selected-path values (Decision 0044),
-  with a direct Windows open-file adapter and a bounded UI-thread request
+  strict portable filters and bounded selected/save-path values (Decisions 0044
+  and 0047), with direct Windows open/save adapters and a bounded UI-thread request
   bridge (Decision 0045). Protocol 1.7 now grants `dialog.open_file` only
   through that bridge; file access remains deferred.
 - Implement secure credential storage through the operating system.

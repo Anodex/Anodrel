@@ -1,10 +1,13 @@
 //! Narrow Comdlg32 binding for one bounded host-owned open-file dialog.
-use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
+use anodrel_file_dialog::{FileDialogFilter, SaveFilePath, SelectedFilePath};
 use std::{mem, ptr};
 const MAX_PATH_UNITS: usize = 32_768;
 const OFN_EXPLORER: u32 = 0x0008_0000;
 const OFN_FILEMUSTEXIST: u32 = 0x0000_1000;
 const OFN_PATHMUSTEXIST: u32 = 0x0000_0800;
+const OFN_OVERWRITEPROMPT: u32 = 0x0000_0002;
+const OPEN_FLAGS: u32 = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+const SAVE_FLAGS: u32 = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
 #[repr(C)]
 struct OpenFileNameW {
     l_struct_size: u32,
@@ -34,12 +37,31 @@ struct OpenFileNameW {
 #[link(name = "comdlg32")]
 unsafe extern "system" {
     fn GetOpenFileNameW(value: *mut OpenFileNameW) -> i32;
+    fn GetSaveFileNameW(value: *mut OpenFileNameW) -> i32;
     fn CommDlgExtendedError() -> u32;
 }
 pub(super) fn open_file(
     owner_window: isize,
     filters: &[FileDialogFilter],
 ) -> Result<Option<SelectedFilePath>, ()> {
+    let path = choose_file(owner_window, filters, OPEN_FLAGS, GetOpenFileNameW)?;
+    path.map(SelectedFilePath::new).transpose().map_err(|_| ())
+}
+
+pub(super) fn save_file(
+    owner_window: isize,
+    filters: &[FileDialogFilter],
+) -> Result<Option<SaveFilePath>, ()> {
+    let path = choose_file(owner_window, filters, SAVE_FLAGS, GetSaveFileNameW)?;
+    path.map(SaveFilePath::new).transpose().map_err(|_| ())
+}
+
+fn choose_file(
+    owner_window: isize,
+    filters: &[FileDialogFilter],
+    flags: u32,
+    choose: unsafe extern "system" fn(*mut OpenFileNameW) -> i32,
+) -> Result<Option<String>, ()> {
     let filter = filter_string(filters);
     let mut file = vec![0_u16; MAX_PATH_UNITS];
     let mut value = OpenFileNameW {
@@ -56,7 +78,7 @@ pub(super) fn open_file(
         file_title_max: 0,
         initial_dir: ptr::null(),
         title: ptr::null(),
-        flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST,
+        flags,
         file_offset: 0,
         file_extension: 0,
         def_ext: ptr::null(),
@@ -67,7 +89,7 @@ pub(super) fn open_file(
         reserved_max: 0,
         flags_ex: 0,
     };
-    let selected = unsafe { GetOpenFileNameW(&mut value) };
+    let selected = unsafe { choose(&mut value) };
     if selected == 0 {
         let error = unsafe { CommDlgExtendedError() };
         return if error == 0 { Ok(None) } else { Err(()) };
@@ -76,7 +98,7 @@ pub(super) fn open_file(
         return Err(());
     };
     let path = String::from_utf16(&file[..end]).map_err(|_| ())?;
-    SelectedFilePath::new(path).map(Some).map_err(|_| ())
+    Ok(Some(path))
 }
 fn filter_string(filters: &[FileDialogFilter]) -> Vec<u16> {
     let mut result = Vec::new();
@@ -104,5 +126,14 @@ mod tests {
         let f = FileDialogFilter::new("Text", vec!["txt".to_owned()]).unwrap();
         let e = filter_string(&[f]);
         assert_eq!(&e[e.len() - 2..], [0, 0]);
+    }
+
+    #[test]
+    fn open_and_save_use_distinct_file_existence_policies() {
+        assert_ne!(OPEN_FLAGS & OFN_FILEMUSTEXIST, 0);
+        assert_eq!(OPEN_FLAGS & OFN_OVERWRITEPROMPT, 0);
+        assert_eq!(SAVE_FLAGS & OFN_FILEMUSTEXIST, 0);
+        assert_ne!(SAVE_FLAGS & OFN_OVERWRITEPROMPT, 0);
+        assert_ne!(SAVE_FLAGS & OFN_PATHMUSTEXIST, 0);
     }
 }

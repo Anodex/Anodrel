@@ -1,12 +1,12 @@
 # Anodrel file-dialog foundation
 
-**Status:** Portable open-dialog values, a direct Windows adapter, and a
+**Status:** Portable open/save-dialog values, a direct Windows adapter, and a
 bounded UI-thread request bridge are implemented. Protocol 1.7 exposes the
 session-bound `dialog.open_file` capability through that bridge.
 
 ## Boundary
 
-The first file-dialog contract models one host-owned open-file choice. An
+The first file-dialog contract models one host-owned open-file or save-file choice. An
 application supplies no native window handle, initial directory, raw filter
 string, file-system path, multiple-selection flag, save location, or dialog
 flag. Hosts later select a documented dialog configuration and return either a
@@ -25,10 +25,13 @@ does not grant file read, write, enumeration, handle access, or process launch.
   only lowercase ASCII letters and digits, without dots or wildcards.
 - A selected path is an absolute non-empty path at most 32 KiB in UTF-8 bytes.
   It is opaque application data, never a native handle or permission grant.
+- A save destination follows the same absolute 32 KiB bound. Selecting it does
+  not create, truncate, or write a file.
 - The portable crate performs no filesystem I/O, path resolution, dialog call,
   logging, or protocol operation.
 
 ## Deferred
 
-Initial-directory policy, file access, save dialogs, folder dialogs, multiple
-selection, confirmation UI, and non-Windows adapters need separate decisions.
+Initial-directory policy, file access, the session-bound save capability,
+folder dialogs, multiple selection, confirmation UI, and non-Windows adapters
+need separate decisions.
