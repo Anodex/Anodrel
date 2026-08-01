@@ -1,6 +1,7 @@
 # Anodrel clipboard foundation
 
-**Status:** Design contract; implementation follows this document.
+**Status:** Portable text values and the direct Windows adapter are implemented;
+the capability-checked protocol surface remains deferred.
 
 ## Boundary
 
@@ -47,6 +48,10 @@ uses a movable global-memory allocation only during the documented ownership
 transfer to Windows. It frees memory itself only when that transfer fails.
 The adapter closes the clipboard on every path and never retains the native
 handle after a call.
+
+The direct adapter is host-only. It accepts the current host window only as an
+opaque transient owner value, never exposes it to an application, and maps all
+native failures to `Unavailable`, `StoredTextInvalid`, or `StoredTextTooLarge`.
 
 ## Security and privacy
 

@@ -88,10 +88,14 @@ Status: **Direct Windows host in progress**
   with fixed warmup and documented percentile rules (Decision 0024). Startup,
   memory, rendering, and application comparisons remain separate workloads.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
-  **Completed for the path foundation:** host-only per-application `data`,
+  **Completed for the path and text-clipboard foundations:** host-only
+  per-application `data`,
   `cache`, and `logs` locations derived from a validated identity and the
   current user's Windows Local AppData root (Decision 0021). Filesystem
   access, directory creation, and a public storage protocol remain deferred.
+  The clipboard is limited to bounded Unicode text through a direct Windows
+  adapter (Decision 0040); application capability grants and protocol
+  operations remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded

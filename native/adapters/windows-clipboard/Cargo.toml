@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-windows-clipboard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-clipboard = { path = "../../crates/clipboard" }

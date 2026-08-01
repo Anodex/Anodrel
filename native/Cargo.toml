@@ -26,6 +26,7 @@ members = [
   "adapters/windows-launch",
   "adapters/windows-paths",
   "adapters/windows-credentials",
+  "adapters/windows-clipboard",
   "hosts/windows",
   "tools/perf-lab",
 ]

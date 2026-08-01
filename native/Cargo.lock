@@ -133,6 +133,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-clipboard"
+version = "0.1.0"
+dependencies = [
+ "anodrel-clipboard",
+]
+
+[[package]]
 name = "anodrel-windows-credentials"
 version = "0.1.0"
 dependencies = [
