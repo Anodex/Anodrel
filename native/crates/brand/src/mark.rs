@@ -389,7 +389,9 @@ fn glow_paint(bounds: Rect) -> Paint {
 #[must_use]
 pub fn sweep_paint(bounds: Rect, progress: f32, strength: f32) -> Paint {
     let travel = -0.25 + progress.clamp(0.0, 1.0) * 1.5;
-    let half_width = 0.13;
+    // Narrow enough to read as a glint catching an edge rather than as a wash
+    // moving over the whole mark.
+    let half_width = 0.10;
     let peak = Color::WHITE.with_alpha((strength.clamp(0.0, 1.0) * 255.0) as u8);
     let stops = vec![
         Stop::new(0.0, Color::TRANSPARENT),

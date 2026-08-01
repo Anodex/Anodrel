@@ -484,9 +484,11 @@ fn draw_ambient_layers(canvas: &mut Canvas, elapsed_millis: u64) -> bool {
         let left = hero.region.left as i32;
         let top = hero.region.top as i32;
 
-        // Breathing: a slow, shallow rise and fall. Anything deeper stops
-        // reading as a glow and starts reading as a flash.
-        let breath = 0.86 + 0.14 * (phase * std::f32::consts::TAU).sin().mul_add(0.5, 0.5);
+        // Breathing: the glow layer is rendered at its brightest and then
+        // modulated down, because a layer cannot be composited above full
+        // opacity. The swing has to be wide enough to register at a glance —
+        // a few percent is arithmetic nobody sees.
+        let breath = 0.62 + 0.38 * (phase * std::f32::consts::TAU).sin().mul_add(0.5, 0.5);
         canvas.draw_canvas(&hero.glow, left, top, breath);
         canvas.draw_canvas(&hero.body, left, top, 1.0);
 
@@ -494,7 +496,7 @@ fn draw_ambient_layers(canvas: &mut Canvas, elapsed_millis: u64) -> bool {
             let progress = phase / SWEEP_FRACTION;
             // Fade the band in and out across its pass so it never appears or
             // vanishes at an edge.
-            let strength = (progress * std::f32::consts::PI).sin() * 0.30;
+            let strength = (progress * std::f32::consts::PI).sin() * 0.62;
             canvas.fill_mask(
                 &hero.mask,
                 &mark::sweep_paint(hero.bounds, progress, strength),

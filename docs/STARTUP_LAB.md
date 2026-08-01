@@ -126,9 +126,20 @@ settles, the mark scales up from slightly small and fades in, the title and
 identity rise, then the cards and action tiles stagger in. Stages overlap
 deliberately, so it reads as one motion rather than a queue.
 
-The reveal is a one-shot. Once it settles, only the mark keeps a slow ambient
-motion at 30 frames per second; the host repaints its declared region rather
-than the whole surface, and pauses that timer while inactive or minimized.
+The reveal is a one-shot. Once it settles, only the mark keeps moving, on a
+7.2-second ambient cycle: its bloom breathes across the whole cycle, and a
+narrow highlight crosses the artwork once near the start, then stays away for
+the rest. The two are deliberately out of step, so the mark reads as a solid
+object under changing light rather than as a looping animation.
+
+Amplitudes are chosen to be noticed rather than merely present — an effect
+measurable only by a test is not an effect. The bloom swings across roughly a
+third of its brightness, and the highlight peaks near two-thirds opacity but is
+narrow enough to read as a glint on an edge.
+
+Ambient motion runs at 30 frames per second, repaints only its declared region
+rather than the whole surface, and pauses while the window is inactive or
+minimized.
 
 The design deliberately borrows the useful role of Electron's welcome screen: a
 first-run orientation and a visual test point. Its mark, palette, wording,
@@ -147,7 +158,13 @@ Startup Lab** window opens and shows:
 - Open Logs, Inspect Package, and Runtime Diagnostics highlighting under the
   pointer, taking a hand cursor, and each opening a native window when
   clicked;
-- a smooth reveal that settles into low-frequency mark motion.
+- a smooth reveal that settles into a visibly breathing mark, with a highlight
+  crossing the artwork roughly every seven seconds.
+
+Watch the settled screen for one full ambient cycle. The bloom's rise and fall
+should be obvious without staring, and the highlight should read as light
+catching an edge rather than as a bar sliding across a picture. Motion confined
+to the mark is correct; nothing else on the surface may move.
 
 Resize the window and confirm the layout scales without overflowing and without
 flicker. Close the Startup Lab window last: the host exits only after its final
@@ -172,4 +189,9 @@ asserted:
 - the linked log action displays only the closed host event catalogue;
 - the reveal adds content over time, then transitions to the lower-frequency
   ambient mark cadence without changing any other pixels;
+- the surface is pixel-identical when sampled a whole ambient cycle apart, so
+  nothing but the ambient loop is still moving;
+- ambient motion visibly changes the mark across the cycle, and every pixel it
+  changes lies inside the region the host invalidates;
+- a partial ambient update reproduces a full compose exactly;
 - a frame composes inside the animation timer's interval in a release build.
