@@ -13,6 +13,9 @@ Each record should include:
 
 Current records (newest first):
 
+- 0024 — Native transport performance uses an owned repeatable measurement
+  tool.
+
 - 0023 — Session capability grants are bound to installed machine policy.
 
 - 0022 — Windows credentials use a narrow current-user Credential Manager

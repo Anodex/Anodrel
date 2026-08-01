@@ -65,6 +65,11 @@ Status: **Direct Windows host in progress**
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
   per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
+- Establish repeatable native performance measurements. **Completed for the
+  owned in-process transport path:** a first-party release performance lab
+  measures 1 KiB and 64 KiB wire payload latency with fixed warmup and
+  documented percentile rules (Decision 0024). Equivalent pipe, startup,
+  memory, rendering, and application comparisons remain separate workloads.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
   **Completed for the path foundation:** host-only per-application `data`,
   `cache`, and `logs` locations derived from a validated identity and the

@@ -189,6 +189,13 @@ and a separate sensitive invitation, but does not start a process, deliver the
 invitation, or perform pipe I/O. Those remain explicit caller-owned lifecycle
 steps.
 
+`anodrel-perf-lab` is a development tool, not part of the shipped host. It
+measures the owned in-process wire, authenticated transport, and core path at
+fixed 1 KiB and 64 KiB payload sizes. Its bounded iteration count, fixed warmup,
+and nearest-rank percentiles make results repeatable; it does not measure pipe
+I/O, application startup, memory, rendering, or another runtime. See
+`docs/PERFORMANCE.md` and Decision 0024.
+
 ## Communication model
 
 The application-to-host boundary must use a documented, versioned protocol.

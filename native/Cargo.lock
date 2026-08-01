@@ -60,6 +60,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-perf-lab"
+version = "0.1.0"
+dependencies = [
+ "anodrel-core",
+ "anodrel-transport",
+ "anodrel-wire",
+]
+
+[[package]]
 name = "anodrel-protocol"
 version = "0.1.0"
 dependencies = [

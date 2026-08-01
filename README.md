@@ -34,6 +34,11 @@ still shipping no image decoder. Neither crate has an operating-system or
 third-party dependency, and both forbid unsafe code, so rendering is tested by
 asserting on pixels without opening a window.
 
+The native workspace also includes a first-party performance lab for the owned
+wire, authenticated transport, and core path. It reports repeatable release
+measurements without making a comparison claim or bringing in a benchmark
+framework. See `docs/PERFORMANCE.md`.
+
 ## Goals
 
 - Create a reusable native desktop runtime.

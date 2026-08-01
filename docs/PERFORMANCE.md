@@ -45,8 +45,45 @@ recomposed each frame — see `docs/RENDERER.md`.
 The wire and session unit tests verify framing, limits, fragmentation,
 coalescing, authentication, and capability policy without timing-sensitive
 assertions. The Windows adapter integration test exercises a real local named
-pipe from connection through authenticated health response. Repeatable runtime
-measurement commands will be added before any performance comparison is
+pipe from connection through authenticated health response.
+
+## Owned transport performance lab
+
+`anodrel-perf-lab` is a first-party release measurement tool. It sends a
+documented `platform.ping` request through Anodrel's frame codec,
+already-authenticated `TransportSession`, and `CoreHost`. It measures the two
+fixed wire payload sizes required above: **1,024 bytes** and **65,536 bytes**.
+It makes no OS call and does not listen on a pipe, so it isolates the work
+Anodrel owns in those three layers.
+
+Run it from the repository root in a release build:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
+~~~
+
+`--iterations` accepts a whole number from 10 through 100,000 and defaults to
+5,000. The tool runs 200 unreported warmup requests for each size. It writes one
+JSON object to standard output and performs no file I/O. To retain a result,
+redirect standard output to an ignored local `.anodrel/` directory along with
+the machine, OS build, power mode, compiler version, and workload notes.
+
+The report is a local tooling format, not a public protocol. Its v1 fields are:
+
+| Field | Meaning |
+| --- | --- |
+| `benchmark` | Exact workload identifier: `anodrel.transport.in-process.v1`. |
+| `iterations` | Measured requests per payload size, excluding warmup. |
+| `measurements[].payloadBytes` | Exact encoded JSON payload size. |
+| `measurements[].samples` | Number of reported latency samples. |
+| `p50Nanoseconds`, `p95Nanoseconds`, `p99Nanoseconds` | Nearest-rank latency percentiles; rank is `ceil(percentile × samples / 100)`. |
+| `meanNanoseconds` | Integer mean latency across reported samples. |
+| `unit` | Always `nanoseconds`. |
+| `scope` | Fixed statement of the layers being measured. |
+
+This result must not be presented as startup time, named-pipe latency, process
+memory, rendering performance, or an Electron comparison. Those need their own
+equivalent benchmark contracts and recorded environment before a comparison is
 published.
 
 ## Reference material

@@ -63,6 +63,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-registered-sessi
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 ~~~
 

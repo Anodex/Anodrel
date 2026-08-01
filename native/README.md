@@ -23,6 +23,8 @@ anodrel-session-policy -> anodrel-application / anodrel-core
 
 anodrel-windows-registered-session -> anodrel-windows-policy / anodrel-windows-pipe
 
+anodrel-perf-lab -> anodrel-wire / anodrel-transport / anodrel-core
+
 anodrel-windows-launch -> anodrel-windows-policy / anodrel-windows-signature
                         -> anodrel-windows-bootstrap / Kernel32
 
@@ -68,6 +70,10 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
   fixed Windows machine store and creates one owner-restricted named-pipe
   endpoint. It leaves process launch, invitation delivery, and worker-thread
   pipe service to their dedicated adapters.
+- `tools/perf-lab` is a development-only first-party release benchmark. It
+  measures fixed 1 KiB and 64 KiB in-process wire, authenticated transport, and
+  core requests; it does not measure pipe I/O or claim an application-runtime
+  comparison.
 - `adapters/windows-launch` is the host-only registered-process service. It
   locks the policy-approved executable, revalidates its digest and signer,
   launches no shell or application arguments, delivers one private bootstrap
@@ -126,6 +132,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json

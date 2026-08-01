@@ -23,6 +23,7 @@ members = [
   "adapters/windows-paths",
   "adapters/windows-credentials",
   "hosts/windows",
+  "tools/perf-lab",
 ]
 resolver = "2"
 
