@@ -30,6 +30,7 @@ use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
 };
+use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
 use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -39,6 +40,7 @@ pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
 pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
+pub const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES: usize = 24 * 1024;
 
 /// One host-created, coalescing request to end an authenticated session.
 ///
@@ -110,6 +112,7 @@ pub struct CoreHost {
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
+    storage: Box<dyn StorageService>,
 }
 
 #[derive(Debug)]
@@ -143,6 +146,23 @@ impl FileDialogService for UnavailableFileDialogs {
         _filters: &[FileDialogFilter],
     ) -> Result<FileDialogSelection, FileDialogServiceError> {
         Err(FileDialogServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableStorage;
+
+impl StorageService for UnavailableStorage {
+    fn read(&self) -> Result<StorageRead, StorageServiceError> {
+        Err(StorageServiceError::Unavailable)
+    }
+
+    fn replace(&self, _snapshot: &StorageSnapshot) -> Result<(), StorageServiceError> {
+        Err(StorageServiceError::Unavailable)
+    }
+
+    fn clear(&self) -> Result<(), StorageServiceError> {
+        Err(StorageServiceError::Unavailable)
     }
 }
 
@@ -250,6 +270,33 @@ impl CoreHost {
         file_selections: impl FileSelectionService + 'static,
         file_text: impl FileTextService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            UnavailableStorage,
+        )
+    }
+
+    /// Creates a host core with all injected services, including one
+    /// host-selected application-state store for this authenticated session.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access_and_storage(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
@@ -261,6 +308,7 @@ impl CoreHost {
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
             file_text: Box::new(file_text),
+            storage: Box::new(storage),
         }
     }
 
@@ -349,6 +397,15 @@ impl CoreHost {
             }
             "file.read_text" if request.protocol_version.minor >= 9 => {
                 self.handle_file_text_read(request)
+            }
+            "storage.state.read" if request.protocol_version.minor >= 10 => {
+                self.handle_storage_read(request)
+            }
+            "storage.state.replace" if request.protocol_version.minor >= 10 => {
+                self.handle_storage_replace(request)
+            }
+            "storage.state.clear" if request.protocol_version.minor >= 10 => {
+                self.handle_storage_clear(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -892,6 +949,108 @@ impl CoreHost {
         }
     }
 
+    fn handle_storage_read(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "storage.state.read requires an empty payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::StorageStateRead) {
+            return self.capability_denied(request.request_id, "storage.state.read");
+        }
+        match self.storage.read() {
+            Ok(StorageRead::Absent) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("absent".to_owned()))]),
+            ),
+            Ok(StorageRead::Snapshot(snapshot))
+                if snapshot.as_str().len() <= MAX_STORAGE_SNAPSHOT_REQUEST_BYTES =>
+            {
+                ResponseEnvelope::success(
+                    request.request_id,
+                    &self.policy.host_name,
+                    object([
+                        ("status", JsonValue::String("snapshot".to_owned())),
+                        ("snapshot", JsonValue::String(snapshot.as_str().to_owned())),
+                    ]),
+                )
+            }
+            Ok(StorageRead::Snapshot(_)) | Err(StorageServiceError::StoredSnapshotTooLarge) => self
+                .storage_failure(
+                    request.request_id,
+                    StorageServiceError::StoredSnapshotTooLarge,
+                ),
+            Err(error) => self.storage_failure(request.request_id, error),
+        }
+    }
+
+    fn handle_storage_replace(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(snapshot) = storage_replace_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "storage.state.replace requires one exact snapshot.",
+                None,
+            );
+        };
+        if snapshot.len() > MAX_STORAGE_SNAPSHOT_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "storage snapshot is too large.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::StorageStateReplace) {
+            return self.capability_denied(request.request_id, "storage.state.replace");
+        }
+        let snapshot = match StorageSnapshot::new(snapshot.to_owned()) {
+            Ok(snapshot) => snapshot,
+            Err(_) => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::RequestPayloadInvalid,
+                    "storage snapshot is too large.",
+                    None,
+                );
+            }
+        };
+        match self.storage.replace(&snapshot) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("replaced".to_owned()))]),
+            ),
+            Err(error) => self.storage_failure(request.request_id, error),
+        }
+    }
+
+    fn handle_storage_clear(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "storage.state.clear requires an empty payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::StorageStateClear) {
+            return self.capability_denied(request.request_id, "storage.state.clear");
+        }
+        match self.storage.clear() {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("cleared".to_owned()))]),
+            ),
+            Err(error) => self.storage_failure(request.request_id, error),
+        }
+    }
+
     fn capability_denied(&self, request_id: String, capability: &str) -> JsonValue {
         self.failure(
             request_id,
@@ -917,6 +1076,24 @@ impl CoreHost {
             ClipboardServiceError::StoredTextTooLarge => (
                 ProtocolErrorCode::ClipboardTextTooLarge,
                 "clipboard text is too large.",
+            ),
+        };
+        self.failure(request_id, code, message, None)
+    }
+
+    fn storage_failure(&self, request_id: String, error: StorageServiceError) -> JsonValue {
+        let (code, message) = match error {
+            StorageServiceError::Unavailable => (
+                ProtocolErrorCode::StorageUnavailable,
+                "application state is unavailable.",
+            ),
+            StorageServiceError::StoredSnapshotInvalid => (
+                ProtocolErrorCode::StorageSnapshotInvalid,
+                "stored application state is invalid.",
+            ),
+            StorageServiceError::StoredSnapshotTooLarge => (
+                ProtocolErrorCode::StorageSnapshotTooLarge,
+                "stored application state is too large.",
             ),
         };
         self.failure(request_id, code, message, None)
@@ -1025,6 +1202,14 @@ fn file_text_read_payload(value: &JsonValue) -> Option<SelectionReference> {
     SelectionReference::new(fields.get("selectionReference")?.as_string()?.to_owned()).ok()
 }
 
+fn storage_replace_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("snapshot"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
 fn rfc3339_now() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1064,6 +1249,7 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::sync::Mutex;
 
     use anodrel_clipboard::{
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
@@ -1071,6 +1257,7 @@ mod tests {
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
     use anodrel_file_access::{FileSelection, FileSelectionService, FileTextService};
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
+    use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
 
@@ -1209,6 +1396,32 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct MemoryStorage(Mutex<Result<StorageRead, StorageServiceError>>);
+
+    impl MemoryStorage {
+        fn with_state(state: StorageRead) -> Self {
+            Self(Mutex::new(Ok(state)))
+        }
+    }
+
+    impl StorageService for MemoryStorage {
+        fn read(&self) -> Result<StorageRead, StorageServiceError> {
+            self.0.lock().expect("storage lock is available").clone()
+        }
+
+        fn replace(&self, snapshot: &StorageSnapshot) -> Result<(), StorageServiceError> {
+            *self.0.lock().expect("storage lock is available") =
+                Ok(StorageRead::Snapshot(snapshot.clone()));
+            Ok(())
+        }
+
+        fn clear(&self) -> Result<(), StorageServiceError> {
+            *self.0.lock().expect("storage lock is available") = Ok(StorageRead::Absent);
+            Ok(())
+        }
+    }
+
     fn clipboard_host(
         grants: Vec<Capability>,
         clipboard: impl ClipboardService + 'static,
@@ -1262,6 +1475,20 @@ mod tests {
             CancellingFileDialog,
             selections,
             text,
+        )
+    }
+
+    fn storage_host(grants: Vec<Capability>, storage: impl StorageService + 'static) -> CoreHost {
+        CoreHost::with_session_components_and_all_services_and_file_access_and_storage(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            MemoryClipboard::with_text(None),
+            FailingExternalLinks,
+            CancellingFileDialog,
+            CapturingFileDialog,
+            FixedFileText(Err(FileTextServiceError::Unavailable)),
+            storage,
         )
     }
 
@@ -1322,6 +1549,12 @@ mod tests {
     fn request_v1_9(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":9}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_10(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":10}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -1917,6 +2150,74 @@ mod tests {
         assert_eq!(
             field(field(&oversized, "error"), "code").as_string(),
             Some("file.text_too_large")
+        );
+    }
+
+    #[test]
+    fn storage_operations_are_exact_bounded_and_independently_granted() {
+        let storage_host = storage_host(
+            vec![
+                Capability::StorageStateRead,
+                Capability::StorageStateReplace,
+                Capability::StorageStateClear,
+            ],
+            MemoryStorage::with_state(StorageRead::Absent),
+        );
+        let replaced = JsonValue::parse(&storage_host.handle_json(&request_v1_10(
+            "storage.state.replace",
+            r#"{"snapshot":"saved"}"#,
+        )))
+        .expect("replace response is JSON");
+        assert_eq!(
+            field(field(&replaced, "result"), "status").as_string(),
+            Some("replaced")
+        );
+
+        let read =
+            JsonValue::parse(&storage_host.handle_json(&request_v1_10("storage.state.read", "{}")))
+                .expect("read response is JSON");
+        assert_eq!(
+            field(field(&read, "result"), "snapshot").as_string(),
+            Some("saved")
+        );
+
+        let cleared = JsonValue::parse(
+            &storage_host.handle_json(&request_v1_10("storage.state.clear", "{}")),
+        )
+        .expect("clear response is JSON");
+        assert_eq!(
+            field(field(&cleared, "result"), "status").as_string(),
+            Some("cleared")
+        );
+
+        let invalid = JsonValue::parse(
+            &storage_host.handle_json(&request_v1_10("storage.state.read", r#"{"extra":true}"#)),
+        )
+        .expect("invalid response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let no_grant =
+            JsonValue::parse(&host(vec![]).handle_json(&request_v1_10("storage.state.read", "{}")))
+                .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&no_grant, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let oversized = format!(
+            r#"{{"snapshot":"{}"}}"#,
+            "x".repeat(MAX_STORAGE_SNAPSHOT_REQUEST_BYTES + 1)
+        );
+        let rejected = JsonValue::parse(
+            &storage_host.handle_json(&request_v1_10("storage.state.replace", &oversized)),
+        )
+        .expect("oversized response is JSON");
+        assert_eq!(
+            field(field(&rejected, "error"), "code").as_string(),
+            Some("request.payload_invalid")
         );
     }
 

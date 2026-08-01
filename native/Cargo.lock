@@ -43,6 +43,7 @@ dependencies = [
  "anodrel-file-access",
  "anodrel-file-dialog",
  "anodrel-protocol",
+ "anodrel-storage",
  "anodrel-ui",
  "anodrel-ui-session",
 ]

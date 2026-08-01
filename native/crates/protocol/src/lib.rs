@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 9;
+pub const PROTOCOL_MINOR: u16 = 10;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -52,6 +52,9 @@ pub enum Capability {
     DialogOpenFile,
     DialogSaveFile,
     FileReadText,
+    StorageStateRead,
+    StorageStateReplace,
+    StorageStateClear,
 }
 
 impl Capability {
@@ -67,6 +70,9 @@ impl Capability {
             Self::DialogOpenFile => "dialog.open_file",
             Self::DialogSaveFile => "dialog.save_file",
             Self::FileReadText => "file.read_text",
+            Self::StorageStateRead => "storage.state.read",
+            Self::StorageStateReplace => "storage.state.replace",
+            Self::StorageStateClear => "storage.state.clear",
         }
     }
 }
@@ -86,6 +92,9 @@ pub enum ProtocolErrorCode {
     FileUnavailable,
     FileTextInvalid,
     FileTextTooLarge,
+    StorageUnavailable,
+    StorageSnapshotInvalid,
+    StorageSnapshotTooLarge,
 }
 
 impl ProtocolErrorCode {
@@ -104,6 +113,9 @@ impl ProtocolErrorCode {
             Self::FileUnavailable => "file.unavailable",
             Self::FileTextInvalid => "file.text_invalid",
             Self::FileTextTooLarge => "file.text_too_large",
+            Self::StorageUnavailable => "storage.unavailable",
+            Self::StorageSnapshotInvalid => "storage.snapshot_invalid",
+            Self::StorageSnapshotTooLarge => "storage.snapshot_too_large",
         }
     }
 }
