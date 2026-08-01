@@ -14,6 +14,7 @@ use std::{
 };
 
 use anodrel_json::JsonValue;
+use anodrel_protocol::Capability;
 
 use crate::{
     ApplicationError, ApplicationIdentity, ApplicationPackage, MAX_EXECUTABLE_BYTES,
@@ -48,6 +49,7 @@ pub struct InstalledApplication {
     executable_path: PathBuf,
     executable_digest: [u8; 32],
     publisher_fingerprint: PublisherFingerprint,
+    capabilities: Vec<Capability>,
 }
 
 impl InstalledApplication {
@@ -118,6 +120,12 @@ impl InstalledApplication {
     #[must_use]
     pub fn matches_publisher(&self, actual: [u8; 32]) -> bool {
         self.publisher_fingerprint.0 == actual
+    }
+
+    /// Returns the machine-policy grants for a future authenticated child session.
+    #[must_use]
+    pub fn capabilities(&self) -> &[Capability] {
+        &self.capabilities
     }
 
     /// Rechecks an executable path and hashes bytes read from a caller-held
@@ -193,6 +201,7 @@ fn validate_record(
         executable_path,
         executable_digest: record.executable_digest,
         publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
+        capabilities: record.capabilities,
     })
 }
 
@@ -267,6 +276,13 @@ struct ParsedRecord {
     executable_path: String,
     executable_digest: [u8; 32],
     publisher_fingerprint: [u8; 32],
+    capabilities: Vec<Capability>,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RecordVersion {
+    V1_0,
+    V1_1,
 }
 
 fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> {
@@ -277,17 +293,26 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
     let fields = root
         .as_object()
         .ok_or(InstalledApplicationError::InvalidRecord)?;
-    exact_fields(
-        fields,
+    let version = validate_version(required_object(fields, "recordVersion")?)?;
+    let expected_fields = if version == RecordVersion::V1_0 {
         &[
             "recordVersion",
             "applicationId",
             "packageRoot",
             "executable",
             "publisher",
-        ],
-    )?;
-    validate_version(required_object(fields, "recordVersion")?)?;
+        ][..]
+    } else {
+        &[
+            "recordVersion",
+            "applicationId",
+            "packageRoot",
+            "executable",
+            "publisher",
+            "capabilities",
+        ][..]
+    };
+    exact_fields(fields, expected_fields)?;
 
     let application_id = required_string(fields, "applicationId")?;
     if !manifest::is_valid_application_id(application_id) {
@@ -313,12 +338,33 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
         sha256::parse_lower_hex(required_string(publisher, "leafCertificateSha256")?)
             .ok_or(InstalledApplicationError::InvalidRecord)?;
 
+    let capabilities = if version == RecordVersion::V1_0 {
+        Vec::new()
+    } else {
+        let Some(JsonValue::Array(values)) = fields.get("capabilities") else {
+            return Err(InstalledApplicationError::InvalidRecord);
+        };
+        let mut grants = Vec::with_capacity(values.len());
+        for value in values {
+            let capability = match value.as_string() {
+                Some("diagnostics.read") => Capability::DiagnosticsRead,
+                _ => return Err(InstalledApplicationError::InvalidRecord),
+            };
+            if grants.contains(&capability) {
+                return Err(InstalledApplicationError::InvalidRecord);
+            }
+            grants.push(capability);
+        }
+        grants
+    };
+
     Ok(ParsedRecord {
         application_id: application_id.to_owned(),
         package_root: package_root.to_owned(),
         executable_path: executable_path.to_owned(),
         executable_digest,
         publisher_fingerprint,
+        capabilities,
     })
 }
 
@@ -404,7 +450,9 @@ fn required_object<'a>(
         .ok_or(InstalledApplicationError::InvalidRecord)
 }
 
-fn validate_version(fields: &BTreeMap<String, JsonValue>) -> Result<(), InstalledApplicationError> {
+fn validate_version(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<RecordVersion, InstalledApplicationError> {
     exact_fields(fields, &["major", "minor"])?;
     let major = fields
         .get("major")
@@ -414,10 +462,10 @@ fn validate_version(fields: &BTreeMap<String, JsonValue>) -> Result<(), Installe
         .get("minor")
         .and_then(JsonValue::as_u16)
         .ok_or(InstalledApplicationError::InvalidRecord)?;
-    if major == 1 && minor == 0 {
-        Ok(())
-    } else {
-        Err(InstalledApplicationError::InvalidRecord)
+    match (major, minor) {
+        (1, 0) => Ok(RecordVersion::V1_0),
+        (1, 1) => Ok(RecordVersion::V1_1),
+        _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
 
@@ -602,6 +650,24 @@ mod tests {
             installed.revalidate_executable(&substitute, &mut substitute_file),
             Err(InstalledApplicationError::ExecutablePathChanged)
         ));
+        fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_1_accepts_only_the_supported_machine_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path).expect("record is read");
+        let record = record.replace("\"minor\": 0", "\"minor\": 1").replace(
+            "\"publisher\": {",
+            "\"capabilities\": [\"diagnostics.read\"], \"publisher\": {",
+        );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.1 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[anodrel_protocol::Capability::DiagnosticsRead]
+        );
         fixture.remove();
     }
 

@@ -30,12 +30,13 @@ process, create a pipe, or expose a record to an application or renderer.
 ## Record format
 
 A record is strict UTF-8 JSON no larger than **16 KiB**. Version 1.0 accepts
-exactly the fields below; unknown, missing, duplicate, and wrongly typed fields
-are rejected.
+the existing five fields and grants no capabilities. Version 1.1 adds the
+required `capabilities` array; unknown, missing, duplicate, and wrongly typed
+fields are rejected.
 
 ~~~json
 {
-  "recordVersion": { "major": 1, "minor": 0 },
+  "recordVersion": { "major": 1, "minor": 1 },
   "applicationId": "org.anodrel.sample",
   "packageRoot": "C:\\Program Files\\Anodrel\\Sample",
   "executable": {
@@ -44,18 +45,20 @@ are rejected.
   },
   "publisher": {
     "leafCertificateSha256": "64 lowercase hexadecimal characters"
-  }
+  },
+  "capabilities": ["diagnostics.read"]
 }
 ~~~
 
 | Field | Rule |
 | --- | --- |
-| `recordVersion` | Object with numeric `major: 1` and `minor: 0`. |
+| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing, minor `1` requires `capabilities`. |
 | `applicationId` | Uses the same 3â€“128 character identity grammar as the validated package manifest and exactly equals its `applicationId`. |
 | `packageRoot` | Absolute local directory path. Its canonical value is private host data and is never rendered. |
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
+| `capabilities` | Required only in 1.1. Exact non-duplicate supported grants selected by machine policy; 1.1 currently supports only `diagnostics.read`. |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's
