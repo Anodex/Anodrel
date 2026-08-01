@@ -130,6 +130,8 @@ before process launch.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
 boundary.
+`docs/STORAGE.md` defines the planned bounded application-state storage
+boundary.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.

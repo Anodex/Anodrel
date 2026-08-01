@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0051: Application state starts as one bounded atomic snapshot.
+
 - 0050: File text reads use selection references.
 - 0049: File access requires session-bound selection identity.
 - 0048: Save-file dialogs use a dedicated session capability.

@@ -137,9 +137,11 @@ The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. That builder derives fixed
 per-application `data`, `cache`, and `logs` locations solely from the validated
 application identity; it never creates, enumerates, or exposes those paths to
-the protocol. Storage and logging services will define their own permission,
-creation, and recovery rules on top of this layout. See `docs/PATHS.md` and
-Decision 0021.
+the protocol. The planned state-store foundation reserves one bounded opaque
+snapshot below `data`, while its adapter and protocol grants remain separate
+work. Logging and future storage services define their own permission,
+creation, and recovery rules on top of this layout. See `docs/PATHS.md`,
+`docs/STORAGE.md`, Decisions 0021 and 0051.
 
 The Windows credential adapter stores a bounded secret only under the exact
 target derived from a validated application identity and credential name. It

@@ -93,6 +93,9 @@ Status: **Direct Windows host in progress**
   `cache`, and `logs` locations derived from a validated identity and the
   current user's Windows Local AppData root (Decision 0021). Filesystem
   access, directory creation, and a public storage protocol remain deferred.
+  The first bounded whole-snapshot application-state store is designed in
+  Decision 0051; its portable and Windows adapters remain the next storage
+  work.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and
