@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0016 — The first diagnostic log is typed and host-owned.
+
 - 0015 — The brand mark ships as the authored asset, not a reconstruction.
   Supersedes the asset reasoning in 0013.
 

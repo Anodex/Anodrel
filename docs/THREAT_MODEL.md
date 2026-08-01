@@ -51,6 +51,7 @@ authority for permissions.
 | A file operation escapes an approved location. | Canonicalize and validate paths after resolving links; enforce a per-operation scope. |
 | A child process gains arbitrary shell authority or outlives the host. | Expose allowlisted operations, avoid shell interpolation, track child processes, and terminate them during shutdown. |
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
+| A host diagnostic log captures untrusted or sensitive data. | The first log accepts only a closed typed host-event enum; it has no dynamic message, payload, path, error, credential, persistence, export, or protocol input. |
 | Message floods exhaust CPU or memory. | Reject frames above 64 KiB before decoding, reject more than four complete frames in one receive burst, and add authenticated-session queue, concurrency, timeout, and cancellation limits in the OS adapter. |
 | A local or remote process connects to the endpoint by guessing its name. | Create one random-suffix pipe, restrict its DACL to the current logon SID, require a 32-byte CNG-generated token as the first frame, and close on any failed handshake. |
 | A session invitation reaches another process or durable diagnostic. | Deliver one bounded record only through a child-only inherited standard-input handle; never put it in arguments, environment, logs, telemetry, crash data, or files. |
@@ -139,6 +140,13 @@ capability carry a declared pending state that both drawing and hit-testing
 read, so a control cannot be made live by changing how it looks. Any tile that
 would carry a privileged capability — process launch in particular — requires an
 entry in this document before it becomes active.
+
+The host diagnostic log is equally constrained. It is a bounded in-memory
+catalogue of typed startup events, not a string sink. Its document view receives
+only sequence, severity, component, and fixed event text; no application value,
+native error, path, invitation, credential, or request data can enter that
+boundary. `docs/LOGGING.md` and Decision 0016 define the catalogue and its
+extension gate.
 
 The development sample exercises this private path with a developer-supplied
 Node.js executable and an owned sample script. It has no executable identity

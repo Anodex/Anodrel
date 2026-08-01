@@ -106,6 +106,7 @@ Anodrel/
 `docs/TRANSPORT.md` defines the native frame and session contract.
 `docs/APPLICATIONS.md` defines the validated application-package contract.
 `docs/RENDERER.md` documents the owned renderer and brand API.
+`docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.

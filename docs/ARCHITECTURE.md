@@ -104,9 +104,11 @@ temporary owned loopback through the named-pipe authentication and
 The lab also shows every action the platform intends to offer, each carrying a
 declared linked or planned state. A planned tile is drawn dimmed, states the
 gate it waits on, and is inert; hit-testing and drawing read the same value, so
-a tile cannot be enabled by changing its appearance. The two linked tiles open
-host-owned windows that display values the host already held, introducing no
-capability. See `docs/STARTUP_LAB.md` and Decision 0014.
+a tile cannot be enabled by changing its appearance. Its three linked tiles
+open host-owned windows that display values the host already held, introducing
+no capability. The log view reads a bounded typed event ledger that cannot
+accept dynamic application or native diagnostic text. See `docs/STARTUP_LAB.md`,
+`docs/LOGGING.md`, Decisions 0014 and 0016.
 
 The owned Windows instance adapter gives the package text surface one bounded,
 current-session primary instance per validated application identity. A second

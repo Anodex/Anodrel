@@ -59,7 +59,7 @@ records the reasoning.
 | Tile | State | Behaviour |
 | --- | --- | --- |
 | Launch Sample | **Planned** — needs verified executable identity | Dimmed, labelled, inert. |
-| Open Logs | **Planned** — needs a logging boundary | Dimmed, labelled, inert. |
+| Open Logs | **Linked** | Opens a host-owned view of the safe typed startup-event ledger. |
 | Inspect Package | **Linked** | Opens a host-owned window showing the verified package facts. |
 | Runtime Diagnostics | **Linked** | Opens a host-owned window showing protocol, transport, and process readings. |
 
@@ -67,11 +67,13 @@ A planned tile states the gate it is waiting on instead of a description, does
 not respond to hover, and takes no pointer cursor. `ROADMAP.md` tracks each one
 against the decision that gates it.
 
-The two linked tiles introduce no capability. They display values the host
+The three linked tiles introduce no capability. They display values the host
 already held after startup: the package's identity, declared relative content
 path, verified digest, byte count, and documented limits; and the protocol
 version, request and frame limits, JSON depth limit, pipe scope, working set,
-startup time, and last frame cost.
+startup time, and last frame cost. The log view is limited to the typed events
+defined in `docs/LOGGING.md`; it cannot show application text, paths, secrets,
+raw native errors, or persistent history.
 
 ### Footer readings
 
@@ -124,8 +126,9 @@ settles, the mark scales up from slightly small and fades in, the title and
 identity rise, then the cards and action tiles stagger in. Stages overlap
 deliberately, so it reads as one motion rather than a queue.
 
-The reveal is a one-shot. Once it settles, the animation timer is stopped and
-the surface is static — it must not keep waking the process.
+The reveal is a one-shot. Once it settles, only the mark keeps a slow ambient
+motion at 30 frames per second; the host repaints its declared region rather
+than the whole surface, and pauses that timer while inactive or minimized.
 
 The design deliberately borrows the useful role of Electron's welcome screen: a
 first-run orientation and a visual test point. Its mark, palette, wording,
@@ -140,10 +143,11 @@ Startup Lab** window opens and shows:
   brand crate rather than from a compiled icon resource;
 - the `org.anodrel.sample` identity below the hero mark;
 - Owned Core, Verified Package, Private IPC, and Native Shell as ready;
-- Launch Sample and Open Logs dimmed and marked `PLANNED`;
-- Inspect Package and Runtime Diagnostics highlighting under the pointer, taking
-  a hand cursor, and each opening a host-owned window when clicked;
-- a smooth reveal that settles and then stops.
+- Launch Sample dimmed and marked `PLANNED`;
+- Open Logs, Inspect Package, and Runtime Diagnostics highlighting under the
+  pointer, taking a hand cursor, and each opening a host-owned window when
+  clicked;
+- a smooth reveal that settles into low-frequency mark motion.
 
 Resize the window and confirm the layout scales without overflowing and without
 flicker. Close the Startup Lab window last: the host exits only after its final
@@ -164,7 +168,8 @@ asserted:
 - every action tile is hit-testable at its own centre, and points outside the
   strip hit nothing;
 - hit-testing follows the layout when the window is resized;
-- exactly the tiles with a capability behind them are marked linked;
+- exactly the tiles with a documented host operation behind them are marked linked;
+- the linked log action displays only the closed host event catalogue;
 - the reveal adds content over time and is completely static by the time its
   timer stops;
 - a frame composes inside the animation timer's interval in a release build.

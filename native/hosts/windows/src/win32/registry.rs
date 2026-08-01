@@ -61,6 +61,7 @@ mod tests {
     use super::*;
     use crate::win32::PackageFacts;
     use crate::win32::document::Document;
+    use anodrel_diagnostics::LogBook;
     use std::time::Instant;
 
     /// The registry is process-global, so tests that assert on the remaining
@@ -81,6 +82,7 @@ mod tests {
                 content_digest: "00".repeat(32),
                 content_bytes: 7,
             },
+            log: LogBook::new(),
             startup_millis: 12,
             working_set_bytes: 1024,
             last_frame_micros: 0,

@@ -67,7 +67,11 @@ Status: **Direct Windows host in progress**
   per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
 - Implement secure credential storage through the operating system.
-- Add logging, crash reporting boundaries, and shutdown behavior.
+- Add logging, crash reporting boundaries, and shutdown behavior. **Completed
+  for the first host-owned in-memory diagnostic log:** a bounded closed event
+  catalogue with no application input, persistence, export, or protocol
+  surface (Decision 0016). Crash reporting and public/application logging
+  remain separate work.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
@@ -86,19 +90,19 @@ identity, a capability bridge, and operation-specific native tests.
 
 The Startup Lab shows every action the platform intends to offer, each in a
 declared **linked** or **planned** state (Decision 0014). This table is the
-list to work through: a tile moves to linked when the capability behind it
-exists, is documented, and — where it is privileged — has a threat-model entry.
-Linking a tile is then a data change plus its capability, not a redesign.
+list to work through: a tile moves to linked when its documented host operation
+exists and — where it is privileged — has a threat-model entry. Linking a tile
+is then a data change plus its operation, not a redesign.
 
 | Tile | State | Gate to link it |
 | --- | --- | --- |
 | Launch Sample | Planned | Signed package distribution and verified executable identity, bound to a validated application ID through the existing private bootstrap boundary. This is the Phase 2 acceptance item and carries the largest threat-model change; it must not be linked before that entry exists. |
-| Open Logs | Planned | A logging boundary with defined redaction: logs must not carry credentials, raw secret material, canonical paths, or untrusted application text. Needs the "logging, crash reporting boundaries" item above. |
+| Open Logs | **Linked** | Done. Shows only the bounded typed host events defined by `docs/LOGGING.md`; it exposes no application text, persistence, export, or capability. |
 | Inspect Package | **Linked** | Done. Displays facts already verified at startup; introduces no capability. |
 | Runtime Diagnostics | **Linked** | Done. Displays this process's own readings; introduces no capability. |
 
 Adding a tile beyond these four requires the same treatment: show it planned
-with its gate stated, and link it only once the capability is real.
+with its gate stated, and link it only once its underlying operation is real.
 
 ## Phase 3 — Reusable SDK and tooling
 

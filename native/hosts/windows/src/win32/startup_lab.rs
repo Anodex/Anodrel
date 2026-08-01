@@ -5,8 +5,9 @@
 //! size and scaled, so the same code serves a 100% and a 200% display.
 //!
 //! The screen states only what the host actually verified. Cards report checks
-//! that ran during startup; action tiles that are not yet backed by a capability
-//! are drawn in a `planned` state rather than being presented as working.
+//! that ran during startup; action tiles that are not yet backed by a documented
+//! host operation are drawn in a `planned` state rather than being presented as
+//! working.
 
 use std::cell::RefCell;
 
@@ -104,7 +105,7 @@ pub(super) struct Action {
     accent: Color,
     title: &'static str,
     subtitle: &'static str,
-    /// `false` while the capability behind the tile is still being built.
+    /// `false` while the operation behind the tile is still being built.
     ///
     /// A planned tile is drawn dimmed with a marker and does not respond to a
     /// click. It is shown rather than hidden so the surface reflects the whole
@@ -127,8 +128,8 @@ pub(super) const ACTIONS: [Action; 4] = [
         icon: Icon::Logs,
         accent: palette::ACCENT_PACKAGE,
         title: "Open Logs",
-        subtitle: "Needs log boundary",
-        linked: false,
+        subtitle: "Safe host events",
+        linked: true,
     },
     Action {
         kind: ActionKind::InspectPackage,
@@ -1320,15 +1321,15 @@ mod tests {
     }
 
     #[test]
-    fn only_actions_backed_by_a_capability_are_linked() {
+    fn only_actions_backed_by_a_host_operation_are_linked() {
         for action in &ACTIONS {
             let expected = matches!(
                 action.kind,
-                ActionKind::InspectPackage | ActionKind::RuntimeDiagnostics
+                ActionKind::OpenLogs | ActionKind::InspectPackage | ActionKind::RuntimeDiagnostics
             );
             assert_eq!(
                 action.linked, expected,
-                "{:?} is linked without a capability behind it",
+                "{:?} is linked without a documented host operation behind it",
                 action.kind
             );
         }

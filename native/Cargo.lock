@@ -37,6 +37,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-diagnostics"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-json"
 version = "0.1.0"
 
@@ -74,6 +78,7 @@ dependencies = [
  "anodrel-brand",
  "anodrel-canvas",
  "anodrel-core",
+ "anodrel-diagnostics",
  "anodrel-json",
  "anodrel-protocol",
  "anodrel-windows-bootstrap",

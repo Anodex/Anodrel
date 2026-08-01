@@ -22,6 +22,7 @@ mod text;
 use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
+use anodrel_diagnostics::{Event, LogBook};
 use anodrel_windows_instance::PrimaryInstance;
 
 use document::{Body, Document, Section};
@@ -204,6 +205,8 @@ pub struct PackageFacts {
 #[derive(Clone)]
 pub(super) struct StartupLab {
     pub(super) package: PackageFacts,
+    /// Fixed host events recorded after the Startup Lab preflight succeeded.
+    log: LogBook,
     /// Time from process start to the surface being ready.
     pub(super) startup_millis: u64,
     pub(super) working_set_bytes: u64,
@@ -214,6 +217,25 @@ pub(super) struct StartupLab {
     pub(super) hovered: Option<usize>,
     /// `true` once the reveal has finished and the surface is breathing.
     ambient: bool,
+}
+
+/// Builds the diagnostic history displayed by the Startup Lab.
+///
+/// This function deliberately has no input: the displayed catalogue reflects
+/// fixed host milestones rather than application text, operating-system errors,
+/// paths, or arbitrary caller data.
+fn startup_log_book() -> LogBook {
+    let mut log = LogBook::new();
+    for event in [
+        Event::PackageVerified,
+        Event::CoreHealthChecked,
+        Event::PipeLoopbackChecked,
+        Event::StartupLabAuthorized,
+    ] {
+        log.record(event)
+            .expect("four fixed startup events fit in the diagnostic log");
+    }
+    log
 }
 
 #[derive(Clone)]
@@ -342,6 +364,7 @@ pub fn run_startup_lab(
             height: (startup_lab::BASE_HEIGHT * scale) as i32,
             view: View::StartupLab(StartupLab {
                 package,
+                log: startup_log_book(),
                 startup_millis: startup.as_millis() as u64,
                 working_set_bytes: stats::working_set_bytes(),
                 last_frame_micros: 0,
@@ -701,6 +724,47 @@ fn action_document(
     lab: &StartupLab,
 ) -> Option<(String, Document)> {
     match action {
+        startup_lab::ActionKind::OpenLogs => Some((
+            "Anodrel - Runtime Logs".to_owned(),
+            Document {
+                title: "Runtime Logs".to_owned(),
+                subtitle: "Host-owned typed events for this process".to_owned(),
+                body: Body::Sections(vec![
+                    Section {
+                        heading: "STARTUP EVENTS".to_owned(),
+                        rows: lab
+                            .log
+                            .entries()
+                            .map(|entry| {
+                                (
+                                    format!("#{:04}", entry.sequence()),
+                                    format!(
+                                        "{} | {} | {}",
+                                        entry.level().label(),
+                                        entry.component(),
+                                        entry.message()
+                                    ),
+                                )
+                            })
+                            .collect(),
+                    },
+                    Section {
+                        heading: "BOUNDARY".to_owned(),
+                        rows: vec![
+                            (
+                                "Retention".to_owned(),
+                                "64 in-memory events; oldest entries drop first".to_owned(),
+                            ),
+                            ("Application input".to_owned(), "not accepted".to_owned()),
+                            (
+                                "Persistence or export".to_owned(),
+                                "not available".to_owned(),
+                            ),
+                        ],
+                    },
+                ]),
+            },
+        )),
         startup_lab::ActionKind::InspectPackage => Some((
             "Anodrel - Inspect Package".to_owned(),
             Document {
@@ -815,7 +879,7 @@ fn action_document(
                 ]),
             },
         )),
-        startup_lab::ActionKind::LaunchSample | startup_lab::ActionKind::OpenLogs => None,
+        startup_lab::ActionKind::LaunchSample => None,
     }
 }
 
@@ -1151,8 +1215,9 @@ unsafe extern "system" fn window_proc(
 #[cfg(test)]
 mod tests {
     use super::{
-        Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, StartupLab,
-        action_document, document, mouse_position, startup_lab, window_size_for_client,
+        Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, StartupLab,
+        action_document, document, mouse_position, startup_lab, startup_log_book,
+        window_size_for_client,
     };
     /// Representative surface state, matching the shipped sample package.
     pub(super) fn sample_lab() -> StartupLab {
@@ -1166,6 +1231,7 @@ mod tests {
                     .to_owned(),
                 content_bytes: 214,
             },
+            log: startup_log_book(),
             startup_millis: 1_240,
             working_set_bytes: 56 * 1024 * 1024,
             last_frame_micros: 3_180,
@@ -1326,6 +1392,26 @@ mod tests {
                 "{:?} disagrees with its linked state",
                 action.kind
             );
+        }
+    }
+
+    #[test]
+    fn log_document_contains_only_the_fixed_startup_catalogue() {
+        let lab = sample_lab();
+        let Some((_, document)) = action_document(startup_lab::ActionKind::OpenLogs, &lab) else {
+            panic!("the linked log action needs its host document");
+        };
+        let Body::Sections(sections) = document.body else {
+            panic!("the log document must be structured");
+        };
+        let events = &sections[0].rows;
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0].0, "#0001");
+        assert_eq!(events[3].0, "#0004");
+        for (_, reading) in events {
+            assert!(!reading.contains(char::from(92)));
+            assert!(!reading.contains('/'));
+            assert!(!reading.contains(':'));
         }
     }
 

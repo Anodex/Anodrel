@@ -9,6 +9,7 @@ anodrel-application = { path = "../../crates/application" }
 anodrel-brand = { path = "../../crates/brand" }
 anodrel-canvas = { path = "../../crates/canvas" }
 anodrel-core = { path = "../../crates/core" }
+anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-wire = { path = "../../crates/wire" }
