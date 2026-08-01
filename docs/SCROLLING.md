@@ -1,7 +1,7 @@
 # Anodrel scroll-container contract
 
-**Status:** Owned Rust model and layout contract. The external document format
-remains future work.
+**Status:** Owned model, layout, version 2 interchange, and bounded Windows
+host-input contract.
 
 ## Boundary
 
@@ -28,13 +28,16 @@ scroll viewport starts at zero. Layout never mutates caller-owned positions;
 it independently clamps each input before translating the child.
 
 The first container is vertical only. Horizontal scrolling, overscroll,
-inertia, scrollbars, wheel deltas, gesture input, scroll events, and persistence
-are intentionally outside this contract.
+inertia, scrollbars, gesture input, scroll events, and persistence are
+intentionally outside this contract. The portable `UiScrollWheel` translates
+signed input units into owned whole-line steps without retaining device state;
+the Windows diagnostic and session hosts use it to accumulate partial wheel
+reports locally. It is not an application input event.
 
 ## Format compatibility
 
 `anodrel.ui.document.v1` remains exact and does not accept scroll containers.
 Decision 0039 defines `anodrel.ui.document.v2` as the first exact external
-scroll-container form. Its `decode_v2` and `encode_v2` codec entry points are
-implemented; document-session compatibility remains separate. It will never
-serialize a scroll position.
+scroll-container form. Its codec, explicit session replacement path, and
+authenticated `ui.document.replace.v2` operation are implemented. It will
+never serialize a scroll position.

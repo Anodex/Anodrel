@@ -9,8 +9,8 @@ use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 use anodrel_ui::{
     Action, Axis, ElementId, Insets, Scroll, Stack, Text, TextMeasurer, UiActionTone, UiDocument,
-    UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiScrollOffsets, UiSize, UiSurfaceTone,
-    UiTextTone,
+    UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollWheel, UiSize,
+    UiSurfaceTone, UiTextTone,
 };
 use anodrel_ui_document::decode;
 
@@ -29,6 +29,7 @@ pub(super) struct UiLab {
     status_target: Option<ElementId>,
     focus: UiFocus,
     scroll_offsets: UiScrollOffsets,
+    wheel: UiScrollWheel,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
 }
@@ -101,6 +102,7 @@ impl UiLab {
         self.document = document;
         self.focus = UiFocus::new();
         self.scroll_offsets.clear();
+        self.wheel.clear();
         self.hovered = None;
         self.last_action = None;
     }
@@ -111,6 +113,7 @@ impl UiLab {
             status_target,
             focus: UiFocus::new(),
             scroll_offsets: UiScrollOffsets::new(),
+            wheel: UiScrollWheel::default(),
             hovered: None,
             last_action: None,
         }
@@ -226,6 +229,13 @@ impl UiLab {
             self.hovered = None;
         }
         changed
+    }
+
+    /// Converts one native wheel delta into owned whole-line movement.
+    pub(super) fn scroll_wheel_delta(&mut self, width: f32, height: f32, delta: i32) -> bool {
+        let lines = self.wheel.push(delta);
+        let forward = lines < 0;
+        (0..lines.unsigned_abs()).any(|_| self.scroll_line(width, height, forward))
     }
 
     /// Clamps retained scroll positions after a native size change.

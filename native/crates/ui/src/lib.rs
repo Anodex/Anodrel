@@ -34,4 +34,4 @@ pub use layout::{
     UiEvent, UiLayout, UiLayoutItem, UiLayoutKind, UiScrollMetrics, UiScrollOffsets,
 };
 pub use model::{Action, Axis, Insets, Scroll, Stack, Text, UiDocument, UiNode};
-pub use scroll::{DEFAULT_SCROLL_LINE, UiScrollState};
+pub use scroll::{DEFAULT_SCROLL_LINE, UiScrollState, UiScrollWheel, WHEEL_DELTA_PER_LINE};

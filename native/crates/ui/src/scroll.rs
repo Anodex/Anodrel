@@ -2,6 +2,29 @@
 
 /// The owned default distance for one logical line scroll.
 pub const DEFAULT_SCROLL_LINE: f32 = 40.0;
+/// Input units that make one whole logical wheel line.
+pub const WHEEL_DELTA_PER_LINE: i32 = 120;
+
+/// Bounded remainder for translating wheel input units into whole line steps.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct UiScrollWheel {
+    remainder: i32,
+}
+
+impl UiScrollWheel {
+    /// Adds signed input units and returns whole signed line steps.
+    pub fn push(&mut self, delta_units: i32) -> i32 {
+        let total = self.remainder.saturating_add(delta_units);
+        let lines = total / WHEEL_DELTA_PER_LINE;
+        self.remainder = total % WHEEL_DELTA_PER_LINE;
+        lines
+    }
+
+    /// Clears partial input units retained for a later call.
+    pub fn clear(&mut self) {
+        self.remainder = 0;
+    }
+}
 
 /// Mutable vertical position for one host-owned scroll viewport.
 ///
@@ -116,7 +139,7 @@ fn finite_delta(value: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{DEFAULT_SCROLL_LINE, UiScrollState};
+    use super::{DEFAULT_SCROLL_LINE, UiScrollState, UiScrollWheel};
 
     #[test]
     fn clamps_to_zero_when_content_fits_the_viewport() {
@@ -149,5 +172,16 @@ mod tests {
         assert!(!scroll.scroll_by(f32::NAN, 250.0, 300.0));
         assert!(!scroll.scroll_to(f32::INFINITY, 250.0, 300.0));
         assert_eq!(scroll.offset_y(), 50.0);
+    }
+
+    #[test]
+    fn wheel_accumulator_preserves_partial_signed_input() {
+        let mut wheel = UiScrollWheel::default();
+        assert_eq!(wheel.push(40), 0);
+        assert_eq!(wheel.push(40), 0);
+        assert_eq!(wheel.push(40), 1);
+        assert_eq!(wheel.push(-240), -2);
+        wheel.clear();
+        assert_eq!(wheel.push(120), 1);
     }
 }

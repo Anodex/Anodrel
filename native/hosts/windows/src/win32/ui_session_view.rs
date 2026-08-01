@@ -72,9 +72,9 @@ impl UiSessionView {
         self.lab.scroll_page(width, height, forward)
     }
 
-    /// Moves a current v2 scroll viewport by one local native line.
-    pub(super) fn scroll_line(&mut self, width: f32, height: f32, forward: bool) -> bool {
-        self.lab.scroll_line(width, height, forward)
+    /// Converts one native wheel delta into local owned line movement.
+    pub(super) fn scroll_wheel_delta(&mut self, width: f32, height: f32, delta: i32) -> bool {
+        self.lab.scroll_wheel_delta(width, height, delta)
     }
 
     /// Clamps retained local viewport positions after a native size change.

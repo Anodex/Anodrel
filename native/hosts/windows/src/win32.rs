@@ -1290,15 +1290,18 @@ unsafe extern "system" fn window_proc(
                 return 0;
             }
             let rect = client_rect(window);
-            let forward = delta < 0;
             let changed = registry::with_ui_lab(window, |lab| {
-                lab.scroll_line(rect.width() as f32, rect.height() as f32, forward)
+                lab.scroll_wheel_delta(rect.width() as f32, rect.height() as f32, i32::from(delta))
             })
             .ok()
             .flatten()
             .or_else(|| {
                 registry::with_ui_session(window, |session| {
-                    session.scroll_line(rect.width() as f32, rect.height() as f32, forward)
+                    session.scroll_wheel_delta(
+                        rect.width() as f32,
+                        rect.height() as f32,
+                        i32::from(delta),
+                    )
                 })
                 .ok()
                 .flatten()
