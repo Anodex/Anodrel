@@ -1220,6 +1220,11 @@ unsafe extern "system" fn window_proc(
                                 )
                             })
                     }
+                    // Selection-reference capture is not implemented by this
+                    // UI host yet. It must never fall back to path selection.
+                    FileDialogRequestKind::OpenWithReference => {
+                        Err(anodrel_windows_file_dialog::FileDialogError::Unavailable)
+                    }
                 };
                 let _ = registry::complete_file_dialog_request(window, request.id(), selection);
             }

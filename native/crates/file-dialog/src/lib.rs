@@ -21,6 +21,8 @@ pub use mailbox::{
 pub const MAX_FILTER_EXTENSIONS: usize = 8;
 /// Maximum UTF-8 bytes in one selected file path.
 pub const MAX_SELECTED_PATH_BYTES: usize = 32 * 1024;
+/// Exact UTF-8 byte length of a Version 1 opaque selection reference.
+pub const SELECTION_REFERENCE_BYTES: usize = 22;
 
 /// One visible filter and its allowed filename extensions.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -140,9 +142,57 @@ impl fmt::Display for FileDialogInputError {
 }
 impl std::error::Error for FileDialogInputError {}
 
+/// An opaque Version 1 base64url reference to host-retained selected-file state.
+///
+/// A host adapter derives this from 128 bits of cryptographically secure random
+/// data only after it captures the selected regular file's native identity.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SelectionReference(String);
+
+impl SelectionReference {
+    /// Validates one exact opaque selection reference.
+    ///
+    /// Validation deliberately does not generate a value or access a file.
+    pub fn new(value: impl Into<String>) -> Result<Self, SelectionReferenceError> {
+        let value = value.into();
+        if value.len() != SELECTION_REFERENCE_BYTES
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            return Err(SelectionReferenceError::Invalid);
+        }
+        Ok(Self(value))
+    }
+
+    /// Returns the opaque reference for the protocol boundary.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A safe failure while validating an opaque selection reference.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectionReferenceError {
+    /// The reference was not an exact Version 1 base64url value.
+    Invalid,
+}
+
+impl fmt::Display for SelectionReferenceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("selection reference is invalid")
+    }
+}
+
+impl std::error::Error for SelectionReferenceError {}
+
 #[cfg(test)]
 mod tests {
-    use super::{FileDialogFilter, FileDialogInputError, SaveFilePath, SelectedFilePath};
+    use super::{
+        FileDialogFilter, FileDialogInputError, SaveFilePath, SelectedFilePath, SelectionReference,
+        SelectionReferenceError,
+    };
     #[test]
     fn accepts_strict_filters_and_absolute_selected_paths() {
         let filter = FileDialogFilter::new("Documents", vec!["txt".to_owned(), "json".to_owned()])
@@ -164,6 +214,19 @@ mod tests {
         assert_eq!(
             SaveFilePath::new("draft.txt"),
             Err(FileDialogInputError::InvalidSavePath)
+        );
+    }
+
+    #[test]
+    fn accepts_only_exact_base64url_selection_references() {
+        assert!(SelectionReference::new("AbCdEfGhIjKlMnOpQrStUv").is_ok());
+        assert_eq!(
+            SelectionReference::new("short"),
+            Err(SelectionReferenceError::Invalid)
+        );
+        assert_eq!(
+            SelectionReference::new("AbCdEfGhIjKlMnOpQrStU!"),
+            Err(SelectionReferenceError::Invalid)
         );
     }
 }

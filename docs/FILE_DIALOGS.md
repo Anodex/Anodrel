@@ -3,7 +3,10 @@
 **Status:** Portable open/save-dialog values, a direct Windows adapter, and a
 bounded UI-thread request bridge are implemented. Protocol 1.7 exposes the
 session-bound `dialog.open_file` capability and Protocol 1.8 exposes the
-independent `dialog.save_file` capability through that bridge.
+independent `dialog.save_file` capability through that bridge. The same
+one-request bridge also carries the internal capture request required before a
+future Protocol 1.9 `dialog.open_file.v2` success can contain a selection
+reference.
 
 ## Boundary
 
@@ -14,12 +17,13 @@ flag. Hosts later select a documented dialog configuration and return either a
 bounded selected path or cancellation.
 
 The application or pipe worker never invokes a native dialog. A
-`FileDialogMailbox` holds at most one request, lets the host UI thread take it,
-and waits only for that UI thread to complete or safely fail it. It times out
-after two minutes and has no queue or history. A selected path remains data; it
-does not grant file read, write, enumeration, handle access, or process launch.
-The Windows UI-session host routes both open and save requests through that
-mailbox, selecting the host window as the native owner.
+`FileDialogMailbox` holds at most one request of any kind, lets the host UI
+thread take it, and waits only for that UI thread to complete or safely fail it.
+It times out after two minutes and has no queue or history. A selected path
+remains data; it does not grant file read, write, enumeration, handle access,
+or process launch. The Windows UI-session host routes open, save, and future
+selection-capture requests through that one mailbox, selecting the host window
+as the native owner.
 
 ## Portable values
 

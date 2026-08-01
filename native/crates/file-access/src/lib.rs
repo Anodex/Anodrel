@@ -12,54 +12,12 @@ use std::fmt;
 
 use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
 
+pub use anodrel_file_dialog::{
+    SELECTION_REFERENCE_BYTES, SelectionReference, SelectionReferenceError,
+};
+
 /// Maximum live file selections for one authenticated session.
 pub const MAX_SESSION_SELECTIONS: usize = 32;
-/// Exact UTF-8 byte length of a Version 1 opaque selection reference.
-pub const SELECTION_REFERENCE_BYTES: usize = 22;
-
-/// An opaque Version 1 base64url reference to host-retained selected-file state.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectionReference(String);
-
-impl SelectionReference {
-    /// Validates one exact opaque selection reference.
-    ///
-    /// The adapter must derive this from 128 bits of cryptographically secure
-    /// random data. Validation deliberately does not generate a value.
-    pub fn new(value: impl Into<String>) -> Result<Self, SelectionReferenceError> {
-        let value = value.into();
-        if value.len() != SELECTION_REFERENCE_BYTES
-            || !value
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-        {
-            return Err(SelectionReferenceError::Invalid);
-        }
-        Ok(Self(value))
-    }
-
-    /// Returns the opaque reference for the protocol boundary.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// A safe failure while validating an opaque selection reference.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SelectionReferenceError {
-    /// The reference was not an exact Version 1 base64url value.
-    Invalid,
-}
-
-impl fmt::Display for SelectionReferenceError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("selection reference is invalid")
-    }
-}
-
-impl std::error::Error for SelectionReferenceError {}
-
 /// A bounded, one-use store of host-retained selected-file state.
 ///
 /// `T` is intentionally selected by the native host. The portable layer never
