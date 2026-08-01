@@ -10,6 +10,7 @@ members = [
   "crates/transport",
   "crates/bootstrap",
   "crates/application",
+  "crates/session-policy",
   "crates/paths",
   "crates/credentials",
   "adapters/windows-pipe",

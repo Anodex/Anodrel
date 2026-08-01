@@ -176,6 +176,12 @@ the invitation only over a restricted inherited standard-input handle; it does
 not verify executable identity or own a restart policy. Separately,
 `anodrel-application` validates a bounded manifest, canonical package paths,
 and content digest before the host draws a plain-text application surface.
+`anodrel-session-policy` then converts only a validated installed application
+record into the identity and machine-selected grants for one `anodrel-core`
+host session. It has no operating-system store, launch, pipe, bootstrap, or UI
+authority; platform adapters select the record before calling it. A version
+1.0 record produces no grants, while version 1.1 uses only its strict validated
+capability array. See Decision 0023.
 
 ## Communication model
 

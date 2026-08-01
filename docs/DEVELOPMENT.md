@@ -41,7 +41,7 @@ tracked.
 The Rust workspace is under `native/`. It has no third-party runtime
 dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
 `anodrel-wire`, `anodrel-transport`, `anodrel-bootstrap`,
-`anodrel-application`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`,
+`anodrel-application`, `anodrel-session-policy`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`,
 `anodrel-paths`, `anodrel-windows-policy`, `anodrel-windows-launch`,
 `anodrel-windows-paths`, `anodrel-credentials`,
 `anodrel-windows-credentials`, and the Windows host are all source modules. The
@@ -58,6 +58,7 @@ cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-pipe
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-policy
+cargo test --manifest-path native/Cargo.toml -p anodrel-session-policy
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials

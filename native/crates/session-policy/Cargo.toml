@@ -1,0 +1,10 @@
+[package]
+name = "anodrel-session-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-application = { path = "../application" }
+anodrel-core = { path = "../core" }
+anodrel-protocol = { path = "../protocol" }

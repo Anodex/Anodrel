@@ -84,7 +84,11 @@ bytes produced by Windows CNG. On success the host sends:
 The session then accepts only documented Anodrel protocol requests. A malformed
 or failed handshake, a public request before authentication, or a second
 authentication attempt ends the connection without a public-protocol response.
-The host compares the token without an early exit.
+The host compares the token without an early exit. For a registered
+application, the host must create its policy before the pipe session by mapping
+only the already validated machine record through `anodrel-session-policy`.
+Neither this handshake nor its bootstrap invitation carries an application ID
+or capability grant.
 
 The invitation is sensitive bootstrap material. It must not pass through
 command-line arguments, environment variables, logs, or a predictable on-disk

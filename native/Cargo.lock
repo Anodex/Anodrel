@@ -67,6 +67,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-session-policy"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-core",
+ "anodrel-protocol",
+]
+
+[[package]]
 name = "anodrel-transport"
 version = "0.1.0"
 dependencies = [

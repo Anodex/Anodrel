@@ -11,7 +11,7 @@ array containing exact supported grant strings. Version 1.0 remains valid and
 grants no capabilities. Unknown, duplicate, malformed, or unsupported grants
 fail closed.
 
-The next session-policy module will convert only a validated installed record
+The session-policy module converts only a validated installed record
 into the existing host policy. Packages, bootstrap data, pipe clients, protocol
 messages, and UI cannot select or elevate these grants.
 
