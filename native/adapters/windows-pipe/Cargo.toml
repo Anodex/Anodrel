@@ -12,5 +12,6 @@ anodrel-external-links = { path = "../../crates/external-links" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
 anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-storage = { path = "../../crates/storage" }
 anodrel-transport = { path = "../../crates/transport" }
 anodrel-wire = { path = "../../crates/wire" }

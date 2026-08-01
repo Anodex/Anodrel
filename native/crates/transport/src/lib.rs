@@ -16,6 +16,7 @@ use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
 use anodrel_protocol::{JsonValue, object};
+use anodrel_storage::StorageService;
 pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
 
@@ -172,6 +173,26 @@ impl FileDialogService for TransportUnavailableFileDialogs {
 }
 
 #[derive(Debug)]
+struct TransportUnavailableStorage;
+
+impl StorageService for TransportUnavailableStorage {
+    fn read(&self) -> Result<anodrel_storage::StorageRead, anodrel_storage::StorageServiceError> {
+        Err(anodrel_storage::StorageServiceError::Unavailable)
+    }
+
+    fn replace(
+        &self,
+        _snapshot: &anodrel_storage::StorageSnapshot,
+    ) -> Result<(), anodrel_storage::StorageServiceError> {
+        Err(anodrel_storage::StorageServiceError::Unavailable)
+    }
+
+    fn clear(&self) -> Result<(), anodrel_storage::StorageServiceError> {
+        Err(anodrel_storage::StorageServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
 pub struct TransportSession {
     decoder: FrameDecoder,
     host: CoreHost,
@@ -321,9 +342,39 @@ impl TransportSession {
         file_selections: impl FileSelectionService + 'static,
         file_text: impl FileTextService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            TransportUnavailableStorage,
+        )
+    }
+
+    /// Creates one session with an explicit host-owned application-state store.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access_and_storage(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_session_components_and_all_services_and_file_access(
+            host: CoreHost::with_session_components_and_all_services_and_file_access_and_storage(
                 policy,
                 ui_input_mailbox,
                 session_close_signal,
@@ -332,6 +383,7 @@ impl TransportSession {
                 file_dialogs,
                 file_selections,
                 file_text,
+                storage,
             ),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),

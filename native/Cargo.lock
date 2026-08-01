@@ -125,6 +125,7 @@ dependencies = [
  "anodrel-file-access",
  "anodrel-file-dialog",
  "anodrel-protocol",
+ "anodrel-storage",
  "anodrel-ui",
  "anodrel-ui-session",
  "anodrel-wire",
@@ -257,6 +258,7 @@ dependencies = [
  "anodrel-file-access",
  "anodrel-file-dialog",
  "anodrel-protocol",
+ "anodrel-storage",
  "anodrel-transport",
  "anodrel-wire",
 ]

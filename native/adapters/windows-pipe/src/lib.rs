@@ -19,6 +19,7 @@ use anodrel_file_access::{FileSelectionService, FileTextService};
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
+use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
 use anodrel_transport::{
     SessionCredentials, TransportSession, UiDocumentMailbox, UiInputMailbox, authentication_message,
 };
@@ -35,6 +36,21 @@ impl FileDialogService for UnavailableFileDialogs {
         _filters: &[FileDialogFilter],
     ) -> Result<FileDialogSelection, FileDialogServiceError> {
         Err(FileDialogServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableStorage;
+
+impl StorageService for UnavailableStorage {
+    fn read(&self) -> Result<StorageRead, StorageServiceError> {
+        Err(StorageServiceError::Unavailable)
+    }
+    fn replace(&self, _snapshot: &StorageSnapshot) -> Result<(), StorageServiceError> {
+        Err(StorageServiceError::Unavailable)
+    }
+    fn clear(&self) -> Result<(), StorageServiceError> {
+        Err(StorageServiceError::Unavailable)
     }
 }
 
@@ -336,8 +352,38 @@ impl WindowsPipeServer {
         file_selections: impl FileSelectionService + 'static,
         file_text: impl FileTextService + 'static,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_session_components_and_all_services_and_file_access_and_storage(
+            policy,
+            session_id,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            UnavailableStorage,
+        )
+    }
+
+    /// Creates one endpoint with an explicit host-owned application-state store.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_session_components_and_all_services_and_file_access_and_storage(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
         Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_all_services_and_file_access(
+            TransportSession::with_session_components_and_all_services_and_file_access_and_storage(
                 policy,
                 credentials,
                 ui_document_mailbox,
@@ -348,6 +394,7 @@ impl WindowsPipeServer {
                 file_dialogs,
                 file_selections,
                 file_text,
+                storage,
             )
         })
     }
