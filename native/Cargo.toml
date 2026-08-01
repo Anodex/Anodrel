@@ -18,6 +18,7 @@ members = [
   "crates/credentials",
   "crates/clipboard",
   "crates/external-links",
+  "crates/file-dialog",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-instance",
