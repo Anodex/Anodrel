@@ -167,6 +167,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-file-dialog"
+version = "0.1.0"
+dependencies = [
+ "anodrel-file-dialog",
+]
+
+[[package]]
 name = "anodrel-windows-host"
 version = "0.1.0"
 dependencies = [

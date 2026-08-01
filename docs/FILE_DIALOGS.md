@@ -1,7 +1,7 @@
 # Anodrel file-dialog foundation
 
-**Status:** Portable open-dialog filter and selected-path values are implemented;
-the native Windows dialog and protocol capability remain deferred.
+**Status:** Portable open-dialog values and the direct Windows adapter are
+implemented; the protocol capability remains deferred.
 
 ## Boundary
 
