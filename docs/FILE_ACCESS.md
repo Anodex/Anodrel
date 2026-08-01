@@ -26,6 +26,9 @@ invalid outside its authenticated session and expires when that session ends.
 The host keeps the resolved selection private and accepts no caller-supplied
 path, filename, initial directory, filter, or file identity for a read.
 
+On Windows, the direct adapter generates each Version 1 reference from 128 bits
+of CNG random data and encodes it as exactly 22 unpadded base64url characters.
+
 `file.read_text` will require a distinct host-issued `file.read_text` grant and
 will accept exactly one selection reference. It will return bounded UTF-8 text
 or a stable safe failure category; it will not expose native status, canonical

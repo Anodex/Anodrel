@@ -1,5 +1,7 @@
 use std::{io, os::windows::ffi::OsStrExt, path::Path, ptr};
 
+use anodrel_file_access::SelectionReference;
+
 use crate::FileIdentity;
 
 type Handle = isize;
@@ -14,6 +16,7 @@ const FILE_ATTRIBUTE_NORMAL: Dword = 0x0000_0080;
 const FILE_FLAG_OPEN_REPARSE_POINT: Dword = 0x0020_0000;
 const FILE_ATTRIBUTE_DIRECTORY: Dword = 0x0000_0010;
 const FILE_ATTRIBUTE_REPARSE_POINT: Dword = 0x0000_0400;
+const BCRYPT_USE_SYSTEM_PREFERRED_RNG: Dword = 0x0000_0002;
 
 #[repr(C)]
 struct ByHandleFileInformation {
@@ -47,6 +50,16 @@ unsafe extern "system" {
     fn CloseHandle(handle: Handle) -> Bool;
 }
 
+#[link(name = "bcrypt")]
+unsafe extern "system" {
+    fn BCryptGenRandom(
+        algorithm: Handle,
+        buffer: *mut u8,
+        buffer_length: Dword,
+        flags: Dword,
+    ) -> i32;
+}
+
 pub(super) struct ReadOnlyFile {
     handle: Handle,
     identity: FileIdentity,
@@ -56,6 +69,40 @@ impl ReadOnlyFile {
     pub(super) const fn identity(&self) -> FileIdentity {
         self.identity
     }
+}
+
+pub(super) fn new_selection_reference() -> io::Result<SelectionReference> {
+    let mut bytes = [0_u8; 16];
+    let status = unsafe {
+        // SAFETY: the system-preferred RNG permits a null algorithm handle and
+        // bytes is writable storage for the exact declared byte count.
+        BCryptGenRandom(
+            0,
+            bytes.as_mut_ptr(),
+            bytes.len() as Dword,
+            BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+        )
+    };
+    if status != 0 {
+        return Err(io::Error::other("Windows random generation failed"));
+    }
+    SelectionReference::new(base64url_128(&bytes))
+        .map_err(|_| io::Error::other("Windows random reference was malformed"))
+}
+
+fn base64url_128(bytes: &[u8; 16]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut encoded = String::with_capacity(22);
+    for chunk in bytes[..15].chunks_exact(3) {
+        encoded.push(ALPHABET[(chunk[0] >> 2) as usize] as char);
+        encoded.push(ALPHABET[((chunk[0] & 0b0000_0011) << 4 | chunk[1] >> 4) as usize] as char);
+        encoded.push(ALPHABET[((chunk[1] & 0b0000_1111) << 2 | chunk[2] >> 6) as usize] as char);
+        encoded.push(ALPHABET[(chunk[2] & 0b0011_1111) as usize] as char);
+    }
+    let last = bytes[15];
+    encoded.push(ALPHABET[(last >> 2) as usize] as char);
+    encoded.push(ALPHABET[((last & 0b0000_0011) << 4) as usize] as char);
+    encoded
 }
 
 pub(super) fn open_selected_file(path: &Path) -> io::Result<ReadOnlyFile> {
@@ -135,7 +182,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::open_selected_file;
+    use super::{base64url_128, new_selection_reference, open_selected_file};
 
     #[test]
     fn rejects_relative_paths_before_calling_windows() {
@@ -157,5 +204,19 @@ mod tests {
         assert_ne!(file.identity().file_index(), 0);
         drop(file);
         std::fs::remove_file(&path).expect("fixture is removed");
+    }
+
+    #[test]
+    fn cng_generated_references_are_exact_and_not_reused() {
+        let first = new_selection_reference().expect("reference is generated");
+        let second = new_selection_reference().expect("reference is generated");
+        assert_eq!(first.as_str().len(), 22);
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn encodes_128_bits_as_unpadded_base64url() {
+        assert_eq!(base64url_128(&[0; 16]), "AAAAAAAAAAAAAAAAAAAAAA");
+        assert_eq!(base64url_128(&[255; 16]), "_____________________w");
     }
 }

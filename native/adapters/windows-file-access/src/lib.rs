@@ -8,7 +8,13 @@
 
 mod raw;
 
+use anodrel_file_access::SelectionReference;
 use anodrel_file_dialog::SelectedFilePath;
+
+/// Creates one CNG-backed opaque reference for a selected-file session entry.
+pub fn new_selection_reference() -> Result<SelectionReference, FileAccessError> {
+    raw::new_selection_reference().map_err(|_| FileAccessError::Unavailable)
+}
 
 /// Opens one selected regular file as an identity-retaining read-only object.
 pub fn open_selected_file(path: &SelectedFilePath) -> Result<WindowsSelectedFile, FileAccessError> {
