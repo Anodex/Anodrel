@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0034 — Windows UI Session Lab consumes one bounded mailbox.
+
 - 0033 — UI document delivery coalesces in one session mailbox.
 
 - 0032 — UI document replacement is capability-checked and session-bound.

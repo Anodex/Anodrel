@@ -12,9 +12,11 @@ npm run demo
 
 `src/native-client.ts` is a separate development-only entry point. The direct
 Windows host launches it with a private standard-input invitation so it can
-authenticate to the real named pipe and call `platform.health`. Its command is
-documented in `docs/DEVELOPMENT.md`; it is not a packaged or trusted content
-host.
+authenticate to the real named pipe, call `platform.health`, and submit one
+strict UI document. Its command is documented in `docs/DEVELOPMENT.md`; it is
+not a packaged or trusted content host. Use `--sample-ui-client` to display
+that authenticated replacement through the native UI Session Lab; its visible
+action remains inert.
 
 `anodrel.application.json` and `content/main.txt` are a separate static
 application package for the first Windows content surface. The host

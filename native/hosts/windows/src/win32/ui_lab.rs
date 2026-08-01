@@ -8,8 +8,8 @@
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 use anodrel_ui::{
-    Action, ElementId, Text, TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFocus, UiLayout,
-    UiNode, UiPoint, UiRect, UiSize, UiSurfaceTone, UiTextTone,
+    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiActionTone, UiDocument, UiEvent,
+    UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiSize, UiSurfaceTone, UiTextTone,
 };
 use anodrel_ui_document::decode;
 
@@ -44,6 +44,62 @@ impl UiLab {
     /// carried by the document, and its action events stay local to this view.
     pub(super) fn preview(document: UiDocument) -> Self {
         Self::from_document_with_status(document, None)
+    }
+
+    /// Builds a host-owned waiting document for an authenticated session view.
+    pub(super) fn waiting_for_session() -> Self {
+        let root = UiNode::Stack(
+            Stack::new(
+                ElementId::new("session.waiting.root").expect("fixed waiting ID is valid"),
+                Axis::Vertical,
+                Insets::new(56, 56, 56, 56).expect("fixed waiting padding is valid"),
+                16,
+                vec![
+                    UiNode::Text(
+                        Text::new(
+                            ElementId::new("session.waiting.eyebrow")
+                                .expect("fixed waiting ID is valid"),
+                            "ANODREL UI SESSION",
+                            14,
+                        )
+                        .expect("fixed waiting text is valid")
+                        .with_tone(UiTextTone::Accent),
+                    ),
+                    UiNode::Text(
+                        Text::new(
+                            ElementId::new("session.waiting.title")
+                                .expect("fixed waiting ID is valid"),
+                            "Waiting for an authenticated document",
+                            28,
+                        )
+                        .expect("fixed waiting text is valid"),
+                    ),
+                    UiNode::Text(
+                        Text::new(
+                            ElementId::new("session.waiting.detail")
+                                .expect("fixed waiting ID is valid"),
+                            "The native host will apply only the latest accepted session revision.",
+                            16,
+                        )
+                        .expect("fixed waiting text is valid")
+                        .with_tone(UiTextTone::Secondary),
+                    ),
+                ],
+            )
+            .expect("fixed waiting stack is valid"),
+        );
+        Self::from_document_with_status(
+            UiDocument::new(root).expect("fixed waiting document is valid"),
+            None,
+        )
+    }
+
+    /// Replaces this local visual document and discards stale local input state.
+    pub(super) fn replace_document(&mut self, document: UiDocument) {
+        self.document = document;
+        self.focus = UiFocus::new();
+        self.hovered = None;
+        self.last_action = None;
     }
 
     fn from_document_with_status(document: UiDocument, status_target: Option<ElementId>) -> Self {

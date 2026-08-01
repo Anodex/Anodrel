@@ -133,6 +133,8 @@ format.
 `docs/UI_SESSIONS.md` defines bounded revision and semantic-event state used by
 the first capability-checked authenticated UI document replacement path.
 `docs/UI_PREVIEW.md` defines the bounded Windows developer preview command.
+`docs/UI_SESSION_LAB.md` defines the authenticated native UI delivery smoke
+test.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

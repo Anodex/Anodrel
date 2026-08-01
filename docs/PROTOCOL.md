@@ -176,10 +176,11 @@ The direct Windows core and wire engine reject encoded messages larger than 64
 KiB before JSON parsing. The codec rejects duplicate keys, malformed Unicode,
 trailing data, and nesting beyond 64 levels. An authenticated transport can
 publish a successful UI document replacement into a bounded per-session
-mailbox, but no current Win32 surface consumes that mailbox. The host does not
-yet support action event delivery, asynchronous privileged operations, or a
-production event queue; those requirements remain part of the host acceptance
-gate.
+mailbox. The development-only Windows UI Session Lab consumes one supplied
+mailbox in one inert native view; it is not a public application window. The
+host does not yet support action event delivery, asynchronous privileged
+operations, or a production event queue; those requirements remain part of the
+host acceptance gate.
 
 ## Compatibility tests
 

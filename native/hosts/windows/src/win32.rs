@@ -19,12 +19,14 @@ mod startup_lab;
 mod stats;
 mod text;
 mod ui_lab;
+mod ui_session_view;
 
 use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_ui::UiDocument;
+use anodrel_ui_session::UiDocumentMailbox;
 use anodrel_windows_instance::PrimaryInstance;
 
 use document::{Body, Document, Section};
@@ -79,6 +81,8 @@ const VK_RETURN: Wparam = 0x0D;
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 const REVEAL_TIMER: usize = 1;
 const REVEAL_INTERVAL_MILLIS: Uint = 16;
+const UI_SESSION_TIMER: usize = 2;
+const UI_SESSION_POLL_INTERVAL_MILLIS: Uint = 50;
 
 /// Interval the surface settles to once the reveal completes.
 ///
@@ -249,6 +253,7 @@ enum View {
     Document(Document),
     StartupLab(StartupLab),
     UiLab(ui_lab::UiLab),
+    UiSession(ui_session_view::UiSessionView),
 }
 
 struct WindowDefinition {
@@ -444,6 +449,21 @@ pub fn run_ui_preview(document: UiDocument) -> io::Result<()> {
     )
 }
 
+/// Opens one host-controlled native view that consumes exactly one authenticated
+/// session mailbox. Session document actions remain inert in this diagnostic.
+pub fn run_ui_session(mailbox: UiDocumentMailbox) -> io::Result<()> {
+    let scale = primary_scale();
+    run_windows(
+        vec![WindowDefinition {
+            title: "Anodrel UI Session Lab".to_owned(),
+            width: (920.0 * scale) as i32,
+            height: (660.0 * scale) as i32,
+            view: View::UiSession(ui_session_view::UiSessionView::new(mailbox)),
+        }],
+        None,
+    )
+}
+
 fn run_windows(
     definitions: Vec<WindowDefinition>,
     primary_instance: Option<&PrimaryInstance>,
@@ -465,6 +485,7 @@ fn run_windows(
     let mut windows = Vec::with_capacity(definitions.len());
     for definition in definitions {
         let animated = matches!(definition.view, View::StartupLab(_));
+        let session_driven = matches!(definition.view, View::UiSession(_));
         let window = match create_window(instance, &class_name, &definition) {
             Ok(window) => window,
             Err(error) => {
@@ -483,6 +504,13 @@ fn run_windows(
             // message queue. The timer is stopped when the reveal completes.
             unsafe {
                 SetTimer(window, REVEAL_TIMER, REVEAL_INTERVAL_MILLIS, 0);
+            }
+        }
+        if session_driven {
+            // SAFETY: this window owns the mailbox consumer and stops this
+            // low-frequency poll when the window is destroyed.
+            unsafe {
+                SetTimer(window, UI_SESSION_TIMER, UI_SESSION_POLL_INTERVAL_MILLIS, 0);
             }
         }
         windows.push(window);
@@ -1011,6 +1039,11 @@ fn paint(window: Hwnd, device_context: Hdc, view: &View, update: Rect) -> u64 {
             ui_lab::draw(&mut canvas, lab);
             present::present(device_context, &canvas);
         }
+        View::UiSession(session) => {
+            let mut canvas = Canvas::new(width, height);
+            ui_lab::draw(&mut canvas, session.lab());
+            present::present(device_context, &canvas);
+        }
     }
     started.elapsed().as_micros() as u64
 }
@@ -1130,6 +1163,12 @@ unsafe extern "system" fn window_proc(
                 // is redrawn above it. Both fit inside this bounded region.
                 Some(region) => invalidate_region(window, region),
                 None => invalidate(window),
+            }
+            0
+        }
+        WM_TIMER if wparam == UI_SESSION_TIMER => {
+            if registry::poll_ui_session(window).ok().flatten() == Some(true) {
+                invalidate(window);
             }
             0
         }
@@ -1310,6 +1349,10 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_DESTROY => {
+            // SAFETY: killing a timer for a window that has no session poll is
+            // a no-op, and this window is being destroyed by the current UI
+            // thread.
+            unsafe { KillTimer(window, UI_SESSION_TIMER) };
             if registry::remove(window).is_ok_and(|remaining| remaining == 0) {
                 // SAFETY: this only posts a quit message after the final
                 // native top-level window is being destroyed.

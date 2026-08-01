@@ -147,6 +147,7 @@ dependencies = [
  "anodrel-protocol",
  "anodrel-ui",
  "anodrel-ui-document",
+ "anodrel-ui-session",
  "anodrel-windows-bootstrap",
  "anodrel-windows-instance",
  "anodrel-windows-pipe",

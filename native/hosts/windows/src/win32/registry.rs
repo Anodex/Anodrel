@@ -57,6 +57,15 @@ pub(super) fn with_ui_lab<R>(
     }
 }
 
+/// Polls one session view's explicitly supplied mailbox on the UI thread.
+pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.poll())),
+        _ => Ok(None),
+    }
+}
+
 /// Removes a window and returns the number of host windows that remain.
 pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
     let mut views = lock_views()?;

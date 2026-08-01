@@ -14,6 +14,7 @@ anodrel-json = { path = "../../crates/json" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
 anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }

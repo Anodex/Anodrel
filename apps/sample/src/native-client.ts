@@ -25,9 +25,16 @@ async function run(): Promise<number> {
     return 12;
   }
   try {
-    const health = await new PlatformClient(transport).getHealth();
+    const client = new PlatformClient(transport);
+    const health = await client.getHealth();
     if (health.status !== "ready") {
       return 13;
+    }
+    const update = await client.replaceUiDocument(
+      '{"format":"anodrel.ui.document.v1","root":{"id":"sample.session.root","kind":"stack","axis":"vertical","padding":{"left":56,"top":56,"right":56,"bottom":56},"gap":16,"surfaceTone":"plain","children":[{"id":"sample.session.eyebrow","kind":"text","value":"AUTHENTICATED ANODREL SESSION","fontSize":14,"tone":"accent"},{"id":"sample.session.title","kind":"text","value":"Native document delivered","fontSize":28,"tone":"primary"},{"id":"sample.session.detail","kind":"text","value":"This view came through the private pipe and remains free of native action authority.","fontSize":16,"tone":"secondary"},{"id":"sample.session.action","kind":"action","label":"Visual-only semantic action","fontSize":16,"enabled":true,"tone":"accent"}]}}',
+    );
+    if (update.revision !== "1") {
+      return 16;
     }
     return 0;
   } catch {

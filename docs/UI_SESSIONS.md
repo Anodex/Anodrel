@@ -81,6 +81,11 @@ updates rather than promising every intermediate frame. A host must create one
 mailbox for one authenticated session and define how a native window is
 notified or polls it. It must never use the mailbox for semantic action events.
 
+The Windows UI Session Lab is the first consumer. It polls one explicitly
+supplied mailbox on its UI thread and applies only a newer revision to its own
+host-created view. It is a development diagnostic with inert session actions,
+not a public application window or event bridge. See `docs/UI_SESSION_LAB.md`.
+
 ## Verification
 
 The crate tests successful replacement, deterministic revisions, failed-update

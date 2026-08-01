@@ -165,6 +165,19 @@ prints only a safe success summary. This is a development diagnostic—not a
 packaged application launcher, trusted content host, or replacement for the
 future application-identity policy.
 
+To see the same authenticated client replace a host-controlled direct native
+window, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-client $nodePath $clientPath
+~~~
+
+The **Anodrel UI Session Lab** opens with a host-owned waiting screen, then
+replaces it with the document the client submits after authentication. Close the
+window to finish the command. Actions in that delivered document are visibly
+drawn but intentionally inert; there is no action-event bridge yet. See
+`docs/UI_SESSION_LAB.md`.
+
 ## Working process
 
 1. Start from an issue or a written task with a clear acceptance condition.

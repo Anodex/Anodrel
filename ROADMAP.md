@@ -75,10 +75,12 @@ Status: **Direct Windows host in progress**
   UI Lab renders one compiled-in format fixture, and the explicit Windows
   developer preview can render one bounded operator-selected file. The preview
   is not an application session. The replacement operation can transfer only
-  its latest accepted snapshot through a bounded per-session mailbox; it has no
-  native window attachment or event delivery. Authenticated application input,
-  operating-system accessibility adapters, host keyboard focus, scrolling,
-  window lifecycle, and action-event transport remain separate gates.
+  its latest accepted snapshot through a bounded per-session mailbox. The
+  development-only Windows UI Session Lab consumes one mailbox in one native
+  view, but has inert input and no product lifecycle. Authenticated application
+  input, operating-system accessibility adapters, host keyboard focus,
+  scrolling, public window lifecycle, and action-event transport remain
+  separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency
