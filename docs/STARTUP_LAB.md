@@ -170,6 +170,6 @@ asserted:
 - hit-testing follows the layout when the window is resized;
 - exactly the tiles with a documented host operation behind them are marked linked;
 - the linked log action displays only the closed host event catalogue;
-- the reveal adds content over time and is completely static by the time its
-  timer stops;
+- the reveal adds content over time, then transitions to the lower-frequency
+  ambient mark cadence without changing any other pixels;
 - a frame composes inside the animation timer's interval in a release build.
