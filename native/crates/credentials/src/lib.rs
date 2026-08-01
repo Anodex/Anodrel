@@ -45,3 +45,31 @@ impl fmt::Display for CredentialInputError {
 }
 
 impl std::error::Error for CredentialInputError {}
+
+/// Host-injected exact-target credential operations for one application
+/// identity. The implementation, not a protocol caller, owns that identity.
+pub trait CredentialService: std::fmt::Debug + Send {
+    /// Reads one existing credential by its validated local name.
+    fn read(&self, name: &CredentialName) -> Result<Secret, CredentialServiceError>;
+
+    /// Replaces one credential by its validated local name.
+    fn write(&self, name: &CredentialName, secret: &Secret) -> Result<(), CredentialServiceError>;
+
+    /// Deletes one credential by its validated local name.
+    ///
+    /// `false` means the exact credential was not present.
+    fn delete(&self, name: &CredentialName) -> Result<bool, CredentialServiceError>;
+}
+
+/// Safe categories a native credential service can return to the host core.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CredentialServiceError {
+    /// The exact credential was not present.
+    NotFound,
+    /// The current process cannot access the exact credential.
+    AccessDenied,
+    /// The selected operating-system credential service is unavailable.
+    Unavailable,
+    /// A persisted credential violates Anodrel's bounded secret contract.
+    StoredSecretInvalid,
+}

@@ -65,6 +65,13 @@ Credential Manager calls are synchronous and must run off a future host UI
 thread. The adapter has no global cache or background work; each request makes
 one operating-system call.
 
+The portable `CredentialService` seam carries only a validated local name and
+opaque secret. A native service instance is constructed with the already
+validated application identity, so neither a protocol caller nor a renderer can
+substitute an application ID or Credential Manager target. The Windows adapter
+maps its safe errors to exact not-found, access-denied, unavailable, or invalid
+stored-secret categories; it still exposes no protocol operation by itself.
+
 ## Compatibility and public exposure
 
 This is credential layout version 1. The `Anodrel/v1` target prefix, type,

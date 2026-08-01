@@ -11,7 +11,38 @@ mod raw;
 use std::fmt;
 
 use anodrel_application::ApplicationIdentity;
-use anodrel_credentials::{CredentialInputError, CredentialName, CredentialTarget, Secret};
+use anodrel_credentials::{
+    CredentialInputError, CredentialName, CredentialService, CredentialServiceError,
+    CredentialTarget, Secret,
+};
+
+/// One Windows Credential Manager service bound to a host-validated
+/// application identity. Protocol callers never provide this identity.
+#[derive(Clone, Debug)]
+pub struct WindowsCredentialService {
+    identity: ApplicationIdentity,
+}
+
+impl WindowsCredentialService {
+    /// Binds a Windows credential service to one validated application.
+    pub fn new(identity: ApplicationIdentity) -> Self {
+        Self { identity }
+    }
+}
+
+impl CredentialService for WindowsCredentialService {
+    fn read(&self, name: &CredentialName) -> Result<Secret, CredentialServiceError> {
+        read(&self.identity, name).map_err(service_error)
+    }
+
+    fn write(&self, name: &CredentialName, secret: &Secret) -> Result<(), CredentialServiceError> {
+        write(&self.identity, name, secret).map_err(service_error)
+    }
+
+    fn delete(&self, name: &CredentialName) -> Result<bool, CredentialServiceError> {
+        delete(&self.identity, name).map_err(service_error)
+    }
+}
 
 /// Writes one bounded secret to its exact derived Windows credential target.
 pub fn write(
@@ -97,14 +128,25 @@ impl std::error::Error for CredentialStoreError {
     }
 }
 
+fn service_error(error: CredentialStoreError) -> CredentialServiceError {
+    match error {
+        CredentialStoreError::Input(_) | CredentialStoreError::StoredSecretInvalid => {
+            CredentialServiceError::StoredSecretInvalid
+        }
+        CredentialStoreError::NotFound => CredentialServiceError::NotFound,
+        CredentialStoreError::AccessDenied => CredentialServiceError::AccessDenied,
+        CredentialStoreError::Unavailable => CredentialServiceError::Unavailable,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anodrel_application::{ApplicationIdentity, ApplicationManifest};
-    use anodrel_credentials::{CredentialName, Secret};
+    use anodrel_credentials::{CredentialName, CredentialService, Secret};
 
-    use super::{CredentialStoreError, delete, read, write};
+    use super::{CredentialStoreError, WindowsCredentialService, delete, read};
 
     struct CredentialCleanup {
         identity: ApplicationIdentity,
@@ -155,11 +197,20 @@ mod tests {
 
         let expected = b"anodrel credential roundtrip";
         let secret = Secret::new(expected.to_vec()).expect("fixture secret is valid");
-        write(&identity, &name, &secret).expect("Windows writes the scoped credential");
-        let loaded = read(&identity, &name).expect("Windows reads the scoped credential");
+        let service = WindowsCredentialService::new(identity.clone());
+        service
+            .write(&name, &secret)
+            .expect("Windows writes the scoped credential");
+        let loaded = service
+            .read(&name)
+            .expect("Windows reads the scoped credential");
         assert_eq!(loaded.as_bytes(), expected);
 
-        assert!(delete(&identity, &name).expect("Windows removes the scoped credential"));
+        assert!(
+            service
+                .delete(&name)
+                .expect("Windows removes the scoped credential")
+        );
         assert!(matches!(
             read(&identity, &name),
             Err(CredentialStoreError::NotFound)
