@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 8 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 9 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -12,6 +12,8 @@ export const MAX_CLIPBOARD_TEXT_REQUEST_BYTES = 24 * 1024;
 export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_FILTERS = 8;
+export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
+export const SELECTION_REFERENCE_BYTES = 22;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -28,7 +30,8 @@ export type Capability =
   | "clipboard.write"
   | "external.open"
   | "dialog.open_file"
-  | "dialog.save_file";
+  | "dialog.save_file"
+  | "file.read_text";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -102,6 +105,18 @@ export interface PlatformOperationMap {
       | { readonly status: "saved"; readonly path: string }
       | { readonly status: "cancelled" };
   };
+  "dialog.open_file.v2": {
+    readonly payload: {
+      readonly filters: readonly { readonly label: string; readonly extensions: readonly string[] }[];
+    };
+    readonly result:
+      | { readonly status: "selected"; readonly path: string; readonly selectionReference: string }
+      | { readonly status: "cancelled" };
+  };
+  "file.read_text": {
+    readonly payload: { readonly selectionReference: string };
+    readonly result: { readonly status: "text"; readonly text: string };
+  };
 }
 
 export type PlatformOperation = keyof PlatformOperationMap;
@@ -170,7 +185,10 @@ export type ProtocolErrorCode =
   | "clipboard.text_invalid"
   | "clipboard.text_too_large"
   | "external.unavailable"
-  | "dialog.unavailable";
+  | "dialog.unavailable"
+  | "file.unavailable"
+  | "file.text_invalid"
+  | "file.text_too_large";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -329,6 +347,19 @@ export function isFileDialogOpenPayload(
     value.filters.length <= MAX_FILE_DIALOG_FILTERS &&
     new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_FILE_DIALOG_REQUEST_BYTES &&
     value.filters.every(isFileDialogFilter)
+  );
+}
+
+/** Validates one exact opaque selection reference for a bounded file text read. */
+export function isFileTextReadPayload(
+  value: unknown,
+): value is PayloadFor<"file.read_text"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.selectionReference === "string" &&
+    value.selectionReference.length === SELECTION_REFERENCE_BYTES &&
+    /^[A-Za-z0-9_-]+$/.test(value.selectionReference)
   );
 }
 

@@ -5,6 +5,7 @@ import {
   isClipboardWritePayload,
   isExternalOpenPayload,
   isFileDialogOpenPayload,
+  isFileTextReadPayload,
   isEmptyPayload,
   isUiDocumentReplacePayload,
   isPingPayload,
@@ -398,6 +399,60 @@ export class MockHost {
           );
         }
         return this.success("dialog.save_file", request.requestId, { status: "cancelled" });
+
+      case "dialog.open_file.v2":
+        if (request.protocolVersion.minor < 9) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "dialog.open_file.v2 requires protocol 1.9 or later.",
+          );
+        }
+        if (!isFileDialogOpenPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "dialog.open_file.v2 requires strict bounded filters.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "dialog.open_file")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "dialog.open_file.v2 requires the dialog.open_file capability.",
+            { capability: "dialog.open_file" },
+          );
+        }
+        return this.success("dialog.open_file.v2", request.requestId, { status: "cancelled" });
+
+      case "file.read_text":
+        if (request.protocolVersion.minor < 9) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "file.read_text requires protocol 1.9 or later.",
+          );
+        }
+        if (!isFileTextReadPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "file.read_text requires one exact selection reference.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "file.read_text")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "file.read_text requires the file.read_text capability.",
+            { capability: "file.read_text" },
+          );
+        }
+        return this.failure(
+          request.requestId,
+          "file.unavailable",
+          "selected file is unavailable.",
+        );
 
       default:
         return this.failure(

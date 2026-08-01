@@ -268,6 +268,44 @@ test("SDK and host agree on a separately authorized save dialog", async () => {
   );
 });
 
+test("selection-scoped file text keeps selection and reading separately granted", async () => {
+  const selectionClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.open_file"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  assert.deepEqual(
+    await selectionClient.openFileDialogWithReference([{ label: "Text", extensions: ["txt"] }]),
+    { status: "cancelled" },
+  );
+
+  await assert.rejects(
+    () => selectionClient.readSelectedFileText("AbCdEfGhIjKlMnOpQrStUv"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "file.read_text",
+  );
+
+  const readClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["file.read_text"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => readClient.readSelectedFileText("AbCdEfGhIjKlMnOpQrStUv"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "file.unavailable",
+  );
+  await assert.rejects(
+    () => readClient.readSelectedFileText("C:/private.txt"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+  );
+});
+
 test("session close requires a host-issued grant", async () => {
   const host = new MockHost({ applicationId: "test.application" });
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());

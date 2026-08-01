@@ -40,6 +40,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
  "anodrel-external-links",
+ "anodrel-file-access",
  "anodrel-file-dialog",
  "anodrel-protocol",
  "anodrel-ui",
@@ -64,6 +65,9 @@ version = "0.1.0"
 [[package]]
 name = "anodrel-file-access"
 version = "0.1.0"
+dependencies = [
+ "anodrel-file-dialog",
+]
 
 [[package]]
 name = "anodrel-file-dialog"

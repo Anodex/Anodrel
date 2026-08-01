@@ -18,6 +18,11 @@ use std::{
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
+use anodrel_file_access::{
+    FileSelectionResult, FileSelectionService, FileSelectionServiceError, FileTextService,
+    FileTextServiceError, SelectionReference, UnavailableFileSelectionService,
+    UnavailableFileTextService,
+};
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
@@ -33,6 +38,7 @@ pub const MAX_CLIPBOARD_TEXT_REQUEST_BYTES: usize = 24 * 1024;
 pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
+pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
 
 /// One host-created, coalescing request to end an authenticated session.
 ///
@@ -102,6 +108,8 @@ pub struct CoreHost {
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
     file_dialogs: Box<dyn FileDialogService>,
+    file_selections: Box<dyn FileSelectionService>,
+    file_text: Box<dyn FileTextService>,
 }
 
 #[derive(Debug)]
@@ -213,6 +221,35 @@ impl CoreHost {
         external_links: impl ExternalLinkService + 'static,
         file_dialogs: impl FileDialogService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            UnavailableFileSelectionService,
+            UnavailableFileTextService,
+        )
+    }
+
+    /// Creates a host core with all injected platform services, including the
+    /// separate selection-capture and selected-file text boundaries.
+    ///
+    /// The selection service must bind a picker choice to retained native
+    /// identity before returning success. The text service consumes only that
+    /// retained state, never a request path.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
@@ -222,6 +259,8 @@ impl CoreHost {
             clipboard: Box::new(clipboard),
             external_links: Box::new(external_links),
             file_dialogs: Box::new(file_dialogs),
+            file_selections: Box::new(file_selections),
+            file_text: Box::new(file_text),
         }
     }
 
@@ -304,6 +343,12 @@ impl CoreHost {
             }
             "dialog.save_file" if request.protocol_version.minor >= 8 => {
                 self.handle_file_dialog_save(request)
+            }
+            "dialog.open_file.v2" if request.protocol_version.minor >= 9 => {
+                self.handle_file_dialog_open_with_reference(request)
+            }
+            "file.read_text" if request.protocol_version.minor >= 9 => {
+                self.handle_file_text_read(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -751,6 +796,100 @@ impl CoreHost {
         }
     }
 
+    fn handle_file_dialog_open_with_reference(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(filters) = file_dialog_open_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.open_file.v2 requires strict bounded filters.",
+                None,
+            );
+        };
+        if request.payload.to_json().len() > MAX_FILE_DIALOG_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.open_file.v2 filters exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::DialogOpenFile) {
+            return self.capability_denied(request.request_id, "dialog.open_file");
+        }
+        match self.file_selections.open_file(&filters) {
+            Ok(FileSelectionResult::Selected(selection)) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("selected".to_owned())),
+                    (
+                        "path",
+                        JsonValue::String(
+                            selection.path().as_path().to_string_lossy().into_owned(),
+                        ),
+                    ),
+                    (
+                        "selectionReference",
+                        JsonValue::String(selection.reference().as_str().to_owned()),
+                    ),
+                ]),
+            ),
+            Ok(FileSelectionResult::Cancelled) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("cancelled".to_owned()))]),
+            ),
+            Err(FileSelectionServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::DialogUnavailable,
+                "file dialog is unavailable.",
+                None,
+            ),
+        }
+    }
+
+    fn handle_file_text_read(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(reference) = file_text_read_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "file.read_text requires one exact selection reference.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::FileReadText) {
+            return self.capability_denied(request.request_id, "file.read_text");
+        }
+        match self.file_text.read_text(&reference) {
+            Ok(text) if text.len() <= MAX_FILE_TEXT_RESPONSE_BYTES => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("text".to_owned())),
+                    ("text", JsonValue::String(text)),
+                ]),
+            ),
+            Ok(_) | Err(FileTextServiceError::TooLarge) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileTextTooLarge,
+                "selected file text is too large.",
+                None,
+            ),
+            Err(FileTextServiceError::InvalidText) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileTextInvalid,
+                "selected file text is invalid.",
+                None,
+            ),
+            Err(FileTextServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileUnavailable,
+                "selected file is unavailable.",
+                None,
+            ),
+        }
+    }
+
     fn capability_denied(&self, request_id: String, capability: &str) -> JsonValue {
         self.failure(
             request_id,
@@ -876,6 +1015,14 @@ fn file_dialog_open_payload(value: &JsonValue) -> Option<Vec<FileDialogFilter>> 
         .collect()
 }
 
+fn file_text_read_payload(value: &JsonValue) -> Option<SelectionReference> {
+    let fields = value.as_object()?;
+    if fields.len() != 1 {
+        return None;
+    }
+    SelectionReference::new(fields.get("selectionReference")?.as_string()?.to_owned()).ok()
+}
+
 fn rfc3339_now() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -920,7 +1067,8 @@ mod tests {
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
     };
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
-    use anodrel_file_dialog::SaveFilePath;
+    use anodrel_file_access::{FileSelection, FileSelectionService, FileTextService};
+    use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
 
@@ -1029,6 +1177,36 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct CapturingFileDialog;
+
+    impl FileSelectionService for CapturingFileDialog {
+        fn open_file(
+            &self,
+            _filters: &[FileDialogFilter],
+        ) -> Result<FileSelectionResult, FileSelectionServiceError> {
+            let path =
+                SelectedFilePath::new(r"C:\\Users\\Owner\\selection.txt").expect("path is valid");
+            let reference =
+                SelectionReference::new("AbCdEfGhIjKlMnOpQrStUv").expect("reference is valid");
+            Ok(FileSelectionResult::Selected(FileSelection::new(
+                path, reference,
+            )))
+        }
+    }
+
+    #[derive(Debug)]
+    struct FixedFileText(Result<String, FileTextServiceError>);
+
+    impl FileTextService for FixedFileText {
+        fn read_text(
+            &self,
+            _reference: &SelectionReference,
+        ) -> Result<String, FileTextServiceError> {
+            self.0.clone()
+        }
+    }
+
     fn clipboard_host(
         grants: Vec<Capability>,
         clipboard: impl ClipboardService + 'static,
@@ -1065,6 +1243,23 @@ mod tests {
             MemoryClipboard::with_text(None),
             FailingExternalLinks,
             dialogs,
+        )
+    }
+
+    fn file_access_host(
+        grants: Vec<Capability>,
+        selections: impl FileSelectionService + 'static,
+        text: impl FileTextService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_session_components_and_all_services_and_file_access(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            MemoryClipboard::with_text(None),
+            FailingExternalLinks,
+            CancellingFileDialog,
+            selections,
+            text,
         )
     }
 
@@ -1119,6 +1314,12 @@ mod tests {
     fn request_v1_8(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":8}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_9(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":9}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -1597,6 +1798,123 @@ mod tests {
         assert_eq!(
             field(field(&unsupported, "error"), "code").as_string(),
             Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn selection_dialog_requires_the_open_grant_and_returns_an_opaque_reference() {
+        let accepted_host = file_access_host(
+            vec![Capability::DialogOpenFile],
+            CapturingFileDialog,
+            FixedFileText(Err(FileTextServiceError::Unavailable)),
+        );
+        let accepted = JsonValue::parse(&accepted_host.handle_json(&request_v1_9(
+            "dialog.open_file.v2",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("selection response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "selectionReference").as_string(),
+            Some("AbCdEfGhIjKlMnOpQrStUv")
+        );
+
+        let denied = JsonValue::parse(&host(vec![]).handle_json(&request_v1_9(
+            "dialog.open_file.v2",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&accepted_host.handle_json(&request_v1_9(
+            "dialog.open_file.v2",
+            r#"{"filters":[{"label":"Raw","extensions":["*.txt"]}]}"#,
+        )))
+        .expect("invalid response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn selected_file_text_is_separately_granted_bounded_and_safe() {
+        let reference = "AbCdEfGhIjKlMnOpQrStUv";
+        let accepted_host = file_access_host(
+            vec![Capability::FileReadText],
+            CapturingFileDialog,
+            FixedFileText(Ok("selected text".to_owned())),
+        );
+        let accepted = JsonValue::parse(&accepted_host.handle_json(&request_v1_9(
+            "file.read_text",
+            &format!(r#"{{"selectionReference":"{reference}"}}"#),
+        )))
+        .expect("text response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "text").as_string(),
+            Some("selected text")
+        );
+
+        let denied = JsonValue::parse(&host(vec![Capability::DialogOpenFile]).handle_json(
+            &request_v1_9(
+                "file.read_text",
+                &format!(r#"{{"selectionReference":"{reference}"}}"#),
+            ),
+        ))
+        .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&accepted_host.handle_json(&request_v1_9(
+            "file.read_text",
+            r#"{"selectionReference":"path.txt"}"#,
+        )))
+        .expect("invalid response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        for (service_error, expected) in [
+            (FileTextServiceError::Unavailable, "file.unavailable"),
+            (FileTextServiceError::InvalidText, "file.text_invalid"),
+            (FileTextServiceError::TooLarge, "file.text_too_large"),
+        ] {
+            let failing_host = file_access_host(
+                vec![Capability::FileReadText],
+                CapturingFileDialog,
+                FixedFileText(Err(service_error)),
+            );
+            let response = JsonValue::parse(&failing_host.handle_json(&request_v1_9(
+                "file.read_text",
+                &format!(r#"{{"selectionReference":"{reference}"}}"#),
+            )))
+            .expect("failure response is JSON");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(expected)
+            );
+        }
+
+        let oversized_host = file_access_host(
+            vec![Capability::FileReadText],
+            CapturingFileDialog,
+            FixedFileText(Ok("x".repeat(MAX_FILE_TEXT_RESPONSE_BYTES + 1))),
+        );
+        let oversized = JsonValue::parse(&oversized_host.handle_json(&request_v1_9(
+            "file.read_text",
+            &format!(r#"{{"selectionReference":"{reference}"}}"#),
+        )))
+        .expect("oversized response is JSON");
+        assert_eq!(
+            field(field(&oversized, "error"), "code").as_string(),
+            Some("file.text_too_large")
         );
     }
 

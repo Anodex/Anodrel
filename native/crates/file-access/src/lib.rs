@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
+
 /// Maximum live file selections for one authenticated session.
 pub const MAX_SESSION_SELECTIONS: usize = 32;
 /// Exact UTF-8 byte length of a Version 1 opaque selection reference.
@@ -148,12 +150,93 @@ impl fmt::Display for FileSelectionStoreError {
 
 impl std::error::Error for FileSelectionStoreError {}
 
+/// One display-safe path paired with its opaque retained-file reference.
+///
+/// Constructing this portable value does not open a file. A native adapter may
+/// construct it only after it has captured the selected regular file's native
+/// identity for the supplied reference.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FileSelection {
+    path: SelectedFilePath,
+    reference: SelectionReference,
+}
+
+impl FileSelection {
+    /// Pairs one selected display path with its host-retained reference.
+    #[must_use]
+    pub fn new(path: SelectedFilePath, reference: SelectionReference) -> Self {
+        Self { path, reference }
+    }
+
+    /// Returns the display-safe selected path.
+    #[must_use]
+    pub fn path(&self) -> &SelectedFilePath {
+        &self.path
+    }
+
+    /// Returns the opaque reference that is valid only in this host session.
+    #[must_use]
+    pub fn reference(&self) -> &SelectionReference {
+        &self.reference
+    }
+}
+
+/// The bounded result from a selection-capturing host-owned picker.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FileSelectionResult {
+    /// The host captured one selected regular file and its private identity.
+    Selected(FileSelection),
+    /// The user cancelled the host-owned picker.
+    Cancelled,
+}
+
+/// Captures selected-file identity while completing one host-owned picker.
+///
+/// Implementations must not derive a selection from a caller-supplied path or
+/// reopen a path returned by another picker. The Windows implementation must
+/// run this work through its host UI-thread boundary.
+pub trait FileSelectionService: fmt::Debug + Send {
+    /// Opens one bounded picker and captures the selected file before success.
+    fn open_file(
+        &self,
+        filters: &[FileDialogFilter],
+    ) -> Result<FileSelectionResult, FileSelectionServiceError>;
+}
+
+/// A safe selection-capture service failure category.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileSelectionServiceError {
+    /// The host could not show the picker or retain its selected-file identity.
+    Unavailable,
+}
+
+impl fmt::Display for FileSelectionServiceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("selected file identity is unavailable")
+    }
+}
+
+impl std::error::Error for FileSelectionServiceError {}
+
+/// A safe default service for hosts without selection-time identity capture.
+#[derive(Debug, Default)]
+pub struct UnavailableFileSelectionService;
+
+impl FileSelectionService for UnavailableFileSelectionService {
+    fn open_file(
+        &self,
+        _filters: &[FileDialogFilter],
+    ) -> Result<FileSelectionResult, FileSelectionServiceError> {
+        Err(FileSelectionServiceError::Unavailable)
+    }
+}
+
 /// Reads bounded UTF-8 text from one session-bound selected-file reference.
 ///
 /// Implementations must never accept a path, native handle, or caller-selected
 /// filesystem scope. A missing reference is intentionally indistinguishable
 /// from an unavailable host selection at this portable boundary.
-pub trait FileTextService {
+pub trait FileTextService: fmt::Debug + Send {
     /// Consumes the reference's retained file object and returns bounded text.
     fn read_text(&self, reference: &SelectionReference) -> Result<String, FileTextServiceError>;
 }
@@ -190,10 +273,12 @@ impl FileTextService for UnavailableFileTextService {
 #[cfg(test)]
 mod tests {
     use super::{
+        FileSelection, FileSelectionResult, FileSelectionService, FileSelectionServiceError,
         FileSelectionStore, FileSelectionStoreError, FileTextService, FileTextServiceError,
         MAX_SESSION_SELECTIONS, SelectionReference, SelectionReferenceError,
-        UnavailableFileTextService,
+        UnavailableFileSelectionService, UnavailableFileTextService,
     };
+    use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
 
     const FIRST: &str = "AbCdEfGhIjKlMnOpQrStUv";
     const SECOND: &str = "ZyXwVuTsRqPoNmLkJiHgFe";
@@ -255,6 +340,28 @@ mod tests {
         assert_eq!(
             UnavailableFileTextService.read_text(&reference),
             Err(FileTextServiceError::Unavailable)
+        );
+    }
+
+    #[test]
+    fn default_selection_service_does_not_create_file_authority() {
+        let filter =
+            FileDialogFilter::new("Text", vec!["txt".to_owned()]).expect("filter is valid");
+        assert_eq!(
+            UnavailableFileSelectionService.open_file(&[filter]),
+            Err(FileSelectionServiceError::Unavailable)
+        );
+
+        let path = SelectedFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid");
+        let reference = SelectionReference::new(FIRST).expect("reference is valid");
+        let selection = FileSelection::new(path, reference.clone());
+        assert_eq!(selection.reference(), &reference);
+        assert_eq!(
+            FileSelectionResult::Selected(selection).clone(),
+            FileSelectionResult::Selected(FileSelection::new(
+                SelectedFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid"),
+                reference,
+            ))
         );
     }
 }

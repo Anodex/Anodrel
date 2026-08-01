@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 8;
+pub const PROTOCOL_MINOR: u16 = 9;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -51,6 +51,7 @@ pub enum Capability {
     ExternalOpen,
     DialogOpenFile,
     DialogSaveFile,
+    FileReadText,
 }
 
 impl Capability {
@@ -65,6 +66,7 @@ impl Capability {
             Self::ExternalOpen => "external.open",
             Self::DialogOpenFile => "dialog.open_file",
             Self::DialogSaveFile => "dialog.save_file",
+            Self::FileReadText => "file.read_text",
         }
     }
 }
@@ -81,6 +83,9 @@ pub enum ProtocolErrorCode {
     ClipboardTextTooLarge,
     ExternalUnavailable,
     DialogUnavailable,
+    FileUnavailable,
+    FileTextInvalid,
+    FileTextTooLarge,
 }
 
 impl ProtocolErrorCode {
@@ -96,6 +101,9 @@ impl ProtocolErrorCode {
             Self::ClipboardTextTooLarge => "clipboard.text_too_large",
             Self::ExternalUnavailable => "external.unavailable",
             Self::DialogUnavailable => "dialog.unavailable",
+            Self::FileUnavailable => "file.unavailable",
+            Self::FileTextInvalid => "file.text_invalid",
+            Self::FileTextTooLarge => "file.text_too_large",
         }
     }
 }

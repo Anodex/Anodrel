@@ -100,6 +100,16 @@ export class PlatformClient {
     return this.request("dialog.save_file", { filters });
   }
 
+  openFileDialogWithReference(
+    filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
+  ): Promise<ResultFor<"dialog.open_file.v2">> {
+    return this.request("dialog.open_file.v2", { filters });
+  }
+
+  readSelectedFileText(selectionReference: string): Promise<ResultFor<"file.read_text">> {
+    return this.request("file.read_text", { selectionReference });
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,
