@@ -1,7 +1,7 @@
 # Anodrel clipboard foundation
 
-**Status:** Portable text values and the direct Windows adapter are implemented;
-the capability-checked protocol surface remains deferred.
+**Status:** Portable text values, the direct Windows adapter, and the
+capability-checked Protocol 1.5 surface are implemented.
 
 ## Boundary
 
@@ -35,15 +35,18 @@ format identifier, source application name, or raw handle.
 ## Authority and protocol
 
 Clipboard reading and writing are separate host-issued capabilities:
-`clipboard.read` and `clipboard.write`. A protocol operation must check its
-capability immediately before touching the operating system, use a bounded
-string payload/result, and return only safe error categories. No current
-protocol operation grants clipboard authority.
+`clipboard.read` and `clipboard.write`. Protocol 1.5 maps them to exact
+`clipboard.read` and `clipboard.write` operations as defined in
+`docs/PROTOCOL.md`. The protocol accepts at most 24 KiB of UTF-8 text even
+though the portable service can represent 64 KiB, leaving envelope headroom
+inside Wire 1.0's 64 KiB frame. Capability checks happen immediately before the
+service is used, and failures return only safe categories.
 
 ## Windows mapping
 
 The Windows adapter uses only User32 and Kernel32 APIs. It opens the clipboard
-for the host's current native window, reads or writes `CF_UNICODETEXT`, and
+for the host's current native window when one is available (or no owner window
+for a non-windowed host), reads or writes `CF_UNICODETEXT`, and
 uses a movable global-memory allocation only during the documented ownership
 transfer to Windows. It frees memory itself only when that transfer fails.
 The adapter closes the clipboard on every path and never retains the native
@@ -52,6 +55,9 @@ handle after a call.
 The direct adapter is host-only. It accepts the current host window only as an
 opaque transient owner value, never exposes it to an application, and maps all
 native failures to `Unavailable`, `StoredTextInvalid`, or `StoredTextTooLarge`.
+Its portable service implementation is moved only to the authenticated session
+worker that calls it; it is neither shared across sessions nor used by the UI
+thread at the same time.
 
 ## Security and privacy
 

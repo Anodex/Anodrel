@@ -8,6 +8,7 @@
 
 use std::fmt;
 
+use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
 use anodrel_protocol::{JsonValue, object};
 pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
@@ -132,6 +133,19 @@ enum SessionState {
 }
 
 #[derive(Debug)]
+struct TransportUnavailableClipboard;
+
+impl ClipboardService for TransportUnavailableClipboard {
+    fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError> {
+        Err(ClipboardServiceError::Unavailable)
+    }
+
+    fn write_text(&self, _text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+        Err(ClipboardServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
 pub struct TransportSession {
     decoder: FrameDecoder,
     host: CoreHost,
@@ -186,9 +200,34 @@ impl TransportSession {
         ui_input_mailbox: UiInputMailbox,
         session_close_signal: SessionCloseSignal,
     ) -> Self {
+        Self::with_session_components_and_clipboard(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            TransportUnavailableClipboard,
+        )
+    }
+
+    /// Creates one session with explicit native components and one portable
+    /// clipboard service supplied by the native host.
+    pub fn with_session_components_and_clipboard(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_session_components(policy, ui_input_mailbox, session_close_signal),
+            host: CoreHost::with_session_components_and_clipboard(
+                policy,
+                ui_input_mailbox,
+                session_close_signal,
+                clipboard,
+            ),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),
         }
@@ -303,6 +342,11 @@ fn constant_time_equals(candidate: &[u8], expected: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
+    use anodrel_clipboard::{
+        ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
+    };
     use anodrel_ui::{ElementId, UiEvent};
 
     use anodrel_protocol::{Capability, JsonValue};
@@ -340,6 +384,39 @@ mod tests {
 
     fn session_close_request() -> String {
         r#"{"protocolVersion":{"major":1,"minor":3},"kind":"request","requestId":"session-close","operation":"session.close","payload":{}}"#.to_owned()
+    }
+
+    fn clipboard_request(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":5}},"kind":"request","requestId":"clipboard","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    #[derive(Debug)]
+    struct MemoryClipboard(RefCell<Option<ClipboardText>>);
+
+    impl MemoryClipboard {
+        fn with_text(text: &str) -> Self {
+            Self(RefCell::new(Some(
+                ClipboardText::new(text).expect("fixture text is valid"),
+            )))
+        }
+    }
+
+    impl ClipboardService for MemoryClipboard {
+        fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError> {
+            Ok(self
+                .0
+                .borrow()
+                .clone()
+                .map(ClipboardRead::Text)
+                .unwrap_or(ClipboardRead::NoText))
+        }
+
+        fn write_text(&self, text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+            *self.0.borrow_mut() = Some(text.clone());
+            Ok(())
+        }
     }
 
     fn decode_response(frame: &[u8]) -> JsonValue {
@@ -549,6 +626,55 @@ mod tests {
             Some("accepted")
         );
         assert!(close_signal.take());
+    }
+
+    #[test]
+    fn routes_granted_clipboard_operations_to_the_injected_service_after_authentication() {
+        let mut transport = TransportSession::with_session_components_and_clipboard(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::ClipboardRead, Capability::ClipboardWrite],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            MemoryClipboard::with_text("before"),
+        );
+        authenticate(&mut transport);
+
+        let read = transport
+            .receive(
+                &encode_json(&clipboard_request("clipboard.read", "{}")).expect("request encodes"),
+            )
+            .expect("read response is returned");
+        assert_eq!(
+            decode_response(&read[0])
+                .as_object()
+                .expect("response object")["result"]
+                .as_object()
+                .expect("result object")["text"]
+                .as_string(),
+            Some("before")
+        );
+
+        let write = transport
+            .receive(
+                &encode_json(&clipboard_request("clipboard.write", r#"{"text":"after"}"#))
+                    .expect("request encodes"),
+            )
+            .expect("write response is returned");
+        assert_eq!(
+            decode_response(&write[0])
+                .as_object()
+                .expect("response object")["result"]
+                .as_object()
+                .expect("result object")["status"]
+                .as_string(),
+            Some("written")
+        );
     }
 
     #[test]

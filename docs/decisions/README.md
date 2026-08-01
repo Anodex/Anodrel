@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0041: Clipboard protocol operations are separate and bounded.
+
 - 0040: Clipboard starts with bounded Unicode text.
 
 - 0039: Scroll documents use a new exact format version.

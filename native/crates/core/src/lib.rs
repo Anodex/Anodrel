@@ -16,6 +16,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
@@ -24,6 +25,7 @@ use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
+pub const MAX_CLIPBOARD_TEXT_REQUEST_BYTES: usize = 24 * 1024;
 
 /// One host-created, coalescing request to end an authenticated session.
 ///
@@ -90,6 +92,20 @@ pub struct CoreHost {
     ui_input_mailbox: UiInputMailbox,
     session_close_signal: SessionCloseSignal,
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
+    clipboard: Box<dyn ClipboardService>,
+}
+
+#[derive(Debug)]
+struct UnavailableClipboard;
+
+impl ClipboardService for UnavailableClipboard {
+    fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError> {
+        Err(ClipboardServiceError::Unavailable)
+    }
+
+    fn write_text(&self, _text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+        Err(ClipboardServiceError::Unavailable)
+    }
 }
 
 impl CoreHost {
@@ -109,12 +125,29 @@ impl CoreHost {
         ui_input_mailbox: UiInputMailbox,
         session_close_signal: SessionCloseSignal,
     ) -> Self {
+        Self::with_session_components_and_clipboard(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            UnavailableClipboard,
+        )
+    }
+
+    /// Creates a host core with explicit native components and one injected
+    /// portable clipboard service.
+    pub fn with_session_components_and_clipboard(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
             ui_input_mailbox,
             session_close_signal,
             pending_ui_document_update: RefCell::new(None),
+            clipboard: Box::new(clipboard),
         }
     }
 
@@ -182,6 +215,12 @@ impl CoreHost {
             }
             "session.close" if request.protocol_version.minor >= 3 => {
                 self.handle_session_close(request)
+            }
+            "clipboard.read" if request.protocol_version.minor >= 5 => {
+                self.handle_clipboard_read(request)
+            }
+            "clipboard.write" if request.protocol_version.minor >= 5 => {
+                self.handle_clipboard_write(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -411,6 +450,107 @@ impl CoreHost {
         )
     }
 
+    fn handle_clipboard_read(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "clipboard.read does not accept a payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::ClipboardRead) {
+            return self.capability_denied(request.request_id, "clipboard.read");
+        }
+        match self.clipboard.read_text() {
+            Ok(ClipboardRead::Text(text)) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("text".to_owned())),
+                    ("text", JsonValue::String(text.as_str().to_owned())),
+                ]),
+            ),
+            Ok(ClipboardRead::NoText) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("no_text".to_owned()))]),
+            ),
+            Err(error) => self.clipboard_failure(request.request_id, error),
+        }
+    }
+
+    fn handle_clipboard_write(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(text) = clipboard_write_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "clipboard.write requires one bounded text string.",
+                None,
+            );
+        };
+        if text.len() > MAX_CLIPBOARD_TEXT_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "clipboard.write text exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::ClipboardWrite) {
+            return self.capability_denied(request.request_id, "clipboard.write");
+        }
+        let text = match ClipboardText::new(text) {
+            Ok(text) => text,
+            Err(_) => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::RequestPayloadInvalid,
+                    "clipboard.write text exceeded the portable size limit.",
+                    None,
+                );
+            }
+        };
+        match self.clipboard.write_text(&text) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("written".to_owned()))]),
+            ),
+            Err(error) => self.clipboard_failure(request.request_id, error),
+        }
+    }
+
+    fn capability_denied(&self, request_id: String, capability: &str) -> JsonValue {
+        self.failure(
+            request_id,
+            ProtocolErrorCode::CapabilityDenied,
+            format!("operation requires the {capability} capability."),
+            Some(BTreeMap::from([(
+                "capability".to_owned(),
+                JsonValue::String(capability.to_owned()),
+            )])),
+        )
+    }
+
+    fn clipboard_failure(&self, request_id: String, error: ClipboardServiceError) -> JsonValue {
+        let (code, message) = match error {
+            ClipboardServiceError::Unavailable => (
+                ProtocolErrorCode::ClipboardUnavailable,
+                "clipboard is unavailable.",
+            ),
+            ClipboardServiceError::StoredTextInvalid => (
+                ProtocolErrorCode::ClipboardTextInvalid,
+                "clipboard text is invalid.",
+            ),
+            ClipboardServiceError::StoredTextTooLarge => (
+                ProtocolErrorCode::ClipboardTextTooLarge,
+                "clipboard text is too large.",
+            ),
+        };
+        self.failure(request_id, code, message, None)
+    }
+
     fn failure(
         &self,
         request_id: String,
@@ -459,6 +599,14 @@ fn ui_document_payload(value: &JsonValue) -> Option<&str> {
         .and_then(JsonValue::as_string)
 }
 
+fn clipboard_write_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("text"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
 fn rfc3339_now() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -497,6 +645,11 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
+    use anodrel_clipboard::{
+        ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
+    };
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
 
@@ -505,6 +658,62 @@ mod tests {
     fn host(grants: Vec<Capability>) -> CoreHost {
         CoreHost::new(
             HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+        )
+    }
+
+    #[derive(Debug)]
+    struct MemoryClipboard {
+        text: RefCell<Option<ClipboardText>>,
+    }
+
+    impl MemoryClipboard {
+        fn with_text(text: Option<&str>) -> Self {
+            Self {
+                text: RefCell::new(
+                    text.map(|value| ClipboardText::new(value).expect("fixture text")),
+                ),
+            }
+        }
+    }
+
+    impl ClipboardService for MemoryClipboard {
+        fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError> {
+            Ok(self
+                .text
+                .borrow()
+                .clone()
+                .map(ClipboardRead::Text)
+                .unwrap_or(ClipboardRead::NoText))
+        }
+
+        fn write_text(&self, text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+            *self.text.borrow_mut() = Some(text.clone());
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct FailingClipboard(ClipboardServiceError);
+
+    impl ClipboardService for FailingClipboard {
+        fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError> {
+            Err(self.0)
+        }
+
+        fn write_text(&self, _text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+            Err(self.0)
+        }
+    }
+
+    fn clipboard_host(
+        grants: Vec<Capability>,
+        clipboard: impl ClipboardService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_session_components_and_clipboard(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            clipboard,
         )
     }
 
@@ -535,6 +744,12 @@ mod tests {
     fn request_v1_4(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":4}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_5(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":5}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -787,6 +1002,85 @@ mod tests {
         assert_eq!(
             field(field(&old_minor, "error"), "code").as_string(),
             Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn clipboard_operations_are_separate_bounded_and_capability_checked() {
+        let clipboard_host = clipboard_host(
+            vec![Capability::ClipboardRead, Capability::ClipboardWrite],
+            MemoryClipboard::with_text(Some("before")),
+        );
+
+        let read =
+            JsonValue::parse(&clipboard_host.handle_json(&request_v1_5("clipboard.read", "{}")))
+                .expect("clipboard read response is JSON");
+        assert_eq!(field(&read, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&read, "result"), "status").as_string(),
+            Some("text")
+        );
+        assert_eq!(
+            field(field(&read, "result"), "text").as_string(),
+            Some("before")
+        );
+
+        let write = JsonValue::parse(
+            &clipboard_host.handle_json(&request_v1_5("clipboard.write", r#"{"text":"after"}"#)),
+        )
+        .expect("clipboard write response is JSON");
+        assert_eq!(
+            field(field(&write, "result"), "status").as_string(),
+            Some("written")
+        );
+
+        let updated =
+            JsonValue::parse(&clipboard_host.handle_json(&request_v1_5("clipboard.read", "{}")))
+                .expect("updated clipboard read response is JSON");
+        assert_eq!(
+            field(field(&updated, "result"), "text").as_string(),
+            Some("after")
+        );
+
+        let denied =
+            JsonValue::parse(&host(vec![]).handle_json(&request_v1_5("clipboard.read", "{}")))
+                .expect("denied clipboard response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let oversized = object([(
+            "text",
+            JsonValue::String("x".repeat(MAX_CLIPBOARD_TEXT_REQUEST_BYTES + 1)),
+        )])
+        .to_json();
+        let rejected = JsonValue::parse(
+            &clipboard_host.handle_json(&request_v1_5("clipboard.write", &oversized)),
+        )
+        .expect("oversized clipboard response is JSON");
+        assert_eq!(
+            field(field(&rejected, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn clipboard_service_failures_have_safe_stable_protocol_codes() {
+        let host = clipboard_host(
+            vec![Capability::ClipboardRead, Capability::ClipboardWrite],
+            FailingClipboard(ClipboardServiceError::StoredTextInvalid),
+        );
+        let response = JsonValue::parse(&host.handle_json(&request_v1_5("clipboard.read", "{}")))
+            .expect("clipboard failure response is JSON");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("clipboard.text_invalid")
+        );
+        assert!(
+            field(field(&response, "error"), "message")
+                .as_string()
+                .is_some_and(|message| !message.contains("before"))
         );
     }
 

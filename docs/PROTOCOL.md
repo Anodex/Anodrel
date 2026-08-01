@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.4
+**Status:** Foundation contract, version 1.5
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.4 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 4}`.
+the host's. Version 1.5 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 5}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -64,6 +64,31 @@ The current operations are:
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
 | `session.close` | `{}` | accepted close request | `session.close` |
+| `clipboard.read` | `{}` | bounded Unicode text or no text | `clipboard.read` |
+| `clipboard.write` | `{ "text": string }` | accepted write | `clipboard.write` |
+
+### `clipboard.read` and `clipboard.write`
+
+Protocol 1.5 adds separate text-only clipboard operations. Both require an
+already authenticated session and an immediate host-issued capability check.
+`clipboard.read` accepts exactly `{}` and returns either
+`{ "status": "text", "text": string }` or `{ "status": "no_text" }`.
+The first form preserves the difference between an empty supported value and a
+clipboard with no supported Unicode-text representation.
+
+`clipboard.write` accepts exactly `{ "text": string }` and returns
+`{ "status": "written" }`. The UTF-8 text field is limited to **24 KiB**,
+leaving bounded space for its request envelope within Wire 1.0's 64 KiB frame.
+The portable clipboard service may support a larger 64 KiB value only behind a
+host boundary; this protocol operation never expands that transport-safe limit.
+
+Neither operation accepts a clipboard owner, window, format, source,
+application selector, history selector, or native handle. The host maps the
+ordinary text format to its current operating-system clipboard. Native
+contention, malformed system text, and an oversized system value return only
+the stable `clipboard.unavailable`, `clipboard.text_invalid`, or
+`clipboard.text_too_large` errors. Clipboard text itself never appears in
+diagnostics or error text.
 
 ### `ui.document.replace`
 
@@ -201,8 +226,10 @@ diagnostics containing only `hostName`. Responses have one of two forms:
 
 Version 1 defines these stable error codes: `capability.denied`,
 `operation.unsupported`, `protocol.version_unsupported`, `request.cancelled`,
-`request.invalid`, and `request.payload_invalid`. Error messages are suitable
-for a developer log but must not contain secrets, raw paths, or native errors.
+`request.invalid`, `request.payload_invalid`, `clipboard.unavailable`,
+`clipboard.text_invalid`, and `clipboard.text_too_large`. Error messages are
+suitable for a developer log but must not contain secrets, raw paths, native
+errors, or clipboard text.
 
 ## Cancellation and events
 

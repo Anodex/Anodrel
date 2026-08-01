@@ -351,6 +351,8 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
                 Some("ui.document.write") => Capability::UiDocumentWrite,
                 Some("ui.events.read") => Capability::UiEventsRead,
                 Some("session.close") => Capability::SessionClose,
+                Some("clipboard.read") => Capability::ClipboardRead,
+                Some("clipboard.write") => Capability::ClipboardWrite,
                 _ => return Err(InstalledApplicationError::InvalidRecord),
             };
             if grants.contains(&capability) {
@@ -705,9 +707,31 @@ mod tests {
             &[anodrel_protocol::Capability::SessionClose]
         );
 
+        let clipboard_read_grant = fs::read_to_string(&fixture.record_path)
+            .expect("validated record is read")
+            .replace("session.close", "clipboard.read");
+        fs::write(&fixture.record_path, clipboard_read_grant).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("clipboard read grant is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[anodrel_protocol::Capability::ClipboardRead]
+        );
+
+        let clipboard_write_grant = fs::read_to_string(&fixture.record_path)
+            .expect("validated record is read")
+            .replace("clipboard.read", "clipboard.write");
+        fs::write(&fixture.record_path, clipboard_write_grant).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("clipboard write grant is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[anodrel_protocol::Capability::ClipboardWrite]
+        );
+
         let unsupported = fs::read_to_string(&fixture.record_path)
             .expect("validated record is read")
-            .replace("session.close", "credentials.read");
+            .replace("clipboard.write", "credentials.read");
         fs::write(&fixture.record_path, unsupported).expect("record is updated");
         assert!(matches!(
             InstalledApplication::load(&fixture.record_path, &fixture.policy_root),

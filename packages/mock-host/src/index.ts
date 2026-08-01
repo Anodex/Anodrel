@@ -1,6 +1,8 @@
 import {
   PROTOCOL_VERSION,
+  MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   isCancellationEnvelope,
+  isClipboardWritePayload,
   isEmptyPayload,
   isUiDocumentReplacePayload,
   isPingPayload,
@@ -24,6 +26,8 @@ export interface MockHostOptions {
   readonly grantedCapabilities?: readonly Capability[];
   readonly hostName?: string;
   readonly now?: () => Date;
+  /** Initial bounded text returned by a granted clipboard read. */
+  readonly clipboardText?: string;
 }
 
 /**
@@ -49,17 +53,25 @@ export class MockHost {
   private readonly grantedCapabilities: readonly Capability[];
   private readonly hostName: string;
   private readonly now: () => Date;
+  private clipboardText: string | undefined;
   private sessionCount = 0;
 
   constructor(options: MockHostOptions) {
     if (options.applicationId.trim().length === 0) {
       throw new Error("MockHost requires a non-empty applicationId.");
     }
+    if (
+      options.clipboardText !== undefined &&
+      new TextEncoder().encode(options.clipboardText).byteLength > MAX_CLIPBOARD_TEXT_REQUEST_BYTES
+    ) {
+      throw new Error("MockHost clipboard text exceeds the protocol size limit.");
+    }
 
     this.applicationId = options.applicationId;
     this.grantedCapabilities = [...(options.grantedCapabilities ?? [])];
     this.hostName = options.hostName ?? "anodrel-mock-host";
     this.now = options.now ?? (() => new Date());
+    this.clipboardText = options.clipboardText;
   }
 
   createTransport(sessionId = `mock-session-${++this.sessionCount}`): MockHostTransport {
@@ -252,6 +264,63 @@ export class MockHost {
           );
         }
         return this.success("session.close", request.requestId, { status: "accepted" });
+
+      case "clipboard.read":
+        if (request.protocolVersion.minor < 5) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "clipboard.read requires protocol 1.5 or later.",
+          );
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "clipboard.read does not accept a payload.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "clipboard.read")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "clipboard.read requires the clipboard.read capability.",
+            { capability: "clipboard.read" },
+          );
+        }
+        return this.success(
+          "clipboard.read",
+          request.requestId,
+          this.clipboardText === undefined
+            ? { status: "no_text" }
+            : { status: "text", text: this.clipboardText },
+        );
+
+      case "clipboard.write":
+        if (request.protocolVersion.minor < 5) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "clipboard.write requires protocol 1.5 or later.",
+          );
+        }
+        if (!isClipboardWritePayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "clipboard.write requires one bounded text string.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "clipboard.write")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "clipboard.write requires the clipboard.write capability.",
+            { capability: "clipboard.write" },
+          );
+        }
+        this.clipboardText = request.payload.text;
+        return this.success("clipboard.write", request.requestId, { status: "written" });
 
       default:
         return this.failure(

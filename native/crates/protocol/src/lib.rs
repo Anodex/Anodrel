@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 4;
+pub const PROTOCOL_MINOR: u16 = 5;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -46,6 +46,8 @@ pub enum Capability {
     UiDocumentWrite,
     UiEventsRead,
     SessionClose,
+    ClipboardRead,
+    ClipboardWrite,
 }
 
 impl Capability {
@@ -55,6 +57,8 @@ impl Capability {
             Self::UiDocumentWrite => "ui.document.write",
             Self::UiEventsRead => "ui.events.read",
             Self::SessionClose => "session.close",
+            Self::ClipboardRead => "clipboard.read",
+            Self::ClipboardWrite => "clipboard.write",
         }
     }
 }
@@ -66,6 +70,9 @@ pub enum ProtocolErrorCode {
     ProtocolVersionUnsupported,
     RequestInvalid,
     RequestPayloadInvalid,
+    ClipboardUnavailable,
+    ClipboardTextInvalid,
+    ClipboardTextTooLarge,
 }
 
 impl ProtocolErrorCode {
@@ -76,6 +83,9 @@ impl ProtocolErrorCode {
             Self::ProtocolVersionUnsupported => "protocol.version_unsupported",
             Self::RequestInvalid => "request.invalid",
             Self::RequestPayloadInvalid => "request.payload_invalid",
+            Self::ClipboardUnavailable => "clipboard.unavailable",
+            Self::ClipboardTextInvalid => "clipboard.text_invalid",
+            Self::ClipboardTextTooLarge => "clipboard.text_too_large",
         }
     }
 }

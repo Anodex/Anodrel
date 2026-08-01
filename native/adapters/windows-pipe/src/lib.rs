@@ -12,6 +12,7 @@ mod security;
 use std::{fmt, io, thread, time::Duration};
 
 use anodrel_bootstrap::BootstrapInvitation;
+use anodrel_clipboard::ClipboardService;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
 use anodrel_transport::{
     SessionCredentials, TransportSession, UiDocumentMailbox, UiInputMailbox, authentication_message,
@@ -220,7 +221,43 @@ impl WindowsPipeServer {
         ui_input_mailbox: UiInputMailbox,
         session_close_signal: SessionCloseSignal,
     ) -> io::Result<(Self, SessionInvitation)> {
-        let session_id = session_id.into();
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_session_components(
+                policy,
+                credentials,
+                ui_document_mailbox,
+                ui_input_mailbox,
+                session_close_signal,
+            )
+        })
+    }
+
+    /// Creates one endpoint with explicit native components and one portable
+    /// clipboard service supplied by the native host.
+    pub fn create_with_session_components_and_clipboard(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_session_components_and_clipboard(
+                policy,
+                credentials,
+                ui_document_mailbox,
+                ui_input_mailbox,
+                session_close_signal,
+                clipboard,
+            )
+        })
+    }
+
+    fn create_endpoint(
+        session_id: String,
+        create_session: impl FnOnce(SessionCredentials) -> TransportSession,
+    ) -> io::Result<(Self, SessionInvitation)> {
         let pipe_name = format!(r"\\.\pipe\anodrel.v1.{}", random_hex()?);
         let token = random_hex()?;
         let credentials = SessionCredentials::new(session_id.clone(), &token).map_err(|error| {
@@ -236,13 +273,7 @@ impl WindowsPipeServer {
         Ok((
             Self {
                 handle,
-                session: TransportSession::with_session_components(
-                    policy,
-                    credentials,
-                    ui_document_mailbox,
-                    ui_input_mailbox,
-                    session_close_signal,
-                ),
+                session: create_session(credentials),
             },
             SessionInvitation {
                 pipe_name,

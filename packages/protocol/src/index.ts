@@ -3,11 +3,12 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 4 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 5 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
 export const MAX_UI_DOCUMENT_REQUEST_BYTES = 24 * 1024;
+export const MAX_CLIPBOARD_TEXT_REQUEST_BYTES = 24 * 1024;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -19,7 +20,9 @@ export type Capability =
   | "diagnostics.read"
   | "ui.document.write"
   | "ui.events.read"
-  | "session.close";
+  | "session.close"
+  | "clipboard.read"
+  | "clipboard.write";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -62,6 +65,16 @@ export interface PlatformOperationMap {
   "session.close": {
     readonly payload: EmptyPayload;
     readonly result: { readonly status: "accepted" };
+  };
+  "clipboard.read": {
+    readonly payload: EmptyPayload;
+    readonly result:
+      | { readonly status: "text"; readonly text: string }
+      | { readonly status: "no_text" };
+  };
+  "clipboard.write": {
+    readonly payload: { readonly text: string };
+    readonly result: { readonly status: "written" };
   };
 }
 
@@ -126,7 +139,10 @@ export type ProtocolErrorCode =
   | "protocol.version_unsupported"
   | "request.cancelled"
   | "request.invalid"
-  | "request.payload_invalid";
+  | "request.payload_invalid"
+  | "clipboard.unavailable"
+  | "clipboard.text_invalid"
+  | "clipboard.text_too_large";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -245,6 +261,18 @@ export function isUiDocumentReplacePayload(
     Object.keys(value).length === 1 &&
     typeof value.document === "string" &&
     new TextEncoder().encode(value.document).byteLength <= MAX_UI_DOCUMENT_REQUEST_BYTES
+  );
+}
+
+/** Validates the exact bounded text payload for a clipboard write. */
+export function isClipboardWritePayload(
+  value: unknown,
+): value is PayloadFor<"clipboard.write"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.text === "string" &&
+    new TextEncoder().encode(value.text).byteLength <= MAX_CLIPBOARD_TEXT_REQUEST_BYTES
   );
 }
 

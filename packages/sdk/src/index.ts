@@ -76,6 +76,14 @@ export class PlatformClient {
     return this.request("session.close", {});
   }
 
+  readClipboardText(): Promise<ResultFor<"clipboard.read">> {
+    return this.request("clipboard.read", {});
+  }
+
+  writeClipboardText(text: string): Promise<ResultFor<"clipboard.write">> {
+    return this.request("clipboard.write", { text });
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,

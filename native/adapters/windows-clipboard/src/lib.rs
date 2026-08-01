@@ -8,19 +8,43 @@
 
 mod raw;
 
-use std::fmt;
+use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 
-use anodrel_clipboard::{ClipboardRead, ClipboardText};
+/// Direct Windows clipboard service associated with one transient host window.
+#[derive(Debug)]
+pub struct WindowsClipboard {
+    owner_window: isize,
+}
+
+impl WindowsClipboard {
+    /// Creates a service using the current host window as clipboard owner.
+    ///
+    /// `owner_window` may be zero for a host that has no native window.
+    #[must_use]
+    pub const fn new(owner_window: isize) -> Self {
+        Self { owner_window }
+    }
+}
+
+impl ClipboardService for WindowsClipboard {
+    fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError> {
+        read_text(self.owner_window)
+    }
+
+    fn write_text(&self, text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+        write_text(self.owner_window, text)
+    }
+}
 
 /// Reads Unicode text from the Windows clipboard owned by `owner_window`.
 ///
 /// `owner_window` is the current native host window handle. The value is used
 /// only while opening the clipboard and is never retained by this adapter.
-pub fn read_text(owner_window: isize) -> Result<ClipboardRead, ClipboardError> {
-    match raw::read_text(owner_window).map_err(ClipboardError::from)? {
+pub fn read_text(owner_window: isize) -> Result<ClipboardRead, ClipboardServiceError> {
+    match raw::read_text(owner_window).map_err(ClipboardServiceError::from)? {
         Some(value) => ClipboardText::new(value)
             .map(ClipboardRead::Text)
-            .map_err(|_| ClipboardError::StoredTextTooLarge),
+            .map_err(|_| ClipboardServiceError::StoredTextTooLarge),
         None => Ok(ClipboardRead::NoText),
     }
 }
@@ -29,45 +53,17 @@ pub fn read_text(owner_window: isize) -> Result<ClipboardRead, ClipboardError> {
 ///
 /// The portable value is already bounded and valid UTF-8 before this adapter
 /// opens the operating-system clipboard.
-pub fn write_text(owner_window: isize, text: &ClipboardText) -> Result<(), ClipboardError> {
-    raw::write_text(owner_window, text.as_str()).map_err(ClipboardError::from)
+pub fn write_text(owner_window: isize, text: &ClipboardText) -> Result<(), ClipboardServiceError> {
+    raw::write_text(owner_window, text.as_str()).map_err(ClipboardServiceError::from)
 }
 
-/// A safe category for a Windows clipboard failure.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ClipboardError {
-    /// The clipboard is currently unavailable, including contention.
-    Unavailable,
-    /// Windows returned malformed Unicode text.
-    StoredTextInvalid,
-    /// Windows returned Unicode text that exceeds Anodrel's portable limit.
-    StoredTextTooLarge,
-}
-
-impl From<raw::ClipboardRawError> for ClipboardError {
+impl From<raw::ClipboardRawError> for ClipboardServiceError {
     fn from(error: raw::ClipboardRawError) -> Self {
         match error {
-            raw::ClipboardRawError::Unavailable => Self::Unavailable,
-            raw::ClipboardRawError::InvalidText => Self::StoredTextInvalid,
-            raw::ClipboardRawError::TooLarge => Self::StoredTextTooLarge,
+            raw::ClipboardRawError::Unavailable => ClipboardServiceError::Unavailable,
+            raw::ClipboardRawError::InvalidText => ClipboardServiceError::StoredTextInvalid,
+            raw::ClipboardRawError::TooLarge => ClipboardServiceError::StoredTextTooLarge,
         }
-    }
-}
-
-impl fmt::Display for ClipboardError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let message = match self {
-            Self::Unavailable => "Windows clipboard is unavailable",
-            Self::StoredTextInvalid => "Windows clipboard text is invalid",
-            Self::StoredTextTooLarge => "Windows clipboard text is too large",
-        };
-        formatter.write_str(message)
-    }
-}
-
-impl std::error::Error for ClipboardError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
     }
 }
 
@@ -75,17 +71,17 @@ impl std::error::Error for ClipboardError {
 mod tests {
     use anodrel_clipboard::{ClipboardRead, ClipboardText};
 
-    use super::ClipboardError;
+    use super::WindowsClipboard;
 
     #[test]
     fn safe_errors_do_not_include_native_details() {
         assert_eq!(
-            ClipboardError::Unavailable.to_string(),
-            "Windows clipboard is unavailable"
+            anodrel_clipboard::ClipboardServiceError::Unavailable.to_string(),
+            "clipboard is unavailable"
         );
         assert_eq!(
-            ClipboardError::StoredTextInvalid.to_string(),
-            "Windows clipboard text is invalid"
+            anodrel_clipboard::ClipboardServiceError::StoredTextInvalid.to_string(),
+            "clipboard text is invalid"
         );
     }
 
@@ -93,5 +89,13 @@ mod tests {
     fn no_text_remains_distinct_from_an_empty_text_value() {
         let empty = ClipboardRead::Text(ClipboardText::new("").expect("empty text is valid"));
         assert_ne!(empty, ClipboardRead::NoText);
+    }
+
+    #[test]
+    fn service_retains_only_its_transient_owner_value() {
+        assert_eq!(
+            format!("{:?}", WindowsClipboard::new(0)),
+            "WindowsClipboard { owner_window: 0 }"
+        );
     }
 }

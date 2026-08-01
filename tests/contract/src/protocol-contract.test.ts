@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MockHost } from "@anodrel/mock-host";
-import { PROTOCOL_VERSION, createRequest, isWireRequestEnvelope } from "@anodrel/protocol";
+import {
+  MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
+  PROTOCOL_VERSION,
+  createRequest,
+  isWireRequestEnvelope,
+} from "@anodrel/protocol";
 import { PlatformClient, PlatformRemoteError, type RequestIdFactory } from "@anodrel/sdk";
 
 const fixedTime = () => new Date("2026-07-31T12:00:00.000Z");
@@ -103,6 +108,50 @@ test("SDK and host agree on a granted session close request", async () => {
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
 
   assert.deepEqual(await client.closeSession(), { status: "accepted" });
+});
+
+test("SDK and host keep clipboard read and write grants separate", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["clipboard.read", "clipboard.write"],
+    clipboardText: "before",
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.readClipboardText(), { status: "text", text: "before" });
+  assert.deepEqual(await client.writeClipboardText("after"), { status: "written" });
+  assert.deepEqual(await client.readClipboardText(), { status: "text", text: "after" });
+});
+
+test("clipboard operations require their exact host-issued grants", async () => {
+  const host = new MockHost({ applicationId: "test.application" });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  await assert.rejects(
+    () => client.readClipboardText(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "clipboard.read",
+  );
+  await assert.rejects(
+    () => client.writeClipboardText("not written"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "clipboard.write",
+  );
+});
+
+test("mock clipboard refuses text outside the protocol envelope limit", () => {
+  assert.throws(
+    () =>
+      new MockHost({
+        applicationId: "test.application",
+        clipboardText: "x".repeat(MAX_CLIPBOARD_TEXT_REQUEST_BYTES + 1),
+      }),
+    /clipboard text exceeds/,
+  );
 });
 
 test("session close requires a host-issued grant", async () => {

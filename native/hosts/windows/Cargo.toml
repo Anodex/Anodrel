@@ -18,4 +18,5 @@ anodrel-ui-session = { path = "../../crates/ui-session" }
 anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
+anodrel-windows-clipboard = { path = "../../adapters/windows-clipboard" }
 anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

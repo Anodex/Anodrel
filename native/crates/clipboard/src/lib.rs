@@ -42,6 +42,42 @@ pub enum ClipboardRead {
     NoText,
 }
 
+/// The portable service boundary used by a host core.
+///
+/// Implementations own the operating-system call. They must not retain a
+/// native clipboard handle, expose raw formats, or log clipboard text.
+pub trait ClipboardService: fmt::Debug + Send {
+    /// Reads the one supported Unicode-text representation.
+    fn read_text(&self) -> Result<ClipboardRead, ClipboardServiceError>;
+
+    /// Replaces the one supported Unicode-text representation.
+    fn write_text(&self, text: &ClipboardText) -> Result<(), ClipboardServiceError>;
+}
+
+/// A safe failure category returned by a portable clipboard service.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ClipboardServiceError {
+    /// The operating-system clipboard is unavailable, including contention.
+    Unavailable,
+    /// The operating system returned malformed Unicode text.
+    StoredTextInvalid,
+    /// The operating system returned text that exceeds the portable limit.
+    StoredTextTooLarge,
+}
+
+impl fmt::Display for ClipboardServiceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::Unavailable => "clipboard is unavailable",
+            Self::StoredTextInvalid => "clipboard text is invalid",
+            Self::StoredTextTooLarge => "clipboard text is too large",
+        };
+        formatter.write_str(message)
+    }
+}
+
+impl std::error::Error for ClipboardServiceError {}
+
 /// A stable validation failure before a native clipboard call.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClipboardInputError {

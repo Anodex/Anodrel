@@ -13,7 +13,9 @@ fail closed.
 
 The session-policy module converts only a validated installed record
 into the existing host policy. Packages, bootstrap data, pipe clients, protocol
-messages, and UI cannot select or elevate these grants.
+messages, and UI cannot select or elevate these grants. Supported grants now
+include separate `clipboard.read` and `clipboard.write` values; adding either
+does not grant the other.
 
 ## Consequences
 

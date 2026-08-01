@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 anodrel-bootstrap = { path = "../../crates/bootstrap" }
+anodrel-clipboard = { path = "../../crates/clipboard" }
 anodrel-core = { path = "../../crates/core" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-transport = { path = "../../crates/transport" }
