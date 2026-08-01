@@ -16,6 +16,9 @@ anodrel-json -> anodrel-protocol -> anodrel-core -> anodrel-windows-host
 
 anodrel-windows-instance -> Kernel32 / User32
 
+anodrel-windows-policy -> anodrel-application
+                       `-> Advapi32
+
 anodrel-json -> anodrel-application -> anodrel-windows-host
 ~~~
 
@@ -39,6 +42,10 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
   shipped runtime component.
 - `adapters/windows-instance` owns the bounded current-session mutex,
   readiness event, and no-data activation request for one package identity.
+- `adapters/windows-policy` reads one bounded installed-application record
+  from the fixed 64-bit `HKEY_LOCAL_MACHINE` registry location with query-only
+  access. It validates that record through `crates/application` but cannot
+  provision policy, verify a signature, or launch a process.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
   handle-keyed view registry, client-area drawing, and final-window shutdown.
 

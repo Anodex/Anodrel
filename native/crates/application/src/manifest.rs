@@ -133,7 +133,9 @@ fn validate_version(fields: &BTreeMap<String, JsonValue>) -> Result<(), Applicat
     }
 }
 
-pub(crate) fn is_valid_application_id(value: &str) -> bool {
+/// Returns whether a value uses the stable application-ID grammar.
+#[must_use]
+pub fn is_valid_application_id(value: &str) -> bool {
     let bytes = value.as_bytes();
     if !(3..=128).contains(&bytes.len()) {
         return false;

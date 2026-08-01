@@ -13,6 +13,9 @@ Each record should include:
 
 Current records (newest first):
 
+- 0019 — Installed application policy is read from the machine-wide Windows
+  registry.
+
 - 0018 — Launch policy is bound through an external installed application
   record.
 

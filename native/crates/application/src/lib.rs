@@ -15,7 +15,7 @@ mod sha256;
 use std::{fmt, io};
 
 pub use installed::{InstalledApplication, InstalledApplicationError};
-pub use manifest::{ApplicationIdentity, ApplicationManifest};
+pub use manifest::{ApplicationIdentity, ApplicationManifest, is_valid_application_id};
 pub use package::{ApplicationPackage, VerifiedContent};
 
 /// Maximum manifest size accepted before UTF-8 or JSON decoding.

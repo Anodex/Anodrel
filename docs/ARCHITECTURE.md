@@ -125,10 +125,11 @@ It neither trusts the mutable package directory nor launches the executable.
 The installed application-record foundation binds the expected executable
 digest and signer fingerprint to a validated package identity in a record
 outside that package. It is not yet a trusted Windows policy store or a launch
-service. Installed policy-store access control, immediate pre-launch
-revalidation, and tracked child lifetime remain required before the host can
-create a product process. See `docs/SIGNING.md`, `docs/LAUNCH.md`, and
-Decisions 0017 and 0018.
+service. The first policy-store adapter reads that record from a fixed,
+machine-wide 64-bit Windows registry location using query access only. Record
+provisioning, immediate pre-launch revalidation, and tracked child lifetime
+remain required before the host can create a product process. See
+`docs/SIGNING.md`, `docs/LAUNCH.md`, and Decisions 0017 through 0019.
 
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only

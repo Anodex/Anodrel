@@ -51,6 +51,7 @@ authority for permissions.
 | A file operation escapes an approved location. | Canonicalize and validate paths after resolving links; enforce a per-operation scope. |
 | A child process gains arbitrary shell authority or outlives the host. | Expose allowlisted operations, avoid shell interpolation, track child processes, and terminate them during shutdown. |
 | A mutable package substitutes a trusted but unauthorized executable. | Do not treat a package-held manifest or an Authenticode result alone as launch authority; require an external installed application record, contain and digest the executable, then match its verified signer to the record's application-ID-bound publisher fingerprint. |
+| An application chooses or substitutes its launch policy. | Read the installed record only from the fixed 64-bit `HKEY_LOCAL_MACHINE` policy location selected by the host; accept no current-user, package, environment, protocol, or UI policy source. Require the registry key, record, and validated package to carry the same application ID. |
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
 | A host diagnostic log captures untrusted or sensitive data. | The first log accepts only a closed typed host-event enum; it has no dynamic message, payload, path, error, credential, persistence, export, or protocol input. |
 | Message floods exhaust CPU or memory. | Reject frames above 64 KiB before decoding, reject more than four complete frames in one receive burst, and add authenticated-session queue, concurrency, timeout, and cancellation limits in the OS adapter. |
@@ -160,9 +161,11 @@ returns the leaf signing certificate fingerprint only after Windows accepts the
 embedded signature, and it deliberately does not launch a process or declare a
 package trusted. Decision 0018 defines a strict installed application record
 outside the package that binds an application ID, executable digest, and
-approved signer fingerprint. A trusted Windows policy store, immediate
-pre-launch revalidation, child tracking, and post-verification bootstrap binding
-still form the gate for the first launch capability.
+approved signer fingerprint. Decision 0019 adds the fixed, read-only,
+machine-wide Windows registry source for that record; it rejects current-user
+and fallback sources. Record provisioning, immediate pre-launch revalidation,
+child tracking, and post-verification bootstrap binding still form the gate for
+the first launch capability.
 
 ## Before the first privileged capability
 

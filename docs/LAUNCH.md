@@ -61,6 +61,39 @@ The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's
 identity binding.
 
+## Windows machine-policy store
+
+The first trusted policy source is read-only and machine-wide:
+
+~~~text
+HKEY_LOCAL_MACHINE\Software\Anodrel\Applications\<applicationId>
+    record    REG_SZ
+~~~
+
+The direct Windows adapter always opens the 64-bit registry view with only
+`KEY_QUERY_VALUE` access. It accepts no current-user store, registry
+virtualization fallback, environment-variable override, package-supplied path,
+or application-supplied record. The key component must already be a valid
+application ID, and the JSON field must exactly match it before package
+validation begins.
+
+`record` is UTF-16 `REG_SZ` JSON. It must contain one trailing NUL and no
+embedded NUL, fit within 32 KiB of UTF-16 registry data, convert to valid Rust
+text, and then meet the 16 KiB JSON record limit above. The adapter reads only;
+it has no create, write, delete, registry enumeration, or installer API.
+
+Windows normally limits writes below this `HKEY_LOCAL_MACHINE` location to
+administrative installation or system management. A later installation service
+must document how it provisions records and validates the key's access-control
+policy. The read adapter trusts this machine-policy boundary but does not claim
+that an administrator is untrusted.
+
+The portable validator has a dedicated trusted-record entry point for this
+operating-system source. It performs every package and executable check from
+this document but does not accept a filesystem policy root, because the record
+has already come from the machine registry. That entry point is for a native
+policy adapter; it is not a public application API.
+
 ## Compatibility and failures
 
 Records are exact at version 1.0 because they influence future process
@@ -72,7 +105,9 @@ inside the package root, malformed, oversized, mismatched with the package, or
 names an executable that is missing, too large, escapes the package, or does
 not match its declared digest. Failure categories never include a raw path,
 certificate subject, fingerprint, argument, bootstrap invitation, or native
-error.
+error. The Windows adapter also fails closed for a missing registry key,
+non-string or malformed registry value, malformed UTF-16, access denial, or a
+record that changes while being read.
 
 ## Future launch sequence
 

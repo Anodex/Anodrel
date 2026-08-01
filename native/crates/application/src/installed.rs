@@ -70,35 +70,24 @@ impl InstalledApplication {
         }
 
         let record = parse_record(&read_limited(&record_path, MAX_INSTALL_RECORD_BYTES)?)?;
-        let package_root = canonical_directory(Path::new(&record.package_root))
-            .map_err(|_| InstalledApplicationError::InvalidPackageRoot)?;
-        if record_path.starts_with(&package_root) {
-            return Err(InstalledApplicationError::RecordInsidePackage);
-        }
+        validate_record(record, Some(&record_path), None)
+    }
 
-        let manifest_path = fs::canonicalize(package_root.join(PACKAGE_MANIFEST_NAME))
-            .map_err(InstalledApplicationError::Io)?;
-        if !manifest_path.starts_with(&package_root) {
-            return Err(InstalledApplicationError::PackageManifestOutsidePackage);
+    /// Validates a record supplied by a native operating-system policy source.
+    ///
+    /// The caller must select the source independently of every application,
+    /// package, protocol, environment, and UI value. The expected identity is
+    /// supplied by the host-selected policy key and must match both the record
+    /// and its package manifest.
+    pub fn load_from_trusted_record(
+        record: &str,
+        expected_application_id: &str,
+    ) -> Result<Self, InstalledApplicationError> {
+        if !manifest::is_valid_application_id(expected_application_id) {
+            return Err(InstalledApplicationError::InvalidRecord);
         }
-        let package =
-            ApplicationPackage::load(&manifest_path).map_err(InstalledApplicationError::Package)?;
-        if package.identity().application_id() != record.application_id {
-            return Err(InstalledApplicationError::ApplicationIdentityMismatch);
-        }
-
-        let executable_path = canonical_executable_path(&package_root, &record.executable_path)?;
-        let (actual_digest, _) = digest_file(&executable_path)?;
-        if actual_digest != record.executable_digest {
-            return Err(InstalledApplicationError::ExecutableDigestMismatch);
-        }
-
-        Ok(Self {
-            identity: package.identity().clone(),
-            executable_path,
-            executable_digest: record.executable_digest,
-            publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
-        })
+        let record = parse_record(record)?;
+        validate_record(record, None, Some(expected_application_id))
     }
 
     /// Returns the package identity that exactly matched the installed record.
@@ -135,6 +124,46 @@ impl fmt::Debug for InstalledApplication {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("InstalledApplication(..)")
     }
+}
+
+fn validate_record(
+    record: ParsedRecord,
+    record_path: Option<&Path>,
+    expected_application_id: Option<&str>,
+) -> Result<InstalledApplication, InstalledApplicationError> {
+    if expected_application_id.is_some_and(|expected| expected != record.application_id) {
+        return Err(InstalledApplicationError::ApplicationIdentityMismatch);
+    }
+
+    let package_root = canonical_directory(Path::new(&record.package_root))
+        .map_err(|_| InstalledApplicationError::InvalidPackageRoot)?;
+    if record_path.is_some_and(|path| path.starts_with(&package_root)) {
+        return Err(InstalledApplicationError::RecordInsidePackage);
+    }
+
+    let manifest_path = fs::canonicalize(package_root.join(PACKAGE_MANIFEST_NAME))
+        .map_err(InstalledApplicationError::Io)?;
+    if !manifest_path.starts_with(&package_root) {
+        return Err(InstalledApplicationError::PackageManifestOutsidePackage);
+    }
+    let package =
+        ApplicationPackage::load(&manifest_path).map_err(InstalledApplicationError::Package)?;
+    if package.identity().application_id() != record.application_id {
+        return Err(InstalledApplicationError::ApplicationIdentityMismatch);
+    }
+
+    let executable_path = canonical_executable_path(&package_root, &record.executable_path)?;
+    let (actual_digest, _) = digest_file(&executable_path)?;
+    if actual_digest != record.executable_digest {
+        return Err(InstalledApplicationError::ExecutableDigestMismatch);
+    }
+
+    Ok(InstalledApplication {
+        identity: package.identity().clone(),
+        executable_path,
+        executable_digest: record.executable_digest,
+        publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
+    })
 }
 
 /// A safe failure category while loading an installed application record.
@@ -206,8 +235,10 @@ struct ParsedRecord {
     publisher_fingerprint: [u8; 32],
 }
 
-fn parse_record(input: &[u8]) -> Result<ParsedRecord, InstalledApplicationError> {
-    let input = std::str::from_utf8(input).map_err(|_| InstalledApplicationError::InvalidRecord)?;
+fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> {
+    if input.len() > MAX_INSTALL_RECORD_BYTES {
+        return Err(InstalledApplicationError::RecordTooLarge);
+    }
     let root = JsonValue::parse(input).map_err(|_| InstalledApplicationError::InvalidRecord)?;
     let fields = root
         .as_object()
@@ -294,7 +325,7 @@ fn digest_file(path: &Path) -> Result<([u8; 32], usize), InstalledApplicationErr
         .ok_or(InstalledApplicationError::ExecutableTooLarge)
 }
 
-fn read_limited(path: &Path, maximum: usize) -> Result<Vec<u8>, InstalledApplicationError> {
+fn read_limited(path: &Path, maximum: usize) -> Result<String, InstalledApplicationError> {
     let file = File::open(path).map_err(InstalledApplicationError::Io)?;
     let mut reader = file.take((maximum + 1) as u64);
     let mut contents = Vec::with_capacity(maximum.min(4_096));
@@ -304,7 +335,7 @@ fn read_limited(path: &Path, maximum: usize) -> Result<Vec<u8>, InstalledApplica
     if contents.len() > maximum {
         Err(InstalledApplicationError::RecordTooLarge)
     } else {
-        Ok(contents)
+        String::from_utf8(contents).map_err(|_| InstalledApplicationError::InvalidRecord)
     }
 }
 
@@ -506,6 +537,29 @@ mod tests {
         assert!(installed.matches_publisher([0xA5; 32]));
         assert!(!installed.matches_publisher([0x5A; 32]));
         assert_eq!(format!("{installed:?}"), "InstalledApplication(..)");
+        fixture.remove();
+    }
+
+    #[test]
+    fn loads_a_trusted_operating_system_record_with_a_matching_identity() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path).expect("record is read");
+        let installed = InstalledApplication::load_from_trusted_record(&record, APPLICATION_ID)
+            .expect("trusted record is valid");
+
+        assert_eq!(installed.identity().application_id(), APPLICATION_ID);
+        fixture.remove();
+    }
+
+    #[test]
+    fn rejects_a_trusted_record_for_a_different_policy_key_identity() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path).expect("record is read");
+
+        assert!(matches!(
+            InstalledApplication::load_from_trusted_record(&record, "org.anodrel.other"),
+            Err(InstalledApplicationError::ApplicationIdentityMismatch)
+        ));
         fixture.remove();
     }
 

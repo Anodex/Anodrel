@@ -41,8 +41,9 @@ tracked.
 The Rust workspace is under `native/`. It has no third-party runtime
 dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
 `anodrel-wire`, `anodrel-transport`, `anodrel-bootstrap`,
-`anodrel-application`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`, and the Windows host are
-all source modules. The host calls User32 and Kernel32 directly for its
+`anodrel-application`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`,
+`anodrel-windows-policy`, and the Windows host are all source modules. The
+host calls User32 and Kernel32 directly for its
 window lifecycle and drawing; the pipe adapter uses direct Win32 and CNG APIs
 on a worker thread, while the bootstrap adapter uses an explicit Windows child
 handle list:
@@ -54,6 +55,7 @@ cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-pipe
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-policy
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 ~~~
 
