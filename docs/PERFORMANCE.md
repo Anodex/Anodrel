@@ -86,8 +86,15 @@ The report is a local tooling format, not a public protocol. Its v1 fields are:
 | `measurements[].samples` | Number of reported latency samples. |
 | `p50Nanoseconds`, `p95Nanoseconds`, `p99Nanoseconds` | Nearest-rank latency percentiles; rank is `ceil(percentile × samples / 100)`. |
 | `meanNanoseconds` | Integer mean latency across reported samples. |
+| `environment.operatingSystem` | Compile-target operating-system name reported by the Rust standard library. |
+| `environment.architecture` | Compile-target architecture reported by the Rust standard library. |
+| `environment.logicalProcessors` | Logical processors available to this process, or `null` when unavailable. It does not identify the computer or user. |
 | `unit` | Always `nanoseconds`. |
 | `scope` | Fixed statement of the layers being measured for the selected workload. |
+
+The report deliberately omits computer/user names, paths, serial numbers,
+network data, power state, OS build, and compiler version. Add the latter three
+manually when retaining results, because they can materially affect comparison.
 
 This result must not be presented as startup time, process memory, rendering
 performance, or an Electron comparison. The in-process workload must not be

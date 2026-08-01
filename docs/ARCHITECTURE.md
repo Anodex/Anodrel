@@ -195,7 +195,8 @@ path or the same path through a temporary authenticated Windows named-pipe
 loopback, always at fixed 1 KiB and 64 KiB payload sizes. Its bounded iteration
 count, fixed warmup, and nearest-rank percentiles make results repeatable; it
 does not measure application startup, memory, rendering, or another runtime.
-See `docs/PERFORMANCE.md` and Decision 0024.
+Its report includes only non-identifying target OS, architecture, and available
+logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
 
 ## Communication model
 

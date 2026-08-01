@@ -8,6 +8,7 @@ use anodrel_windows_pipe::measure_loopback_request;
 use anodrel_wire::encode_json;
 
 use crate::arguments::Workload;
+use crate::environment::Environment;
 use crate::report::{LatencyMeasurement, Report};
 
 const WARMUP_ITERATIONS: usize = 200;
@@ -33,6 +34,7 @@ pub fn measure(workload: Workload, iterations: usize) -> Result<Report, String> 
         workload,
         iterations,
         measurements,
+        environment: Environment::current(),
     })
 }
 

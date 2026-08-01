@@ -9,6 +9,7 @@
 //! before comparison claims are made.
 
 mod arguments;
+mod environment;
 mod report;
 mod workload;
 

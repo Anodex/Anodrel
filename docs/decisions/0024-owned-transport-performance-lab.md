@@ -23,6 +23,11 @@ use a fixed 200-request warmup, a bounded explicit iteration count, and
 nearest-rank p50/p95/p99 results in nanoseconds. Their separate stable local
 JSON report identifiers are documented in `docs/PERFORMANCE.md`.
 
+The report also records the compile-target operating-system name, architecture,
+and logical processors available to the process. It omits identifying machine
+and user data; the operator records OS build, power mode, compiler version, and
+workload context beside a retained result.
+
 The tool has no third-party runtime dependency. It deliberately does not claim
 to measure cold start, application memory, frame performance, or Electron.
 Each comparison requires its own equivalent workload, environment record, and

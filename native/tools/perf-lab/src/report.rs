@@ -1,6 +1,7 @@
 //! Stable JSON report formatting for local benchmark results.
 
 use crate::arguments::Workload;
+use crate::environment::Environment;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LatencyMeasurement {
@@ -17,6 +18,7 @@ pub struct Report {
     pub workload: Workload,
     pub iterations: usize,
     pub measurements: Vec<LatencyMeasurement>,
+    pub environment: Environment,
 }
 
 impl Report {
@@ -31,12 +33,14 @@ impl Report {
             concat!(
                 "{{\"benchmark\":\"{}\",",
                 "\"iterations\":{},\"measurements\":[{}],",
+                "\"environment\":{},",
                 "\"unit\":\"nanoseconds\",",
                 "\"scope\":\"{}\"}}\n"
             ),
             benchmark_name(self.workload),
             self.iterations,
             measurements,
+            self.environment.to_json(),
             scope(self.workload)
         )
     }
@@ -78,7 +82,7 @@ impl LatencyMeasurement {
 
 #[cfg(test)]
 mod tests {
-    use crate::arguments::Workload;
+    use crate::{arguments::Workload, environment::Environment};
 
     use super::{LatencyMeasurement, Report};
 
@@ -87,6 +91,7 @@ mod tests {
         let report = Report {
             workload: Workload::InProcess,
             iterations: 10,
+            environment: Environment::from_parts("windows", "x86_64", Some(16)),
             measurements: vec![LatencyMeasurement {
                 payload_bytes: 1_024,
                 samples: 10,
@@ -99,7 +104,7 @@ mod tests {
 
         assert_eq!(
             report.to_json(),
-            "{\"benchmark\":\"anodrel.transport.in-process.v1\",\"iterations\":10,\"measurements\":[{\"payloadBytes\":1024,\"samples\":10,\"p50Nanoseconds\":10,\"p95Nanoseconds\":20,\"p99Nanoseconds\":30,\"meanNanoseconds\":15}],\"unit\":\"nanoseconds\",\"scope\":\"owned wire, authenticated transport, and core only\"}\n"
+            "{\"benchmark\":\"anodrel.transport.in-process.v1\",\"iterations\":10,\"measurements\":[{\"payloadBytes\":1024,\"samples\":10,\"p50Nanoseconds\":10,\"p95Nanoseconds\":20,\"p99Nanoseconds\":30,\"meanNanoseconds\":15}],\"environment\":{\"operatingSystem\":\"windows\",\"architecture\":\"x86_64\",\"logicalProcessors\":16},\"unit\":\"nanoseconds\",\"scope\":\"owned wire, authenticated transport, and core only\"}\n"
         );
     }
 
@@ -109,6 +114,7 @@ mod tests {
             workload: Workload::WindowsPipe,
             iterations: 10,
             measurements: Vec::new(),
+            environment: Environment::from_parts("windows", "x86_64", Some(16)),
         };
 
         assert!(
