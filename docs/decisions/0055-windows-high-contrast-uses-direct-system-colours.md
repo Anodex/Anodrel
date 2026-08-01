@@ -23,6 +23,9 @@ their host palette with those colours only while high contrast is enabled.
 The adapter exposes no setting mutation, subscription, application API,
 protocol operation, registry data, path, or user identity. The portable UI
 document continues to express only its existing semantic roles.
+The native window procedure may schedule a fresh paint for an existing UI Lab
+or UI Session Lab after Windows broadcasts `WM_SETTINGCHANGE`; that is a
+window-lifecycle repaint, not an application-facing setting subscription.
 
 ## Consequences
 
@@ -37,8 +40,8 @@ Positive:
 
 Tradeoffs:
 
-- appearance is sampled at paint time rather than observed through a live
-  operating-system notification;
+- appearance is sampled at paint time, with a Windows settings broadcast only
+  scheduling a fresh paint for the two existing interactive host views;
 - Startup Lab and package text surfaces remain on their authored presentation
   until each gains an equally reviewed mapping; and
 - operating-system assistive-technology object providers remain a separate

@@ -27,6 +27,16 @@ pub(super) fn view_for(window: Hwnd) -> io::Result<Option<View>> {
     Ok(lock_views()?.get(&window).cloned())
 }
 
+/// Whether the window's current host-owned view reads system appearance while
+/// painting. This is a view-kind query only; it exposes no UI document or
+/// application state.
+pub(super) fn uses_system_appearance(window: Hwnd) -> io::Result<bool> {
+    Ok(matches!(
+        lock_views()?.get(&window),
+        Some(View::UiLab(_) | View::UiSession(_))
+    ))
+}
+
 /// Mutates a window's Startup Lab state in place.
 ///
 /// Returns `Ok(None)` when the window is absent or is not a Startup Lab, which
@@ -236,6 +246,19 @@ mod tests {
                 .is_none()
         );
         assert_eq!(remove(window).expect("UI Lab closes"), 0);
+    }
+
+    #[test]
+    fn only_interactive_native_ui_views_use_system_appearance() {
+        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let lab = -204;
+        let document = -205;
+        insert(lab, ui_lab_view()).expect("UI Lab view registers");
+        insert(document, document_view("document")).expect("document view registers");
+        assert!(uses_system_appearance(lab).expect("appearance query succeeds"));
+        assert!(!uses_system_appearance(document).expect("appearance query succeeds"));
+        remove(lab).expect("UI Lab closes");
+        remove(document).expect("document closes");
     }
 
     #[test]

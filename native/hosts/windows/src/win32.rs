@@ -56,6 +56,7 @@ const SW_RESTORE: i32 = 9;
 const WM_DESTROY: Uint = 0x0002;
 const WM_PAINT: Uint = 0x000F;
 const WM_ERASEBKGND: Uint = 0x0014;
+const WM_SETTINGCHANGE: Uint = 0x001A;
 const WM_GETMINMAXINFO: Uint = 0x0024;
 const WM_SETICON: Uint = 0x0080;
 const WM_SETCURSOR: Uint = 0x0020;
@@ -1257,6 +1258,19 @@ unsafe extern "system" fn window_proc(
         WM_ACTIVATE => {
             set_ambient_running(window, (wparam & 0xFFFF) != WA_INACTIVE);
             0
+        }
+        WM_SETTINGCHANGE => {
+            // Interactive native UI paints read the small direct Windows
+            // appearance adapter. A system broadcast therefore schedules one
+            // repaint without retaining settings or adding an application
+            // observer/subscription surface.
+            if registry::uses_system_appearance(window).unwrap_or(false) {
+                invalidate(window);
+                return 0;
+            }
+            // SAFETY: unhandled system settings messages retain standard
+            // default Win32 processing for every other host view.
+            unsafe { DefWindowProcW(window, message, wparam, lparam) }
         }
         WM_SIZE => {
             set_ambient_running(window, wparam != SIZE_MINIMIZED);

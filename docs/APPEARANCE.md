@@ -37,9 +37,11 @@ identity. This changes colour selection only: document validation, layout,
 scrolling, hit testing, focus order, action delivery, protocol grants, and
 window lifecycle are unaffected.
 
-The adapter is queried once for a UI-Lab paint. It does not install a listener
-or retain settings, so a future live appearance-notification policy needs a
-separate decision.
+The adapter is queried once for a UI-Lab paint. The native window procedure
+responds to Windows `WM_SETTINGCHANGE` only for those two interactive views by
+scheduling another paint; it retains no settings and exposes no application
+listener or subscription. A broader live appearance-notification policy needs
+a separate decision.
 
 ## Verification
 
