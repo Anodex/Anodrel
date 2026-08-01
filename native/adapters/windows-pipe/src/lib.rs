@@ -270,6 +270,18 @@ impl WindowsPipeServer {
         Self::create_with_ui_document_mailbox(policy, session_id, UiDocumentMailbox::new())
     }
 
+    /// Creates an authenticated worker-thread endpoint with only an
+    /// identity-bound credential service enabled.
+    pub fn create_with_credential_service(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        credential_service: impl CredentialService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_credential_service(policy, credentials, credential_service)
+        })
+    }
+
     /// Creates one endpoint whose accepted UI document snapshots are published
     /// into the supplied per-session mailbox.
     ///
@@ -621,10 +633,34 @@ fn invalid_measurement() -> io::Error {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use anodrel_application::ApplicationManifest;
     use anodrel_core::HostPolicy;
-    use anodrel_protocol::Capability;
+    use anodrel_protocol::{Capability, JsonValue};
+    use anodrel_windows_credentials::WindowsCredentialService;
+    use anodrel_wire::{FrameDecoder, encode_json};
 
     use super::*;
+
+    fn write_json(client: &raw::OwnedHandle, message: &str) {
+        raw::write_all(client, &encode_json(message).expect("test request encodes"))
+            .expect("test request writes");
+    }
+
+    fn read_json(client: &raw::OwnedHandle) -> JsonValue {
+        let mut decoder = FrameDecoder::new();
+        let mut buffer = [0_u8; PIPE_BUFFER_BYTES];
+        loop {
+            let count = raw::read(client, &mut buffer).expect("test response reads");
+            let messages = decoder
+                .push(&buffer[..count])
+                .expect("test response frame decodes");
+            if let Some(message) = messages.into_iter().next() {
+                return JsonValue::parse(&message).expect("test response is JSON");
+            }
+        }
+    }
 
     #[test]
     fn serves_an_authenticated_health_request_over_a_real_windows_pipe() {
@@ -678,5 +714,103 @@ mod tests {
         let measurements = measure_loopback_request(policy, request, 1, 2)
             .expect("private loopback measurement succeeds");
         assert_eq!(measurements.len(), 2);
+    }
+
+    #[test]
+    fn routes_credential_requests_over_a_real_authenticated_windows_pipe() {
+        let policy = HostPolicy::new(
+            "anodrel.sample",
+            vec![
+                Capability::CredentialRead,
+                Capability::CredentialWrite,
+                Capability::CredentialDelete,
+            ],
+            "test-host",
+        )
+        .expect("test policy is valid");
+        let credential_name = format!(
+            "pipe-credential-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time is after the epoch")
+                .as_nanos()
+        );
+        let identity = ApplicationManifest::parse(
+            r#"{"manifestVersion":{"major":1,"minor":0},"applicationId":"anodrel.sample","displayName":"Anodrel Sample","content":{"format":"anodrel.text.v1","path":"content/main.txt","sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}}"#,
+        )
+        .expect("test manifest is valid")
+        .identity()
+        .clone();
+        let (server, invitation) = WindowsPipeServer::create_with_credential_service(
+            policy,
+            "credential-test-session",
+            WindowsCredentialService::new(identity),
+        )
+        .expect("credential pipe server creates");
+        let name = wide_null(invitation.pipe_name());
+        let server_thread = std::thread::spawn(move || server.serve_one());
+        let client = raw::connect_client(&name).expect("test client connects");
+
+        write_json(
+            &client,
+            &invitation
+                .authentication_payload()
+                .expect("test invitation authenticates"),
+        );
+        assert_eq!(
+            read_json(&client)
+                .as_object()
+                .and_then(|fields| fields.get("kind"))
+                .and_then(JsonValue::as_string),
+            Some("session.authenticated")
+        );
+        write_json(
+            &client,
+            &format!(
+                r#"{{"protocolVersion":{{"major":1,"minor":12}},"kind":"request","requestId":"credential-write","operation":"credential.write","payload":{{"name":"{credential_name}","secret":"00aaff"}}}}"#
+            ),
+        );
+        assert_eq!(
+            read_json(&client)
+                .as_object()
+                .and_then(|fields| fields.get("status"))
+                .and_then(JsonValue::as_string),
+            Some("success")
+        );
+        write_json(
+            &client,
+            &format!(
+                r#"{{"protocolVersion":{{"major":1,"minor":12}},"kind":"request","requestId":"credential-read","operation":"credential.read","payload":{{"name":"{credential_name}"}}}}"#
+            ),
+        );
+        let response = read_json(&client);
+        let result = response
+            .as_object()
+            .and_then(|fields| fields.get("result"))
+            .and_then(JsonValue::as_object)
+            .expect("read response has a result");
+        assert_eq!(
+            result.get("secret").and_then(JsonValue::as_string),
+            Some("00aaff")
+        );
+        write_json(
+            &client,
+            &format!(
+                r#"{{"protocolVersion":{{"major":1,"minor":12}},"kind":"request","requestId":"credential-delete","operation":"credential.delete","payload":{{"name":"{credential_name}"}}}}"#
+            ),
+        );
+        assert_eq!(
+            read_json(&client)
+                .as_object()
+                .and_then(|fields| fields.get("status"))
+                .and_then(JsonValue::as_string),
+            Some("success")
+        );
+        drop(client);
+        server_thread
+            .join()
+            .expect("test pipe worker does not panic")
+            .expect("test pipe worker completes");
     }
 }

@@ -17,3 +17,7 @@ anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-storage = { path = "../../crates/storage" }
 anodrel-transport = { path = "../../crates/transport" }
 anodrel-wire = { path = "../../crates/wire" }
+
+[dev-dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-windows-credentials = { path = "../windows-credentials" }

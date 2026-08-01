@@ -258,6 +258,30 @@ impl TransportSession {
         Self::with_ui_document_mailbox(policy, credentials, UiDocumentMailbox::new())
     }
 
+    /// Creates an authenticated session with only an identity-bound credential
+    /// service enabled. Other platform services remain unavailable.
+    pub fn with_credential_service(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        credential_service: impl CredentialService + 'static,
+    ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            policy,
+            credentials,
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            TransportUnavailableClipboard,
+            TransportUnavailableExternalLinks,
+            TransportUnavailableFileDialogs,
+            anodrel_file_access::UnavailableFileSelectionService,
+            anodrel_file_access::UnavailableFileTextService,
+            TransportUnavailableStorage,
+            TransportUnavailableDiagnostics,
+            credential_service,
+        )
+    }
+
     /// Creates one session that publishes accepted UI documents into one
     /// caller-owned bounded mailbox.
     pub fn with_ui_document_mailbox(
@@ -674,7 +698,6 @@ mod tests {
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
     };
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
-    use anodrel_file_access::{UnavailableFileSelectionService, UnavailableFileTextService};
     use anodrel_ui::{ElementId, UiEvent};
 
     use anodrel_protocol::{Capability, JsonValue};
@@ -870,7 +893,7 @@ mod tests {
 
     #[test]
     fn routes_a_granted_credential_read_to_the_injected_service_after_authentication() {
-        let mut transport = TransportSession::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+        let mut transport = TransportSession::with_credential_service(
             HostPolicy::new(
                 "test.application",
                 vec![Capability::CredentialRead],
@@ -878,16 +901,6 @@ mod tests {
             )
             .expect("test policy is valid"),
             SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
-            UiDocumentMailbox::new(),
-            UiInputMailbox::new(),
-            SessionCloseSignal::default(),
-            TransportUnavailableClipboard,
-            TransportUnavailableExternalLinks,
-            TransportUnavailableFileDialogs,
-            UnavailableFileSelectionService,
-            UnavailableFileTextService,
-            TransportUnavailableStorage,
-            TransportUnavailableDiagnostics,
             FixedCredentialService,
         );
         authenticate(&mut transport);

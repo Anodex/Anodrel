@@ -90,11 +90,11 @@ watching, export, path, target, or application-ID field. See
 The Windows UI Session Lab can run a development-only credential diagnostic.
 The host binds `WindowsCredentialService` to its fixed `anodrel.sample`
 identity, while its pipe worker executes the synchronous Credential Manager
-calls. The diagnostic client writes, reads, and deletes one fixed exact name
-before waiting for its regular semantic action. It emits neither that name nor
-the secret to logs, diagnostics, events, window content, command lines, or
-errors. It is not a product session: installed application policy, user
-consent, and non-Windows adapters remain separate work.
+calls. The diagnostic client writes, reads, and deletes one process-scoped
+exact name before waiting for its regular semantic action. It emits neither
+that name nor the secret to logs, diagnostics, events, window content,
+command lines, or errors. It is not a product session: installed application
+policy, user consent, and non-Windows adapters remain separate work.
 
 ## Verification
 

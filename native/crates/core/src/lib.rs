@@ -205,6 +205,27 @@ impl CoreHost {
         Self::with_session_components(policy, UiInputMailbox::new(), SessionCloseSignal::default())
     }
 
+    /// Creates a core with only an identity-bound credential service enabled.
+    /// Other platform-service seams remain explicitly unavailable.
+    pub fn with_credential_service(
+        policy: HostPolicy,
+        credentials: impl CredentialService + 'static,
+    ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            policy,
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            UnavailableClipboard,
+            UnavailableExternalLinks,
+            UnavailableFileDialogs,
+            UnavailableFileSelectionService,
+            UnavailableFileTextService,
+            UnavailableStorage,
+            UnavailableDiagnostics,
+            credentials,
+        )
+    }
+
     /// Creates a host core that validates semantic input from one supplied
     /// per-session mailbox.
     pub fn with_ui_input_mailbox(policy: HostPolicy, ui_input_mailbox: UiInputMailbox) -> Self {
@@ -1821,17 +1842,8 @@ mod tests {
         grants: Vec<Capability>,
         credentials: impl CredentialService + 'static,
     ) -> CoreHost {
-        CoreHost::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+        CoreHost::with_credential_service(
             HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
-            UiInputMailbox::new(),
-            SessionCloseSignal::default(),
-            MemoryClipboard::with_text(None),
-            FailingExternalLinks,
-            CancellingFileDialog,
-            CapturingFileDialog,
-            FixedFileText(Err(FileTextServiceError::Unavailable)),
-            MemoryStorage::with_state(StorageRead::Absent),
-            UnavailableDiagnostics,
             credentials,
         )
     }

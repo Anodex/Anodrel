@@ -110,20 +110,9 @@ async function run(): Promise<number> {
     }
 
     if (process.argv.includes("--request-credentials")) {
-      const name = "sample-session-check";
-      const secret = "00aaff";
-      const written = await client.writeCredential(name, secret);
-      if (written.status !== "written") {
-        return 23;
-      }
-      const read = await client.readCredential(name);
-      const deleted = await client.deleteCredential(name);
-      if (
-        read.status !== "found" ||
-        read.secret !== secret ||
-        deleted.status !== "deleted"
-      ) {
-        return 23;
+      const result = await runCredentialDiagnostic(client);
+      if (result !== 0) {
+        return result;
       }
     }
 
@@ -172,6 +161,26 @@ async function waitForSampleAction(
   }
 
   return 17;
+}
+
+async function runCredentialDiagnostic(client: PlatformClient): Promise<number> {
+  const name = `sample-session-${process.pid}`;
+  const secret = "00aaff";
+  const written = await client.writeCredential(name, secret);
+  if (written.status !== "written") {
+    return 23;
+  }
+
+  let read;
+  let deleted;
+  try {
+    read = await client.readCredential(name);
+  } finally {
+    deleted = await client.deleteCredential(name);
+  }
+  return read.status === "found" && read.secret === secret && deleted.status === "deleted"
+    ? 0
+    : 23;
 }
 
 function delay(milliseconds: number): Promise<void> {
