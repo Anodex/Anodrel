@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0030 — Native UI session state uses atomic document revisions.
+
 - 0029 — Native UI document interchange is strict and capability-free.
 
 - 0028 — Native UI appearance is portable semantic data.

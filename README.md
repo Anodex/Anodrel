@@ -130,6 +130,8 @@ contract.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
+`docs/UI_SESSIONS.md` defines bounded revision and semantic-event state for a
+future authenticated UI session.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

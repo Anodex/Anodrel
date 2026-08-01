@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-ui-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-ui = { path = "../ui" }
+anodrel-ui-document = { path = "../ui-document" }

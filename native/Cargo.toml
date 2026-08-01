@@ -6,6 +6,7 @@ members = [
   "crates/canvas",
   "crates/ui",
   "crates/ui-document",
+  "crates/ui-session",
   "crates/brand",
   "crates/diagnostics",
   "crates/wire",

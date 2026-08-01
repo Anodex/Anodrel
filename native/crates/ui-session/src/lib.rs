@@ -1,0 +1,156 @@
+//! Revision-bound state for one current Anodrel UI document.
+//!
+//! The crate atomically validates and replaces a strict UI document, exposes
+//! its monotonic revision, and validates semantic actions against that revision.
+//! It has no application identity, transport, event queue, renderer, native
+//! host, package, callback, protocol operation, or operating-system authority.
+//!
+//! See `docs/UI_SESSIONS.md` and Decision 0030 for the complete contract.
+
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
+mod error;
+mod event;
+mod revision;
+mod session;
+
+pub use error::UiSessionError;
+pub use event::UiApplicationEvent;
+pub use revision::UiDocumentRevision;
+pub use session::UiDocumentSession;
+
+#[cfg(test)]
+mod tests {
+    use anodrel_ui::{ElementId, UiEvent};
+    use anodrel_ui_document::UiDocumentError;
+
+    use super::{UiDocumentRevision, UiDocumentSession, UiSessionError};
+
+    fn action_document(enabled: bool) -> String {
+        format!(
+            r#"{{"format":"anodrel.ui.document.v1","root":{{"id":"root","kind":"stack","axis":"vertical","padding":{{"left":0,"top":0,"right":0,"bottom":0}},"gap":0,"surfaceTone":"plain","children":[{{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":{enabled},"tone":"accent"}}]}}}}"#
+        )
+    }
+
+    fn text_document() -> &'static str {
+        r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"No action","fontSize":16,"tone":"primary"}}"#
+    }
+
+    fn event() -> UiEvent {
+        UiEvent::ActionInvoked(ElementId::new("continue").expect("test ID is valid"))
+    }
+
+    #[test]
+    fn replaces_a_document_atomically_and_returns_monotonic_revisions() {
+        let mut session = UiDocumentSession::new();
+        assert_eq!(session.document(), None);
+
+        let first = session
+            .replace_document(&action_document(true))
+            .expect("document is valid");
+        assert_eq!(first.value(), 1);
+        assert_eq!(
+            session.document().map(|(_, revision)| revision),
+            Some(first)
+        );
+
+        let second = session
+            .replace_document(text_document())
+            .expect("document is valid");
+        assert_eq!(second.value(), 2);
+        assert_eq!(
+            session.document().map(|(_, revision)| revision),
+            Some(second)
+        );
+    }
+
+    #[test]
+    fn invalid_replacement_preserves_the_current_document_and_revision() {
+        let mut session = UiDocumentSession::new();
+        let revision = session
+            .replace_document(&action_document(true))
+            .expect("document is valid");
+
+        assert_eq!(
+            session.replace_document("not JSON"),
+            Err(UiSessionError::InvalidDocument(
+                UiDocumentError::InvalidJson
+            ))
+        );
+        assert_eq!(
+            session.document().map(|(_, current)| current),
+            Some(revision)
+        );
+    }
+
+    #[test]
+    fn clear_invalidates_the_prior_document_without_advancing_when_already_empty() {
+        let mut session = UiDocumentSession::new();
+        assert_eq!(session.clear_document(), Ok(None));
+        let first = session
+            .replace_document(&action_document(true))
+            .expect("document is valid");
+        assert_eq!(first.value(), 1);
+        assert_eq!(
+            session.clear_document(),
+            Ok(Some(
+                UiDocumentRevision::default()
+                    .next()
+                    .unwrap()
+                    .next()
+                    .unwrap()
+            ))
+        );
+        assert_eq!(session.document(), None);
+        assert_eq!(session.clear_document(), Ok(None));
+    }
+
+    #[test]
+    fn rejects_stale_missing_and_unavailable_actions() {
+        let mut session = UiDocumentSession::new();
+        let first = session
+            .replace_document(&action_document(true))
+            .expect("document is valid");
+        let second = session
+            .replace_document(text_document())
+            .expect("document is valid");
+        assert_ne!(first, second);
+        assert_eq!(
+            session.accept_event(first, event()),
+            Err(UiSessionError::StaleRevision)
+        );
+        assert_eq!(
+            session.accept_event(second, event()),
+            Err(UiSessionError::ActionUnavailable)
+        );
+        session
+            .clear_document()
+            .expect("clear can advance revision");
+        assert_eq!(
+            session.accept_event(second, event()),
+            Err(UiSessionError::StaleRevision)
+        );
+    }
+
+    #[test]
+    fn returns_only_the_current_enabled_semantic_action() {
+        let mut session = UiDocumentSession::new();
+        let revision = session
+            .replace_document(&action_document(true))
+            .expect("document is valid");
+        let accepted = session
+            .accept_event(revision, event())
+            .expect("event is current and enabled");
+        assert_eq!(accepted.revision(), revision);
+        assert_eq!(accepted.action().as_str(), "continue");
+
+        let disabled = session
+            .replace_document(&action_document(false))
+            .expect("document is valid");
+        assert_eq!(
+            session.accept_event(disabled, event()),
+            Err(UiSessionError::ActionUnavailable)
+        );
+    }
+}
