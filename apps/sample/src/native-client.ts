@@ -58,6 +58,20 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-selected-file-text")) {
+      const selection = await client.openFileDialogWithReference([
+        { label: "Text", extensions: ["txt", "json", "md"] },
+      ]);
+      if (selection.status === "selected") {
+        const text = await client.readSelectedFileText(selection.selectionReference);
+        if (text.status !== "text") {
+          return 20;
+        }
+      } else if (selection.status !== "cancelled") {
+        return 20;
+      }
+    }
+
     if (process.argv.includes("--wait-for-ui-event")) {
       const eventResult = await waitForSampleAction(client, update.revision);
       if (eventResult !== 0) {

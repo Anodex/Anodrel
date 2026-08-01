@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anodrel_file_access::{
     FileSelectionStore, FileSelectionStoreError, FileTextService, FileTextServiceError,
@@ -12,9 +12,9 @@ use crate::{SelectedTextReadError, WindowsSelectedFile, new_selection_reference}
 /// The host registers only objects it captured itself. A successful read takes
 /// the object out of the session store before reading it, so the reference
 /// cannot be replayed even when a read later fails.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct WindowsFileTextService {
-    selections: Mutex<WindowsSessionSelections>,
+    selections: Arc<Mutex<WindowsSessionSelections>>,
 }
 
 impl WindowsFileTextService {

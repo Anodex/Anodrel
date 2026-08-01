@@ -8,6 +8,7 @@ use std::{
 
 use super::{Hwnd, StartupLab, View, ui_lab::UiLab};
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
+use anodrel_windows_file_access::WindowsFileTextService;
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 
@@ -87,6 +88,15 @@ pub(super) fn complete_file_dialog_request(
         Some(View::UiSession(session)) => Ok(Some(
             session.complete_file_dialog_request(request_id, selection),
         )),
+        _ => Ok(None),
+    }
+}
+
+/// Returns the session-local file registry for the UI thread's capture flow.
+pub(super) fn file_text_service(window: Hwnd) -> io::Result<Option<WindowsFileTextService>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.file_text_service())),
         _ => Ok(None),
     }
 }

@@ -29,6 +29,7 @@ use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSelection};
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
+use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
 
 use document::{Body, Document, Section};
@@ -462,6 +463,7 @@ pub fn run_ui_session(
     input_mailbox: UiInputMailbox,
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
+    file_text: WindowsFileTextService,
 ) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
@@ -474,6 +476,7 @@ pub fn run_ui_session(
                 input_mailbox,
                 close_signal,
                 file_dialog_mailbox,
+                file_text,
             )),
         }],
         None,
@@ -1220,10 +1223,31 @@ unsafe extern "system" fn window_proc(
                                 )
                             })
                     }
-                    // Selection-reference capture is not implemented by this
-                    // UI host yet. It must never fall back to path selection.
                     FileDialogRequestKind::OpenWithReference => {
-                        Err(anodrel_windows_file_dialog::FileDialogError::Unavailable)
+                        let file_text = registry::file_text_service(window).ok().flatten();
+                        match file_text {
+                            Some(file_text) => {
+                                anodrel_windows_file_dialog::open_file_with_owner_and_capture(
+                                    window,
+                                    request.filters(),
+                                    |path| {
+                                        let file =
+                                            anodrel_windows_file_access::open_selected_file(path)
+                                                .map_err(|_| ())?;
+                                        file_text.register(file).map_err(|_| ())
+                                    },
+                                )
+                                .map(|selection| {
+                                    selection.map_or(
+                                        FileDialogSelection::Cancelled,
+                                        |(path, reference)| {
+                                            FileDialogSelection::Captured(path, reference)
+                                        },
+                                    )
+                                })
+                            }
+                            None => Err(anodrel_windows_file_dialog::FileDialogError::Unavailable),
+                        }
                     }
                 };
                 let _ = registry::complete_file_dialog_request(window, request.id(), selection);

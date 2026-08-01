@@ -5,6 +5,7 @@ use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{UiDocumentMailbox, UiDocumentRevision, UiInputCandidate, UiInputMailbox};
+use anodrel_windows_file_access::WindowsFileTextService;
 
 use super::ui_lab::UiLab;
 
@@ -16,6 +17,7 @@ pub(super) struct UiSessionView {
     input_mailbox: UiInputMailbox,
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
+    file_text: WindowsFileTextService,
     revision: UiDocumentRevision,
 }
 
@@ -26,6 +28,7 @@ impl UiSessionView {
         input_mailbox: UiInputMailbox,
         close_signal: SessionCloseSignal,
         file_dialog_mailbox: FileDialogMailbox,
+        file_text: WindowsFileTextService,
     ) -> Self {
         Self {
             lab: UiLab::waiting_for_session(),
@@ -33,6 +36,7 @@ impl UiSessionView {
             input_mailbox,
             close_signal,
             file_dialog_mailbox,
+            file_text,
             revision: UiDocumentRevision::INITIAL,
         }
     }
@@ -66,6 +70,12 @@ impl UiSessionView {
             Ok(selection) => self.file_dialog_mailbox.complete(request_id, selection),
             Err(_) => self.file_dialog_mailbox.fail(request_id),
         }
+    }
+
+    /// Returns this view's session-bound retained-file registry for one UI
+    /// selection capture. The clone shares only session-local native state.
+    pub(super) fn file_text_service(&self) -> WindowsFileTextService {
+        self.file_text.clone()
     }
 
     /// Updates hover state through this view's current native layout.
@@ -145,6 +155,7 @@ mod tests {
     use anodrel_file_dialog::FileDialogMailbox;
     use anodrel_ui::UiEvent;
     use anodrel_ui_session::{UiDocumentMailbox, UiDocumentSession, UiInputMailbox};
+    use anodrel_windows_file_access::WindowsFileTextService;
 
     use super::UiSessionView;
 
@@ -160,6 +171,7 @@ mod tests {
             UiInputMailbox::new(),
             SessionCloseSignal::default(),
             FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
         );
         let mut session = UiDocumentSession::new();
         session
@@ -179,6 +191,7 @@ mod tests {
             UiInputMailbox::new(),
             signal.clone(),
             FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
         );
 
         assert_eq!(view.poll(), (false, false));
@@ -196,6 +209,7 @@ mod tests {
             inputs.clone(),
             SessionCloseSignal::default(),
             FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
         );
         let mut session = UiDocumentSession::new();
         session
@@ -227,6 +241,7 @@ mod tests {
             UiInputMailbox::new(),
             SessionCloseSignal::default(),
             FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
         );
         let mut session = UiDocumentSession::new();
         session

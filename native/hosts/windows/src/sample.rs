@@ -6,12 +6,14 @@
 use std::{error::Error, io, thread};
 
 use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_file_access::SelectionFileDialogMailbox;
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_protocol::Capability;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_external_links::WindowsExternalLinks;
+use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_pipe::WindowsPipeServer;
 
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
@@ -20,6 +22,7 @@ const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
 enum SampleDialogRequest {
     None,
     OpenFile,
+    OpenFileWithReference,
     SaveFile,
 }
 
@@ -41,6 +44,19 @@ pub fn run_ui_session_with_open_file_dialog(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::OpenFile)
 }
 
+/// Runs the UI session diagnostic and asks its client for a selection-scoped
+/// text read through the native UI-thread capture path.
+pub fn run_ui_session_with_selected_file_text(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::OpenFileWithReference,
+    )
+}
+
 /// Runs the UI session diagnostic and asks its client to show one save picker.
 pub fn run_ui_session_with_save_file_dialog(
     node_path: &str,
@@ -58,10 +74,17 @@ fn run_ui_session_with_dialog(
     let input_mailbox = UiInputMailbox::new();
     let close_signal = SessionCloseSignal::default();
     let file_dialog_mailbox = FileDialogMailbox::new();
+    let file_text = WindowsFileTextService::new();
     run_with_optional_session_view(
         node_path,
         client_path,
-        Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox)),
+        Some((
+            mailbox,
+            input_mailbox,
+            close_signal,
+            file_dialog_mailbox,
+            file_text,
+        )),
         dialog_request,
     )
 }
@@ -74,6 +97,7 @@ fn run_with_optional_session_view(
         UiInputMailbox,
         SessionCloseSignal,
         FileDialogMailbox,
+        WindowsFileTextService,
     )>,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
@@ -89,12 +113,13 @@ fn run_with_optional_session_view(
             Capability::ExternalOpen,
             Capability::DialogOpenFile,
             Capability::DialogSaveFile,
+            Capability::FileReadText,
         ],
         "anodrel-windows-host",
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
-        Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox)) => {
-            WindowsPipeServer::create_with_session_components_and_all_services(
+        Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) => {
+            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access(
                 policy,
                 "sample-session",
                 mailbox.clone(),
@@ -103,6 +128,8 @@ fn run_with_optional_session_view(
                 WindowsClipboard::new(0),
                 WindowsExternalLinks,
                 file_dialog_mailbox.clone(),
+                SelectionFileDialogMailbox::new(file_dialog_mailbox.clone()),
+                file_text.clone(),
             )?
         }
         None => WindowsPipeServer::create(policy, "sample-session")?,
@@ -117,14 +144,24 @@ fn run_with_optional_session_view(
         match dialog_request {
             SampleDialogRequest::None => command,
             SampleDialogRequest::OpenFile => command.arg("--request-open-file")?,
+            SampleDialogRequest::OpenFileWithReference => {
+                command.arg("--request-selected-file-text")?
+            }
             SampleDialogRequest::SaveFile => command.arg("--request-save-file")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
     };
     let child = launch(&command, &bootstrap)?;
-    if let Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox)) = mailboxes {
-        crate::win32::run_ui_session(mailbox, input_mailbox, close_signal, file_dialog_mailbox)?;
+    if let Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) = mailboxes
+    {
+        crate::win32::run_ui_session(
+            mailbox,
+            input_mailbox,
+            close_signal,
+            file_dialog_mailbox,
+            file_text,
+        )?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;
     if exit_code != 0 {

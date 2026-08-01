@@ -105,9 +105,11 @@ Status: **Direct Windows host in progress**
   bridge (Decision 0045). Protocol 1.7 grants `dialog.open_file`, and Protocol
   1.8 grants the separate `dialog.save_file`, only through that bridge. Protocol
   1.9 defines a separate `file.read_text` grant and a selection-reference
-  result for `dialog.open_file.v2` (Decision 0050); public file access remains
-  deferred until the Windows picker captures session-bound native identity at
-  selection time (Decision 0049).
+  result for `dialog.open_file.v2` (Decision 0050). The development Windows UI
+  session captures and holds the selected regular-file identity before it
+  returns that reference to the authenticated pipe worker (Decision 0049);
+  product session integration, file writes, and non-Windows adapters remain
+  deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded
