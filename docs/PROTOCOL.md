@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.8
+**Status:** Foundation contract, version 1.9
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.8 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 8}`.
+the host's. Version 1.9 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 9}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -69,6 +69,40 @@ The current operations are:
 | `external.open` | `{ "url": string }` | accepted operating-system handoff | `external.open` |
 | `dialog.open_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path or cancellation | `dialog.open_file` |
 | `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
+| `dialog.open_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus selection reference, or cancellation | `dialog.open_file` |
+| `file.read_text` | `{ "selectionReference": string }` | bounded UTF-8 text | `file.read_text` |
+
+### `dialog.open_file.v2` and `file.read_text`
+
+Protocol 1.9 adds a selection-scoped text-read boundary. The new
+`dialog.open_file.v2` operation keeps the exact bounded filter payload and
+`dialog.open_file` capability from Protocol 1.7. Its successful result is
+`{ "status": "selected", "path": string, "selectionReference": string }`;
+the other result is `{ "status": "cancelled" }`. The returned path is still
+display data only. `selectionReference` is the only value which can later
+authorize a read; it is an opaque 22-character unpadded base64url value derived
+from 128 bits of host randomness.
+
+The host returns the selected result only after it has captured the selected
+regular file as session-bound native read-only state. It returns only
+`dialog.unavailable` if that capture or the picker cannot be serviced. The
+legacy `dialog.open_file` result never contains a selection reference and
+cannot be upgraded into one.
+
+`file.read_text` requires the separate host-issued `file.read_text` capability
+and accepts exactly `{ "selectionReference": string }`. No path, name, native
+handle, directory, encoding, offset, or length field is valid. It consumes a
+reference once and returns `{ "status": "text", "text": string }`, where the
+strict UTF-8 source text contains at most **8 KiB**. The host returns
+`file.unavailable` for an unknown, consumed, expired, cross-session, or native
+unavailable reference; `file.text_too_large` for a larger file; and
+`file.text_invalid` for non-UTF-8 content. None of those responses exposes a
+path, metadata, native status, handle, or file text in diagnostics.
+
+Both operations can return `request.cancelled` only when the host observes the
+cancellation before work begins. A retained-file read performs one fixed,
+bounded synchronous read once started; it does not retain a background transfer
+after returning. Session shutdown revokes all outstanding references.
 
 ### `dialog.save_file`
 
@@ -279,6 +313,8 @@ suitable for a developer log but must not contain secrets, raw paths, native
 errors, clipboard text, or external-link URLs. Protocol 1.6 adds
 `external.unavailable`.
 Protocol 1.7 adds `dialog.unavailable`.
+Protocol 1.9 adds `file.unavailable`, `file.text_invalid`, and
+`file.text_too_large`.
 
 ## Cancellation and events
 

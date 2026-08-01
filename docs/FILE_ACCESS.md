@@ -2,7 +2,9 @@
 
 **Status:** A portable bounded, one-use selection-reference registry and a
 direct Windows session registry for retained regular-file identities are
-implemented; no file read or write protocol operation exists yet.
+implemented. Protocol 1.9 defines selection-scoped text reads, but the public
+operations remain unavailable until the Windows picker captures an identity at
+selection time; no file write protocol operation exists.
 
 ## Purpose
 
@@ -11,9 +13,9 @@ user selected in a host-owned picker, without granting arbitrary filesystem
 access. A path returned by `dialog.open_file` is display data only. It is never
 a future read request parameter or a capability.
 
-## Planned boundary
+## Protocol boundary
 
-The first read operation will use a host-created **selection reference**:
+The first read operation uses a host-created **selection reference**:
 
 ~~~text
 dialog.open_file.v2 -> user chooses one file -> host retains a selection
@@ -29,10 +31,12 @@ path, filename, initial directory, filter, or file identity for a read.
 On Windows, the direct adapter generates each Version 1 reference from 128 bits
 of CNG random data and encodes it as exactly 22 unpadded base64url characters.
 
-`file.read_text` will require a distinct host-issued `file.read_text` grant and
-will accept exactly one selection reference. It will return bounded UTF-8 text
-or a stable safe failure category; it will not expose native status, canonical
-paths, directory contents, file metadata, or a general file handle.
+`file.read_text` requires a distinct host-issued `file.read_text` grant and
+accepts exactly one selection reference. Protocol 1.9 limits the public result
+to 8 KiB of strict UTF-8 source text and defines the safe failures
+`file.unavailable`, `file.text_too_large`, and `file.text_invalid`; it exposes
+no native status, canonical paths, directory contents, file metadata, or a
+general file handle. See `docs/PROTOCOL.md` and Decision 0050.
 
 ## Native identity requirement
 
@@ -58,10 +62,10 @@ authenticated session and consumes its retained object before reading.
 
 ## Limits and deferred work
 
-The native text reader is limited to **32 KiB** of bytes, requires strict UTF-8,
-and reads only the retained regular-file handle. Its result is still native-only
-until the protocol adds capability checks and cancellation behavior. A selection
-reference is single-use and the portable store
+The native text reader is currently limited to **32 KiB** of bytes, requires
+strict UTF-8, and reads only the retained regular-file handle. Public Protocol
+1.9 exposure will apply its stricter 8 KiB response bound. A selection reference
+is single-use and the portable store
 holds at most 32 live references per session. Binary reads, writes,
 directories, multiple selection, persistent grants, bookmarks, drag-and-drop,
 and cross-session sharing remain deferred.
