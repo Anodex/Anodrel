@@ -4,6 +4,8 @@ import {
   MAX_STORAGE_SNAPSHOT_REQUEST_BYTES,
   isCancellationEnvelope,
   isClipboardWritePayload,
+  isCredentialReadPayload,
+  isCredentialWritePayload,
   isExternalOpenPayload,
   isFileDialogOpenPayload,
   isFileTextReadPayload,
@@ -35,6 +37,8 @@ export interface MockHostOptions {
   readonly clipboardText?: string;
   /** Initial bounded application state returned by a granted storage read. */
   readonly storageSnapshot?: string;
+  /** Initial exact credentials, keyed by the documented credential-name grammar. */
+  readonly credentials?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -62,6 +66,7 @@ export class MockHost {
   private readonly now: () => Date;
   private clipboardText: string | undefined;
   private storageSnapshot: string | undefined;
+  private readonly credentials = new Map<string, string>();
   private sessionCount = 0;
 
   constructor(options: MockHostOptions) {
@@ -79,6 +84,12 @@ export class MockHost {
       new TextEncoder().encode(options.storageSnapshot).byteLength > MAX_STORAGE_SNAPSHOT_REQUEST_BYTES
     ) {
       throw new Error("MockHost storage snapshot exceeds the protocol size limit.");
+    }
+    for (const [name, secret] of Object.entries(options.credentials ?? {})) {
+      if (!isCredentialWritePayload({ name, secret })) {
+        throw new Error("MockHost credentials must use a valid name and canonical secret encoding.");
+      }
+      this.credentials.set(name, secret);
     }
 
     this.applicationId = options.applicationId;
@@ -229,6 +240,50 @@ export class MockHost {
               event: "Internal platform.health check completed.",
             },
           ],
+        });
+
+      case "credential.read":
+        if (request.protocolVersion.minor < 12) {
+          return this.failure(request.requestId, "operation.unsupported", "credential.read requires protocol 1.12 or later.");
+        }
+        if (!isCredentialReadPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "credential.read requires one exact credential name.");
+        }
+        if (!this.hasCapability(sessionId, "credential.read")) {
+          return this.failure(request.requestId, "capability.denied", "credential.read requires the credential.read capability.", { capability: "credential.read" });
+        }
+        {
+          const secret = this.credentials.get(request.payload.name);
+          return this.success("credential.read", request.requestId, secret === undefined
+            ? { status: "not_found" }
+            : { status: "found", secret });
+        }
+
+      case "credential.write":
+        if (request.protocolVersion.minor < 12) {
+          return this.failure(request.requestId, "operation.unsupported", "credential.write requires protocol 1.12 or later.");
+        }
+        if (!isCredentialWritePayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "credential.write requires one exact credential name and canonical secret.");
+        }
+        if (!this.hasCapability(sessionId, "credential.write")) {
+          return this.failure(request.requestId, "capability.denied", "credential.write requires the credential.write capability.", { capability: "credential.write" });
+        }
+        this.credentials.set(request.payload.name, request.payload.secret);
+        return this.success("credential.write", request.requestId, { status: "written" });
+
+      case "credential.delete":
+        if (request.protocolVersion.minor < 12) {
+          return this.failure(request.requestId, "operation.unsupported", "credential.delete requires protocol 1.12 or later.");
+        }
+        if (!isCredentialReadPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "credential.delete requires one exact credential name.");
+        }
+        if (!this.hasCapability(sessionId, "credential.delete")) {
+          return this.failure(request.requestId, "capability.denied", "credential.delete requires the credential.delete capability.", { capability: "credential.delete" });
+        }
+        return this.success("credential.delete", request.requestId, {
+          status: this.credentials.delete(request.payload.name) ? "deleted" : "not_found",
         });
 
       case "ui.document.replace":

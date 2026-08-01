@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 11;
+pub const PROTOCOL_MINOR: u16 = 12;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -55,6 +55,9 @@ pub enum Capability {
     StorageStateRead,
     StorageStateReplace,
     StorageStateClear,
+    CredentialRead,
+    CredentialWrite,
+    CredentialDelete,
 }
 
 impl Capability {
@@ -73,6 +76,9 @@ impl Capability {
             Self::StorageStateRead => "storage.state.read",
             Self::StorageStateReplace => "storage.state.replace",
             Self::StorageStateClear => "storage.state.clear",
+            Self::CredentialRead => "credential.read",
+            Self::CredentialWrite => "credential.write",
+            Self::CredentialDelete => "credential.delete",
         }
     }
 }
@@ -97,6 +103,9 @@ pub enum ProtocolErrorCode {
     StorageSnapshotInvalid,
     StorageSnapshotTooLarge,
     DiagnosticsUnavailable,
+    CredentialUnavailable,
+    CredentialAccessDenied,
+    CredentialStoredSecretInvalid,
 }
 
 impl ProtocolErrorCode {
@@ -120,6 +129,9 @@ impl ProtocolErrorCode {
             Self::StorageSnapshotInvalid => "storage.snapshot_invalid",
             Self::StorageSnapshotTooLarge => "storage.snapshot_too_large",
             Self::DiagnosticsUnavailable => "diagnostics.unavailable",
+            Self::CredentialUnavailable => "credential.unavailable",
+            Self::CredentialAccessDenied => "credential.access_denied",
+            Self::CredentialStoredSecretInvalid => "credential.stored_secret_invalid",
         }
     }
 }

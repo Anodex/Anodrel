@@ -64,6 +64,18 @@ export class PlatformClient {
     return this.request("diagnostics.entries.read", {});
   }
 
+  readCredential(name: string): Promise<ResultFor<"credential.read">> {
+    return this.request("credential.read", { name });
+  }
+
+  writeCredential(name: string, secret: string): Promise<ResultFor<"credential.write">> {
+    return this.request("credential.write", { name, secret });
+  }
+
+  deleteCredential(name: string): Promise<ResultFor<"credential.delete">> {
+    return this.request("credential.delete", { name });
+  }
+
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {
     return this.request("ui.document.replace", { document });
   }

@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 11 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 12 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -15,6 +15,10 @@ export const MAX_FILE_DIALOG_FILTERS = 8;
 export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
 export const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES = 24 * 1024;
 export const SELECTION_REFERENCE_BYTES = 22;
+/** Maximum UTF-8 bytes in an exact credential name (ASCII only). */
+export const MAX_CREDENTIAL_NAME_BYTES = 64;
+/** Maximum characters in the canonical hexadecimal representation of a secret. */
+export const MAX_CREDENTIAL_SECRET_HEX_BYTES = 4_096;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -35,7 +39,10 @@ export type Capability =
   | "file.read_text"
   | "storage.state.read"
   | "storage.state.replace"
-  | "storage.state.clear";
+  | "storage.state.clear"
+  | "credential.read"
+  | "credential.write"
+  | "credential.delete";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -69,6 +76,20 @@ export interface PlatformOperationMap {
         readonly event: string;
       }[];
     };
+  };
+  "credential.read": {
+    readonly payload: { readonly name: string };
+    readonly result:
+      | { readonly status: "found"; readonly secret: string }
+      | { readonly status: "not_found" };
+  };
+  "credential.write": {
+    readonly payload: { readonly name: string; readonly secret: string };
+    readonly result: { readonly status: "written" };
+  };
+  "credential.delete": {
+    readonly payload: { readonly name: string };
+    readonly result: { readonly status: "deleted" } | { readonly status: "not_found" };
   };
   "ui.document.replace": {
     readonly payload: { readonly document: string };
@@ -221,7 +242,10 @@ export type ProtocolErrorCode =
   | "storage.unavailable"
   | "storage.snapshot_invalid"
   | "storage.snapshot_too_large"
-  | "diagnostics.unavailable";
+  | "diagnostics.unavailable"
+  | "credential.unavailable"
+  | "credential.access_denied"
+  | "credential.stored_secret_invalid";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -405,6 +429,50 @@ export function isStorageStateReplacePayload(
     Object.keys(value).length === 1 &&
     typeof value.snapshot === "string" &&
     new TextEncoder().encode(value.snapshot).byteLength <= MAX_STORAGE_SNAPSHOT_REQUEST_BYTES
+  );
+}
+
+/** Validates one exact, non-enumerable credential name. */
+export function isCredentialReadPayload(
+  value: unknown,
+): value is PayloadFor<"credential.read"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    isCredentialName(value.name)
+  );
+}
+
+/** Validates one credential name and its canonical bounded secret encoding. */
+export function isCredentialWritePayload(
+  value: unknown,
+): value is PayloadFor<"credential.write"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    isCredentialName(value.name) &&
+    isCanonicalCredentialSecret(value.secret)
+  );
+}
+
+/** Returns whether a value is the stable protocol credential-name grammar. */
+export function isCredentialName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_CREDENTIAL_NAME_BYTES &&
+    /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/.test(value)
+  );
+}
+
+/** Returns whether a value is a non-empty, lowercase, even-length secret hex string. */
+export function isCanonicalCredentialSecret(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_CREDENTIAL_SECRET_HEX_BYTES &&
+    value.length % 2 === 0 &&
+    /^[0-9a-f]+$/.test(value)
   );
 }
 
