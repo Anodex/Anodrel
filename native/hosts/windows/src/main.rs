@@ -51,6 +51,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return sample::run_ui_session_with_save_file_dialog(node_path, client_path);
     }
+    if let [command, node_path, client_path] = arguments.as_slice()
+        && command == "--sample-ui-storage-client"
+    {
+        return sample::run_ui_session_with_storage(node_path, client_path);
+    }
     if let [command, manifest_path] = arguments.as_slice()
         && command == "--application"
     {

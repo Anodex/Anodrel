@@ -5,6 +5,7 @@
 
 use std::{error::Error, io, thread};
 
+use anodrel_application::ApplicationManifest;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
 use anodrel_file_access::SelectionFileDialogMailbox;
 use anodrel_file_dialog::FileDialogMailbox;
@@ -14,7 +15,9 @@ use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_external_links::WindowsExternalLinks;
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_paths::application_directories;
 use anodrel_windows_pipe::WindowsPipeServer;
+use anodrel_windows_storage::WindowsStorageService;
 
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
 
@@ -24,6 +27,7 @@ enum SampleDialogRequest {
     OpenFile,
     OpenFileWithReference,
     SaveFile,
+    Storage,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -63,6 +67,14 @@ pub fn run_ui_session_with_save_file_dialog(
     client_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::SaveFile)
+}
+
+/// Runs the UI session diagnostic and asks its client to replace and read state.
+pub fn run_ui_session_with_storage(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Storage)
 }
 
 fn run_ui_session_with_dialog(
@@ -114,12 +126,15 @@ fn run_with_optional_session_view(
             Capability::DialogOpenFile,
             Capability::DialogSaveFile,
             Capability::FileReadText,
+            Capability::StorageStateRead,
+            Capability::StorageStateReplace,
+            Capability::StorageStateClear,
         ],
         "anodrel-windows-host",
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
         Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) => {
-            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access(
+            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access_and_storage(
                 policy,
                 "sample-session",
                 mailbox.clone(),
@@ -130,6 +145,7 @@ fn run_with_optional_session_view(
                 file_dialog_mailbox.clone(),
                 SelectionFileDialogMailbox::new(file_dialog_mailbox.clone()),
                 file_text.clone(),
+                sample_storage()?,
             )?
         }
         None => WindowsPipeServer::create(policy, "sample-session")?,
@@ -148,6 +164,7 @@ fn run_with_optional_session_view(
                 command.arg("--request-selected-file-text")?
             }
             SampleDialogRequest::SaveFile => command.arg("--request-save-file")?,
+            SampleDialogRequest::Storage => command.arg("--request-storage-state")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
@@ -178,4 +195,13 @@ fn run_with_optional_session_view(
         .map_err(|_| io::Error::other("development pipe worker panicked"))??;
     println!("Anodrel Windows development sample completed successfully.");
     Ok(())
+}
+
+fn sample_storage() -> Result<WindowsStorageService, Box<dyn Error>> {
+    let manifest = ApplicationManifest::parse(
+        r#"{"manifestVersion":{"major":1,"minor":0},"applicationId":"anodrel.sample","displayName":"Anodrel Sample","content":{"format":"anodrel.text.v1","path":"content/main.txt","sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}}"#,
+    )?;
+    Ok(WindowsStorageService::new(&application_directories(
+        manifest.identity(),
+    )?))
 }

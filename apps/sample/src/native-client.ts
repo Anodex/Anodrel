@@ -72,6 +72,21 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-storage-state")) {
+      const replaced = await client.replaceStorageState("Anodrel storage diagnostic");
+      if (replaced.status !== "replaced") {
+        return 21;
+      }
+      const state = await client.readStorageState();
+      if (state.status !== "snapshot" || state.snapshot !== "Anodrel storage diagnostic") {
+        return 21;
+      }
+      const cleared = await client.clearStorageState();
+      if (cleared.status !== "cleared") {
+        return 21;
+      }
+    }
+
     if (process.argv.includes("--wait-for-ui-event")) {
       const eventResult = await waitForSampleAction(client, update.revision);
       if (eventResult !== 0) {
