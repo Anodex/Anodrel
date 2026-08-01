@@ -17,7 +17,8 @@ cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host --
 The window starts with an Anodrel-owned waiting document. The private client
 receives its one-time invitation through standard input, authenticates to a
 current-session named pipe, checks `platform.health`, then submits one strict
-`anodrel.ui.document.v1` document using `ui.document.replace`. The native
+`anodrel.ui.document.v1` document using `ui.document.replace`, or an exact
+`anodrel.ui.document.v2` document using `ui.document.replace.v2`. The native
 window must replace the waiting screen with that document. Close the window to
 complete the development run.
 

@@ -1204,6 +1204,9 @@ unsafe extern "system" fn window_proc(
             let _ = registry::with_ui_lab(window, |lab| {
                 lab.clamp_scroll_offsets(rect.width() as f32, rect.height() as f32);
             });
+            let _ = registry::with_ui_session(window, |session| {
+                session.clamp_scroll_offsets(rect.width() as f32, rect.height() as f32);
+            });
             0
         }
         WM_KEYDOWN => {
@@ -1222,7 +1225,18 @@ unsafe extern "system" fn window_proc(
                     lab.scroll_page(rect.width() as f32, rect.height() as f32, wparam == VK_NEXT)
                 })
                 .ok()
-                .flatten();
+                .flatten()
+                .or_else(|| {
+                    registry::with_ui_session(window, |session| {
+                        session.scroll_page(
+                            rect.width() as f32,
+                            rect.height() as f32,
+                            wparam == VK_NEXT,
+                        )
+                    })
+                    .ok()
+                    .flatten()
+                });
                 let Some(changed) = changed else {
                     return unsafe { DefWindowProcW(window, message, wparam, lparam) };
                 };

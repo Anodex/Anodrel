@@ -67,6 +67,16 @@ impl UiSessionView {
         self.lab.focus_previous(width, height)
     }
 
+    /// Moves a current v2 scroll viewport by one local native page.
+    pub(super) fn scroll_page(&mut self, width: f32, height: f32, forward: bool) -> bool {
+        self.lab.scroll_page(width, height, forward)
+    }
+
+    /// Clamps retained local viewport positions after a native size change.
+    pub(super) fn clamp_scroll_offsets(&mut self, width: f32, height: f32) {
+        self.lab.clamp_scroll_offsets(width, height);
+    }
+
     /// Queues one current pointer-derived semantic action candidate.
     pub(super) fn invoke(&mut self, width: f32, height: f32, at: Point) -> bool {
         let Some(event) = self.lab.event_at(width, height, at) else {
@@ -113,6 +123,7 @@ mod tests {
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.action","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
+    const SCROLL_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v2","root":{"id":"session.viewport","kind":"scroll","child":{"id":"session.content","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":0,"surfaceTone":"plain","children":[{"id":"session.one","kind":"action","label":"One","fontSize":16,"enabled":true,"tone":"accent"},{"id":"session.two","kind":"action","label":"Two","fontSize":16,"enabled":true,"tone":"accent"},{"id":"session.three","kind":"action","label":"Three","fontSize":16,"enabled":true,"tone":"accent"}]}}}"#;
 
     #[test]
     fn applies_only_a_newer_snapshot_from_its_own_mailbox() {
@@ -176,5 +187,24 @@ mod tests {
             .into_parts();
         assert_eq!(revision.value(), 1);
         assert_eq!(action.as_str(), "session.action");
+    }
+
+    #[test]
+    fn scrolls_an_explicit_version_two_snapshot_only_in_local_view_state() {
+        let mailbox = UiDocumentMailbox::new();
+        let mut view = UiSessionView::new(
+            mailbox.clone(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+        );
+        let mut session = UiDocumentSession::new();
+        session
+            .replace_document_v2(SCROLL_DOCUMENT)
+            .expect("version two document is valid");
+        mailbox.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(view.poll(), (true, false));
+
+        assert!(view.scroll_page(920.0, 70.0, true));
+        assert_eq!(view.revision.value(), 1);
     }
 }
