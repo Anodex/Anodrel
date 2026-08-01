@@ -1,16 +1,19 @@
 # Anodrel Project Handoff
 
-**Date:** 2026-07-31  
-**Project path:** C:\Users\Owner\Desktop\Platform X  
-**Status:** Protocol-first foundation implementation underway; direct wire,
-authenticated named-pipe, private child bootstrap, direct Windows host, and
-strict application package modules prove bounded protocol handling, local
-session protection, private credential delivery, window lifecycle, a
-development-only end-to-end health probe, a digest-verified no-script text
-surface, and a branded native Startup Lab visual smoke test. First-party
-surfaces are composed by a portable software renderer and presented in a
-single blit; the Startup Lab shows every intended action tile, each in a
-declared linked or planned state tracked in ROADMAP.md.
+**Updated:** 2026-08-01
+**Project path:** `C:\Users\Owner\Desktop\Platform X`
+**Latest decision:** 0056 — credential protocol uses separate exact grants
+**Protocol version:** 1.12
+
+This file is a resume pointer, not a status report. It says where to start, how
+to check the tree is healthy, and what the next gate is. It deliberately does
+not restate the capability surface or the phase status, because those went
+stale here once already:
+
+- **What exists today** → README.md
+- **Phase status, acceptance gates, Startup Lab tiles** → ROADMAP.md
+- **Why a boundary is shaped the way it is** → `docs/decisions/`
+- **Rules for changing anything** → AGENTS.md
 
 ## What this project is
 
@@ -23,140 +26,94 @@ Anodex is the first planned application that may use Anodrel. Anodex is not
 part of this repository and has not been modified.
 
 The product name is Anodrel. The local workspace still uses its original folder
-name while this task is open.
+name.
 
-## What has been created
+## How to resume
 
-This repository has its own Git history root and currently contains:
+Open this folder as its own workspace, then read in order:
 
-- README.md — project purpose, goals, boundaries, and repository map.
-- AGENTS.md — rules for future coding agents.
-- ROADMAP.md — staged implementation plan and acceptance gates.
-- docs/ARCHITECTURE.md — layer model, responsibilities, protocol, security,
-  migration, and testing strategy.
-- docs/DEVELOPMENT.md — development and documentation workflow.
-- docs/decisions/0001-standalone-repository.md — decision to keep Anodrel
-  separate from Anodex.
-- docs/decisions/README.md — decision-record format.
-- apps/README.md — application ownership.
-- packages/README.md — reusable package ownership.
-- native/README.md — native host ownership.
-- scripts/README.md — script requirements.
-- tests/README.md — cross-component test ownership.
-- .gitignore — exclusions for source control, build output, secrets, logs, and
-  local runtime data.
-- package.json and TypeScript project configuration — workspace build and
-  verification commands.
-- packages/protocol — versioned JSON-compatible protocol types and validation.
-- packages/sdk — application-facing client over an abstract transport.
-- packages/mock-host — policy-driven in-memory host for contract tests.
-- apps/sample — a small application using only the public SDK.
-- tests/contract — protocol compatibility checks shared with future hosts.
-- docs/PROTOCOL.md, docs/TRANSPORT.md, docs/THREAT_MODEL.md, and
-  docs/PERFORMANCE.md — public contracts, security baseline, and performance
-  measurement rules for future native work.
-- native/ — Rust JSON, protocol, core, wire, transport, authenticated
-  Windows named-pipe, and direct Win32 window modules;
-  the deployed dependency graph contains no third-party runtime library.
-- native/crates/canvas and native/crates/brand — a portable software rasterizer
-  and the Anodrel identity: the authored mark committed pre-decoded, plus colour
-  tokens and small-size geometry. Both crates are free of operating-system and
-  third-party dependencies and forbid unsafe code, so a future macOS or Linux
-  host reuses them unchanged.
-- docs/RENDERER.md — the renderer and brand API contract.
+1. HANDOFF.md (this file)
+2. README.md
+3. ROADMAP.md
+4. AGENTS.md
+5. docs/ARCHITECTURE.md
+6. docs/DEVELOPMENT.md
+7. docs/PROTOCOL.md, docs/TRANSPORT.md, docs/THREAT_MODEL.md
+8. The decision records for the area being changed
 
-## Current architectural direction
+## Verify the tree first
 
-The current direction is a layered platform:
+Before changing anything, confirm the baseline is green:
 
 ~~~text
-Application
-    │
-    │ versioned SDK/protocol
-    ▼
-Platform Core
-    │
-    │ platform service interfaces
-    ▼
-Native Host
-    │
-    ├── Windows first
-    ├── macOS later
-    └── Linux later
+npm run check
+npm test
+cd native && cargo test --workspace
 ~~~
 
-The expected implementation direction is:
+As of this handoff: `npm test` passes 31 tests, `cargo test --workspace` passes
+369 tests, and both build without warnings. If those numbers have dropped, find
+out why before adding work.
 
-- Rust for the native host and platform-sensitive code.
-- TypeScript packages for reusable protocol types and SDKs where practical.
-- Existing React applications can remain UI clients initially.
-- A versioned protocol separates applications from the native host.
-- Electron may remain an Anodex adapter temporarily during migration.
+`start.bat` builds in release and opens the Windows Startup Lab for a visual
+smoke test.
 
-These are design directions, not all final implementation decisions. Open
-decisions are listed in docs/ARCHITECTURE.md.
+## Shape of the work
+
+Every capability so far has followed the same ladder, one commit per rung. Keep
+using it:
+
+1. Portable crate under `native/crates/` — no operating-system or third-party
+   dependency, `forbid(unsafe_code)`, tested by asserting on values.
+2. Windows adapter under `native/adapters/` — direct Win32, host-only.
+3. Protocol grant in `packages/protocol` — a new minor version, with separate
+   exact grants per operation rather than one broad capability.
+4. SDK surface and mock-host policy in `packages/sdk` and `packages/mock-host`.
+5. Contract test in `tests/contract` proving SDK and host agree, and that each
+   operation refuses to run without its exact host-issued grant.
+6. A development-only diagnostic that exercises the real path over the
+   authenticated Windows pipe.
+7. A numbered decision record, and the matching `docs/` contract file.
+
+Do not claim a rung is done until its documentation and verification are done.
+
+## Next milestone
+
+**Signed package distribution and verified executable identity.** This is the
+Phase 2 acceptance item and the gate on the `Launch Sample` Startup Lab tile —
+the only tile still `Planned`. It carries the largest threat-model change in the
+project so far and must not be linked before that entry exists.
+
+The supporting pieces are already built and currently unused:
+
+- Decision 0017 — Windows Authenticode verifier, returns a leaf certificate
+  fingerprint.
+- Decision 0018 — installed application record binding expected executable
+  digest and publisher fingerprint to a validated package identity.
+- Decision 0019 — machine-wide 64-bit registry policy reader for that record.
+- Decision 0020 — launch service that locks, revalidates, verifies, and tracks
+  a policy-approved executable before delivering bootstrap material.
+
+What is missing is record provisioning and an installed sample to launch.
+Sequence:
+
+1. Provision an installed application record for the sample.
+2. Bind the verified executable session to its validated application ID through
+   the existing private bootstrap boundary, without exposing bootstrap material.
+3. Extend the threat model, then link the tile.
+
+Everything shipped to date is a development-only diagnostic path. There is no
+product session lifecycle yet, and capability breadth is currently ahead of it.
+Prefer closing this gate over adding a further capability.
 
 ## Non-negotiable boundaries
 
-- Keep Anodrel in its own repository.
-- Do not copy Anodex source into Anodrel.
-- Do not add Anodrel files to the Anodex repository.
-- Keep Anodex-specific concepts out of the platform core.
+AGENTS.md holds the full rules. The ones that have no other home:
+
+- Keep Anodrel in its own repository; do not copy Anodex source into it, and do
+  not add Anodrel files to the Anodex repository.
 - Do not begin a large Anodex migration before platform contracts are stable.
 - Do not expose arbitrary native access to application content.
-- Document substantial architecture, protocol, and security changes.
-
-## Immediate next milestone
-
-Continue from Decision 0010 with the next native-host security boundary:
-
-1. Define signed package distribution and verified executable identity.
-2. Bind a verified executable session to its validated application ID without
-   exposing bootstrap material.
-3. Define a narrow capability bridge and extend the threat model before any
-   filesystem, process, or credential capability.
-
-The initial implementation is a small sample application and mock host, not an
-Anodex migration. Its v1 protocol is documented in docs/PROTOCOL.md.
-
-## Recommended first implementation sequence
-
-1. Define package signing and bind a verified executable identity to the
-   authenticated direct Windows named-pipe adapter through the existing private
-   bootstrap boundary.
-2. Exercise lifecycle, window creation, logging, and shutdown through that
-   bound transport.
-4. Add one capability at a time: paths, dialogs, external links, clipboard,
-   secure storage, notifications, and child processes.
-5. Run the shared contract suite against the native host and add native
-   integration and manual tests.
-6. Only then design the Anodex adapter.
-
-## How to resume this project
-
-Open this folder as its own workspace:
-
-~~~text
-C:\Users\Owner\Desktop\Platform X
-~~~
-
-Read these files in order:
-
-1. HANDOFF.md
-2. README.md
-3. ROADMAP.md
-4. docs/ARCHITECTURE.md
-5. docs/DEVELOPMENT.md
-6. docs/PROTOCOL.md
-7. docs/TRANSPORT.md
-8. docs/RENDERER.md
-9. docs/PERFORMANCE.md
-10. docs/THREAT_MODEL.md
-11. docs/decisions/
-
-Before adding application content or privileged native behavior, review the
-open decisions and extend the threat model. The foundation is published to the
-`Anodex/Anodrel` repository; check Git status before resuming work.
 
 ## Relationship to Anodex
 
@@ -166,7 +123,12 @@ Anodex remains at:
 C:\Users\Owner\Desktop\Anodex4
 ~~~
 
-It should continue to build and operate independently. The future integration
-should use a documented Anodrel adapter and should be introduced only after
-the platform has a working host, contract tests, recovery behavior, and a
-rollback plan.
+It builds and operates independently. Future integration should use a documented
+Anodrel adapter, introduced only after the platform has a working host, contract
+tests, recovery behavior, and a rollback plan.
+
+## Keeping this file honest
+
+Update the header block and the **Next milestone** section whenever a milestone
+closes. If you find yourself adding a list of what the project now contains, put
+it in README.md instead — that is the mistake this rewrite corrected.
