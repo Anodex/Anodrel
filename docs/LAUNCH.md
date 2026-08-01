@@ -1,8 +1,8 @@
 # Installed application records v1
 
-**Status:** Foundation contract. This defines the policy input for a future
-Windows process-launch operation. It does not authorize a launch or define a
-public application capability.
+**Status:** Windows launch-service contract. The service is internal to the
+native host; it does not define a public application capability or make the
+Startup Lab tile available until a provisioned signed application exists.
 
 ## Purpose and boundary
 
@@ -109,14 +109,44 @@ error. The Windows adapter also fails closed for a missing registry key,
 non-string or malformed registry value, malformed UTF-16, access denial, or a
 record that changes while being read.
 
-## Future launch sequence
+## Windows launch sequence
 
-The record parser is only the first input. Before `CreateProcessW`, the future
-Windows launch service must repeat containment and digest checks, call the
-Windows Authenticode adapter, compare its leaf fingerprint to the record,
-create and track the child without shell interpretation, and only then deliver
-the private bootstrap invitation. This work runs off the UI thread. A failure
-leaves no child process and keeps the Startup Lab tile planned.
+`anodrel-windows-launch` is the host-only service that turns a machine-policy
+record into a process launch. Before `CreateProcessW`, it runs this exact
+sequence off the Win32 UI thread:
+
+1. read the host-selected application ID from the machine policy store;
+2. open the record's canonical executable with direct `CreateFileW` using read
+   access and `FILE_SHARE_READ` only, preventing a new writer or delete/rename
+   handle while the verification and launch are in progress;
+3. recanonicalize the locked path, require it to still be the contained record
+   executable, and calculate the SHA-256 digest through that same locked
+   handle;
+4. call the Windows Authenticode adapter while the lock remains held and match
+   its leaf fingerprint to the approved record fingerprint;
+5. create the exact verified `.exe` with no shell and no application arguments;
+6. deliver the existing one-use bootstrap invitation only to that newly created
+   child; and
+7. return a tracked child handle. Dropping that handle terminates the child, so
+   the native host can enforce shutdown rather than leaving a background
+   process.
+
+The service accepts an invitation prepared by the private pipe adapter but does
+not create a public session or expose the invitation. Existing bootstrap code
+terminates a child if invitation delivery itself fails. Any earlier failure
+creates no child. The service has no restart, argument, environment, shell,
+UI, logging, or application-request interface.
+
+The registered application must be re-read by this sequence for every launch;
+an earlier package validation result cannot authorize a later executable. The
+file lock closes only after `CreateProcessW` has returned. This prevents a
+write, delete, or rename race between digest/signature verification and Windows
+opening the process image.
+
+The Startup Lab tile remains planned because the repository does not include a
+machine-provisioned signed application record or a product child executable.
+When those exist, the host can call this service from a worker and move the tile
+to linked with an operation-specific integration test.
 
 ~~~text
 trusted Windows policy directory
@@ -129,7 +159,8 @@ strict installed application record
         `--> approved signer fingerprint
                     |
                     v
-        future Authenticode comparison and tracked process launch
+        locked Authenticode comparison and tracked process launch
 ~~~
 
-See `docs/SIGNING.md`, `docs/APPLICATIONS.md`, and Decision 0018.
+See `docs/SIGNING.md`, `docs/APPLICATIONS.md`, and Decisions 0018 through
+0020.

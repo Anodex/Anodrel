@@ -44,6 +44,7 @@ impl fmt::Debug for PublisherFingerprint {
 /// child lifecycle immediately before process creation.
 pub struct InstalledApplication {
     identity: ApplicationIdentity,
+    package_root: PathBuf,
     executable_path: PathBuf,
     executable_digest: [u8; 32],
     publisher_fingerprint: PublisherFingerprint,
@@ -118,6 +119,34 @@ impl InstalledApplication {
     pub fn matches_publisher(&self, actual: [u8; 32]) -> bool {
         self.publisher_fingerprint.0 == actual
     }
+
+    /// Rechecks an executable path and hashes bytes read from a caller-held
+    /// file handle against this record's expected digest.
+    ///
+    /// A native launch service must call this while it holds operating-system
+    /// protection against replacing the executable, then keep that protection
+    /// until process creation has returned.
+    pub fn revalidate_executable<R: Read>(
+        &self,
+        path: &Path,
+        reader: &mut R,
+    ) -> Result<(), InstalledApplicationError> {
+        let canonical_path = fs::canonicalize(path).map_err(InstalledApplicationError::Io)?;
+        if !canonical_path.starts_with(&self.package_root) {
+            return Err(InstalledApplicationError::ExecutableOutsidePackage);
+        }
+        if canonical_path != self.executable_path {
+            return Err(InstalledApplicationError::ExecutablePathChanged);
+        }
+        let (actual_digest, _) = sha256::digest_reader_limited(reader, MAX_EXECUTABLE_BYTES)
+            .map_err(InstalledApplicationError::Io)?
+            .ok_or(InstalledApplicationError::ExecutableTooLarge)?;
+        if self.matches_executable_digest(actual_digest) {
+            Ok(())
+        } else {
+            Err(InstalledApplicationError::ExecutableDigestMismatch)
+        }
+    }
 }
 
 impl fmt::Debug for InstalledApplication {
@@ -160,6 +189,7 @@ fn validate_record(
 
     Ok(InstalledApplication {
         identity: package.identity().clone(),
+        package_root,
         executable_path,
         executable_digest: record.executable_digest,
         publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
@@ -181,6 +211,7 @@ pub enum InstalledApplicationError {
     ApplicationIdentityMismatch,
     InvalidExecutablePath,
     ExecutableOutsidePackage,
+    ExecutablePathChanged,
     ExecutableNotFile,
     ExecutableTooLarge,
     ExecutableDigestMismatch,
@@ -206,6 +237,9 @@ impl fmt::Display for InstalledApplicationError {
             Self::InvalidExecutablePath => "installed application executable path is invalid",
             Self::ExecutableOutsidePackage => {
                 "installed application executable resolves outside its package"
+            }
+            Self::ExecutablePathChanged => {
+                "installed application executable changed after policy validation"
             }
             Self::ExecutableNotFile => "installed application executable is not a file",
             Self::ExecutableTooLarge => "installed application executable exceeds its limit",
@@ -548,6 +582,26 @@ mod tests {
             .expect("trusted record is valid");
 
         assert_eq!(installed.identity().application_id(), APPLICATION_ID);
+        fixture.remove();
+    }
+
+    #[test]
+    fn revalidation_hashes_the_record_executable_and_rejects_a_substitute_path() {
+        let fixture = fixture();
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("installed record is valid");
+        let mut executable = fs::File::open(&fixture.executable_path).expect("executable opens");
+        installed
+            .revalidate_executable(&fixture.executable_path, &mut executable)
+            .expect("record executable revalidates");
+
+        let substitute = fixture.package_root.join("bin").join("substitute.exe");
+        fs::write(&substitute, b"Anodrel fixture executable").expect("substitute is written");
+        let mut substitute_file = fs::File::open(&substitute).expect("substitute opens");
+        assert!(matches!(
+            installed.revalidate_executable(&substitute, &mut substitute_file),
+            Err(InstalledApplicationError::ExecutablePathChanged)
+        ));
         fixture.remove();
     }
 

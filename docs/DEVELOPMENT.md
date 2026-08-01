@@ -42,7 +42,8 @@ The Rust workspace is under `native/`. It has no third-party runtime
 dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
 `anodrel-wire`, `anodrel-transport`, `anodrel-bootstrap`,
 `anodrel-application`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`,
-`anodrel-windows-policy`, and the Windows host are all source modules. The
+`anodrel-windows-policy`, `anodrel-windows-launch`, and the Windows host are
+all source modules. The
 host calls User32 and Kernel32 directly for its
 window lifecycle and drawing; the pipe adapter uses direct Win32 and CNG APIs
 on a worker thread, while the bootstrap adapter uses an explicit Windows child
@@ -56,6 +57,7 @@ cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-pipe
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-policy
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 ~~~
 
@@ -75,8 +77,9 @@ cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --applica
 
 The window must identify `org.anodrel.sample`, report verified content
 integrity, and display the sample text. Close it normally. This is not a
-packaged process launcher: publisher trust, executable verification, and
-application lifecycle policy remain separate work.
+user-facing packaged process launcher: the host-only registered launch service
+is deliberately separate from this display path until a signed application and
+machine policy record are provisioned.
 
 While that window is open, run the same command a second time. It must not
 create another application window; it waits at most one second for the primary

@@ -19,6 +19,9 @@ anodrel-windows-instance -> Kernel32 / User32
 anodrel-windows-policy -> anodrel-application
                        `-> Advapi32
 
+anodrel-windows-launch -> anodrel-windows-policy / anodrel-windows-signature
+                        -> anodrel-windows-bootstrap / Kernel32
+
 anodrel-json -> anodrel-application -> anodrel-windows-host
 ~~~
 
@@ -46,6 +49,10 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
   from the fixed 64-bit `HKEY_LOCAL_MACHINE` registry location with query-only
   access. It validates that record through `crates/application` but cannot
   provision policy, verify a signature, or launch a process.
+- `adapters/windows-launch` is the host-only registered-process service. It
+  locks the policy-approved executable, revalidates its digest and signer,
+  launches no shell or application arguments, delivers one private bootstrap
+  invitation, and terminates its tracked child during host shutdown.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
   handle-keyed view registry, client-area drawing, and final-window shutdown.
 
@@ -82,6 +89,7 @@ cargo test --manifest-path native/Cargo.toml
 cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json

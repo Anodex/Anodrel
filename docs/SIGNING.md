@@ -58,13 +58,13 @@ directory cannot serve as the trust anchor for its own signer fingerprint.
 Consequently, a future launch policy must obtain the allowed publisher
 fingerprint and application identity from an installation record or
 operating-system package identity outside the mutable application directory.
-`docs/LAUNCH.md` now defines the strict installation-record contract; a trusted
-Windows policy store for those records remains later work.
+`docs/LAUNCH.md` now defines the strict installation-record contract. The
+query-only Windows policy store and host-only launch service consume that
+record, while provisioning a signed application record remains later work.
 
-## Future launch gate
+## Launch gate
 
-The Launch Sample action stays planned until one host-controlled operation
-performs all of the following before CreateProcessW:
+The host-only launch service performs all of the following before CreateProcessW:
 
 1. resolves and contains the executable below the approved package root;
 2. checks its declared SHA-256 digest;
@@ -74,9 +74,12 @@ performs all of the following before CreateProcessW:
 5. creates and tracks the child without shell interpretation; and
 6. uses the existing one-use private bootstrap only after identity validation.
 
-Each failure must be fail-closed, safe to render, and leave no child process.
-The verification work must run off the Win32 UI thread, because Windows trust
-policy can consult certificate and revocation state.
+Each failure is fail-closed, safe to render, and leaves no child process. The
+service locks the executable against write, delete, and rename handles while it
+checks the digest, invokes Windows trust policy, and creates the child. The
+work must run off the Win32 UI thread because Windows trust policy can consult
+certificate and revocation state. A provisioned signed sample and host UI
+integration remain required before Launch Sample can become linked.
 
 ## Logging and privacy
 

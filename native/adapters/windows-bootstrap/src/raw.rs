@@ -207,6 +207,16 @@ pub fn wait_for_exit(process: &OwnedHandle, timeout_milliseconds: u32) -> io::Re
     }
 }
 
+pub fn terminate(process: &OwnedHandle, exit_code: u32) -> io::Result<()> {
+    // SAFETY: process is a valid child process handle, and the caller selects
+    // the bounded host shutdown exit code.
+    if unsafe { TerminateProcess(process.value(), exit_code) } == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
 fn create_bootstrap_pipe() -> io::Result<(OwnedHandle, OwnedHandle)> {
     let attributes = SecurityAttributes {
         length: mem::size_of::<SecurityAttributes>() as Dword,

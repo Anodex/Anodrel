@@ -77,8 +77,10 @@ logon session and requires host-created credentials; a separate direct launcher
 delivers those credentials once through a child-only anonymous standard-input
 handle. Existing TypeScript and React applications remain UI clients through
 the SDK rather than importing native APIs. The first host-validated application
-package is a deliberately limited text surface; publisher trust and executable
-launch remain separate steps.
+package is a deliberately limited text surface. A host-only registered launch
+service separately binds executable digest and publisher policy before it can
+start a process; the Startup Lab does not expose it until a signed application
+is provisioned.
 
 ## Repository map
 
@@ -108,8 +110,9 @@ Anodrel/
 `docs/RENDERER.md` documents the renderer and brand API.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/SIGNING.md` defines the Windows executable-signature foundation.
-`docs/LAUNCH.md` defines the installed application-record contract that will
-bind executable and publisher policy before process launch.
+`docs/LAUNCH.md` defines the installed application-record contract and the
+host-only Windows launch sequence that binds executable and publisher policy
+before process launch.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.

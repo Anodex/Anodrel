@@ -124,12 +124,14 @@ returns only the leaf certificate fingerprint from a successful trust state.
 It neither trusts the mutable package directory nor launches the executable.
 The installed application-record foundation binds the expected executable
 digest and signer fingerprint to a validated package identity in a record
-outside that package. It is not yet a trusted Windows policy store or a launch
-service. The first policy-store adapter reads that record from a fixed,
-machine-wide 64-bit Windows registry location using query access only. Record
-provisioning, immediate pre-launch revalidation, and tracked child lifetime
-remain required before the host can create a product process. See
-`docs/SIGNING.md`, `docs/LAUNCH.md`, and Decisions 0017 through 0019.
+outside that package. The policy-store adapter reads that record only from a
+fixed, machine-wide 64-bit Windows registry location using query access. The
+host-only launch service locks the executable, rechecks containment and digest,
+checks Authenticode and the publisher fingerprint, creates only the exact
+argument-free `.exe`, and returns a child handle that terminates on host
+shutdown. Record provisioning and host UI integration remain required before a
+product process can be launched. See `docs/SIGNING.md`, `docs/LAUNCH.md`, and
+Decisions 0017 through 0020.
 
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only

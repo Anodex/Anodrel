@@ -15,6 +15,7 @@ members = [
   "adapters/windows-instance",
   "adapters/windows-signature",
   "adapters/windows-policy",
+  "adapters/windows-launch",
   "hosts/windows",
 ]
 resolver = "2"

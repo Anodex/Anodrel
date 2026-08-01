@@ -10,6 +10,9 @@ modules for protocol, policy, and framing.
 - `windows-policy` reads one installed application record from a fixed,
   machine-wide registry location with query-only access. It does not provision
   records or launch applications.
+- `windows-launch` is the host-only process service that locks and rechecks a
+  policy-approved executable, verifies its approved signer, launches it with
+  no shell or application arguments, and tracks it for host shutdown.
 
 Adapters must not place application behavior, public protocol definitions, or
 raw OS calls into the platform core.

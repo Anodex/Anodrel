@@ -49,8 +49,8 @@ authority for permissions.
 | A malformed or future message reaches native code. | Validate the envelope, version, operation, and payload at the transport boundary; return only structured safe errors. |
 | An application uses an operation it was not granted. | Check the host capability immediately before executing every privileged operation. |
 | A file operation escapes an approved location. | Canonicalize and validate paths after resolving links; enforce a per-operation scope. |
-| A child process gains arbitrary shell authority or outlives the host. | Expose allowlisted operations, avoid shell interpolation, track child processes, and terminate them during shutdown. |
-| A mutable package substitutes a trusted but unauthorized executable. | Do not treat a package-held manifest or an Authenticode result alone as launch authority; require an external installed application record, contain and digest the executable, then match its verified signer to the record's application-ID-bound publisher fingerprint. |
+| A child process gains arbitrary shell authority or outlives the host. | The launch service supplies only the policy-approved `.exe` with no child arguments or shell, retains a child handle, and terminates it on shutdown. |
+| A mutable package substitutes a trusted but unauthorized executable. | Do not treat a package-held manifest or an Authenticode result alone as launch authority; require an external installed application record, lock the contained executable against write/delete/rename, hash it through that lock, then match its verified signer to the record's application-ID-bound publisher fingerprint. |
 | An application chooses or substitutes its launch policy. | Read the installed record only from the fixed 64-bit `HKEY_LOCAL_MACHINE` policy location selected by the host; accept no current-user, package, environment, protocol, or UI policy source. Require the registry key, record, and validated package to carry the same application ID. |
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
 | A host diagnostic log captures untrusted or sensitive data. | The first log accepts only a closed typed host-event enum; it has no dynamic message, payload, path, error, credential, persistence, export, or protocol input. |
@@ -163,9 +163,10 @@ package trusted. Decision 0018 defines a strict installed application record
 outside the package that binds an application ID, executable digest, and
 approved signer fingerprint. Decision 0019 adds the fixed, read-only,
 machine-wide Windows registry source for that record; it rejects current-user
-and fallback sources. Record provisioning, immediate pre-launch revalidation,
-child tracking, and post-verification bootstrap binding still form the gate for
-the first launch capability.
+and fallback sources. Decision 0020 adds locked pre-launch revalidation,
+tracked child lifetime, and post-verification bootstrap binding. Record
+provisioning and host UI integration remain before the first Launch Sample
+capability becomes available.
 
 ## Before the first privileged capability
 

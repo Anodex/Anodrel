@@ -27,6 +27,14 @@ impl LaunchedProcess {
     pub fn wait_for_exit(&self, timeout_milliseconds: u32) -> io::Result<u32> {
         raw::wait_for_exit(&self.handle, timeout_milliseconds)
     }
+
+    /// Terminates the child with a host-selected exit code.
+    ///
+    /// The bootstrap adapter does not decide when shutdown occurs; a higher
+    /// lifecycle service calls this when its tracked child must stop.
+    pub fn terminate(&self, exit_code: u32) -> io::Result<()> {
+        raw::terminate(&self.handle, exit_code)
+    }
 }
 
 impl fmt::Debug for LaunchedProcess {

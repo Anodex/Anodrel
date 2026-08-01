@@ -92,6 +92,17 @@ name = "anodrel-windows-instance"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-windows-launch"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-bootstrap",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-policy",
+ "anodrel-windows-signature",
+]
+
+[[package]]
 name = "anodrel-windows-pipe"
 version = "0.1.0"
 dependencies = [

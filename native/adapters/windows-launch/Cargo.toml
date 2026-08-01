@@ -1,0 +1,12 @@
+[package]
+name = "anodrel-windows-launch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-bootstrap = { path = "../../crates/bootstrap" }
+anodrel-windows-bootstrap = { path = "../windows-bootstrap" }
+anodrel-windows-policy = { path = "../windows-policy" }
+anodrel-windows-signature = { path = "../windows-signature" }

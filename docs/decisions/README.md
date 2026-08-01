@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0020 — Windows launch requires a locked and revalidated executable.
+
 - 0019 — Installed application policy is read from the machine-wide Windows
   registry.
 

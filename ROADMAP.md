@@ -79,7 +79,10 @@ Status: **Direct Windows host in progress**
   to a validated package identity outside the package directory (Decision
   0018). The direct Windows policy adapter now reads that record only from the
   machine-wide 64-bit registry (Decision 0019). Record provisioning and
-  verified product launch remain required.
+  Startup Lab integration remain required. The direct launch service now locks,
+  revalidates, verifies, and tracks a policy-approved executable before
+  delivering bootstrap material (Decision 0020); it has no installed sample to
+  launch yet.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
