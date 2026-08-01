@@ -53,9 +53,10 @@ objects on session cleanup.
 
 ## Limits and deferred work
 
-The first text reader must define a strict byte limit below the 64 KiB wire
-frame, UTF-8 behavior, regular-file checks, cancellation, and expiry behavior
-before code lands. A selection reference is single-use and the portable store
+The native text reader is limited to **32 KiB** of bytes, requires strict UTF-8,
+and reads only the retained regular-file handle. Its result is still native-only
+until the protocol adds capability checks and cancellation behavior. A selection
+reference is single-use and the portable store
 holds at most 32 live references per session. Binary reads, writes,
 directories, multiple selection, persistent grants, bookmarks, drag-and-drop,
 and cross-session sharing remain deferred.

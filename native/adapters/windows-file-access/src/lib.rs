@@ -14,6 +14,9 @@ use anodrel_file_dialog::SelectedFilePath;
 
 pub use session::{SessionSelectionError, WindowsSessionSelections};
 
+/// Maximum UTF-8 bytes the first selected-file text reader returns.
+pub const MAX_SELECTED_TEXT_BYTES: usize = 32 * 1024;
+
 /// Creates one CNG-backed opaque reference for a selected-file session entry.
 pub fn new_selection_reference() -> Result<SelectionReference, FileAccessError> {
     raw::new_selection_reference().map_err(|_| FileAccessError::Unavailable)
@@ -37,6 +40,18 @@ impl WindowsSelectedFile {
     #[must_use]
     pub fn identity(&self) -> FileIdentity {
         self.0.identity()
+    }
+
+    /// Reads bounded UTF-8 text from this retained Windows file object.
+    pub fn read_text(&mut self) -> Result<String, SelectedTextReadError> {
+        let bytes =
+            raw::read_bounded(&mut self.0, MAX_SELECTED_TEXT_BYTES).map_err(
+                |error| match error {
+                    raw::ReadFailure::TooLarge => SelectedTextReadError::TooLarge,
+                    raw::ReadFailure::Unavailable => SelectedTextReadError::Unavailable,
+                },
+            )?;
+        String::from_utf8(bytes).map_err(|_| SelectedTextReadError::InvalidText)
     }
 }
 
@@ -88,3 +103,22 @@ impl std::fmt::Display for FileAccessError {
 }
 
 impl std::error::Error for FileAccessError {}
+
+/// Safe selected-file text read failure category.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectedTextReadError {
+    /// The retained file could not be read.
+    Unavailable,
+    /// The retained file exceeded the fixed text limit.
+    TooLarge,
+    /// The retained bytes were not valid UTF-8.
+    InvalidText,
+}
+
+impl std::fmt::Display for SelectedTextReadError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("selected file text could not be read")
+    }
+}
+
+impl std::error::Error for SelectedTextReadError {}

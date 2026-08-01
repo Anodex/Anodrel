@@ -47,6 +47,13 @@ unsafe extern "system" {
         template_file: Handle,
     ) -> Handle;
     fn GetFileInformationByHandle(file: Handle, information: *mut ByHandleFileInformation) -> Bool;
+    fn ReadFile(
+        file: Handle,
+        buffer: *mut core::ffi::c_void,
+        bytes_to_read: Dword,
+        bytes_read: *mut Dword,
+        overlapped: *mut core::ffi::c_void,
+    ) -> Bool;
     fn CloseHandle(handle: Handle) -> Bool;
 }
 
@@ -68,6 +75,43 @@ pub(super) struct ReadOnlyFile {
 impl ReadOnlyFile {
     pub(super) const fn identity(&self) -> FileIdentity {
         self.identity
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum ReadFailure {
+    TooLarge,
+    Unavailable,
+}
+
+pub(super) fn read_bounded(file: &mut ReadOnlyFile, limit: usize) -> Result<Vec<u8>, ReadFailure> {
+    let mut output = Vec::with_capacity(limit.min(4096));
+    let mut buffer = [0_u8; 4096];
+    loop {
+        let remaining = limit.saturating_add(1).saturating_sub(output.len());
+        let requested = remaining.min(buffer.len());
+        let mut read = 0_u32;
+        let success = unsafe {
+            // SAFETY: the retained handle remains live, buffer is writable for
+            // requested bytes, and this is a synchronous read with no OVERLAPPED state.
+            ReadFile(
+                file.handle,
+                buffer.as_mut_ptr().cast(),
+                requested as Dword,
+                &mut read,
+                ptr::null_mut(),
+            )
+        };
+        if success == 0 {
+            return Err(ReadFailure::Unavailable);
+        }
+        if read == 0 {
+            return Ok(output);
+        }
+        output.extend_from_slice(&buffer[..read as usize]);
+        if output.len() > limit {
+            return Err(ReadFailure::TooLarge);
+        }
     }
 }
 
@@ -182,7 +226,9 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::{base64url_128, new_selection_reference, open_selected_file};
+    use super::{
+        ReadFailure, base64url_128, new_selection_reference, open_selected_file, read_bounded,
+    };
 
     #[test]
     fn rejects_relative_paths_before_calling_windows() {
@@ -218,5 +264,29 @@ mod tests {
     fn encodes_128_bits_as_unpadded_base64url() {
         assert_eq!(base64url_128(&[0; 16]), "AAAAAAAAAAAAAAAAAAAAAA");
         assert_eq!(base64url_128(&[255; 16]), "_____________________w");
+    }
+
+    #[test]
+    fn reads_only_a_bounded_retained_file() {
+        let path = std::env::temp_dir().join(format!(
+            "anodrel-selected-read-{}-{}.txt",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("time is valid")
+                .as_nanos(),
+        ));
+        std::fs::write(&path, b"retained text").expect("fixture is written");
+        let mut file = open_selected_file(&path).expect("fixture is captured");
+        assert_eq!(
+            read_bounded(&mut file, 32).expect("fixture is read"),
+            b"retained text"
+        );
+        drop(file);
+        std::fs::write(&path, b"0123456789").expect("fixture is replaced");
+        let mut file = open_selected_file(&path).expect("fixture is captured");
+        assert_eq!(read_bounded(&mut file, 4), Err(ReadFailure::TooLarge));
+        drop(file);
+        std::fs::remove_file(&path).expect("fixture is removed");
     }
 }
