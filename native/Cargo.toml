@@ -10,12 +10,14 @@ members = [
   "crates/transport",
   "crates/bootstrap",
   "crates/application",
+  "crates/paths",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-instance",
   "adapters/windows-signature",
   "adapters/windows-policy",
   "adapters/windows-launch",
+  "adapters/windows-paths",
   "hosts/windows",
 ]
 resolver = "2"

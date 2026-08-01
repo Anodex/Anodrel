@@ -22,6 +22,9 @@ anodrel-windows-policy -> anodrel-application
 anodrel-windows-launch -> anodrel-windows-policy / anodrel-windows-signature
                         -> anodrel-windows-bootstrap / Kernel32
 
+anodrel-paths -> anodrel-application
+anodrel-windows-paths -> anodrel-paths -> Shell32 / Ole32
+
 anodrel-json -> anodrel-application -> anodrel-windows-host
 ~~~
 
@@ -53,6 +56,12 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
   locks the policy-approved executable, revalidates its digest and signer,
   launches no shell or application arguments, delivers one private bootstrap
   invitation, and terminates its tracked child during host shutdown.
+- `crates/paths` derives fixed per-application `data`, `cache`, and `logs`
+  locations without filesystem I/O from a validated identity and an absolute
+  operating-system root.
+- `adapters/windows-paths` reads only the current user's Local AppData known
+  folder through Shell32, then delegates the directory layout to `crates/paths`.
+  It does not create, read, enumerate, or expose a directory to an application.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
   handle-keyed view registry, client-area drawing, and final-window shutdown.
 
@@ -63,7 +72,9 @@ native bridge, or privileged platform service. Its named-pipe adapter and
 bootstrap launcher can deliver a private invitation to a child process. The
 Windows host's development-only sample launches the compiled Node client to
 prove the real authenticated health path. Publisher trust, executable launch,
-and a capability bridge still require separate threat-model work.
+and a capability bridge still require separate threat-model work. The
+host-only registered launch service is separate from the visual surface until
+a signed application record is provisioned.
 
 `--showcase <manifest>` opens the Anodrel Startup Lab. Before any window is
 created, it loads the supplied package, performs the internal protocol health
@@ -90,6 +101,7 @@ cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json

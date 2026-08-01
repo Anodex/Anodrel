@@ -13,6 +13,9 @@ modules for protocol, policy, and framing.
 - `windows-launch` is the host-only process service that locks and rechecks a
   policy-approved executable, verifies its approved signer, launches it with
   no shell or application arguments, and tracks it for host shutdown.
+- `windows-paths` reads the current user's Windows Local AppData known folder
+  and derives host-only application directories through the portable path
+  layout. It performs no filesystem mutation or public protocol operation.
 
 Adapters must not place application behavior, public protocol definitions, or
 raw OS calls into the platform core.

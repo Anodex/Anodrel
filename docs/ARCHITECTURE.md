@@ -133,6 +133,14 @@ shutdown. Record provisioning and host UI integration remain required before a
 product process can be launched. See `docs/SIGNING.md`, `docs/LAUNCH.md`, and
 Decisions 0017 through 0020.
 
+The Windows paths adapter reads the current user's Local AppData known folder
+and passes it to a portable layout builder. That builder derives fixed
+per-application `data`, `cache`, and `logs` locations solely from the validated
+application identity; it never creates, enumerates, or exposes those paths to
+the protocol. Storage and logging services will define their own permission,
+creation, and recovery rules on top of this layout. See `docs/PATHS.md` and
+Decision 0021.
+
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only
 after the final registered window closes. The `--window-lab` diagnostic proves

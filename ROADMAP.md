@@ -66,6 +66,10 @@ Status: **Direct Windows host in progress**
   lifted from the platform text engine, a run-time generated window icon, and
   per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
+  **Completed for the path foundation:** host-only per-application `data`,
+  `cache`, and `logs` locations derived from a validated identity and the
+  current user's Windows Local AppData root (Decision 0021). Filesystem
+  access, directory creation, and a public storage protocol remain deferred.
 - Implement secure credential storage through the operating system.
 - Add logging, crash reporting boundaries, and shutdown behavior. **Completed
   for the first in-memory diagnostic log:** a bounded closed event

@@ -113,6 +113,7 @@ Anodrel/
 `docs/LAUNCH.md` defines the installed application-record contract and the
 host-only Windows launch sequence that binds executable and publisher policy
 before process launch.
+`docs/PATHS.md` defines the host-owned per-application directory layout.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
