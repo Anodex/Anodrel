@@ -213,12 +213,14 @@ keeps host-layout-derived actions bounded until the authenticated
 `ui.events.read` pull validates them. The development-only Windows UI Session
 Lab consumes both supplied mailboxes in one host-created view; it is not a
 public window capability and delivers no native command. None of these crates
-has operating-system authority. The
+has operating-system authority. A separate coalescing close signal lets the
+host end only that same authenticated session after a capability-checked
+request; it carries no window target or native handle. The
 host remains responsible for text measurement, mapping appearance roles to an
 actual visual system, rendering, input delivery, operating-system accessibility
 and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`, and
-Decisions 0025 through 0035.
+Decisions 0025 through 0036.
 
 ## Communication model
 

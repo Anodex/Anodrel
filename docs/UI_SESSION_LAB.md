@@ -34,5 +34,8 @@ revision-and-action candidates. The sample client reads them through
 `ui.events.read`, which revalidates them in the authenticated session before
 returning a `ui.action.invoked` event. An action still has no native operation
 or capability meaning. The lab has no accessibility adapter, unsolicited event
-delivery, callback, or background task. See `docs/UI_SESSIONS.md`,
-`docs/TRANSPORT.md`, and Decision 0035.
+delivery, callback, or background task. Its development sample can request a
+close only for that same authenticated session through the separate
+`session.close` capability; the UI thread observes that host-owned signal and
+closes its one lab window. See `docs/UI_SESSIONS.md`, `docs/TRANSPORT.md`, and
+Decisions 0035 and 0036.

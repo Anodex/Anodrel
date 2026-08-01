@@ -8,7 +8,7 @@
 
 use std::fmt;
 
-use anodrel_core::{CoreHost, HostPolicy};
+use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
 use anodrel_protocol::{JsonValue, object};
 pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
@@ -169,9 +169,26 @@ impl TransportSession {
         ui_document_mailbox: UiDocumentMailbox,
         ui_input_mailbox: UiInputMailbox,
     ) -> Self {
+        Self::with_session_components(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            SessionCloseSignal::default(),
+        )
+    }
+
+    /// Creates one session with explicit native UI and lifecycle components.
+    pub fn with_session_components(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_ui_input_mailbox(policy, ui_input_mailbox),
+            host: CoreHost::with_session_components(policy, ui_input_mailbox, session_close_signal),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),
         }
@@ -319,6 +336,10 @@ mod tests {
 
     fn ui_events_read_request() -> String {
         r#"{"protocolVersion":{"major":1,"minor":2},"kind":"request","requestId":"ui-events","operation":"ui.events.read","payload":{}}"#.to_owned()
+    }
+
+    fn session_close_request() -> String {
+        r#"{"protocolVersion":{"major":1,"minor":3},"kind":"request","requestId":"session-close","operation":"session.close","payload":{}}"#.to_owned()
     }
 
     fn decode_response(frame: &[u8]) -> JsonValue {
@@ -484,9 +505,7 @@ mod tests {
             .receive(&encode_json(&ui_events_read_request()).expect("request encodes"))
             .expect("event read succeeds");
         let decoded = decode_response(&response[0]);
-        let result = &decoded
-            .as_object()
-            .expect("response object")["result"];
+        let result = &decoded.as_object().expect("response object")["result"];
         let JsonValue::Array(events) = &result.as_object().expect("result object")["events"] else {
             panic!("events array");
         };
@@ -495,6 +514,41 @@ mod tests {
             events[0].as_object().expect("event object")["eventName"].as_string(),
             Some("ui.action.invoked")
         );
+    }
+
+    #[test]
+    fn returns_a_close_response_before_the_host_consumes_its_session_signal() {
+        let close_signal = SessionCloseSignal::default();
+        let mut transport = TransportSession::with_session_components(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::SessionClose],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            close_signal.clone(),
+        );
+        authenticate(&mut transport);
+
+        let response = transport
+            .receive(&encode_json(&session_close_request()).expect("request encodes"))
+            .expect("close response is returned");
+        let decoded = decode_response(&response[0]);
+        assert_eq!(
+            decoded.as_object().expect("response object")["status"].as_string(),
+            Some("success")
+        );
+        assert_eq!(
+            decoded.as_object().expect("response object")["result"]
+                .as_object()
+                .expect("result object")["status"]
+                .as_string(),
+            Some("accepted")
+        );
+        assert!(close_signal.take());
     }
 
     #[test]

@@ -24,6 +24,7 @@ mod ui_session_view;
 use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
+use anodrel_core::SessionCloseSignal;
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
@@ -452,14 +453,22 @@ pub fn run_ui_preview(document: UiDocument) -> io::Result<()> {
 /// Opens one host-controlled native view that consumes exactly one authenticated
 /// session's mailboxes. Actions enter only the bounded semantic-input mailbox
 /// and remain incapable of native operations in this diagnostic.
-pub fn run_ui_session(mailbox: UiDocumentMailbox, input_mailbox: UiInputMailbox) -> io::Result<()> {
+pub fn run_ui_session(
+    mailbox: UiDocumentMailbox,
+    input_mailbox: UiInputMailbox,
+    close_signal: SessionCloseSignal,
+) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
         vec![WindowDefinition {
             title: "Anodrel UI Session Lab".to_owned(),
             width: (920.0 * scale) as i32,
             height: (660.0 * scale) as i32,
-            view: View::UiSession(ui_session_view::UiSessionView::new(mailbox, input_mailbox)),
+            view: View::UiSession(ui_session_view::UiSessionView::new(
+                mailbox,
+                input_mailbox,
+                close_signal,
+            )),
         }],
         None,
     )
@@ -1168,8 +1177,18 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_TIMER if wparam == UI_SESSION_TIMER => {
-            if registry::poll_ui_session(window).ok().flatten() == Some(true) {
-                invalidate(window);
+            if let Some((changed, close_requested)) =
+                registry::poll_ui_session(window).ok().flatten()
+            {
+                if close_requested {
+                    // SAFETY: the request is consumed only by this window's UI
+                    // thread, which owns the host-created native handle.
+                    unsafe { DestroyWindow(window) };
+                    return 0;
+                }
+                if changed {
+                    invalidate(window);
+                }
             }
             0
         }

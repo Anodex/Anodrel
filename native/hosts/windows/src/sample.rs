@@ -5,7 +5,7 @@
 
 use std::{error::Error, io, thread};
 
-use anodrel_core::HostPolicy;
+use anodrel_core::{HostPolicy, SessionCloseSignal};
 use anodrel_protocol::Capability;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
@@ -22,13 +22,18 @@ pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
 pub fn run_ui_session(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
     let mailbox = UiDocumentMailbox::new();
     let input_mailbox = UiInputMailbox::new();
-    run_with_optional_session_view(node_path, client_path, Some((mailbox, input_mailbox)))
+    let close_signal = SessionCloseSignal::default();
+    run_with_optional_session_view(
+        node_path,
+        client_path,
+        Some((mailbox, input_mailbox, close_signal)),
+    )
 }
 
 fn run_with_optional_session_view(
     node_path: &str,
     client_path: &str,
-    mailboxes: Option<(UiDocumentMailbox, UiInputMailbox)>,
+    mailboxes: Option<(UiDocumentMailbox, UiInputMailbox, SessionCloseSignal)>,
 ) -> Result<(), Box<dyn Error>> {
     let policy = HostPolicy::new(
         "anodrel.sample",
@@ -36,16 +41,20 @@ fn run_with_optional_session_view(
             Capability::DiagnosticsRead,
             Capability::UiDocumentWrite,
             Capability::UiEventsRead,
+            Capability::SessionClose,
         ],
         "anodrel-windows-host",
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
-        Some((mailbox, input_mailbox)) => WindowsPipeServer::create_with_ui_mailboxes(
-            policy,
-            "sample-session",
-            mailbox.clone(),
-            input_mailbox.clone(),
-        )?,
+        Some((mailbox, input_mailbox, close_signal)) => {
+            WindowsPipeServer::create_with_session_components(
+                policy,
+                "sample-session",
+                mailbox.clone(),
+                input_mailbox.clone(),
+                close_signal.clone(),
+            )?
+        }
         None => WindowsPipeServer::create(policy, "sample-session")?,
     };
     let bootstrap = invitation.bootstrap_invitation()?;
@@ -59,8 +68,8 @@ fn run_with_optional_session_view(
         BootstrapCommand::new(node_path)?.arg(client_path)?
     };
     let child = launch(&command, &bootstrap)?;
-    if let Some((mailbox, input_mailbox)) = mailboxes {
-        crate::win32::run_ui_session(mailbox, input_mailbox)?;
+    if let Some((mailbox, input_mailbox, close_signal)) = mailboxes {
+        crate::win32::run_ui_session(mailbox, input_mailbox, close_signal)?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;
     if exit_code != 0 {

@@ -83,6 +83,29 @@ test("UI event reads require a host-issued grant", async () => {
   );
 });
 
+test("SDK and host agree on a granted session close request", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["session.close"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.closeSession(), { status: "accepted" });
+});
+
+test("session close requires a host-issued grant", async () => {
+  const host = new MockHost({ applicationId: "test.application" });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  await assert.rejects(
+    () => client.closeSession(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "session.close",
+  );
+});
+
 test("host derives grants from policy and ignores a forged request context", async () => {
   const host = new MockHost({ applicationId: "test.application", now: fixedTime });
   const request = {

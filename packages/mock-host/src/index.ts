@@ -227,6 +227,31 @@ export class MockHost {
           discarded: 0,
         });
 
+      case "session.close":
+        if (request.protocolVersion.minor < 3) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "session.close requires protocol 1.3 or later.",
+          );
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "session.close does not accept a payload.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "session.close")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "session.close requires the session.close capability.",
+            { capability: "session.close" },
+          );
+        }
+        return this.success("session.close", request.requestId, { status: "accepted" });
+
       default:
         return this.failure(
           request.requestId,

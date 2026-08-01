@@ -12,7 +12,7 @@ mod security;
 use std::{fmt, io, thread, time::Duration};
 
 use anodrel_bootstrap::BootstrapInvitation;
-use anodrel_core::HostPolicy;
+use anodrel_core::{HostPolicy, SessionCloseSignal};
 use anodrel_transport::{
     SessionCredentials, TransportSession, UiDocumentMailbox, UiInputMailbox, authentication_message,
 };
@@ -203,6 +203,23 @@ impl WindowsPipeServer {
         ui_document_mailbox: UiDocumentMailbox,
         ui_input_mailbox: UiInputMailbox,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_session_components(
+            policy,
+            session_id,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            SessionCloseSignal::default(),
+        )
+    }
+
+    /// Creates one endpoint with explicit native UI and lifecycle components.
+    pub fn create_with_session_components(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+    ) -> io::Result<(Self, SessionInvitation)> {
         let session_id = session_id.into();
         let pipe_name = format!(r"\\.\pipe\anodrel.v1.{}", random_hex()?);
         let token = random_hex()?;
@@ -219,11 +236,12 @@ impl WindowsPipeServer {
         Ok((
             Self {
                 handle,
-                session: TransportSession::with_ui_mailboxes(
+                session: TransportSession::with_session_components(
                     policy,
                     credentials,
                     ui_document_mailbox,
                     ui_input_mailbox,
+                    session_close_signal,
                 ),
             },
             SessionInvitation {

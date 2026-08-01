@@ -10,8 +10,9 @@ controls a Windows native host must satisfy; it does not claim that the current
 in-memory mock provides operating-system isolation.
 
 The current operations are `platform.ping`, `platform.capabilities`,
-`platform.health`, `ui.document.replace`, and `ui.events.read`. They expose no
-filesystem, process, credential, window, or network authority.
+`platform.health`, `ui.document.replace`, `ui.events.read`, and
+`session.close`. They expose no filesystem, process, credential, window, or
+network authority.
 
 ## Assets to protect
 
@@ -71,6 +72,7 @@ authority for permissions.
 | A pipe worker manipulates a native window or a session document drives another window. | Give a UI Session Lab exactly one mailbox and poll it only from its own Windows UI thread; accept only a newer revision into that one view. The pipe worker never calls User32, and session documents have no window-selection field. |
 | A stale or forged UI action reaches application logic. | The UI thread queues only a revision and action ID from its current host-rendered layout. `ui.events.read` checks the host-issued `ui.events.read` grant, then revalidates each candidate against the current session document and enabled action before delivery; stale or unavailable candidates are counted and discarded. |
 | UI input exhausts memory or silently loses state. | Keep a per-session queue of 32 candidates. Drop newer candidates only when full and report the exact dropped count on the next `ui.events.read`; return a separate discarded count for stale or unavailable actions. |
+| An application closes another window or turns a close request into process control. | Accept `session.close` only from the authenticated session carrying its host-issued `session.close` grant. Carry no target or native handle, coalesce it into one host-owned signal, and let the host UI or lifecycle owner decide and perform cleanup. |
 | Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
 | A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
 | Two native windows render each other's state or one close ends the host early. | Keep immutable host-created views in a handle-keyed registry and exit the UI loop only after the final registered window is destroyed. |

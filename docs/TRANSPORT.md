@@ -109,6 +109,13 @@ returning event envelopes, dropped-input count, and discarded-stale count.
 The mailbox has no pointer coordinates, renderer work, callback, pipe I/O, or
 native authority.
 
+For a host that chooses to support caller-initiated session termination, the
+transport can also receive one host-owned `SessionCloseSignal`. A successful,
+capability-checked `session.close` request sets only that one coalescing bit.
+The transport returns its ordinary response; it neither destroys a window nor
+terminates a process. The host UI or lifecycle owner polls the signal and
+performs any resource cleanup for its one known session.
+
 The invitation is sensitive bootstrap material. It must not pass through
 command-line arguments, environment variables, logs, or a predictable on-disk
 location.

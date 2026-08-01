@@ -78,7 +78,8 @@ Status: **Direct Windows host in progress**
   its latest accepted snapshot through a bounded per-session mailbox. The
   development-only Windows UI Session Lab consumes one mailbox in one native
   view, and version-bound pointer/keyboard actions are delivered through a
-  bounded authenticated pull operation. It has no product lifecycle.
+  bounded authenticated pull operation. A capability-gated request can signal
+  close only for that same host-owned session. It has no product lifecycle.
   Operating-system accessibility adapters, scrolling, public window lifecycle,
   subscriptions, and broader action-event transport remain separate gates.
 - Establish repeatable native performance measurements. **Completed for the

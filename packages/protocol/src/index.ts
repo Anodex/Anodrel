@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 2 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 3 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -15,7 +15,11 @@ export interface ProtocolVersion {
 }
 
 /** Capabilities are granted by the host policy, never by rendered application content. */
-export type Capability = "diagnostics.read" | "ui.document.write" | "ui.events.read";
+export type Capability =
+  | "diagnostics.read"
+  | "ui.document.write"
+  | "ui.events.read"
+  | "session.close";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -50,6 +54,10 @@ export interface PlatformOperationMap {
       readonly dropped: number;
       readonly discarded: number;
     };
+  };
+  "session.close": {
+    readonly payload: EmptyPayload;
+    readonly result: { readonly status: "accepted" };
   };
 }
 

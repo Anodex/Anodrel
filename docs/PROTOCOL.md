@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.2
+**Status:** Foundation contract, version 1.3
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.2 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 2}`.
+the host's. Version 1.3 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 3}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -62,6 +62,7 @@ The current operations are:
 | `platform.health` | `{}` | ready status, host name, and version | `diagnostics.read` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
+| `session.close` | `{}` | accepted close request | `session.close` |
 
 ### `ui.document.replace`
 
@@ -122,6 +123,21 @@ replacement. `action` is the document-unique enabled action element ID; it has
 no command, callback, native operation, or capability meaning. Reading events
 does not grant additional authority and never returns document content, paths,
 credentials, or native diagnostics.
+
+### `session.close`
+
+This operation requests that the host end only the caller's already
+authenticated session. It requires the host-issued `session.close` capability,
+takes exactly `{}`, and returns `{ "status": "accepted" }` when the request
+has entered the host's one-bit close signal. The response is not evidence that
+a native window has been destroyed or that a process has exited.
+
+The operation carries no window identity, title, geometry, process identifier,
+reason string, callback, or target selector. The host alone decides which
+resources belong to this session and performs any operating-system cleanup on
+its own UI or lifecycle thread. A repeated request is harmless and remains
+accepted. The close signal is a coalescing one-bit state, not a queue, event,
+subscription, or general window-management API.
 
 ### Request example
 

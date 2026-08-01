@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 2;
+pub const PROTOCOL_MINOR: u16 = 3;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -45,6 +45,7 @@ pub enum Capability {
     DiagnosticsRead,
     UiDocumentWrite,
     UiEventsRead,
+    SessionClose,
 }
 
 impl Capability {
@@ -53,6 +54,7 @@ impl Capability {
             Self::DiagnosticsRead => "diagnostics.read",
             Self::UiDocumentWrite => "ui.document.write",
             Self::UiEventsRead => "ui.events.read",
+            Self::SessionClose => "session.close",
         }
     }
 }

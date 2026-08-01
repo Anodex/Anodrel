@@ -41,7 +41,12 @@ async function run(): Promise<number> {
     }
 
     if (process.argv.includes("--wait-for-ui-event")) {
-      return waitForSampleAction(client, update.revision);
+      const eventResult = await waitForSampleAction(client, update.revision);
+      if (eventResult !== 0) {
+        return eventResult;
+      }
+      const close = await client.closeSession();
+      return close.status === "accepted" ? 0 : 17;
     }
     return 0;
   } catch {

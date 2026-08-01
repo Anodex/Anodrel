@@ -9,6 +9,10 @@
 use std::{
     cell::RefCell,
     collections::BTreeMap,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -20,6 +24,27 @@ use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
+
+/// One host-created, coalescing request to end an authenticated session.
+///
+/// This value stores no target, payload, callback, or operating-system state.
+/// The native host that supplied it decides which resources to close.
+#[derive(Clone, Debug, Default)]
+pub struct SessionCloseSignal {
+    requested: Arc<AtomicBool>,
+}
+
+impl SessionCloseSignal {
+    /// Records an idempotent request for the host to end its known session.
+    pub fn request(&self) {
+        self.requested.store(true, Ordering::Release);
+    }
+
+    /// Takes one pending close request, if any.
+    pub fn take(&self) -> bool {
+        self.requested.swap(false, Ordering::AcqRel)
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct HostPolicy {
@@ -63,21 +88,32 @@ pub struct CoreHost {
     policy: HostPolicy,
     ui_document_session: RefCell<UiDocumentSession>,
     ui_input_mailbox: UiInputMailbox,
+    session_close_signal: SessionCloseSignal,
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
 }
 
 impl CoreHost {
     pub fn new(policy: HostPolicy) -> Self {
-        Self::with_ui_input_mailbox(policy, UiInputMailbox::new())
+        Self::with_session_components(policy, UiInputMailbox::new(), SessionCloseSignal::default())
     }
 
     /// Creates a host core that validates semantic input from one supplied
     /// per-session mailbox.
     pub fn with_ui_input_mailbox(policy: HostPolicy, ui_input_mailbox: UiInputMailbox) -> Self {
+        Self::with_session_components(policy, ui_input_mailbox, SessionCloseSignal::default())
+    }
+
+    /// Creates a host core with explicit native input and session-close signals.
+    pub fn with_session_components(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
             ui_input_mailbox,
+            session_close_signal,
             pending_ui_document_update: RefCell::new(None),
         }
     }
@@ -140,6 +176,9 @@ impl CoreHost {
             }
             "ui.events.read" if request.protocol_version.minor >= 2 => {
                 self.handle_ui_events_read(request)
+            }
+            "session.close" if request.protocol_version.minor >= 3 => {
+                self.handle_session_close(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -332,6 +371,34 @@ impl CoreHost {
         )
     }
 
+    fn handle_session_close(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "session.close does not accept a payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::SessionClose) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::CapabilityDenied,
+                "session.close requires the session.close capability.",
+                Some(BTreeMap::from([(
+                    "capability".to_owned(),
+                    JsonValue::String("session.close".to_owned()),
+                )])),
+            );
+        }
+        self.session_close_signal.request();
+        ResponseEnvelope::success(
+            request.request_id,
+            &self.policy.host_name,
+            object([("status", JsonValue::String("accepted".to_owned()))]),
+        )
+    }
+
     fn failure(
         &self,
         request_id: String,
@@ -444,6 +511,12 @@ mod tests {
     fn request_v1_2(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":2}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_3(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":3}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -624,6 +697,47 @@ mod tests {
         assert_eq!(
             field(field(&stale, "result"), "discarded"),
             &JsonValue::Number("1".to_owned())
+        );
+    }
+
+    #[test]
+    fn accepts_only_a_granted_current_protocol_session_close_request() {
+        let signal = SessionCloseSignal::default();
+        let close_host = CoreHost::with_session_components(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::SessionClose],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            UiInputMailbox::new(),
+            signal.clone(),
+        );
+        let accepted =
+            JsonValue::parse(&close_host.handle_json(&request_v1_3("session.close", "{}")))
+                .expect("response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "status").as_string(),
+            Some("accepted")
+        );
+        assert!(signal.take());
+        assert!(!signal.take());
+
+        let denied =
+            JsonValue::parse(&host(vec![]).handle_json(&request_v1_3("session.close", "{}")))
+                .expect("response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let old_minor =
+            JsonValue::parse(&close_host.handle_json(&request_v1_2("session.close", "{}")))
+                .expect("response is JSON");
+        assert_eq!(
+            field(field(&old_minor, "error"), "code").as_string(),
+            Some("operation.unsupported")
         );
     }
 

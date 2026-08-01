@@ -68,6 +68,10 @@ export class PlatformClient {
     return this.request("ui.events.read", {});
   }
 
+  closeSession(): Promise<ResultFor<"session.close">> {
+    return this.request("session.close", {});
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,
