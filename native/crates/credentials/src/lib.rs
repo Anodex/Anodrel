@@ -27,6 +27,7 @@ pub enum CredentialInputError {
     InvalidCredentialName,
     EmptySecret,
     SecretTooLarge,
+    InvalidSecretEncoding,
     InvalidApplicationIdentity,
 }
 
@@ -36,6 +37,7 @@ impl fmt::Display for CredentialInputError {
             Self::InvalidCredentialName => "credential name is invalid",
             Self::EmptySecret => "credential secret is empty",
             Self::SecretTooLarge => "credential secret exceeds its limit",
+            Self::InvalidSecretEncoding => "credential secret encoding is invalid",
             Self::InvalidApplicationIdentity => "application identity is invalid for credentials",
         };
         formatter.write_str(message)

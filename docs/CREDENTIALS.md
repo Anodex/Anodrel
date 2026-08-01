@@ -40,6 +40,12 @@ below Windows Credential Manager's generic credential-blob limit. Secret and
 target debug output is redacted; errors never include a target, application ID,
 secret, raw Windows status, or current-user information.
 
+The portable secret type can convert arbitrary bytes to and from exact
+lowercase hexadecimal for a future explicitly authenticated protocol boundary.
+The encoding is canonical (two lowercase characters per byte), bounded to
+4,096 characters, and accepts no whitespace or alternate spelling. It does not
+itself create a public credential operation or relax the secret-handling rules.
+
 ## Windows behavior
 
 The adapter always uses `CRED_TYPE_GENERIC` and `CRED_PERSIST_LOCAL_MACHINE`.
