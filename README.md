@@ -149,6 +149,8 @@ contract.
 `docs/WINDOW_LIFECYCLE.md` defines the multi-window host foundation.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
+`docs/APPEARANCE.md` defines the direct Windows high-contrast appearance
+adapter used by the native interactive UI labs.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows

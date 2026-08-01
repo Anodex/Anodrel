@@ -163,6 +163,11 @@ own diagnostic reading or viewport position: it does not open a process, read
 a file, send a protocol message, or grant a capability. It is a renderer-and-
 input test, not an application UI API.
 
+When Windows high-contrast mode is enabled, the UI Lab and authenticated
+UI-session view map those same semantic roles to a narrow direct system-colour
+set. The portable document does not gain colours, a theme field, setting access,
+or a subscription as a result. See `docs/APPEARANCE.md` and Decision 0055.
+
 ## Verification
 
 The portable crate tests ID validation and every document resource limit,

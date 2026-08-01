@@ -6,13 +6,14 @@
 //! process, reads a file, sends a protocol message, or grants a capability.
 
 use anodrel_brand::palette;
-use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
+use anodrel_canvas::{Canvas, Color, Paint, Point, Rect, point};
 use anodrel_ui::{
     Action, Axis, ElementId, Insets, Scroll, Stack, Text, TextMeasurer, UiActionTone, UiDocument,
     UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollWheel, UiSize,
     UiSurfaceTone, UiTextTone,
 };
 use anodrel_ui_document::decode;
+use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
 
 use super::text;
 use super::text::{Align, TextSpec};
@@ -261,7 +262,12 @@ impl UiLab {
 
 /// Draws the UI Lab into one full Anodrel canvas.
 pub(super) fn draw(canvas: &mut Canvas, lab: &UiLab) {
-    canvas.clear(palette::BACKDROP);
+    let palette = UiLabPalette::current();
+    draw_with_palette(canvas, lab, palette);
+}
+
+fn draw_with_palette(canvas: &mut Canvas, lab: &UiLab, palette: UiLabPalette) {
+    canvas.clear(palette.backdrop);
     let surface = Surface::new(canvas.width() as f32, canvas.height() as f32);
     let layout = lab.layout(canvas.width() as f32, canvas.height() as f32);
     let status = status_text(lab);
@@ -273,7 +279,78 @@ pub(super) fn draw(canvas: &mut Canvas, lab: &UiLab) {
         surface,
         lab.status_target.as_ref(),
         status.as_deref(),
+        palette,
     );
+}
+
+/// Concrete host colours for one UI-Lab paint pass.
+///
+/// The portable UI document chooses only semantic roles. Windows chooses this
+/// palette, substituting direct system colours only while high contrast is on.
+#[derive(Clone, Copy)]
+struct UiLabPalette {
+    backdrop: Color,
+    backdrop_lift: Color,
+    panel: Color,
+    panel_raised: Color,
+    panel_edge: Color,
+    ink: Color,
+    ink_soft: Color,
+    accent_shell: Color,
+    accent_core: Color,
+    accent_ipc: Color,
+    accent_text: Color,
+    button_text: Color,
+}
+
+impl UiLabPalette {
+    fn current() -> Self {
+        let appearance = SystemAppearance::current();
+        if appearance.high_contrast() {
+            return Self::high_contrast(appearance.colors());
+        }
+        Self {
+            backdrop: palette::BACKDROP,
+            backdrop_lift: palette::BACKDROP_LIFT,
+            panel: palette::PANEL,
+            panel_raised: palette::PANEL_RAISED,
+            panel_edge: palette::PANEL_EDGE,
+            ink: palette::INK,
+            ink_soft: palette::INK_SOFT,
+            accent_shell: palette::ACCENT_SHELL,
+            accent_core: palette::ACCENT_CORE,
+            accent_ipc: palette::ACCENT_IPC,
+            accent_text: palette::INK,
+            button_text: palette::INK,
+        }
+    }
+
+    fn high_contrast(colors: SystemColors) -> Self {
+        let window = color(colors.window);
+        let window_text = color(colors.window_text);
+        let button_face = color(colors.button_face);
+        let button_text = color(colors.button_text);
+        let highlight = color(colors.highlight);
+        let highlight_text = color(colors.highlight_text);
+        Self {
+            backdrop: window,
+            backdrop_lift: button_face,
+            panel: button_face,
+            panel_raised: button_face,
+            panel_edge: window_text,
+            ink: window_text,
+            ink_soft: window_text,
+            accent_shell: highlight,
+            accent_core: highlight,
+            accent_ipc: highlight_text,
+            accent_text: highlight_text,
+            button_text,
+        }
+    }
+}
+
+const fn color(value: Rgb) -> Color {
+    Color::rgb(value.red, value.green, value.blue)
 }
 
 /// Base-space layout and its scale into a real client area.
@@ -328,6 +405,9 @@ impl TextMeasurer for WindowsTextMeasurer {
     }
 }
 
+// Recursive rendering takes the exact immutable state for one paint pass.
+// Keeping those dependencies visible prevents a process-global render context.
+#[allow(clippy::too_many_arguments)]
 fn draw_node(
     canvas: &mut Canvas,
     lab: &UiLab,
@@ -336,6 +416,7 @@ fn draw_node(
     surface: Surface,
     status_target: Option<&ElementId>,
     status: Option<&str>,
+    palette: UiLabPalette,
 ) {
     let Some(item) = layout.items().iter().find(|item| item.id() == node.id()) else {
         return;
@@ -348,17 +429,26 @@ fn draw_node(
                 canvas.fill_rounded_rect(
                     bounds,
                     16.0 * surface.scale,
-                    &Paint::solid(palette::PANEL),
+                    &Paint::solid(palette.panel),
                 );
                 canvas.stroke_rounded_rect(
                     bounds,
                     16.0 * surface.scale,
                     1.0 * surface.scale,
-                    &Paint::solid(palette::PANEL_EDGE),
+                    &Paint::solid(palette.panel_edge),
                 );
             }
             for child in stack.children() {
-                draw_node(canvas, lab, layout, child, surface, status_target, status);
+                draw_node(
+                    canvas,
+                    lab,
+                    layout,
+                    child,
+                    surface,
+                    status_target,
+                    status,
+                    palette,
+                );
             }
         }
         UiNode::Scroll(scroll) => {
@@ -371,13 +461,22 @@ fn draw_node(
                 surface,
                 status_target,
                 status,
+                palette,
             );
             canvas.draw_canvas_clipped(&content, 0, 0, 1.0, surface.to_canvas_rect(item.bounds()));
         }
         UiNode::Text(text_node) => {
-            draw_text(canvas, text_node, bounds, surface, status_target, status);
+            draw_text(
+                canvas,
+                text_node,
+                bounds,
+                surface,
+                status_target,
+                status,
+                palette,
+            );
         }
-        UiNode::Action(action) => draw_action(canvas, lab, action, bounds, surface),
+        UiNode::Action(action) => draw_action(canvas, lab, action, bounds, surface, palette),
     }
 }
 
@@ -388,6 +487,7 @@ fn draw_text(
     surface: Surface,
     status_target: Option<&ElementId>,
     status: Option<&str>,
+    palette: UiLabPalette,
 ) {
     let value = if status_target.is_some_and(|target| target == text_node.id()) {
         status.unwrap_or(text_node.value())
@@ -395,9 +495,9 @@ fn draw_text(
         text_node.value()
     };
     let color = match text_node.tone() {
-        UiTextTone::Primary => palette::INK,
-        UiTextTone::Secondary => palette::INK_SOFT,
-        UiTextTone::Accent => palette::ACCENT_SHELL,
+        UiTextTone::Primary => palette.ink,
+        UiTextTone::Secondary => palette.ink_soft,
+        UiTextTone::Accent => palette.accent_shell,
     };
     let position = point(bounds.left * surface.scale, bounds.top * surface.scale);
     text::draw(
@@ -415,22 +515,23 @@ fn draw_action(
     action: &Action,
     bounds: UiRect,
     surface: Surface,
+    palette: UiLabPalette,
 ) {
     let bounds = surface.to_canvas_rect(bounds);
     let hovered = lab.hovered.as_ref() == Some(action.id());
     let focused = lab.focus.focused() == Some(action.id());
     let fill = match (action.tone(), hovered) {
-        (UiActionTone::Accent, true) => palette::ACCENT_CORE,
-        (UiActionTone::Accent, false) => palette::INDIGO,
-        (UiActionTone::Neutral, true) => palette::PANEL_RAISED,
-        (UiActionTone::Neutral, false) => palette::BACKDROP_LIFT,
+        (UiActionTone::Accent, true) => palette.accent_core,
+        (UiActionTone::Accent, false) => palette.accent_shell,
+        (UiActionTone::Neutral, true) => palette.panel_raised,
+        (UiActionTone::Neutral, false) => palette.backdrop_lift,
     };
     let edge = if focused {
-        palette::ACCENT_IPC
+        palette.accent_ipc
     } else if action.tone() == UiActionTone::Accent || hovered {
-        palette::ACCENT_SHELL
+        palette.accent_shell
     } else {
-        palette::PANEL_EDGE
+        palette.panel_edge
     };
     canvas.fill_rounded_rect(bounds, 10.0 * surface.scale, &Paint::solid(fill));
     canvas.stroke_rounded_rect(
@@ -451,7 +552,11 @@ fn draw_action(
         &spec,
         point((bounds.left + bounds.right) / 2.0, baseline),
         Align::Center,
-        &Paint::solid(palette::INK),
+        &Paint::solid(if action.tone() == UiActionTone::Accent {
+            palette.accent_text
+        } else {
+            palette.button_text
+        }),
     );
 }
 
@@ -511,6 +616,10 @@ mod tests {
     use super::*;
     use anodrel_ui::UiAccessibilityRole;
 
+    fn rgb(red: u8, green: u8, blue: u8) -> Rgb {
+        Rgb { red, green, blue }
+    }
+
     fn id(value: &str) -> ElementId {
         ElementId::new(value).expect("fixed UI Lab ID is valid")
     }
@@ -539,6 +648,24 @@ mod tests {
                 Some(expected)
             );
         }
+    }
+
+    #[test]
+    fn high_contrast_palette_uses_only_host_supplied_system_colours() {
+        let palette = UiLabPalette::high_contrast(SystemColors {
+            window: rgb(1, 2, 3),
+            window_text: rgb(4, 5, 6),
+            button_face: rgb(7, 8, 9),
+            button_text: rgb(10, 11, 12),
+            highlight: rgb(13, 14, 15),
+            highlight_text: rgb(16, 17, 18),
+        });
+        assert_eq!(palette.backdrop, Color::rgb(1, 2, 3));
+        assert_eq!(palette.panel, Color::rgb(7, 8, 9));
+        assert_eq!(palette.ink, Color::rgb(4, 5, 6));
+        assert_eq!(palette.accent_shell, Color::rgb(13, 14, 15));
+        assert_eq!(palette.accent_text, Color::rgb(16, 17, 18));
+        assert_eq!(palette.button_text, Color::rgb(10, 11, 12));
     }
 
     #[test]

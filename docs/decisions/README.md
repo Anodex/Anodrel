@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0055: Windows high contrast uses direct system colours.
+
 - 0054: Native cancellation is bounded, ordered, and pre-execution.
 
 - 0053: Diagnostic log reads stay bounded and closed.

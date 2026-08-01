@@ -154,6 +154,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-appearance"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-windows-bootstrap"
 version = "0.1.0"
 dependencies = [
@@ -216,6 +220,7 @@ dependencies = [
  "anodrel-ui",
  "anodrel-ui-document",
  "anodrel-ui-session",
+ "anodrel-windows-appearance",
  "anodrel-windows-bootstrap",
  "anodrel-windows-clipboard",
  "anodrel-windows-external-links",

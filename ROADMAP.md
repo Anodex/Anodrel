@@ -89,6 +89,9 @@ Status: **Direct Windows host in progress**
   lifecycle. Operating-system accessibility adapters, public window lifecycle,
   subscriptions, scrollbars, gestures, and broader action-event transport remain
   separate gates.
+  The direct Windows UI Lab and session view now also substitute the user's
+  fixed high-contrast system colours for their host palette without changing
+  the portable document model (Decision 0055).
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency
