@@ -4,6 +4,7 @@ members = [
   "crates/protocol",
   "crates/core",
   "crates/canvas",
+  "crates/ui",
   "crates/brand",
   "crates/diagnostics",
   "crates/wire",

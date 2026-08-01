@@ -95,6 +95,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-ui"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-windows-bootstrap"
 version = "0.1.0"
 dependencies = [

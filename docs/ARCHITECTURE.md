@@ -198,6 +198,13 @@ does not measure application startup, memory, rendering, or another runtime.
 Its report includes only non-identifying target OS, architecture, and available
 logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
 
+`anodrel-ui` is a portable foundation between an application model and a future
+host renderer. It owns only a bounded declarative tree, layout, clipping, and
+semantic action hit testing; it accepts no package or protocol input and has no
+operating-system authority. The host remains responsible for text measurement,
+rendering, input delivery, and every capability decision. See `docs/UI.md` and
+Decision 0025.
+
 ## Communication model
 
 The application-to-host boundary must use a documented, versioned protocol.

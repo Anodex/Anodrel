@@ -44,7 +44,7 @@ dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
 `anodrel-application`, `anodrel-session-policy`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`,
 `anodrel-paths`, `anodrel-windows-policy`, `anodrel-windows-launch`,
 `anodrel-windows-paths`, `anodrel-credentials`,
-`anodrel-windows-credentials`, and the Windows host are all source modules. The
+`anodrel-windows-credentials`, `anodrel-ui`, and the Windows host are all source modules. The
 host calls User32 and Kernel32 directly for its
 window lifecycle and drawing; the pipe adapter uses direct Win32 and CNG APIs
 on a worker thread, while the bootstrap adapter uses an explicit Windows child
@@ -63,6 +63,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-registered-sessi
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
+cargo test --manifest-path native/Cargo.toml -p anodrel-ui
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --windows-pipe --iterations 5000
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host

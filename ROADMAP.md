@@ -65,6 +65,11 @@ Status: **Direct Windows host in progress**
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
   per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
+- Define an owned native application UI foundation. **In progress:** a portable
+  declarative layout tree with semantic actions establishes the first reusable
+  UI contract (Decision 0025). Rendering, authenticated application input,
+  accessibility, focus, scrolling, and an application package format remain
+  separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency
@@ -164,7 +169,7 @@ Status: **Planned**
 
 ## Explicitly deferred
 
-- Native UI rewrite.
+- A full native UI toolkit beyond the constrained foundation in Decision 0025.
 - Custom browser engine.
 - Custom operating system.
 - Full Anodex rewrite before the platform contracts are proven.
