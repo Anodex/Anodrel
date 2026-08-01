@@ -252,6 +252,11 @@ content. `docs/APPLICATIONS.md` separately
 defines the no-script package surface that the Windows host can display. It has
 no native bridge or protocol session.
 
+The native session handles the existing `cancel` control before the core begins
+a matching request. It retains no more than 32 unresolved opaque IDs, sends no
+control response, and cannot interrupt work already begun. See
+`docs/TRANSPORT.md` and Decision 0054.
+
 Every request should have:
 
 - protocol version;

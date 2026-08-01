@@ -35,6 +35,9 @@ Status: **Foundation slice in progress**
 
 - Define the platform service interfaces.
 - Define protocol envelopes, request IDs, errors, cancellation, and events.
+  **Completed for the first native transport cancellation rule:** a bounded,
+  ordered pre-execution cancellation control is handled by the authenticated
+  session (Decision 0054).
 - Define capability and permission declarations.
 - Create compatibility and schema tests.
 - Build a minimal mock host for application development.

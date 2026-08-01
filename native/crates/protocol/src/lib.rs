@@ -82,6 +82,7 @@ pub enum ProtocolErrorCode {
     CapabilityDenied,
     OperationUnsupported,
     ProtocolVersionUnsupported,
+    RequestCancelled,
     RequestInvalid,
     RequestPayloadInvalid,
     ClipboardUnavailable,
@@ -104,6 +105,7 @@ impl ProtocolErrorCode {
             Self::CapabilityDenied => "capability.denied",
             Self::OperationUnsupported => "operation.unsupported",
             Self::ProtocolVersionUnsupported => "protocol.version_unsupported",
+            Self::RequestCancelled => "request.cancelled",
             Self::RequestInvalid => "request.invalid",
             Self::RequestPayloadInvalid => "request.payload_invalid",
             Self::ClipboardUnavailable => "clipboard.unavailable",
@@ -171,6 +173,34 @@ impl RequestEnvelope {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequestError {
     Malformed,
+}
+
+/// A transport control that prevents one not-yet-started request from running.
+///
+/// Cancellation has no request identifier of its own and produces no response.
+/// A transport may remember it only for a small, documented pending set.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CancellationEnvelope {
+    pub protocol_version: ProtocolVersion,
+    pub cancellation_id: String,
+}
+
+impl CancellationEnvelope {
+    pub fn from_json(value: JsonValue) -> Result<Self, RequestError> {
+        let fields = value.as_object().ok_or(RequestError::Malformed)?;
+        let protocol_version = protocol_version(fields)?;
+        if required_string(fields, "kind")? != "cancel" {
+            return Err(RequestError::Malformed);
+        }
+        let cancellation_id = required_string(fields, "cancellationId")?.to_owned();
+        if !is_limited_identifier(&cancellation_id, MAX_CANCELLATION_ID_BYTES) {
+            return Err(RequestError::Malformed);
+        }
+        Ok(Self {
+            protocol_version,
+            cancellation_id,
+        })
+    }
 }
 
 pub struct ResponseEnvelope;
@@ -306,6 +336,29 @@ mod tests {
         .expect("JSON is valid");
         assert_eq!(
             RequestEnvelope::from_json(value),
+            Err(RequestError::Malformed)
+        );
+    }
+
+    #[test]
+    fn parses_a_bounded_cancellation_control() {
+        let value = JsonValue::parse(
+            r#"{"protocolVersion":{"major":1,"minor":0},"kind":"cancel","cancellationId":"stop-before-start"}"#,
+        )
+        .expect("valid JSON");
+        assert_eq!(
+            CancellationEnvelope::from_json(value)
+                .expect("control is valid")
+                .cancellation_id,
+            "stop-before-start"
+        );
+
+        let malformed = JsonValue::parse(
+            r#"{"protocolVersion":{"major":1,"minor":0},"kind":"cancel","cancellationId":""}"#,
+        )
+        .expect("valid JSON");
+        assert_eq!(
+            CancellationEnvelope::from_json(malformed),
             Err(RequestError::Malformed)
         );
     }

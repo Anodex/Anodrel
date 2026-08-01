@@ -363,9 +363,10 @@ Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 ## Cancellation and events
 
 A cancellation message contains `protocolVersion`, `kind: "cancel"`, and a
-non-empty `cancellationId`. A host may cancel only work that has not completed;
-it returns `request.cancelled` for a request that it observes before execution.
-Later host operations will document operation-specific cancellation behavior.
+non-empty `cancellationId`. It has no response. A host may cancel only work
+that has not started; it returns `request.cancelled` for a request that it
+observes before execution. Later host operations will document operation-specific
+cancellation behavior.
 
 Events are opt-in. Every event must include `protocolVersion`, `kind: "event"`,
 `eventName`, `source`, `schemaVersion`, and a typed payload. Version 1.2

@@ -6,7 +6,7 @@
 //! bounded transition from framed input to complete core responses and refuses
 //! every public protocol request until host-created credentials are verified.
 
-use std::fmt;
+use std::{collections::BTreeSet, fmt};
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
@@ -16,7 +16,7 @@ use anodrel_file_access::{FileSelectionService, FileTextService};
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
-use anodrel_protocol::{JsonValue, object};
+use anodrel_protocol::{CancellationEnvelope, JsonValue, RequestEnvelope, object};
 use anodrel_storage::StorageService;
 pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
@@ -25,6 +25,11 @@ pub const MAX_SESSION_ID_BYTES: usize = 128;
 pub const SESSION_TOKEN_HEX_BYTES: usize = 64;
 const AUTHENTICATE_KIND: &str = "session.authenticate";
 const AUTHENTICATED_KIND: &str = "session.authenticated";
+const CANCELLATION_KIND: &str = "cancel";
+/// A session retains at most this many controls that arrived before their
+/// corresponding request. The bounded set prevents cancellation-only traffic
+/// from becoming unbounded host memory.
+pub const MAX_PENDING_CANCELLATIONS: usize = 32;
 
 #[derive(Debug)]
 struct TransportUnavailableDiagnostics;
@@ -119,6 +124,8 @@ pub enum TransportError {
     Wire(WireError),
     AuthenticationRequired,
     AuthenticationFailed,
+    CancellationInvalid,
+    CancellationLimitReached,
     SessionClosed,
 }
 
@@ -130,6 +137,15 @@ impl fmt::Display for TransportError {
                 write!(formatter, "native session authentication is required")
             }
             Self::AuthenticationFailed => write!(formatter, "native session authentication failed"),
+            Self::CancellationInvalid => {
+                write!(formatter, "native cancellation control is invalid")
+            }
+            Self::CancellationLimitReached => {
+                write!(
+                    formatter,
+                    "native session reached its pending cancellation limit"
+                )
+            }
             Self::SessionClosed => write!(formatter, "native transport session is closed"),
         }
     }
@@ -209,6 +225,7 @@ pub struct TransportSession {
     decoder: FrameDecoder,
     host: CoreHost,
     ui_document_mailbox: UiDocumentMailbox,
+    pending_cancellations: BTreeSet<String>,
     state: SessionState,
 }
 
@@ -431,6 +448,7 @@ impl TransportSession {
                 diagnostics,
             ),
             ui_document_mailbox,
+            pending_cancellations: BTreeSet::new(),
             state: SessionState::Pending(credentials),
         }
     }
@@ -448,33 +466,66 @@ impl TransportSession {
         };
         let mut responses = Vec::with_capacity(requests.len());
         for request in requests {
-            let response = self.handle_message(&request)?;
-            responses.push(self.encode_or_close(response)?);
+            if let Some(response) = self.handle_message(&request)? {
+                responses.push(self.encode_or_close(response)?);
+            }
         }
         Ok(responses)
     }
 
-    fn handle_message(&mut self, message: &str) -> Result<String, TransportError> {
+    fn handle_message(&mut self, message: &str) -> Result<Option<String>, TransportError> {
         match &self.state {
             SessionState::Pending(credentials) => {
                 if !matches_credentials(message, credentials) {
                     return self.close_with(TransportError::AuthenticationFailed);
                 }
                 self.state = SessionState::Authenticated;
-                Ok(object([("kind", JsonValue::String(AUTHENTICATED_KIND.to_owned()))]).to_json())
+                Ok(Some(
+                    object([("kind", JsonValue::String(AUTHENTICATED_KIND.to_owned()))]).to_json(),
+                ))
             }
             SessionState::Authenticated if has_kind(message, AUTHENTICATE_KIND) => {
                 self.close_with(TransportError::AuthenticationFailed)
             }
             SessionState::Authenticated => {
+                if has_kind(message, CANCELLATION_KIND) {
+                    self.remember_cancellation(message)?;
+                    return Ok(None);
+                }
+                if let Some(request) =
+                    request_with_pending_cancellation(message, &mut self.pending_cancellations)
+                {
+                    return Ok(Some(self.host.cancelled_response(request.request_id)));
+                }
                 let response = self.host.handle_json(message);
                 if let Some(snapshot) = self.host.take_ui_document_update() {
                     self.ui_document_mailbox.publish(snapshot);
                 }
-                Ok(response)
+                Ok(Some(response))
             }
             SessionState::Closed => Err(TransportError::SessionClosed),
         }
+    }
+
+    fn remember_cancellation(&mut self, message: &str) -> Result<(), TransportError> {
+        let control = JsonValue::parse(message)
+            .ok()
+            .and_then(|value| CancellationEnvelope::from_json(value).ok())
+            .filter(|control| control.protocol_version.is_supported());
+        let Some(control) = control else {
+            return self.close_with(TransportError::CancellationInvalid);
+        };
+        if self
+            .pending_cancellations
+            .contains(&control.cancellation_id)
+        {
+            return Ok(());
+        }
+        if self.pending_cancellations.len() == MAX_PENDING_CANCELLATIONS {
+            return self.close_with(TransportError::CancellationLimitReached);
+        }
+        self.pending_cancellations.insert(control.cancellation_id);
+        Ok(())
     }
 
     fn encode_or_close(&mut self, response: String) -> Result<Vec<u8>, TransportError> {
@@ -488,6 +539,20 @@ impl TransportSession {
         self.state = SessionState::Closed;
         Err(error)
     }
+}
+
+fn request_with_pending_cancellation(
+    message: &str,
+    pending_cancellations: &mut BTreeSet<String>,
+) -> Option<RequestEnvelope> {
+    let request = JsonValue::parse(message)
+        .ok()
+        .and_then(|value| RequestEnvelope::from_json(value).ok())?;
+    request
+        .cancellation_id
+        .as_ref()
+        .filter(|cancellation_id| pending_cancellations.remove(*cancellation_id))?;
+    Some(request)
 }
 
 fn matches_credentials(message: &str, credentials: &SessionCredentials) -> bool {
@@ -570,6 +635,18 @@ mod tests {
     fn request(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":0}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn cancellable_request(operation: &str, payload: &str, cancellation_id: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":0}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload},"cancellationId":"{cancellation_id}"}}"#
+        )
+    }
+
+    fn cancellation(cancellation_id: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":0}},"kind":"cancel","cancellationId":"{cancellation_id}"}}"#
         )
     }
 
@@ -701,6 +778,99 @@ mod tests {
                 .as_string(),
             Some("ready")
         );
+    }
+
+    #[test]
+    fn cancels_only_a_request_that_has_not_started() {
+        let mut transport = session(vec![Capability::DiagnosticsRead]);
+        authenticate(&mut transport);
+
+        let control = transport
+            .receive(&encode_json(&cancellation("stop-before-start")).expect("control encodes"))
+            .expect("cancellation control is accepted");
+        assert!(control.is_empty());
+
+        let response = transport
+            .receive(
+                &encode_json(&cancellable_request(
+                    "platform.health",
+                    "{}",
+                    "stop-before-start",
+                ))
+                .expect("request encodes"),
+            )
+            .expect("cancelled request returns a response");
+        let response = decode_response(&response[0]);
+        assert_eq!(
+            response.as_object().expect("response object")["error"]
+                .as_object()
+                .expect("error object")["code"]
+                .as_string(),
+            Some("request.cancelled")
+        );
+
+        let completed = transport
+            .receive(
+                &encode_json(&cancellable_request("platform.health", "{}", "too-late"))
+                    .expect("request encodes"),
+            )
+            .expect("request completes before cancellation");
+        assert_eq!(
+            decode_response(&completed[0])
+                .as_object()
+                .expect("response object")["status"]
+                .as_string(),
+            Some("success")
+        );
+        assert!(
+            transport
+                .receive(&encode_json(&cancellation("too-late")).expect("control encodes"))
+                .expect("late control is accepted")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn closes_when_cancellation_only_traffic_reaches_the_bounded_limit() {
+        let mut transport = session(vec![]);
+        authenticate(&mut transport);
+        for index in 0..MAX_PENDING_CANCELLATIONS {
+            assert!(
+                transport
+                    .receive(
+                        &encode_json(&cancellation(&format!("pending-{index}")))
+                            .expect("control encodes"),
+                    )
+                    .expect("control below limit is accepted")
+                    .is_empty()
+            );
+        }
+        assert!(matches!(
+            transport
+                .receive(&encode_json(&cancellation("one-too-many")).expect("control encodes"),),
+            Err(TransportError::CancellationLimitReached)
+        ));
+        assert!(matches!(
+            transport.receive(&[]),
+            Err(TransportError::SessionClosed)
+        ));
+    }
+
+    #[test]
+    fn closes_on_a_malformed_cancellation_control() {
+        let mut transport = session(vec![]);
+        authenticate(&mut transport);
+        assert!(matches!(
+            transport.receive(
+                &encode_json(r#"{"protocolVersion":{"major":1,"minor":0},"kind":"cancel","cancellationId":""}"#)
+                    .expect("control encodes"),
+            ),
+            Err(TransportError::CancellationInvalid)
+        ));
+        assert!(matches!(
+            transport.receive(&[]),
+            Err(TransportError::SessionClosed)
+        ));
     }
 
     #[test]

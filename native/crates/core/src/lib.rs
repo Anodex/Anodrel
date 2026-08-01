@@ -389,6 +389,22 @@ impl CoreHost {
         response.to_json()
     }
 
+    /// Produces the safe result for a request whose cancellation was observed
+    /// by the authenticated transport before this core began processing it.
+    ///
+    /// The transport obtains `request_id` only from a validated request
+    /// envelope. This method does not retain cancellation state or attempt to
+    /// roll back work that has already entered an operation handler.
+    pub fn cancelled_response(&self, request_id: String) -> String {
+        self.failure(
+            request_id,
+            ProtocolErrorCode::RequestCancelled,
+            "Request was cancelled before the host began processing it.",
+            None,
+        )
+        .to_json()
+    }
+
     fn handle(&self, request: RequestEnvelope) -> JsonValue {
         if !request.protocol_version.is_supported() {
             return self.failure(

@@ -51,6 +51,13 @@ other.
 - Frames are handled synchronously in arrival order by the session engine. A
   future adapter must move blocking stream I/O and long-running work away from
   the Windows UI thread.
+- After authentication, the session accepts the documented `cancel` control.
+  It retains at most **32** distinct bounded cancellation IDs that arrive before
+  their matching request, emits no control response, consumes a matching ID
+  exactly once, and returns `request.cancelled` without calling the core
+  operation. A late cancellation cannot undo completed work. A malformed or
+  unsupported control, or a 33rd unresolved ID, ends the session rather than
+  retaining unbounded state.
 - The frame contains no identity or capability grant. The host creates policy
   before it constructs the session; client-supplied context remains untrusted.
 

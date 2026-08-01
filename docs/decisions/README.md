@@ -13,9 +13,11 @@ Each record should include:
 
 Current records (newest first):
 
-- 0052: Storage protocol uses independent state grants.
+- 0054: Native cancellation is bounded, ordered, and pre-execution.
 
 - 0053: Diagnostic log reads stay bounded and closed.
+
+- 0052: Storage protocol uses independent state grants.
 
 - 0051: Application state starts as one bounded atomic snapshot.
 
