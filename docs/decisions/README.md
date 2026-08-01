@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0052: Storage protocol uses independent state grants.
+
 - 0051: Application state starts as one bounded atomic snapshot.
 
 - 0050: File text reads use selection references.

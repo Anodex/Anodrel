@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.9
+**Status:** Foundation contract, version 1.10
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.9 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 9}`.
+the host's. Version 1.10 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 10}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -71,6 +71,33 @@ The current operations are:
 | `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
 | `dialog.open_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus selection reference, or cancellation | `dialog.open_file` |
 | `file.read_text` | `{ "selectionReference": string }` | bounded UTF-8 text | `file.read_text` |
+| `storage.state.read` | `{}` | bounded saved snapshot or absence | `storage.state.read` |
+| `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
+| `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
+
+### Storage state
+
+Protocol 1.10 exposes exactly one host-derived application-state snapshot. It
+does not expose a filesystem API. `storage.state.read` and
+`storage.state.clear` accept exactly `{}`. `storage.state.replace` accepts
+exactly `{ "snapshot": string }`, with a UTF-8 snapshot of at most **24 KiB**.
+The host returns `request.payload_invalid` for any other payload or a larger
+replacement before calling the storage service.
+
+Each operation requires its matching immediate host-issued capability:
+`storage.state.read`, `storage.state.replace`, or `storage.state.clear`.
+Read returns `{ "status": "snapshot", "snapshot": string }` when a complete
+saved snapshot exists, including an empty value, and `{ "status": "absent" }`
+otherwise. Replace returns `{ "status": "replaced" }`; clear returns
+`{ "status": "cleared" }`. The protocol has no key, path, filename, handle,
+directory, range, stream, binary encoding, or temporary-name selector.
+
+A storage service that cannot be safely called returns `storage.unavailable`.
+Stored malformed UTF-8 and oversized state return `storage.snapshot_invalid`
+and `storage.snapshot_too_large` respectively. Errors and diagnostics never
+contain state data, paths, recovery source, temporary names, or native details.
+Cancellation is honored only before the core begins the one bounded storage
+operation; no operation continues in the background after its response.
 
 ### `dialog.open_file.v2` and `file.read_text`
 
@@ -315,6 +342,8 @@ errors, clipboard text, or external-link URLs. Protocol 1.6 adds
 Protocol 1.7 adds `dialog.unavailable`.
 Protocol 1.9 adds `file.unavailable`, `file.text_invalid`, and
 `file.text_too_large`.
+Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
+`storage.snapshot_too_large`.
 
 ## Cancellation and events
 

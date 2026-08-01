@@ -1,7 +1,7 @@
 # Application state storage v1
 
-**Status:** Portable value and direct Windows host-service foundation. No public
-protocol operation is available yet.
+**Status:** Portable value, direct Windows host-service, and Protocol 1.10
+contract foundation. Protocol wiring remains in progress.
 
 ## Purpose and boundary
 
@@ -52,11 +52,21 @@ The adapter must reject links, directories, and malformed storage records.
 
 ## Permissions and compatibility
 
-This document intentionally defines no protocol operation or capability. A
-future protocol must add independent host-issued read, replace, and clear
-grants; document its exact payload and result forms; and add contract coverage
-before any authenticated application can use storage. The protocol must not
-accept an absolute or relative path.
+Protocol 1.10 reserves independent host-issued `storage.state.read`,
+`storage.state.replace`, and `storage.state.clear` grants. Its exact operations
+are `storage.state.read` (`{}`), `storage.state.replace`
+(`{ "snapshot": string }`), and `storage.state.clear` (`{}`). Read returns
+either `{ "status": "snapshot", "snapshot": string }` or
+`{ "status": "absent" }`; replace and clear return fixed accepted statuses.
+The protocol snapshot is limited to **24 KiB**, independently of the portable
+256 KiB store limit, so it remains safe inside Wire 1.0. No protocol form
+accepts an absolute or relative path.
+
+The core must check the matching host-issued grant immediately before calling
+its injected storage service. A host that has not explicitly supplied one
+returns only `storage.unavailable`. Stored invalid and oversized values map to
+their stable safe error categories without state contents, paths, recovery
+source, or native details.
 
 The v1 snapshot limit, whole-value semantics, and one-snapshot namespace are
 part of the compatibility contract. A key-value API, binary-transfer surface,
@@ -68,7 +78,7 @@ concurrent multi-process writer policy require separate decisions.
 The portable foundation tests absent versus empty state, the fixed size limit,
 value redaction, and error categories. The Windows adapter tests whole-value
 replacement, recovery from an interrupted staging file, and path redaction.
-Its direct file boundary rejects directories and reparse points. Authenticated
-protocol coverage will be added only with the later capability contract.
+Its direct file boundary rejects directories and reparse points. Shared
+protocol contract coverage will be added with the implementation wiring.
 
-Decision 0051 records this boundary.
+Decisions 0051 and 0052 record these boundaries.
