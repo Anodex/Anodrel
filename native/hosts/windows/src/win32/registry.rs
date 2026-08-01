@@ -42,10 +42,10 @@ pub(super) fn with_startup_lab<R>(
     }
 }
 
-/// Mutates a window's host-owned UI Lab state in place.
+/// Mutates a window's local native UI diagnostic state in place.
 ///
-/// The UI Lab is a fixed diagnostic view. It is separate from Startup Lab so
-/// UI action events cannot inherit Startup Lab's linked host operations.
+/// UI Lab and the explicit developer preview are separate from Startup Lab, so
+/// their UI action events cannot inherit Startup Lab's linked host operations.
 pub(super) fn with_ui_lab<R>(
     window: Hwnd,
     change: impl FnOnce(&mut UiLab) -> R,

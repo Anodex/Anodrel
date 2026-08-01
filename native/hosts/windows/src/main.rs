@@ -3,11 +3,20 @@
 mod sample;
 mod win32;
 
-use std::{env, error::Error, io, time::Instant};
+use std::{
+    env,
+    error::Error,
+    fs::File,
+    io::{self, Read},
+    path::Path,
+    time::Instant,
+};
 
 use anodrel_application::ApplicationPackage;
 use anodrel_core::{CoreHost, HostPolicy};
 use anodrel_protocol::{Capability, JsonValue};
+use anodrel_ui::UiDocument;
+use anodrel_ui_document::{MAX_ENCODED_DOCUMENT_BYTES, decode};
 use anodrel_windows_instance::{InstanceClaim, InstanceScope, claim};
 use anodrel_windows_pipe::run_health_self_test;
 
@@ -38,14 +47,63 @@ fn main() -> Result<(), Box<dyn Error>> {
     if arguments.as_slice() == ["--ui-lab"] {
         return win32::run_ui_lab().map_err(Into::into);
     }
+    if let [command, document_path] = arguments.as_slice()
+        && command == "--ui-preview"
+    {
+        return run_ui_preview(document_path);
+    }
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js>]",
         )
         .into());
     }
     run_diagnostics_window()
+}
+
+/// Loads one bounded regular-file UI document for the explicit developer preview.
+///
+/// This is intentionally not an application, package, or session loader. It
+/// reads only the named local file, then validates the whole document before
+/// the caller creates a native window.
+fn load_ui_preview_document(path: &Path) -> Result<UiDocument, Box<dyn Error>> {
+    let encoded = read_bounded_regular_utf8(path)?;
+    Ok(decode(&encoded)?)
+}
+
+fn run_ui_preview(document_path: &str) -> Result<(), Box<dyn Error>> {
+    let document = load_ui_preview_document(Path::new(document_path))?;
+    win32::run_ui_preview(document)?;
+    Ok(())
+}
+
+fn read_bounded_regular_utf8(path: &Path) -> io::Result<String> {
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "UI preview input must be a regular file",
+        ));
+    }
+    if metadata.len() > MAX_ENCODED_DOCUMENT_BYTES as u64 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "UI preview input exceeds the encoded document limit",
+        ));
+    }
+
+    let mut encoded = String::new();
+    let mut bounded = file.take(MAX_ENCODED_DOCUMENT_BYTES as u64 + 1);
+    bounded.read_to_string(&mut encoded)?;
+    if encoded.len() > MAX_ENCODED_DOCUMENT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "UI preview input exceeds the encoded document limit",
+        ));
+    }
+    Ok(encoded)
 }
 
 fn run_diagnostics_window() -> Result<(), Box<dyn Error>> {
@@ -161,7 +219,10 @@ fn string_field<'a>(
 mod tests {
     use anodrel_application::ApplicationPackage;
 
-    use super::{check_core_health, health_display, package_facts};
+    use super::{
+        MAX_ENCODED_DOCUMENT_BYTES, check_core_health, health_display, load_ui_preview_document,
+        package_facts, read_bounded_regular_utf8,
+    };
 
     #[test]
     fn displays_a_valid_health_response() {
@@ -213,5 +274,40 @@ mod tests {
         );
         assert!(!facts.content_path.contains(':'));
         std::fs::remove_dir_all(root).expect("fixture directory is removed");
+    }
+
+    #[test]
+    fn preview_loader_reads_one_bounded_valid_document_before_window_creation() {
+        let root =
+            std::env::temp_dir().join(format!("anodrel-ui-preview-test-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("fixture directory is created");
+        let document_path = root.join("preview.json");
+        std::fs::write(
+            &document_path,
+            r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"Preview","fontSize":16,"tone":"primary"}}"#,
+        )
+        .expect("fixture document is written");
+
+        let document = load_ui_preview_document(&document_path).expect("preview is valid");
+        assert_eq!(document.root().id().as_str(), "root");
+
+        let oversized_path = root.join("oversized.json");
+        std::fs::write(&oversized_path, "x".repeat(MAX_ENCODED_DOCUMENT_BYTES + 1))
+            .expect("oversized fixture is written");
+        let error = read_bounded_regular_utf8(&oversized_path)
+            .expect_err("oversized preview is rejected before decoding");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+
+        std::fs::remove_dir_all(root).expect("fixture directory is removed");
+    }
+
+    #[test]
+    fn shipped_ui_preview_document_matches_the_strict_format() {
+        let document_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../apps/sample/anodrel.ui.json");
+        let document =
+            load_ui_preview_document(&document_path).expect("shipped UI preview document is valid");
+
+        assert_eq!(document.root().id().as_str(), "sample.root");
     }
 }

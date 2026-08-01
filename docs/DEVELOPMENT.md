@@ -65,6 +65,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui-document
+cargo test --manifest-path native/Cargo.toml -p anodrel-ui-session
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --windows-pipe --iterations 5000
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
@@ -82,6 +83,16 @@ It needs Windows but does not require WebView2. Do not add privileged
 capabilities or new third-party runtime dependencies. The named-pipe adapter
 already binds a logon-SID DACL and a host-generated credential; the bootstrap
 adapter performs one-time delivery through child standard input.
+
+To preview one explicit v1 UI document through the same native renderer, run:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-preview path-to-document.json
+~~~
+
+The file must be a valid bounded `anodrel.ui.document.v1` document. Hover its
+actions and use Tab/Shift+Tab/Enter to exercise the local input path. This is a
+developer diagnostic only, not an application session. See `docs/UI_PREVIEW.md`.
 
 The host can also display the digest-verified, no-script sample application
 package described in `docs/APPLICATIONS.md`:

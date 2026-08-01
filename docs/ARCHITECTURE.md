@@ -203,15 +203,16 @@ host renderer. It owns only a bounded declarative tree, semantic appearance
 roles, layout, clipping, semantic action hit testing, visible accessibility
 snapshot, and portable focus traversal. `anodrel-ui-document` separately owns
 the exact, bounded JSON interchange form for that tree. The Windows UI Lab
-decodes a fixed compile-time fixture through it, but no native host accepts an
-externally supplied document. Neither crate has operating-system authority. The
+decodes a fixed compile-time fixture through it, and the separate explicit
+Windows developer preview can render one bounded operator-selected document.
+Neither crate has operating-system authority. The
 `anodrel-ui-session` separately owns one revision-bound current document and
 semantic-action validation, but does not authenticate or deliver events. The
 host remains responsible for text measurement, mapping appearance roles to an
 actual visual system, rendering, input delivery, operating-system accessibility
 and focus adapters, and every capability decision. See `docs/UI.md`,
-`docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, and Decisions 0025 through
-0030.
+`docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`, and
+Decisions 0025 through 0031.
 
 ## Communication model
 

@@ -116,10 +116,10 @@ boundary.
 This is a Rust API foundation, not an application file or protocol format.
 `docs/UI_DOCUMENTS.md` separately defines the exact capability-free JSON form
 that can decode into this model. The Windows UI Lab uses one compiled-in fixture
-only; no native host accepts an externally supplied document. When a package or
-session transports this tree to a host, that surface must still have its own
-lifecycle, resource limits, compatibility tests, and security decision before
-reuse.
+and the separate explicit developer preview can render one bounded operator-
+selected document. When a package or session transports this tree to a host,
+that surface must still have its own lifecycle, resource limits, compatibility
+tests, and security decision before reuse.
 
 ## Windows UI Lab
 

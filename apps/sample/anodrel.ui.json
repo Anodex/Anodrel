@@ -1,0 +1,67 @@
+{
+  "format": "anodrel.ui.document.v1",
+  "root": {
+    "id": "sample.root",
+    "kind": "stack",
+    "axis": "vertical",
+    "padding": { "left": 56, "top": 56, "right": 56, "bottom": 56 },
+    "gap": 16,
+    "surfaceTone": "plain",
+    "children": [
+      {
+        "id": "sample.eyebrow",
+        "kind": "text",
+        "value": "ANODREL UI PREVIEW",
+        "fontSize": 12,
+        "tone": "accent"
+      },
+      {
+        "id": "sample.title",
+        "kind": "text",
+        "value": "A direct native document",
+        "fontSize": 32,
+        "tone": "primary"
+      },
+      {
+        "id": "sample.detail",
+        "kind": "text",
+        "value": "This file is validated before Windows opens a native renderer. It has no webview, script, or native bridge.",
+        "fontSize": 16,
+        "tone": "secondary"
+      },
+      {
+        "id": "sample.actions",
+        "kind": "stack",
+        "axis": "vertical",
+        "padding": { "left": 18, "top": 18, "right": 18, "bottom": 18 },
+        "gap": 10,
+        "surfaceTone": "raised",
+        "children": [
+          {
+            "id": "sample.inspect",
+            "kind": "action",
+            "label": "Inspect the layout",
+            "fontSize": 16,
+            "enabled": true,
+            "tone": "neutral"
+          },
+          {
+            "id": "sample.action",
+            "kind": "action",
+            "label": "Test a semantic action",
+            "fontSize": 16,
+            "enabled": true,
+            "tone": "accent"
+          }
+        ]
+      },
+      {
+        "id": "sample.boundary",
+        "kind": "text",
+        "value": "Preview actions stay local. They do not open a process, file, protocol, or capability.",
+        "fontSize": 13,
+        "tone": "secondary"
+      }
+    ]
+  }
+}

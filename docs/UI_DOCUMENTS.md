@@ -2,8 +2,9 @@
 
 **Status:** Foundation contract. This format can be decoded into the portable
 `anodrel-ui` model. The Windows UI Lab decodes one compiled-in host fixture to
-exercise the contract; no native host accepts an externally supplied document,
-package loader, protocol operation, or application session yet.
+exercise the contract, and the separate explicit Windows developer preview can
+render one bounded operator-selected file. No package loader, protocol
+operation, or application session accepts this format yet.
 
 ## Purpose and boundary
 
@@ -132,5 +133,5 @@ appearance roles, unknown and missing fields, malformed values, unsupported
 format identifiers, size limits, and model-level document limits. It has only
 first-party `anodrel-ui` and `anodrel-json` dependencies and no operating-
 system calls. The Windows host additionally builds and renders its compiled-in
-UI Lab fixture through this decoder; it never reads UI JSON from an application
-or external source.
+UI Lab fixture through this decoder and offers a separate bounded developer
+preview input; neither path reads UI JSON from an application session.

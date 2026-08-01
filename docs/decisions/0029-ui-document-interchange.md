@@ -28,11 +28,11 @@ objects, native handles, file paths, URLs, scripts, package locations, or
 window instructions.
 
 The Windows UI Lab may decode one compile-time fixture held in host source to
-exercise the full schema-to-renderer path. It does not read a document from a
-package, command line, file, pipe, protocol operation, or application session.
-No native host accepts an externally supplied format in this decision. Such a
-consumer requires a separate lifecycle, queue, permission, and threat-model
-decision.
+exercise the full schema-to-renderer path. Decision 0031 separately permits one
+bounded operator-selected developer-preview file. Neither path reads from a
+package, pipe, protocol operation, or application session. An authenticated
+consumer still requires a separate lifecycle, queue, permission, and threat-
+model decision.
 
 ## Consequences
 
@@ -44,6 +44,6 @@ decision.
 
 ## Revisit conditions
 
-Revisit before a host renders externally supplied documents, an application
-session transports documents, incremental updates are introduced, a document
-can refer to an asset, or an action event reaches application code.
+Revisit before an application session transports documents, incremental updates
+are introduced, a document can refer to an asset, or an action event reaches
+application code.

@@ -25,6 +25,7 @@ const UI_LAB_DOCUMENT_JSON: &str = include_str!("ui_lab_document.json");
 #[derive(Clone)]
 pub(super) struct UiLab {
     document: UiDocument,
+    status_target: Option<ElementId>,
     focus: UiFocus,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
@@ -33,8 +34,22 @@ pub(super) struct UiLab {
 impl UiLab {
     /// Builds the fixed visual test document.
     pub(super) fn new() -> Self {
+        let status_target = ElementId::new("ui.lab.status").expect("fixed UI Lab ID is valid");
+        Self::from_document_with_status(test_document(), Some(status_target))
+    }
+
+    /// Builds a local diagnostic view around one already-validated document.
+    ///
+    /// A preview has no host status binding: its nodes display exactly the text
+    /// carried by the document, and its action events stay local to this view.
+    pub(super) fn preview(document: UiDocument) -> Self {
+        Self::from_document_with_status(document, None)
+    }
+
+    fn from_document_with_status(document: UiDocument, status_target: Option<ElementId>) -> Self {
         Self {
-            document: test_document(),
+            document,
+            status_target,
             focus: UiFocus::new(),
             hovered: None,
             last_action: None,
@@ -117,7 +132,15 @@ pub(super) fn draw(canvas: &mut Canvas, lab: &UiLab) {
     let surface = Surface::new(canvas.width() as f32, canvas.height() as f32);
     let layout = lab.document.layout(surface.bounds(), &WindowsTextMeasurer);
     let status = status_text(lab);
-    draw_node(canvas, lab, &layout, lab.document.root(), surface, &status);
+    draw_node(
+        canvas,
+        lab,
+        &layout,
+        lab.document.root(),
+        surface,
+        lab.status_target.as_ref(),
+        status.as_deref(),
+    );
 }
 
 /// Base-space layout and its scale into a real client area.
@@ -178,7 +201,8 @@ fn draw_node(
     layout: &UiLayout,
     node: &UiNode,
     surface: Surface,
-    status: &str,
+    status_target: Option<&ElementId>,
+    status: Option<&str>,
 ) {
     let Some(bounds) = layout.bounds(node.id()) else {
         return;
@@ -200,10 +224,12 @@ fn draw_node(
                 );
             }
             for child in stack.children() {
-                draw_node(canvas, lab, layout, child, surface, status);
+                draw_node(canvas, lab, layout, child, surface, status_target, status);
             }
         }
-        UiNode::Text(text_node) => draw_text(canvas, text_node, bounds, surface, status),
+        UiNode::Text(text_node) => {
+            draw_text(canvas, text_node, bounds, surface, status_target, status);
+        }
         UiNode::Action(action) => draw_action(canvas, lab, action, bounds, surface),
     }
 }
@@ -213,10 +239,11 @@ fn draw_text(
     text_node: &Text,
     bounds: UiRect,
     surface: Surface,
-    status: &str,
+    status_target: Option<&ElementId>,
+    status: Option<&str>,
 ) {
-    let value = if text_node.id().as_str() == "ui.lab.status" {
-        status
+    let value = if status_target.is_some_and(|target| target == text_node.id()) {
+        status.unwrap_or(text_node.value())
     } else {
         text_node.value()
     };
@@ -281,11 +308,12 @@ fn draw_action(
     );
 }
 
-fn status_text(lab: &UiLab) -> String {
-    lab.last_action.as_ref().map_or_else(
+fn status_text(lab: &UiLab) -> Option<String> {
+    lab.status_target.as_ref()?;
+    Some(lab.last_action.as_ref().map_or_else(
         || "Latest semantic event: none".to_owned(),
         |id| format!("Latest semantic event: {id} (no native operation)"),
-    )
+    ))
 }
 
 fn test_document() -> UiDocument {
@@ -432,6 +460,34 @@ mod tests {
         assert_eq!(detail.tone(), UiTextTone::Secondary);
         assert_eq!(actions.surface_tone(), UiSurfaceTone::Raised);
         assert_eq!(emphasized_action.tone(), UiActionTone::Accent);
+    }
+
+    #[test]
+    fn preview_documents_have_no_lab_specific_status_replacement() {
+        let document = decode(
+            r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"External text","fontSize":16,"tone":"primary"}}"#,
+        )
+        .expect("preview fixture is valid");
+        let preview = UiLab::preview(document);
+
+        assert!(preview.status_target.is_none());
+        assert_eq!(status_text(&preview), None);
+    }
+
+    #[test]
+    fn preview_document_renders_through_the_same_native_ui_view() {
+        let document = decode(
+            r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":40,"top":40,"right":40,"bottom":40},"gap":12,"surfaceTone":"plain","children":[{"id":"title","kind":"text","value":"External preview document","fontSize":28,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#,
+        )
+        .expect("preview fixture is valid");
+        let mut canvas = Canvas::new(BASE_WIDTH as u32, BASE_HEIGHT as u32);
+        draw(&mut canvas, &UiLab::preview(document));
+
+        let changed = (0..canvas.height())
+            .flat_map(|y| (0..canvas.width()).map(move |x| (x as i32, y as i32)))
+            .filter(|(x, y)| canvas.pixel(*x, *y) != palette::BACKDROP)
+            .count();
+        assert!(changed > 1_000, "preview drew too little content");
     }
 
     #[test]

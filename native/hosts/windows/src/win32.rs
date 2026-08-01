@@ -24,6 +24,7 @@ use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_diagnostics::{Event, LogBook};
+use anodrel_ui::UiDocument;
 use anodrel_windows_instance::PrimaryInstance;
 
 use document::{Body, Document, Section};
@@ -409,7 +410,7 @@ pub fn run_window_lab() -> io::Result<()> {
 
 /// Opens the host-owned visual and input test for the native UI foundation.
 ///
-/// The screen uses a fixed document constructed by the host. Its action events
+/// The screen uses a fixed document compiled into the host. Its action events
 /// update only a visible diagnostic line; they never reach an application or a
 /// native capability boundary.
 pub fn run_ui_lab() -> io::Result<()> {
@@ -420,6 +421,24 @@ pub fn run_ui_lab() -> io::Result<()> {
             width: (920.0 * scale) as i32,
             height: (660.0 * scale) as i32,
             view: View::UiLab(ui_lab::UiLab::new()),
+        }],
+        None,
+    )
+}
+
+/// Opens one operator-validated UI document as a local developer preview.
+///
+/// The caller must decode the document before this function is called. This
+/// view has no package, protocol, application session, or capability binding;
+/// its semantic actions remain local to the preview view.
+pub fn run_ui_preview(document: UiDocument) -> io::Result<()> {
+    let scale = primary_scale();
+    run_windows(
+        vec![WindowDefinition {
+            title: "Anodrel UI Preview".to_owned(),
+            width: (920.0 * scale) as i32,
+            height: (660.0 * scale) as i32,
+            view: View::UiLab(ui_lab::UiLab::preview(document)),
         }],
         None,
     )

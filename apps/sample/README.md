@@ -29,3 +29,16 @@ If `content/main.txt` changes, its SHA-256 value in the manifest must be
 updated in the same review. Its Git attribute preserves exact bytes so line
 ending conversion cannot invalidate that digest. This format has no scripts,
 executable entry point, navigation, or native bridge.
+
+## Native UI preview
+
+`anodrel.ui.json` is a strict native UI document for the explicit Windows
+developer preview. From the repository root, run:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-preview apps/sample/anodrel.ui.json
+~~~
+
+It exercises the document decoder, direct native layout, pointer hit testing,
+and keyboard focus without opening an application session or native capability.
+See `docs/UI_PREVIEW.md`.

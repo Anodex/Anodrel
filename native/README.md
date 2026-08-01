@@ -146,6 +146,11 @@ screen. Tab and Shift+Tab move the test focus ring; Enter reports the focused
 action's ID. These actions do not create a session or grant a capability. See
 `docs/UI.md`.
 
+`--ui-preview <document.json>` is an explicit developer command that reads one
+bounded regular JSON file, validates it through `anodrel-ui-document`, and
+renders it through the same native UI view. It does not load a package or asset,
+create a protocol session, or grant an action authority. See `docs/UI_PREVIEW.md`.
+
 Verify from the repository root:
 
 ~~~text
