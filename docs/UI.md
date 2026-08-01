@@ -65,9 +65,27 @@ untrusted source can construct a document through Anodrel today. When a package
 or session transports this tree, that surface must have its own version,
 resource limits, compatibility tests, and security decision before reuse.
 
+## Windows UI Lab
+
+The direct Windows host includes a fixed, host-owned consumer of this contract:
+
+~~~text
+anodrel-windows-host --ui-lab
+~~~
+
+It uses the Windows text-measurement seam, Anodrel's software canvas, and a
+validated `UiDocument` to draw a responsive native screen. Hovering and
+clicking an action exercises the same layout hit test and displays its semantic
+element ID. The view has no package input and the event changes only its own
+diagnostic reading: it does not call Windows, open a process, read a file, send
+a protocol message, or grant a capability. It is a renderer-and-input test,
+not an application UI API.
+
 ## Verification
 
 The portable crate tests ID validation and every document resource limit,
 unique IDs, vertical and horizontal placement, clipping, responsive bounds,
 disabled actions, and top-most action hit testing. It has no operating-system
-or third-party runtime dependency.
+or third-party runtime dependency. The Windows host additionally tests that the
+UI Lab paints content, resolves every fixed action to its own ID, tracks scaled
+hit testing, and changes only host-owned diagnostic state on invocation.

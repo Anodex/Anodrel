@@ -6,7 +6,7 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use super::{Hwnd, StartupLab, View};
+use super::{Hwnd, StartupLab, View, ui_lab::UiLab};
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 
@@ -42,6 +42,21 @@ pub(super) fn with_startup_lab<R>(
     }
 }
 
+/// Mutates a window's host-owned UI Lab state in place.
+///
+/// The UI Lab is a fixed diagnostic view. It is separate from Startup Lab so
+/// UI action events cannot inherit Startup Lab's linked host operations.
+pub(super) fn with_ui_lab<R>(
+    window: Hwnd,
+    change: impl FnOnce(&mut UiLab) -> R,
+) -> io::Result<Option<R>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiLab(lab)) => Ok(Some(change(lab))),
+        _ => Ok(None),
+    }
+}
+
 /// Removes a window and returns the number of host windows that remain.
 pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
     let mut views = lock_views()?;
@@ -61,6 +76,7 @@ mod tests {
     use super::*;
     use crate::win32::PackageFacts;
     use crate::win32::document::Document;
+    use crate::win32::ui_lab::UiLab;
     use anodrel_diagnostics::LogBook;
     use std::time::Instant;
 
@@ -90,6 +106,10 @@ mod tests {
             hovered: None,
             ambient: false,
         })
+    }
+
+    fn ui_lab_view() -> View {
+        View::UiLab(UiLab::new())
     }
 
     #[test]
@@ -138,6 +158,28 @@ mod tests {
         assert_eq!(lab.hovered, Some(2));
         assert_eq!(lab.last_frame_micros, 1_500);
         remove(window).expect("lab closes");
+    }
+
+    #[test]
+    fn ui_lab_state_is_mutated_only_for_a_ui_lab_window() {
+        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let window = -203;
+        insert(window, ui_lab_view()).expect("UI Lab view registers");
+        assert_eq!(
+            with_ui_lab(window, |lab| {
+                let was_empty = lab.hovered.is_none() && lab.last_action.is_none();
+                lab.clear_hover();
+                was_empty
+            })
+            .expect("mutation succeeds"),
+            Some(true)
+        );
+        assert!(
+            with_startup_lab(window, |_| ())
+                .expect("mutation succeeds")
+                .is_none()
+        );
+        assert_eq!(remove(window).expect("UI Lab closes"), 0);
     }
 
     #[test]

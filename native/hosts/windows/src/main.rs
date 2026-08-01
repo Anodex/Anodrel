@@ -35,10 +35,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     if arguments.as_slice() == ["--window-lab"] {
         return win32::run_window_lab().map_err(Into::into);
     }
+    if arguments.as_slice() == ["--ui-lab"] {
+        return win32::run_ui_lab().map_err(Into::into);
+    }
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js>]",
         )
         .into());
     }

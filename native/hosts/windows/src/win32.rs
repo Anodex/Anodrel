@@ -6,8 +6,8 @@
 //!
 //! Submodules split that responsibility: [`present`] moves a canvas to the
 //! screen, [`text`] turns GDI glyphs into canvas coverage, [`appicon`] builds
-//! the window icon from brand geometry, and [`startup_lab`] and [`document`]
-//! own the two surfaces the host can show.
+//! the window icon from brand geometry, and [`startup_lab`], [`document`], and
+//! [`ui_lab`] own the host surfaces.
 
 #![allow(non_snake_case)]
 
@@ -18,6 +18,7 @@ mod registry;
 mod startup_lab;
 mod stats;
 mod text;
+mod ui_lab;
 
 use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
@@ -242,6 +243,7 @@ fn startup_log_book() -> LogBook {
 enum View {
     Document(Document),
     StartupLab(StartupLab),
+    UiLab(ui_lab::UiLab),
 }
 
 struct WindowDefinition {
@@ -396,6 +398,24 @@ pub fn run_window_lab() -> io::Result<()> {
                 460,
             ),
         ],
+        None,
+    )
+}
+
+/// Opens the host-owned visual and input test for the native UI foundation.
+///
+/// The screen uses a fixed document constructed by the host. Its action events
+/// update only a visible diagnostic line; they never reach an application or a
+/// native capability boundary.
+pub fn run_ui_lab() -> io::Result<()> {
+    let scale = primary_scale();
+    run_windows(
+        vec![WindowDefinition {
+            title: "Anodrel UI Lab".to_owned(),
+            width: (920.0 * scale) as i32,
+            height: (660.0 * scale) as i32,
+            view: View::UiLab(ui_lab::UiLab::new()),
+        }],
         None,
     )
 }
@@ -962,6 +982,11 @@ fn paint(window: Hwnd, device_context: Hdc, view: &View, update: Rect) -> u64 {
                 }
             });
         }
+        View::UiLab(lab) => {
+            let mut canvas = Canvas::new(width, height);
+            ui_lab::draw(&mut canvas, lab);
+            present::present(device_context, &canvas);
+        }
     }
     started.elapsed().as_micros() as u64
 }
@@ -1095,20 +1120,31 @@ unsafe extern "system" fn window_proc(
         WM_MOUSEMOVE => {
             let (x, y) = mouse_position(lparam);
             let rect = client_rect(window);
-            let hovered = startup_lab::action_at(
-                rect.width() as f32,
-                rect.height() as f32,
-                point(x as f32, y as f32),
-            )
-            .filter(|index| startup_lab::ACTIONS[*index].linked);
-            let changed = registry::with_startup_lab(window, |lab| {
-                let changed = lab.hovered != hovered;
-                lab.hovered = hovered;
-                changed
+            let changed = registry::with_ui_lab(window, |lab| {
+                lab.update_hover(
+                    rect.width() as f32,
+                    rect.height() as f32,
+                    point(x as f32, y as f32),
+                )
             })
             .ok()
             .flatten()
-            .unwrap_or(false);
+            .unwrap_or_else(|| {
+                let hovered = startup_lab::action_at(
+                    rect.width() as f32,
+                    rect.height() as f32,
+                    point(x as f32, y as f32),
+                )
+                .filter(|index| startup_lab::ACTIONS[*index].linked);
+                registry::with_startup_lab(window, |lab| {
+                    let changed = lab.hovered != hovered;
+                    lab.hovered = hovered;
+                    changed
+                })
+                .ok()
+                .flatten()
+                .unwrap_or(false)
+            });
             if changed {
                 invalidate(window);
             }
@@ -1126,29 +1162,36 @@ unsafe extern "system" fn window_proc(
             0
         }
         WM_MOUSELEAVE => {
-            let changed = registry::with_startup_lab(window, |lab| {
-                let changed = lab.hovered.is_some();
-                lab.hovered = None;
-                changed
-            })
-            .ok()
-            .flatten()
-            .unwrap_or(false);
+            let changed = registry::with_ui_lab(window, ui_lab::UiLab::clear_hover)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| {
+                    registry::with_startup_lab(window, |lab| {
+                        let changed = lab.hovered.is_some();
+                        lab.hovered = None;
+                        changed
+                    })
+                    .ok()
+                    .flatten()
+                    .unwrap_or(false)
+                });
             if changed {
                 invalidate(window);
             }
             0
         }
         WM_SETCURSOR if (lparam as u32 & 0xFFFF) as isize == HTCLIENT => {
-            let hovered = registry::with_startup_lab(window, |lab| lab.hovered)
+            let hovered = registry::with_ui_lab(window, |lab| lab.hovered.is_some())
                 .ok()
                 .flatten()
-                .flatten();
-            let cursor_id = if hovered.is_some() {
-                IDC_HAND
-            } else {
-                IDC_ARROW
-            };
+                .unwrap_or_else(|| {
+                    registry::with_startup_lab(window, |lab| lab.hovered)
+                        .ok()
+                        .flatten()
+                        .flatten()
+                        .is_some()
+                });
+            let cursor_id = if hovered { IDC_HAND } else { IDC_ARROW };
             // SAFETY: both identifiers are documented integer resources, and
             // LoadCursorW returns a shared cursor that must not be destroyed.
             unsafe {
@@ -1159,6 +1202,21 @@ unsafe extern "system" fn window_proc(
         WM_LBUTTONUP => {
             let (x, y) = mouse_position(lparam);
             let rect = client_rect(window);
+            if let Some(changed) = registry::with_ui_lab(window, |lab| {
+                lab.invoke(
+                    rect.width() as f32,
+                    rect.height() as f32,
+                    point(x as f32, y as f32),
+                )
+            })
+            .ok()
+            .flatten()
+            {
+                if changed {
+                    invalidate(window);
+                }
+                return 0;
+            }
             let clicked = startup_lab::action_at(
                 rect.width() as f32,
                 rect.height() as f32,

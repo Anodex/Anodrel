@@ -126,6 +126,11 @@ separate diagnostic scope. See `docs/INSTANCE_LIFECYCLE.md`.
 registry. Closing one leaves the other open; closing the final window exits the
 message loop. It is a lifecycle diagnostic, not a public window API.
 
+`--ui-lab` opens a fixed host-owned screen built through `anodrel-ui`. Its
+actions use the documented layout hit test and show only their semantic IDs in
+the same screen. They do not call Windows, create a session, or grant a
+capability. See `docs/UI.md`.
+
 Verify from the repository root:
 
 ~~~text
@@ -144,11 +149,12 @@ cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-lab
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab
 ~~~
 
-The final two commands are manual Windows smoke checks: confirm that an
-**Anodrel Windows host** window shows a `platform.health` success response, and
-that the sample package window identifies `org.anodrel.sample` and displays
-verified text. The Startup Lab command must show the branded native surface,
-verified identity, and three foundation cards. Close each normally. Windows is
-required; WebView2 is not.
+The Windows host commands are manual smoke checks: the default host window must
+show a `platform.health` success response; the sample package window must
+identify `org.anodrel.sample` and display verified text; Startup Lab must show
+the branded native surface, verified identity, and its foundation cards; and UI
+Lab must update only its semantic-event reading when an action is clicked.
+Close each normally. Windows is required; WebView2 is not.

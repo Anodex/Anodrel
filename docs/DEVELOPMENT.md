@@ -67,10 +67,14 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-ui
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --windows-pipe --iterations 5000
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab
 ~~~
 
-The last command is a manual smoke check: an **Anodrel Windows host** window
-must show a successful internal `platform.health` response and close normally.
+The direct host command without an argument is a manual smoke check: an
+**Anodrel Windows host** window must show a successful internal
+`platform.health` response and close normally. `--ui-lab` is a separate manual
+check for the owned UI foundation: hover actions for the hand cursor, click one,
+and confirm that the screen reports only its semantic ID.
 It needs Windows but does not require WebView2. Do not add privileged
 capabilities or new third-party runtime dependencies. The named-pipe adapter
 already binds a logon-SID DACL and a host-generated credential; the bootstrap

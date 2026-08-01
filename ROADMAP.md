@@ -67,9 +67,10 @@ Status: **Direct Windows host in progress**
   per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
 - Define an owned native application UI foundation. **In progress:** a portable
   declarative layout tree with semantic actions establishes the first reusable
-  UI contract (Decision 0025). Rendering, authenticated application input,
-  accessibility, focus, scrolling, and an application package format remain
-  separate gates.
+  UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a
+  fixed host-owned document through that contract. Authenticated application
+  input, accessibility, focus, scrolling, and an application package format
+  remain separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

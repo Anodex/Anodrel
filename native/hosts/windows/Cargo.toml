@@ -12,6 +12,7 @@ anodrel-core = { path = "../../crates/core" }
 anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-ui = { path = "../../crates/ui" }
 anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
