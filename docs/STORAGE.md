@@ -1,7 +1,7 @@
 # Application state storage v1
 
-**Status:** Designed foundation; no native adapter or public protocol operation
-is available yet.
+**Status:** Portable value and host-service foundation. No native adapter or
+public protocol operation is available yet.
 
 ## Purpose and boundary
 
@@ -18,9 +18,10 @@ future scoped document-access feature.
 
 ## Planned value contract
 
-The portable storage value is an arbitrary UTF-8 byte sequence of at most
-**256 KiB**. It may be empty. An absent snapshot is distinct from an empty
-snapshot. The first storage service will expose only these host operations:
+`anodrel-storage` defines the portable storage value as an arbitrary UTF-8 byte
+sequence of at most **256 KiB**. It may be empty. An absent snapshot is distinct
+from an empty snapshot. The host-service interface exposes only these
+operations:
 
 | Operation | Input | Result |
 | --- | --- | --- |
@@ -63,8 +64,8 @@ concurrent multi-process writer policy require separate decisions.
 
 ## Verification plan
 
-The portable foundation will test absent versus empty state, the fixed size
-limit, value redaction, and error categories. The Windows adapter will test
+The portable foundation tests absent versus empty state, the fixed size limit,
+value redaction, and error categories. The Windows adapter will test
 current-user identity isolation, atomic replacement, recovery from an
 interrupted staging file, malformed-record rejection, link rejection, and that
 no storage path or content appears in safe error output. Authenticated protocol

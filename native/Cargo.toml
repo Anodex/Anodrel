@@ -15,6 +15,7 @@ members = [
   "crates/application",
   "crates/session-policy",
   "crates/paths",
+  "crates/storage",
   "crates/credentials",
   "crates/clipboard",
   "crates/external-links",

@@ -111,6 +111,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-storage"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-transport"
 version = "0.1.0"
 dependencies = [

@@ -131,7 +131,7 @@ before process launch.
 `docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
 boundary.
 `docs/STORAGE.md` defines the planned bounded application-state storage
-boundary.
+boundary and its portable value foundation.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.

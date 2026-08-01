@@ -137,9 +137,9 @@ The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. That builder derives fixed
 per-application `data`, `cache`, and `logs` locations solely from the validated
 application identity; it never creates, enumerates, or exposes those paths to
-the protocol. The planned state-store foundation reserves one bounded opaque
-snapshot below `data`, while its adapter and protocol grants remain separate
-work. Logging and future storage services define their own permission,
+the protocol. The portable state-store foundation reserves one bounded opaque
+snapshot below `data`, while its native adapter and protocol grants remain
+separate work. Logging and future storage services define their own permission,
 creation, and recovery rules on top of this layout. See `docs/PATHS.md`,
 `docs/STORAGE.md`, Decisions 0021 and 0051.
 
