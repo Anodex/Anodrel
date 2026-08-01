@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0039: Scroll documents use a new exact format version.
+
 - 0038: Scroll containers use host-retained state and layout metrics.
 
 - 0037: Scroll state starts as an owned bounded primitive.

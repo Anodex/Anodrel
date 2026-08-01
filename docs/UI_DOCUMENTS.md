@@ -133,6 +133,27 @@ representation fits inside the same 64 KiB limit; otherwise it returns the
 encoded-limit failure. Consumers must treat object-member ordering as
 non-semantic.
 
+## Version 2 scroll extension
+
+`anodrel.ui.document.v2` is the next exact format identifier. It retains the
+v1 envelope and the `stack`, `text`, and `action` objects unchanged. It adds
+only this node object:
+
+### Scroll
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `id` | string | Valid, document-unique element ID. |
+| `kind` | string | `scroll` |
+| `child` | node object | Exactly one v2 node object. |
+
+No scroll position, input policy, callback, command, native operation,
+scrollbar, or accessibility handle is encoded. The host retains each position
+separately under this node's element ID. A v2 decoder rejects unknown or
+missing fields exactly as v1 does; a v1 decoder continues to reject `scroll`.
+The v2 codec implementation and its document-session compatibility tests are
+the next implementation work under Decision 0039.
+
 ## Verification
 
 `anodrel-ui-document` tests a known document round trip, every version 1 node kind and

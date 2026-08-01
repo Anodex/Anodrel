@@ -34,5 +34,6 @@ are intentionally outside this contract.
 ## Format compatibility
 
 `anodrel.ui.document.v1` remains exact and does not accept scroll containers.
-The first external scroll-container form will use a new exact format identifier
-and tests that prove v1 remains unchanged.
+Decision 0039 defines `anodrel.ui.document.v2` as the first exact external
+scroll-container form. Its codec and session compatibility tests remain to be
+implemented; it will never serialize a scroll position.
