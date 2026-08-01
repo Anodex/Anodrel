@@ -34,6 +34,9 @@ anodrel-windows-paths -> anodrel-paths -> Shell32 / Ole32
 anodrel-credentials -> anodrel-application
 anodrel-windows-credentials -> anodrel-credentials -> Advapi32
 
+anodrel-external-links -> Shell32
+anodrel-windows-external-links -> anodrel-external-links -> Shell32
+
 anodrel-json -> anodrel-application -> anodrel-windows-host
 
 anodrel-ui -> future renderer / input adapter
@@ -107,6 +110,12 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   generic Credential Manager target derived from a validated identity. It
   cannot enumerate credentials or expose a secret, target, or raw Windows
   status to diagnostics or an application.
+- `crates/external-links` validates one bounded ASCII HTTPS link with a strict
+  DNS-style authority. It has no native handoff, protocol, shell, or network
+  operation.
+- `adapters/windows-external-links` hands one validated HTTPS link to the
+  ordinary Windows association through Shell32 with no verb, arguments,
+  directory, process handle, or raw native error exposure.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
   handle-keyed view registry, client-area drawing, and final-window shutdown.
 

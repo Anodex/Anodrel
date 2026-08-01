@@ -54,6 +54,7 @@ authority for permissions.
 | Application data, cache, or log output crosses an application boundary. | Derive the fixed location only from a host-validated application ID below the current user's Local AppData root; accept no application-supplied absolute path, and do not expose the location through the current protocol. |
 | An application reads, replaces, or leaks another application's credential. | Derive one exact generic Credential Manager target from the host-validated application ID and a restricted credential name; prohibit arbitrary targets and enumeration, keep secrets opaque and bounded, and expose no credential protocol operation until authenticated capability checks exist. |
 | An application reads rich clipboard data, targets another window, or leaks clipboard contents through diagnostics. | Accept only an immediate `clipboard.read` or `clipboard.write` grant from host policy; permit only bounded Unicode text with no format, source, owner, history, or handle selector; return safe categories and never log clipboard text or native failure detail. |
+| A link launches a command, file, custom protocol, or leaks a destination through diagnostics. | Validate only bounded ASCII HTTPS links with one DNS-style authority before the native call; pass no verb, parameters, directory, or shell string; return a safe unavailable category and never log the address or native status. |
 | A child process gains arbitrary shell authority or outlives the host. | The launch service supplies only the policy-approved `.exe` with no child arguments or shell, retains a child handle, and terminates it on shutdown. |
 | A mutable package substitutes a trusted but unauthorized executable. | Do not treat a package-held manifest or an Authenticode result alone as launch authority; require an external installed application record, lock the contained executable against write/delete/rename, hash it through that lock, then match its verified signer to the record's application-ID-bound publisher fingerprint. |
 | An application chooses or substitutes its launch policy. | Read the installed record only from the fixed 64-bit `HKEY_LOCAL_MACHINE` policy location selected by the host; accept no current-user, package, environment, protocol, or UI policy source. Require the registry key, record, and validated package to carry the same application ID. |
@@ -196,10 +197,13 @@ The native-host decision must extend this model with:
 - tests for traversal, malformed input, capability bypass, shutdown races, and
   overload handling.
 
-No filesystem, process, credential, dialog, notification, or external-link
-operation may be implemented until its contract and these host-specific
-controls are documented and tested. The bounded text clipboard is the explicit
-exception: `docs/CLIPBOARD.md`, Decisions 0040 and 0041, capability checks,
-portable and native-boundary tests, and the authenticated transport integration
-test define and verify its development-session exposure. Production executable
-trust, consent, and every richer clipboard feature remain separate gates.
+No application-facing filesystem, process, credential, dialog, notification,
+or external-link operation may be implemented until its contract and these
+host-specific controls are documented and tested. The bounded text clipboard is
+the explicit current application-facing exception: `docs/CLIPBOARD.md`,
+Decisions 0040 and 0041, capability checks, portable and native-boundary tests,
+and the authenticated transport integration test define and verify its
+development-session exposure. `docs/EXTERNAL_LINKS.md` and Decision 0042 define
+the validated HTTPS host adapter, but it has no protocol operation or
+application capability yet. Production executable trust, consent, and richer
+platform features remain separate gates.

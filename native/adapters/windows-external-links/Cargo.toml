@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-windows-external-links"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-external-links = { path = "../../crates/external-links" }

@@ -17,6 +17,7 @@ members = [
   "crates/paths",
   "crates/credentials",
   "crates/clipboard",
+  "crates/external-links",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-instance",
@@ -27,6 +28,7 @@ members = [
   "adapters/windows-paths",
   "adapters/windows-credentials",
   "adapters/windows-clipboard",
+  "adapters/windows-external-links",
   "hosts/windows",
   "tools/perf-lab",
 ]

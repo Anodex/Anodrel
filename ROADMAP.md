@@ -95,8 +95,11 @@ Status: **Direct Windows host in progress**
   access, directory creation, and a public storage protocol remain deferred.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
-  0041). Rich formats, consent, subscriptions, and non-Windows adapters
-  remain deferred.
+  0041). The external-link foundation accepts only validated HTTPS values and
+  hands them directly to the Windows association with no command construction
+  (Decision 0042); its protocol capability remains deferred. Rich clipboard
+  formats, consent, subscriptions, custom link schemes, and non-Windows
+  adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded

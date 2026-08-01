@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0042: External links start as validated HTTPS handoff.
+
 - 0041: Clipboard protocol operations are separate and bounded.
 
 - 0040: Clipboard starts with bounded Unicode text.
