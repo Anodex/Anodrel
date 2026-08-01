@@ -20,6 +20,15 @@ impl UiScrollState {
         self.offset_y
     }
 
+    /// Returns the vertical translation a viewport applies to its child.
+    ///
+    /// A host positions child content at this value before clipping it to the
+    /// viewport. The value is always finite and never exposes raw input data.
+    #[must_use]
+    pub const fn content_translation_y(self) -> f32 {
+        -self.offset_y
+    }
+
     /// Returns the largest valid offset for the supplied vertical extents.
     #[must_use]
     pub fn maximum_offset(viewport_height: f32, content_height: f32) -> f32 {
@@ -126,6 +135,7 @@ mod tests {
         assert_eq!(scroll.offset_y(), 140.0);
         assert!(scroll.scroll_to(999.0, 100.0, 250.0));
         assert_eq!(scroll.offset_y(), 150.0);
+        assert_eq!(scroll.content_translation_y(), -150.0);
         assert!(scroll.scroll_line(false, 100.0, 250.0));
         assert_eq!(scroll.offset_y(), 110.0);
     }
