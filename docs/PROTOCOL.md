@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.3
+**Status:** Foundation contract, version 1.4
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.3 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 3}`.
+the host's. Version 1.4 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 4}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -61,6 +61,7 @@ The current operations are:
 | `platform.capabilities` | `{}` | application ID and current grants | none |
 | `platform.health` | `{}` | ready status, host name, and version | `diagnostics.read` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
+| `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
 | `session.close` | `{}` | accepted close request | `session.close` |
 
@@ -86,6 +87,17 @@ it exactly rather than interpreting it as a JavaScript number. A replacement
 always advances the revision. This operation has no incremental patch form,
 window selection, document readback, action event, renderer attachment, or
 native side effect.
+
+### `ui.document.replace.v2`
+
+Protocol 1.4 adds this explicit replacement operation for one exact
+`anodrel.ui.document.v2` document. It has the same authenticated-session scope,
+`ui.document.write` capability check, 24 KiB encoded limit, atomic revision
+result, and safe failure behavior as `ui.document.replace`. It differs only in
+the document codec: v2 may contain the bounded `scroll` node defined in
+`docs/UI_DOCUMENTS.md`; its position remains host-owned runtime state and is
+never part of the request or result. A v1 document passed to this operation is
+invalid, and a v2 document passed to `ui.document.replace` is invalid.
 
 ### `ui.events.read`
 

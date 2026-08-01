@@ -171,11 +171,12 @@ export class MockHost {
         });
 
       case "ui.document.replace":
-        if (request.protocolVersion.minor < 1) {
+      case "ui.document.replace.v2":
+        if (request.protocolVersion.minor < (request.operation === "ui.document.replace.v2" ? 4 : 1)) {
           return this.failure(
             request.requestId,
             "operation.unsupported",
-            "ui.document.replace requires protocol 1.1 or later.",
+            `${request.operation} requires a supported protocol version.`,
           );
         }
         if (!isUiDocumentReplacePayload(request.payload)) {
@@ -194,7 +195,7 @@ export class MockHost {
           );
         }
         uiDocument.revision += 1;
-        return this.success("ui.document.replace", request.requestId, {
+        return this.success(request.operation, request.requestId, {
           revision: uiDocument.revision.toString(),
         });
 

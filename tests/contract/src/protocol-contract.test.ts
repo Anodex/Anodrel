@@ -43,6 +43,18 @@ test("SDK and host bind UI document revisions to one granted transport session",
   assert.deepEqual(await client.replaceUiDocument(document), { revision: "2" });
 });
 
+test("SDK and host expose version two UI document replacement separately", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["ui.document.write"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+  const document =
+    '{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"text","value":"Hello","fontSize":16,"tone":"primary"}}}';
+
+  assert.deepEqual(await client.replaceUiDocumentV2(document), { revision: "1" });
+});
+
 test("UI document replacement requires a host-issued grant", async () => {
   const host = new MockHost({ applicationId: "test.application" });
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());

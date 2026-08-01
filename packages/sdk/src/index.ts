@@ -64,6 +64,10 @@ export class PlatformClient {
     return this.request("ui.document.replace", { document });
   }
 
+  replaceUiDocumentV2(document: string): Promise<ResultFor<"ui.document.replace.v2">> {
+    return this.request("ui.document.replace.v2", { document });
+  }
+
   readUiEvents(): Promise<ResultFor<"ui.events.read">> {
     return this.request("ui.events.read", {});
   }

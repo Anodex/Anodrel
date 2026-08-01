@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 3 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 4 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -44,6 +44,10 @@ export interface PlatformOperationMap {
     };
   };
   "ui.document.replace": {
+    readonly payload: { readonly document: string };
+    readonly result: { readonly revision: string };
+  };
+  "ui.document.replace.v2": {
     readonly payload: { readonly document: string };
     readonly result: { readonly revision: string };
   };

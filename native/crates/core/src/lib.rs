@@ -172,7 +172,10 @@ impl CoreHost {
             "platform.capabilities" => self.handle_capabilities(request),
             "platform.health" => self.handle_health(request),
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
-                self.handle_ui_document_replace(request)
+                self.handle_ui_document_replace(request, false)
+            }
+            "ui.document.replace.v2" if request.protocol_version.minor >= 4 => {
+                self.handle_ui_document_replace(request, true)
             }
             "ui.events.read" if request.protocol_version.minor >= 2 => {
                 self.handle_ui_events_read(request)
@@ -270,12 +273,17 @@ impl CoreHost {
         )
     }
 
-    fn handle_ui_document_replace(&self, request: RequestEnvelope) -> JsonValue {
+    fn handle_ui_document_replace(&self, request: RequestEnvelope, version_two: bool) -> JsonValue {
+        let operation = if version_two {
+            "ui.document.replace.v2"
+        } else {
+            "ui.document.replace"
+        };
         let Some(document) = ui_document_payload(&request.payload) else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "ui.document.replace requires one document string.",
+                format!("{operation} requires one document string."),
                 None,
             );
         };
@@ -283,7 +291,7 @@ impl CoreHost {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::CapabilityDenied,
-                "ui.document.replace requires the ui.document.write capability.",
+                format!("{operation} requires the ui.document.write capability."),
                 Some(BTreeMap::from([(
                     "capability".to_owned(),
                     JsonValue::String("ui.document.write".to_owned()),
@@ -294,14 +302,18 @@ impl CoreHost {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "ui.document.replace document exceeded the operation size limit.",
+                format!("{operation} document exceeded the operation size limit."),
                 None,
             );
         }
 
         let Some(snapshot) = ({
             let mut session = self.ui_document_session.borrow_mut();
-            let revision = session.replace_document(document);
+            let revision = if version_two {
+                session.replace_document_v2(document)
+            } else {
+                session.replace_document(document)
+            };
             revision.ok().and_then(|revision| {
                 session
                     .snapshot()
@@ -311,7 +323,7 @@ impl CoreHost {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "ui.document.replace document is invalid.",
+                format!("{operation} document is invalid."),
                 None,
             );
         };
@@ -520,6 +532,12 @@ mod tests {
         )
     }
 
+    fn request_v1_4(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":4}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
     fn ui_document_payload(document: &str) -> String {
         object([("document", JsonValue::String(document.to_owned()))]).to_json()
     }
@@ -528,6 +546,10 @@ mod tests {
         format!(
             r#"{{"format":"anodrel.ui.document.v1","root":{{"id":"root","kind":"action","label":"{label}","fontSize":16,"enabled":true,"tone":"accent"}}}}"#
         )
+    }
+
+    fn valid_ui_document_v2() -> &'static str {
+        r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}}"#
     }
 
     fn field<'a>(value: &'a JsonValue, field: &str) -> &'a JsonValue {
@@ -628,6 +650,33 @@ mod tests {
             JsonValue::parse(&host.handle_json(&oversized)).expect("response JSON is valid");
         assert_eq!(
             field(field(&oversized, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn replaces_version_two_documents_only_through_the_new_operation() {
+        let host = host(vec![Capability::UiDocumentWrite]);
+        let document = valid_ui_document_v2();
+
+        let accepted = JsonValue::parse(&host.handle_json(&request_v1_4(
+            "ui.document.replace.v2",
+            &ui_document_payload(document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        let snapshot = host
+            .take_ui_document_update()
+            .expect("accepted version two document is delivered");
+        assert_eq!(snapshot.document().root().id().as_str(), "viewport");
+
+        let wrong_operation = JsonValue::parse(&host.handle_json(&request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&wrong_operation, "error"), "code").as_string(),
             Some("request.payload_invalid")
         );
     }
