@@ -104,6 +104,36 @@ pub struct Stack {
     pub(crate) children: Vec<UiNode>,
 }
 
+/// One vertical viewport with exactly one scrollable child tree.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Scroll {
+    pub(crate) id: ElementId,
+    pub(crate) child: Box<UiNode>,
+}
+
+impl Scroll {
+    /// Builds one scroll viewport around a validated child tree.
+    #[must_use]
+    pub fn new(id: ElementId, child: UiNode) -> Self {
+        Self {
+            id,
+            child: Box::new(child),
+        }
+    }
+
+    /// Returns this viewport's stable element ID.
+    #[must_use]
+    pub fn id(&self) -> &ElementId {
+        &self.id
+    }
+
+    /// Returns its one source-ordered child tree.
+    #[must_use]
+    pub fn child(&self) -> &UiNode {
+        &self.child
+    }
+}
+
 impl Stack {
     /// Builds a stack with bounded padding and inter-child gap.
     pub fn new(
@@ -310,6 +340,8 @@ impl Action {
 pub enum UiNode {
     /// A source-ordered stack.
     Stack(Stack),
+    /// A vertically clipped scroll viewport.
+    Scroll(Scroll),
     /// A non-interactive text run.
     Text(Text),
     /// A semantic action.
@@ -322,6 +354,7 @@ impl UiNode {
     pub fn id(&self) -> &ElementId {
         match self {
             Self::Stack(stack) => stack.id(),
+            Self::Scroll(scroll) => scroll.id(),
             Self::Text(text) => text.id(),
             Self::Action(action) => action.id(),
         }
@@ -399,6 +432,7 @@ impl DocumentValidator {
                     self.visit(child, depth + 1)?;
                 }
             }
+            UiNode::Scroll(scroll) => self.visit(scroll.child(), depth + 1)?,
             UiNode::Text(text) => self.add_text(text.value.len())?,
             UiNode::Action(action) => self.add_text(action.label.len())?,
         }

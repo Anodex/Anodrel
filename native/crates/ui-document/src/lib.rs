@@ -1,7 +1,9 @@
 //! Strict, capability-free interchange for Anodrel's native UI document.
 //!
 //! This crate decodes and encodes only `anodrel.ui.document.v1`, a bounded JSON
-//! form of [`anodrel_ui::UiDocument`]. It has no renderer, operating-system
+//! form of [`anodrel_ui::UiDocument`]. Version 1 deliberately does not encode
+//! an in-memory scroll container; an attempt returns `UnsupportedFormat` until
+//! a later exact format defines its fields. It has no renderer, operating-system
 //! call, package loader, protocol operation, session, callback, or capability.
 //! A future consumer must establish those boundaries separately.
 //!
@@ -26,8 +28,8 @@ pub const MAX_ENCODED_DOCUMENT_BYTES: usize = 64 * 1024;
 #[cfg(test)]
 mod tests {
     use anodrel_ui::{
-        Action, Axis, ElementId, Insets, Stack, Text, UiActionTone, UiDocument, UiError, UiNode,
-        UiSurfaceTone, UiTextTone,
+        Action, Axis, ElementId, Insets, Scroll, Stack, Text, UiActionTone, UiDocument, UiError,
+        UiNode, UiSurfaceTone, UiTextTone,
     };
 
     use super::{MAX_ENCODED_DOCUMENT_BYTES, UiDocumentError, decode, encode};
@@ -142,5 +144,16 @@ mod tests {
             encode(&document),
             Err(UiDocumentError::EncodedLimitExceeded)
         );
+    }
+
+    #[test]
+    fn refuses_to_encode_an_in_memory_scroll_container_as_version_one() {
+        let document = UiDocument::new(UiNode::Scroll(Scroll::new(
+            id("viewport"),
+            UiNode::Text(Text::new(id("content"), "Content", 16).expect("text is valid")),
+        )))
+        .expect("scroll model is valid");
+
+        assert_eq!(encode(&document), Err(UiDocumentError::UnsupportedFormat));
     }
 }

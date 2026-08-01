@@ -1,6 +1,11 @@
 //! Deterministic UI layout and semantic action hit testing.
 
-use crate::{Action, Axis, ElementId, Stack, Text, UiDocument, UiNode, UiPoint, UiRect, UiSize};
+use std::collections::BTreeMap;
+
+use crate::{
+    Action, Axis, ElementId, Scroll, Stack, Text, UiDocument, UiNode, UiPoint, UiRect,
+    UiScrollState, UiSize,
+};
 
 /// Horizontal padding applied to every action label, on each side.
 pub const ACTION_HORIZONTAL_PADDING: f32 = 16.0;
@@ -23,10 +28,48 @@ pub trait TextMeasurer {
 pub enum UiLayoutKind {
     /// A stack container.
     Stack,
+    /// A vertical scroll viewport.
+    Scroll,
     /// A non-interactive text run.
     Text,
     /// A semantic action.
     Action,
+}
+
+/// Host-owned scroll positions keyed by scroll-viewport element ID.
+///
+/// The layout engine reads but never mutates these positions. It independently
+/// clamps each supplied value against the current measured extents, while the
+/// returned [`UiScrollMetrics`] lets the host update its retained state after a
+/// layout or resize.
+pub type UiScrollOffsets = BTreeMap<ElementId, UiScrollState>;
+
+/// Measured vertical extents for one visible scroll viewport.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UiScrollMetrics {
+    id: ElementId,
+    viewport_height: f32,
+    content_height: f32,
+}
+
+impl UiScrollMetrics {
+    /// Returns the scroll viewport's stable element ID.
+    #[must_use]
+    pub fn id(&self) -> &ElementId {
+        &self.id
+    }
+
+    /// Returns the visible viewport height in logical pixels.
+    #[must_use]
+    pub const fn viewport_height(&self) -> f32 {
+        self.viewport_height
+    }
+
+    /// Returns the child content height in logical pixels.
+    #[must_use]
+    pub const fn content_height(&self) -> f32 {
+        self.content_height
+    }
 }
 
 /// One visible element in source paint order.
@@ -87,6 +130,7 @@ impl UiEvent {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UiLayout {
     items: Vec<UiLayoutItem>,
+    scroll_metrics: Vec<UiScrollMetrics>,
 }
 
 impl UiLayout {
@@ -94,6 +138,15 @@ impl UiLayout {
     #[must_use]
     pub fn items(&self) -> &[UiLayoutItem] {
         &self.items
+    }
+
+    /// Returns visible scroll viewport extents in source order.
+    ///
+    /// A host retains each viewport's [`UiScrollState`] separately, then uses
+    /// these extents to clamp it after a layout or resize.
+    #[must_use]
+    pub fn scroll_metrics(&self) -> &[UiScrollMetrics] {
+        &self.scroll_metrics
     }
 
     /// Returns clipped visible bounds for an element ID, if visible.
@@ -130,6 +183,23 @@ impl UiDocument {
     /// rectangle. An empty or non-finite client rectangle produces no items.
     #[must_use]
     pub fn layout(&self, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiLayout {
+        self.layout_with_scroll_offsets(client_bounds, measurer, &UiScrollOffsets::new())
+    }
+
+    /// Lays out this document with host-owned vertical scroll positions.
+    ///
+    /// Missing viewport IDs start at offset zero. The supplied positions are
+    /// never changed. Each visible scroll child is vertically translated by
+    /// its current clamped position and clipped to its viewport on all edges.
+    /// [`UiLayout::scroll_metrics`] reports the extents that a host needs to
+    /// retain a clamped position for the next pass.
+    #[must_use]
+    pub fn layout_with_scroll_offsets(
+        &self,
+        client_bounds: UiRect,
+        measurer: &dyn TextMeasurer,
+        scroll_offsets: &UiScrollOffsets,
+    ) -> UiLayout {
         if client_bounds.is_empty() {
             return UiLayout::default();
         }
@@ -140,6 +210,7 @@ impl UiDocument {
             root_bounds,
             client_bounds,
             measurer,
+            scroll_offsets,
             &mut layout,
         );
         layout
@@ -149,7 +220,7 @@ impl UiDocument {
 fn root_bounds(node: &UiNode, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiRect {
     match node {
         UiNode::Text(text) => bounded_text_bounds(text, client_bounds, measurer),
-        UiNode::Stack(_) | UiNode::Action(_) => client_bounds,
+        UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) => client_bounds,
     }
 }
 
@@ -158,6 +229,7 @@ fn layout_node(
     bounds: UiRect,
     clip: UiRect,
     measurer: &dyn TextMeasurer,
+    scroll_offsets: &UiScrollOffsets,
     layout: &mut UiLayout,
 ) {
     let visible_bounds = bounds.intersect(clip);
@@ -173,7 +245,23 @@ fn layout_node(
                 kind: UiLayoutKind::Stack,
                 enabled: false,
             });
-            layout_stack_children(stack, bounds, clip, measurer, layout);
+            layout_stack_children(stack, bounds, clip, measurer, scroll_offsets, layout);
+        }
+        UiNode::Scroll(scroll) => {
+            layout.items.push(UiLayoutItem {
+                id: scroll.id.clone(),
+                bounds: visible_bounds,
+                kind: UiLayoutKind::Scroll,
+                enabled: false,
+            });
+            layout_scroll_child(
+                scroll,
+                bounds,
+                visible_bounds,
+                measurer,
+                scroll_offsets,
+                layout,
+            );
         }
         UiNode::Text(text) => layout.items.push(UiLayoutItem {
             id: text.id.clone(),
@@ -195,6 +283,7 @@ fn layout_stack_children(
     bounds: UiRect,
     clip: UiRect,
     measurer: &dyn TextMeasurer,
+    scroll_offsets: &UiScrollOffsets,
     layout: &mut UiLayout,
 ) {
     let content = bounds.inset(stack.padding);
@@ -211,11 +300,18 @@ fn layout_stack_children(
                 let intrinsic = intrinsic_size(child, measurer);
                 let width = match child {
                     UiNode::Text(_) => intrinsic.width.min(content.width()),
-                    UiNode::Stack(_) | UiNode::Action(_) => content.width(),
+                    UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) => content.width(),
                 };
                 let child_bounds =
                     UiRect::from_size(content.left, cursor, width.max(0.0), intrinsic.height);
-                layout_node(child, child_bounds, child_clip, measurer, layout);
+                layout_node(
+                    child,
+                    child_bounds,
+                    child_clip,
+                    measurer,
+                    scroll_offsets,
+                    layout,
+                );
                 cursor += intrinsic.height + gap;
             }
         }
@@ -225,15 +321,56 @@ fn layout_stack_children(
                 let intrinsic = intrinsic_size(child, measurer);
                 let height = match child {
                     UiNode::Text(_) => intrinsic.height.min(content.height()),
-                    UiNode::Stack(_) | UiNode::Action(_) => content.height(),
+                    UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) => content.height(),
                 };
                 let child_bounds =
                     UiRect::from_size(cursor, content.top, intrinsic.width, height.max(0.0));
-                layout_node(child, child_bounds, child_clip, measurer, layout);
+                layout_node(
+                    child,
+                    child_bounds,
+                    child_clip,
+                    measurer,
+                    scroll_offsets,
+                    layout,
+                );
                 cursor += intrinsic.width + gap;
             }
         }
     }
+}
+
+fn layout_scroll_child(
+    scroll: &Scroll,
+    viewport_bounds: UiRect,
+    viewport_clip: UiRect,
+    measurer: &dyn TextMeasurer,
+    scroll_offsets: &UiScrollOffsets,
+    layout: &mut UiLayout,
+) {
+    let content_height = intrinsic_size(scroll.child(), measurer)
+        .height
+        .max(viewport_bounds.height());
+    let mut state = scroll_offsets.get(scroll.id()).copied().unwrap_or_default();
+    state.clamp(viewport_bounds.height(), content_height);
+    layout.scroll_metrics.push(UiScrollMetrics {
+        id: scroll.id().clone(),
+        viewport_height: viewport_bounds.height(),
+        content_height,
+    });
+    let child_bounds = UiRect::from_size(
+        viewport_bounds.left,
+        viewport_bounds.top + state.content_translation_y(),
+        viewport_bounds.width(),
+        content_height,
+    );
+    layout_node(
+        scroll.child(),
+        child_bounds,
+        viewport_clip,
+        measurer,
+        scroll_offsets,
+        layout,
+    );
 }
 
 fn intrinsic_size(node: &UiNode, measurer: &dyn TextMeasurer) -> UiSize {
@@ -241,6 +378,7 @@ fn intrinsic_size(node: &UiNode, measurer: &dyn TextMeasurer) -> UiSize {
         UiNode::Text(text) => measured_text(text.value(), text.font_size(), measurer),
         UiNode::Action(action) => intrinsic_action_size(action, measurer),
         UiNode::Stack(stack) => intrinsic_stack_size(stack, measurer),
+        UiNode::Scroll(scroll) => intrinsic_size(scroll.child(), measurer),
     }
 }
 
@@ -293,7 +431,7 @@ fn bounded_text_bounds(text: &Text, client_bounds: UiRect, measurer: &dyn TextMe
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Action, Axis, ElementId, Insets, Stack, Text, UiError};
+    use crate::{Action, Axis, ElementId, Insets, Scroll, Stack, Text, UiError, UiScrollState};
 
     struct FixedMeasurer;
 
@@ -325,6 +463,10 @@ mod tests {
         UiNode::Stack(
             Stack::new(id(id_value), axis, padding, gap, children).expect("test stack is valid"),
         )
+    }
+
+    fn scroll(id_value: &str, child: UiNode) -> UiNode {
+        UiNode::Scroll(Scroll::new(id(id_value), child))
     }
 
     #[test]
@@ -446,6 +588,7 @@ mod tests {
         };
         let layout = UiLayout {
             items: vec![lower, upper],
+            scroll_metrics: vec![],
         };
         assert_eq!(
             layout.hit_test(UiPoint::new(25.0, 25.0)),
@@ -491,6 +634,99 @@ mod tests {
                 .layout(UiRect::from_size(0.0, 0.0, 100.0, 100.0), &InvalidMeasurer)
                 .items()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn translates_scroll_content_and_clips_actions_to_its_viewport() {
+        let document = UiDocument::new(scroll(
+            "viewport",
+            stack(
+                "content",
+                Axis::Vertical,
+                Insets::zero(),
+                0,
+                vec![
+                    action("first", "First", true),
+                    action("second", "Second", true),
+                    action("third", "Third", true),
+                ],
+            ),
+        ))
+        .expect("document is valid");
+        let mut offsets = UiScrollOffsets::new();
+        let mut state = UiScrollState::default();
+        assert!(state.scroll_to(36.0, 60.0, 108.0));
+        offsets.insert(id("viewport"), state);
+
+        let layout = document.layout_with_scroll_offsets(
+            UiRect::from_size(0.0, 0.0, 100.0, 60.0),
+            &FixedMeasurer,
+            &offsets,
+        );
+
+        assert_eq!(
+            layout.scroll_metrics(),
+            &[UiScrollMetrics {
+                id: id("viewport"),
+                viewport_height: 60.0,
+                content_height: 108.0,
+            }]
+        );
+        assert_eq!(layout.bounds(&id("first")), None);
+        assert_eq!(
+            layout.bounds(&id("second")),
+            Some(UiRect::new(0.0, 0.0, 100.0, 36.0))
+        );
+        assert_eq!(
+            layout.bounds(&id("third")),
+            Some(UiRect::new(0.0, 36.0, 100.0, 60.0))
+        );
+        assert_eq!(
+            layout.hit_test(UiPoint::new(10.0, 10.0)),
+            Some(UiEvent::ActionInvoked(id("second")))
+        );
+        assert_eq!(
+            layout.hit_test(UiPoint::new(10.0, 50.0)),
+            Some(UiEvent::ActionInvoked(id("third")))
+        );
+    }
+
+    #[test]
+    fn clamps_stale_scroll_input_without_mutating_host_state() {
+        let document = UiDocument::new(scroll(
+            "viewport",
+            stack(
+                "content",
+                Axis::Vertical,
+                Insets::zero(),
+                0,
+                vec![
+                    action("first", "First", true),
+                    action("second", "Second", true),
+                ],
+            ),
+        ))
+        .expect("document is valid");
+        let mut offsets = UiScrollOffsets::new();
+        let mut stale_state = UiScrollState::default();
+        assert!(stale_state.scroll_to(300.0, 0.0, 300.0));
+        offsets.insert(id("viewport"), stale_state);
+
+        let layout = document.layout_with_scroll_offsets(
+            UiRect::from_size(0.0, 0.0, 100.0, 60.0),
+            &FixedMeasurer,
+            &offsets,
+        );
+
+        assert_eq!(offsets[&id("viewport")].offset_y(), 300.0);
+        assert_eq!(
+            layout.bounds(&id("first")),
+            Some(UiRect::new(0.0, 0.0, 100.0, 24.0))
+        );
+        assert_eq!(
+            layout.bounds(&id("second")),
+            Some(UiRect::new(0.0, 24.0, 100.0, 60.0))
         );
     }
 }

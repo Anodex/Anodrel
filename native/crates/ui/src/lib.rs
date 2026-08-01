@@ -31,7 +31,7 @@ pub use geometry::{UiPoint, UiRect, UiSize};
 pub use id::ElementId;
 pub use layout::{
     ACTION_HORIZONTAL_PADDING, ACTION_MINIMUM_HEIGHT, ACTION_VERTICAL_PADDING, TextMeasurer,
-    UiEvent, UiLayout, UiLayoutItem, UiLayoutKind,
+    UiEvent, UiLayout, UiLayoutItem, UiLayoutKind, UiScrollMetrics, UiScrollOffsets,
 };
-pub use model::{Action, Axis, Insets, Stack, Text, UiDocument, UiNode};
+pub use model::{Action, Axis, Insets, Scroll, Stack, Text, UiDocument, UiNode};
 pub use scroll::{DEFAULT_SCROLL_LINE, UiScrollState};

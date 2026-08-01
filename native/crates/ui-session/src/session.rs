@@ -106,6 +106,7 @@ fn contains_enabled_action(node: &UiNode, expected: &ElementId) -> bool {
             .children()
             .iter()
             .any(|child| contains_enabled_action(child, expected)),
+        UiNode::Scroll(scroll) => contains_enabled_action(scroll.child(), expected),
         UiNode::Text(_) => false,
     }
 }

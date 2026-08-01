@@ -1,13 +1,16 @@
 # Anodrel scroll-container contract
 
-**Status:** Design contract for the next UI document format.
+**Status:** Owned Rust model and layout contract. The external document format
+remains future work.
 
 ## Boundary
 
 A scroll container is a portable vertical viewport with one child tree. It owns
 no input device, timer, native handle, callback, protocol operation, or
 application command. The host keeps its `UiScrollState` separately and supplies
-the current offset to layout.
+the current offset to `UiDocument::layout_with_scroll_offsets`. Layout returns
+one `UiScrollMetrics` record for each visible viewport so the host can clamp
+its retained state after measuring the current viewport and content heights.
 
 ## Rules
 
@@ -19,6 +22,10 @@ the current offset to layout.
   through that viewport.
 - A nested scroll viewport is permitted only inside the existing depth and node
   limits; scroll positions are never serialized into document data.
+
+The convenience `UiDocument::layout` method supplies no offsets, so every
+scroll viewport starts at zero. Layout never mutates caller-owned positions;
+it independently clamps each input before translating the child.
 
 The first container is vertical only. Horizontal scrolling, overscroll,
 inertia, scrollbars, wheel deltas, gesture input, scroll events, and persistence

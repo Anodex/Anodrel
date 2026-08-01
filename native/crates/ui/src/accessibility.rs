@@ -109,16 +109,20 @@ fn collect_node(
         bounds,
         enabled,
     });
-    if let UiNode::Stack(stack) = node {
-        for child in stack.children() {
-            collect_node(child, visible_bounds, output);
+    match node {
+        UiNode::Stack(stack) => {
+            for child in stack.children() {
+                collect_node(child, visible_bounds, output);
+            }
         }
+        UiNode::Scroll(scroll) => collect_node(scroll.child(), visible_bounds, output),
+        UiNode::Text(_) | UiNode::Action(_) => {}
     }
 }
 
 fn semantic_fields(node: &UiNode) -> (UiAccessibilityRole, Option<String>, bool) {
     match node {
-        UiNode::Stack(_) => (UiAccessibilityRole::Group, None, false),
+        UiNode::Stack(_) | UiNode::Scroll(_) => (UiAccessibilityRole::Group, None, false),
         UiNode::Text(text) => text_fields(text),
         UiNode::Action(action) => action_fields(action),
     }

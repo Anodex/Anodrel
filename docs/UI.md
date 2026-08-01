@@ -21,11 +21,13 @@ back-pressure, cancellation, focus, accessibility, and lifecycle behavior.
 
 ## Tree model
 
-`UiDocument` owns one validated root node. Version 1 has only three node kinds:
+`UiDocument` owns one validated root node. Its in-memory Rust model has four
+node kinds:
 
 | Node | Fields | Meaning |
 | --- | --- | --- |
 | `Stack` | element ID, vertical or horizontal axis, padding, gap, semantic surface tone, children | Places child nodes in source order. |
+| `Scroll` | element ID, one child | A vertical viewport that clips and translates its one child. |
 | `Text` | element ID, plain text, font size, semantic text tone | A non-interactive text run. |
 | `Action` | element ID, plain label, font size, enabled state, semantic action tone | A semantic, hit-testable action. |
 
@@ -71,12 +73,17 @@ deterministically:
 - a hit test checks visible enabled actions in reverse paint order and returns
   `UiEvent::ActionInvoked(element_id)` only.
 
-The model has no scroll node, wrapping, transforms, z-index, animation, pointer
-capture, text editing, or implicit native behavior. `UiScrollState` is a
-separate bounded numerical foundation: it clamps one host-owned vertical offset
-against supplied viewport and content extents, but it has no tree attachment,
-input source, or renderer behavior yet. A scroll node and its next exact
-document format require their own documented contract before they are added.
+A `Scroll` is one vertical viewport. The host retains a `UiScrollState` for
+each scroll element ID and passes those states to
+`layout_with_scroll_offsets`. Layout never changes caller-owned state: it
+clamps the supplied position against the current full child height and viewport
+height, translates only the child vertically, clips it on all four viewport
+edges, and returns `UiScrollMetrics` so the host can retain a clamped value for
+the next pass. `layout` remains the zero-offset convenience method. The model
+has no wheel or gesture input, scrollbar, horizontal scrolling, overscroll,
+inertia, wrapping, transforms, z-index, animation, pointer capture, text
+editing, or implicit native behavior. See `docs/SCROLLING.md` and Decision
+0038.
 
 ## Focus traversal
 
@@ -104,6 +111,7 @@ plain-text accessible name.
 | UI node | Accessibility role | Accessible name | Enabled |
 | --- | --- | --- | --- |
 | `Stack` | `Group` | none | false |
+| `Scroll` | `Group` | none | false |
 | `Text` | `StaticText` | text value | false |
 | `Action` | `Button` | action label | action enabled state |
 
@@ -117,12 +125,13 @@ boundary.
 ## Compatibility
 
 This is a Rust API foundation, not an application file or protocol format.
-`docs/UI_DOCUMENTS.md` separately defines the exact capability-free JSON form
-that can decode into this model. The Windows UI Lab uses one compiled-in fixture
-and the separate explicit developer preview can render one bounded operator-
-selected document. When a package or session transports this tree to a host,
-that surface must still have its own lifecycle, resource limits, compatibility
-tests, and security decision before reuse.
+`docs/UI_DOCUMENTS.md` separately defines the exact capability-free JSON form.
+Its version 1 shape represents only stacks, text, and actions; it deliberately
+rejects an in-memory scroll node until a new exact format exists. The Windows
+UI Lab uses one compiled-in fixture and the separate explicit developer preview
+can render one bounded operator-selected document. When a package or session
+transports this tree to a host, that surface must still have its own lifecycle,
+resource limits, compatibility tests, and security decision before reuse.
 
 ## Windows UI Lab
 
@@ -151,8 +160,9 @@ unique IDs, vertical and horizontal placement, clipping, responsive bounds,
 disabled actions, top-most action hit testing, appearance-role defaults and
 selection, accessibility role/name/visibility semantics, and focus
 traversal/activation. It also tests finite, deterministic line, page, absolute,
-and relayout clamping for the independent scroll-state foundation. It has no operating-
-system or third-party runtime dependency. The Windows host additionally tests
+and relayout clamping for the independent scroll-state foundation, plus viewport
+translation, clipping, metrics, and stale input clamping for scroll containers.
+It has no operating-system or third-party runtime dependency. The Windows host additionally tests
 that the UI Lab paints content, resolves every fixed action to its own ID,
 tracks scaled hit testing, and changes only host-owned diagnostic state on
 invocation.

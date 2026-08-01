@@ -19,7 +19,7 @@ pub fn encode(document: &UiDocument) -> Result<String, UiDocumentError> {
         "format".to_owned(),
         JsonValue::String(UI_DOCUMENT_FORMAT_V1.to_owned()),
     );
-    fields.insert("root".to_owned(), node(document.root()));
+    fields.insert("root".to_owned(), node(document.root())?);
     let encoded = JsonValue::Object(fields).to_json();
     if encoded.len() > MAX_ENCODED_DOCUMENT_BYTES {
         Err(UiDocumentError::EncodedLimitExceeded)
@@ -28,15 +28,16 @@ pub fn encode(document: &UiDocument) -> Result<String, UiDocumentError> {
     }
 }
 
-fn node(node: &UiNode) -> JsonValue {
+fn node(node: &UiNode) -> Result<JsonValue, UiDocumentError> {
     match node {
         UiNode::Stack(stack) => stack_value(stack),
-        UiNode::Text(text) => text_value(text),
-        UiNode::Action(action) => action_value(action),
+        UiNode::Scroll(_) => Err(UiDocumentError::UnsupportedFormat),
+        UiNode::Text(text) => Ok(text_value(text)),
+        UiNode::Action(action) => Ok(action_value(action)),
     }
 }
 
-fn stack_value(stack: &Stack) -> JsonValue {
+fn stack_value(stack: &Stack) -> Result<JsonValue, UiDocumentError> {
     let mut fields = common_fields(stack.id().as_str(), "stack");
     fields.insert(
         "axis".to_owned(),
@@ -62,9 +63,15 @@ fn stack_value(stack: &Stack) -> JsonValue {
     );
     fields.insert(
         "children".to_owned(),
-        JsonValue::Array(stack.children().iter().map(node).collect()),
+        JsonValue::Array(
+            stack
+                .children()
+                .iter()
+                .map(node)
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
     );
-    JsonValue::Object(fields)
+    Ok(JsonValue::Object(fields))
 }
 
 fn text_value(text: &Text) -> JsonValue {

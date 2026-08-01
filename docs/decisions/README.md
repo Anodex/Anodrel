@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0038: Scroll containers use host-retained state and layout metrics.
+
 - 0037: Scroll state starts as an owned bounded primitive.
 
 - 0036: Session close uses a host-owned coalescing signal.

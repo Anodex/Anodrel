@@ -11,8 +11,9 @@ or deliver action events yet.
 ## Purpose and boundary
 
 `anodrel.ui.document.v1` is the first stable external representation of a
-bounded Anodrel UI tree. It lets a future SDK or package describe the same
-portable document that a host-owned caller can currently construct in Rust.
+bounded Anodrel UI tree. It lets a future SDK or package describe the supported
+version 1 subset of the portable document that a host-owned caller can
+currently construct in Rust.
 It is data only: it is not executable code, HTML, CSS, a web page, a renderer,
 a window request, or a capability declaration.
 
@@ -120,8 +121,10 @@ from 0 through 256.
 
 Version 1 is exact. A decoder rejects every unknown field, missing field,
 unknown enum value, non-integer number, out-of-range value, malformed document,
-or model validation failure. It returns only a stable failure category and must
-not echo raw untrusted input into a diagnostic.
+or model validation failure. In particular, the in-memory `Scroll` node has no
+version 1 node form: a `kind` of `scroll` is an unsupported node kind, and the
+version 1 encoder rejects a model containing one. It returns only a stable
+failure category and must not echo raw untrusted input into a diagnostic.
 
 An additive or semantic extension requires a new documented format version and
 compatibility tests. A v1 decoder must not guess at an unfamiliar document. The
@@ -132,7 +135,7 @@ non-semantic.
 
 ## Verification
 
-`anodrel-ui-document` tests a known document round trip, all node kinds and
+`anodrel-ui-document` tests a known document round trip, every version 1 node kind and
 appearance roles, unknown and missing fields, malformed values, unsupported
 format identifiers, size limits, and model-level document limits. It has only
 first-party `anodrel-ui` and `anodrel-json` dependencies and no operating-

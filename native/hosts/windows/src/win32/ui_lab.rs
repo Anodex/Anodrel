@@ -297,6 +297,17 @@ fn draw_node(
                 draw_node(canvas, lab, layout, child, surface, status_target, status);
             }
         }
+        UiNode::Scroll(scroll) => {
+            draw_node(
+                canvas,
+                lab,
+                layout,
+                scroll.child(),
+                surface,
+                status_target,
+                status,
+            );
+        }
         UiNode::Text(text_node) => {
             draw_text(canvas, text_node, bounds, surface, status_target, status);
         }
