@@ -234,6 +234,40 @@ test("file dialog validates filters and its independent host grant", async () =>
   );
 });
 
+test("SDK and host agree on a separately authorized save dialog", async () => {
+  const client = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.save_file"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+
+  assert.deepEqual(await client.saveFileDialog([{ label: "Text", extensions: ["txt"] }]), {
+    status: "cancelled",
+  });
+
+  const openOnlyClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.open_file"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => openOnlyClient.saveFileDialog([{ label: "Text", extensions: ["txt"] }]),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "dialog.save_file",
+  );
+
+  await assert.rejects(
+    () => client.saveFileDialog([{ label: "Raw", extensions: ["*.txt"] }]),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+  );
+});
+
 test("session close requires a host-issued grant", async () => {
   const host = new MockHost({ applicationId: "test.application" });
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());

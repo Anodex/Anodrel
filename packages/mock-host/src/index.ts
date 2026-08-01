@@ -376,13 +376,26 @@ export class MockHost {
 
       case "dialog.save_file":
         if (request.protocolVersion.minor < 8) {
-          return this.failure(request.requestId, "operation.unsupported", "dialog.save_file requires protocol 1.8 or later.");
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "dialog.save_file requires protocol 1.8 or later.",
+          );
         }
         if (!isFileDialogOpenPayload(request.payload)) {
-          return this.failure(request.requestId, "request.payload_invalid", "dialog.save_file requires strict bounded filters.");
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "dialog.save_file requires strict bounded filters.",
+          );
         }
         if (!this.hasCapability(sessionId, "dialog.save_file")) {
-          return this.failure(request.requestId, "capability.denied", "dialog.save_file requires the dialog.save_file capability.", { capability: "dialog.save_file" });
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "dialog.save_file requires the dialog.save_file capability.",
+            { capability: "dialog.save_file" },
+          );
         }
         return this.success("dialog.save_file", request.requestId, { status: "cancelled" });
 

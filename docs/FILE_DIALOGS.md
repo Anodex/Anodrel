@@ -2,7 +2,8 @@
 
 **Status:** Portable open/save-dialog values, a direct Windows adapter, and a
 bounded UI-thread request bridge are implemented. Protocol 1.7 exposes the
-session-bound `dialog.open_file` capability through that bridge.
+session-bound `dialog.open_file` capability and Protocol 1.8 exposes the
+independent `dialog.save_file` capability through that bridge.
 
 ## Boundary
 
@@ -34,6 +35,5 @@ mailbox, selecting the host window as the native owner.
 
 ## Deferred
 
-Initial-directory policy, file access, the session-bound save capability,
-folder dialogs, multiple selection, confirmation UI, and non-Windows adapters
-need separate decisions.
+Initial-directory policy, file access, folder dialogs, multiple selection,
+additional confirmation UI, and non-Windows adapters need separate decisions.

@@ -102,8 +102,9 @@ Status: **Direct Windows host in progress**
   and non-Windows adapters remain deferred. The file-dialog foundation defines
   strict portable filters and bounded selected/save-path values (Decisions 0044
   and 0047), with direct Windows open/save adapters and a bounded UI-thread request
-  bridge (Decision 0045). Protocol 1.7 now grants `dialog.open_file` only
-  through that bridge; file access remains deferred.
+  bridge (Decision 0045). Protocol 1.7 grants `dialog.open_file`, and Protocol
+  1.8 grants the separate `dialog.save_file`, only through that bridge; file
+  access remains deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded

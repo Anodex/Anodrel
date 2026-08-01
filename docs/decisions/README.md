@@ -13,6 +13,7 @@ Each record should include:
 
 Current records (newest first):
 
+- 0048: Save-file dialogs use a dedicated session capability.
 - 0047: Save-file selection stays separate from writing.
 - 0046: Open-file dialogs use a dedicated session capability.
 - 0044: File dialogs start with bounded portable values.

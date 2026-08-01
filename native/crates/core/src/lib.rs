@@ -920,6 +920,7 @@ mod tests {
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
     };
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
+    use anodrel_file_dialog::SaveFilePath;
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
 
@@ -1003,6 +1004,28 @@ mod tests {
             _filters: &[FileDialogFilter],
         ) -> Result<FileDialogSelection, FileDialogServiceError> {
             Ok(FileDialogSelection::Cancelled)
+        }
+    }
+
+    #[derive(Debug)]
+    struct SavingFileDialog;
+
+    impl FileDialogService for SavingFileDialog {
+        fn open_file(
+            &self,
+            _filters: &[FileDialogFilter],
+        ) -> Result<FileDialogSelection, FileDialogServiceError> {
+            Ok(FileDialogSelection::Cancelled)
+        }
+
+        fn save_file(
+            &self,
+            _filters: &[FileDialogFilter],
+        ) -> Result<FileDialogSelection, FileDialogServiceError> {
+            let destination = std::env::temp_dir().join("anodrel-save-dialog-test.txt");
+            Ok(FileDialogSelection::Saved(
+                SaveFilePath::new(destination).expect("temporary directory is absolute"),
+            ))
         }
     }
 
@@ -1090,6 +1113,12 @@ mod tests {
     fn request_v1_7(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":7}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_8(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":8}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -1514,6 +1543,60 @@ mod tests {
         assert_eq!(
             field(field(&invalid, "error"), "code").as_string(),
             Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn save_dialog_requires_its_own_grant_and_returns_only_cancellation_or_a_destination() {
+        let accepted_host = file_dialog_host(vec![Capability::DialogSaveFile], SavingFileDialog);
+        let accepted = JsonValue::parse(&accepted_host.handle_json(&request_v1_8(
+            "dialog.save_file",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("save dialog response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "status").as_string(),
+            Some("saved")
+        );
+        assert!(
+            field(field(&accepted, "result"), "path")
+                .as_string()
+                .is_some_and(|path| !path.is_empty())
+        );
+
+        let denied = JsonValue::parse(
+            &file_dialog_host(vec![Capability::DialogOpenFile], SavingFileDialog).handle_json(
+                &request_v1_8(
+                    "dialog.save_file",
+                    r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+                ),
+            ),
+        )
+        .expect("denied save dialog response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&accepted_host.handle_json(&request_v1_8(
+            "dialog.save_file",
+            r#"{"filters":[{"label":"Raw","extensions":["*.txt"]}]}"#,
+        )))
+        .expect("invalid save dialog response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let unsupported = JsonValue::parse(&accepted_host.handle_json(&request_v1_7(
+            "dialog.save_file",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("unsupported save dialog response is JSON");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
         );
     }
 

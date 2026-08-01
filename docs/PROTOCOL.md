@@ -75,7 +75,11 @@ The current operations are:
 Protocol 1.8 adds the matching host-owned save picker. It uses the same strict
 2 KiB filter payload and UI-thread boundary as `dialog.open_file`, but requires
 the independent `dialog.save_file` capability. Its result is either a saved
-destination or cancellation; selection never creates, truncates, or writes.
+destination (`{ "status": "saved", "path": string }`) or cancellation
+(`{ "status": "cancelled" }`); selection never creates, truncates, or writes.
+The destination is opaque application data, not write authority. The host
+returns only `dialog.unavailable` when the picker cannot be serviced, without
+a native error or destination path in diagnostics.
 
 ### `dialog.open_file`
 
