@@ -14,8 +14,10 @@ to one host window. The caller—not this crate—owns session identity, connect
 lifetime, update scheduling, rendering, event delivery, permission checks, and
 shutdown.
 
-The state machine consumes only the strict `anodrel.ui.document.v1` format from
-`docs/UI_DOCUMENTS.md`. It never reads a file, package, pipe, socket, or native
+`replace_document` consumes only the strict `anodrel.ui.document.v1` format
+from `docs/UI_DOCUMENTS.md`. The separate `replace_document_v2` method is an
+explicit opt-in to `anodrel.ui.document.v2` scroll trees; it has the same atomic
+revision behavior. Neither method reads a file, package, pipe, socket, or native
 window. A document and an action remain visual data only.
 
 ## Document replacement
@@ -59,7 +61,9 @@ acknowledgement, or queue. `ui.document.replace` now binds one authenticated
 transport session to this state after its `ui.document.write` capability check;
 it accepts only a 24 KiB encoded document and maps validation failure to a safe
 protocol payload error. The state itself still has no I/O or knowledge of that
-operation.
+operation. The protocol operation currently calls only `replace_document`, so
+its public v1 contract remains unchanged until a separately documented protocol
+revision opts into v2.
 
 The transport delivers semantic actions only through the bounded pull contract
 below. It does not expose document readback, subscriptions, callbacks,

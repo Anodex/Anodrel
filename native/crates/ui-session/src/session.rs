@@ -1,7 +1,7 @@
 //! In-memory state for one caller-selected UI document session.
 
 use anodrel_ui::{ElementId, UiDocument, UiEvent, UiNode};
-use anodrel_ui_document::decode;
+use anodrel_ui_document::{decode, decode_v2};
 
 use crate::{UiApplicationEvent, UiDocumentRevision, UiDocumentSnapshot, UiSessionError};
 
@@ -48,7 +48,26 @@ impl UiDocumentSession {
         &mut self,
         encoded_document: &str,
     ) -> Result<UiDocumentRevision, UiSessionError> {
-        let document = decode(encoded_document).map_err(UiSessionError::InvalidDocument)?;
+        self.replace_decoded(decode(encoded_document))
+    }
+
+    /// Validates and atomically replaces the current document from exact v2 data.
+    ///
+    /// This explicit opt-in accepts the version 2 scroll-container format only.
+    /// It has the same revision and failure behavior as [`Self::replace_document`]
+    /// and does not change the authenticated protocol operation's v1 contract.
+    pub fn replace_document_v2(
+        &mut self,
+        encoded_document: &str,
+    ) -> Result<UiDocumentRevision, UiSessionError> {
+        self.replace_decoded(decode_v2(encoded_document))
+    }
+
+    fn replace_decoded(
+        &mut self,
+        decoded_document: Result<UiDocument, anodrel_ui_document::UiDocumentError>,
+    ) -> Result<UiDocumentRevision, UiSessionError> {
+        let document = decoded_document.map_err(UiSessionError::InvalidDocument)?;
         let revision = self
             .revision
             .next()

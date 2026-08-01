@@ -47,6 +47,10 @@ mod tests {
         r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"No action","fontSize":16,"tone":"primary"}}"#
     }
 
+    fn scroll_document() -> &'static str {
+        r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}}"#
+    }
+
     fn event() -> UiEvent {
         UiEvent::ActionInvoked(ElementId::new("continue").expect("test ID is valid"))
     }
@@ -91,6 +95,26 @@ mod tests {
         assert_eq!(
             session.document().map(|(_, current)| current),
             Some(revision)
+        );
+    }
+
+    #[test]
+    fn accepts_scroll_documents_only_through_the_explicit_version_two_method() {
+        let mut session = UiDocumentSession::new();
+
+        assert_eq!(
+            session.replace_document(scroll_document()),
+            Err(UiSessionError::InvalidDocument(
+                UiDocumentError::UnsupportedFormat
+            ))
+        );
+        assert_eq!(session.document(), None);
+        assert_eq!(
+            session
+                .replace_document_v2(scroll_document())
+                .expect("version two document is valid")
+                .value(),
+            1
         );
     }
 
