@@ -71,9 +71,12 @@ deterministically:
 - a hit test checks visible enabled actions in reverse paint order and returns
   `UiEvent::ActionInvoked(element_id)` only.
 
-The model has no scrolling, wrapping, transforms, z-index, animation, pointer
-capture, text editing, or implicit native behavior. A future version needs a
-new documented contract before adding any of them.
+The model has no scroll node, wrapping, transforms, z-index, animation, pointer
+capture, text editing, or implicit native behavior. `UiScrollState` is a
+separate bounded numerical foundation: it clamps one host-owned vertical offset
+against supplied viewport and content extents, but it has no tree attachment,
+input source, or renderer behavior yet. A scroll node and its next exact
+document format require their own documented contract before they are added.
 
 ## Focus traversal
 
@@ -147,7 +150,8 @@ The portable crate tests ID validation and every document resource limit,
 unique IDs, vertical and horizontal placement, clipping, responsive bounds,
 disabled actions, top-most action hit testing, appearance-role defaults and
 selection, accessibility role/name/visibility semantics, and focus
-traversal/activation. It has no operating-
+traversal/activation. It also tests finite, deterministic line, page, absolute,
+and relayout clamping for the independent scroll-state foundation. It has no operating-
 system or third-party runtime dependency. The Windows host additionally tests
 that the UI Lab paints content, resolves every fixed action to its own ID,
 tracks scaled hit testing, and changes only host-owned diagnostic state on

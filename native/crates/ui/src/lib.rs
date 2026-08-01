@@ -21,6 +21,7 @@ mod geometry;
 mod id;
 mod layout;
 mod model;
+mod scroll;
 
 pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
 pub use appearance::{UiActionTone, UiSurfaceTone, UiTextTone};
@@ -33,3 +34,4 @@ pub use layout::{
     UiEvent, UiLayout, UiLayoutItem, UiLayoutKind,
 };
 pub use model::{Action, Axis, Insets, Stack, Text, UiDocument, UiNode};
+pub use scroll::{DEFAULT_SCROLL_LINE, UiScrollState};

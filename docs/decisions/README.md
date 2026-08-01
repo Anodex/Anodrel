@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0037: Scroll state starts as an owned bounded primitive.
+
 - 0036: Session close uses a host-owned coalescing signal.
 
 - 0035 — UI actions use bounded authenticated pull delivery.
