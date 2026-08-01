@@ -90,9 +90,9 @@ anodrel-ui -> future renderer / input adapter
   generic-credential targets, and bounded opaque secret values. It has no
   operating-system calls or public application protocol.
 - `crates/ui` owns a bounded in-memory native UI document, deterministic layout,
-  clipping, semantic action hit testing, and visible accessibility snapshot. It
-  has no renderer, package, protocol, scripting, operating-system dependency,
-  or native authority.
+  clipping, semantic action hit testing, visible accessibility snapshot, and
+  portable focus traversal. It has no renderer, package, protocol, scripting,
+  operating-system dependency, or native authority.
 - `adapters/windows-credentials` reads, writes, and deletes only the exact
   generic Credential Manager target derived from a validated identity. It
   cannot enumerate credentials or expose a secret, target, or raw Windows
@@ -129,7 +129,8 @@ message loop. It is a lifecycle diagnostic, not a public window API.
 
 `--ui-lab` opens a fixed host-owned screen built through `anodrel-ui`. Its
 actions use the documented layout hit test and show only their semantic IDs in
-the same screen. They do not call Windows, create a session, or grant a
+the same screen. Tab and Shift+Tab move the test focus ring; Enter reports the
+focused action's ID. These actions do not create a session or grant a
 capability. See `docs/UI.md`.
 
 Verify from the repository root:

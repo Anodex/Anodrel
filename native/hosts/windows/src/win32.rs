@@ -53,6 +53,7 @@ const WM_ERASEBKGND: Uint = 0x0014;
 const WM_GETMINMAXINFO: Uint = 0x0024;
 const WM_SETICON: Uint = 0x0080;
 const WM_SETCURSOR: Uint = 0x0020;
+const WM_KEYDOWN: Uint = 0x0100;
 const WM_MOUSEMOVE: Uint = 0x0200;
 const WM_LBUTTONUP: Uint = 0x0202;
 const WM_MOUSELEAVE: Uint = 0x02A3;
@@ -70,6 +71,9 @@ const TME_LEAVE: Dword = 0x0000_0002;
 const SWP_NOZORDER: Uint = 0x0004;
 const SWP_NOACTIVATE: Uint = 0x0010;
 const HTCLIENT: isize = 1;
+const VK_SHIFT: i32 = 0x10;
+const VK_TAB: Wparam = 0x09;
+const VK_RETURN: Wparam = 0x0D;
 
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 const REVEAL_TIMER: usize = 1;
@@ -301,6 +305,7 @@ unsafe extern "system" {
     fn GetClientRect(window: Hwnd, rectangle: *mut Rect) -> Bool;
     fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
     fn SetCursor(cursor: Hcursor) -> Hcursor;
+    fn GetKeyState(virtual_key: i32) -> i16;
     fn InvalidateRect(window: Hwnd, rectangle: *const Rect, erase: Bool) -> Bool;
     fn SendMessageW(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult;
     fn SetTimer(window: Hwnd, id: usize, elapse: Uint, callback: usize) -> usize;
@@ -1115,6 +1120,37 @@ unsafe extern "system" fn window_proc(
         }
         WM_SIZE => {
             set_ambient_running(window, wparam != SIZE_MINIMIZED);
+            0
+        }
+        WM_KEYDOWN => {
+            if !matches!(wparam, VK_TAB | VK_RETURN) {
+                // SAFETY: an unsupported key is forwarded unchanged to the
+                // documented default Win32 procedure.
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            }
+            let rect = client_rect(window);
+            // SAFETY: querying one documented virtual-key state has no side
+            // effect and returns a value owned by the current thread's input
+            // state.
+            let shift_down = unsafe { GetKeyState(VK_SHIFT) } < 0;
+            let Some(changed) = registry::with_ui_lab(window, |lab| match wparam {
+                VK_TAB if shift_down => {
+                    lab.focus_previous(rect.width() as f32, rect.height() as f32)
+                }
+                VK_TAB => lab.focus_next(rect.width() as f32, rect.height() as f32),
+                VK_RETURN => lab.activate_focused(rect.width() as f32, rect.height() as f32),
+                _ => false,
+            })
+            .ok()
+            .flatten() else {
+                // The only host keyboard adapter is deliberately UI Lab
+                // specific. Startup Lab and document views retain the native
+                // default behavior until their own input contracts exist.
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            };
+            if changed {
+                invalidate(window);
+            }
             0
         }
         WM_MOUSEMOVE => {

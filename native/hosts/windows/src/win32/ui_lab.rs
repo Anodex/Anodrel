@@ -8,8 +8,8 @@
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiDocument, UiEvent, UiLayout,
-    UiNode, UiPoint, UiRect, UiSize,
+    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiDocument, UiEvent, UiFocus,
+    UiLayout, UiNode, UiPoint, UiRect, UiSize,
 };
 
 use super::text;
@@ -23,6 +23,7 @@ const WEIGHT_REGULAR: i32 = 400;
 #[derive(Clone)]
 pub(super) struct UiLab {
     document: UiDocument,
+    focus: UiFocus,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
 }
@@ -32,6 +33,7 @@ impl UiLab {
     pub(super) fn new() -> Self {
         Self {
             document: test_document(),
+            focus: UiFocus::new(),
             hovered: None,
             last_action: None,
         }
@@ -62,6 +64,28 @@ impl UiLab {
         changed
     }
 
+    /// Moves focus forward through this view's current visible action layout.
+    pub(super) fn focus_next(&mut self, width: f32, height: f32) -> bool {
+        self.move_focus(width, height, UiFocus::move_next)
+    }
+
+    /// Moves focus backward through this view's current visible action layout.
+    pub(super) fn focus_previous(&mut self, width: f32, height: f32) -> bool {
+        self.move_focus(width, height, UiFocus::move_previous)
+    }
+
+    /// Records the semantic action associated with the current valid focus.
+    pub(super) fn activate_focused(&mut self, width: f32, height: f32) -> bool {
+        let surface = Surface::new(width, height);
+        let layout = self.document.layout(surface.bounds(), &WindowsTextMeasurer);
+        let Some(UiEvent::ActionInvoked(action)) = self.focus.activate(&layout) else {
+            return false;
+        };
+        let changed = self.last_action.as_ref() != Some(&action);
+        self.last_action = Some(action);
+        changed
+    }
+
     fn action_at(&self, width: f32, height: f32, at: Point) -> Option<ElementId> {
         let surface = Surface::new(width, height);
         let event = self
@@ -69,6 +93,19 @@ impl UiLab {
             .layout(surface.bounds(), &WindowsTextMeasurer)
             .hit_test(surface.to_ui_point(at));
         event.map(|UiEvent::ActionInvoked(id)| id)
+    }
+
+    fn move_focus(
+        &mut self,
+        width: f32,
+        height: f32,
+        move_focus: fn(&mut UiFocus, &UiLayout) -> Option<ElementId>,
+    ) -> bool {
+        let surface = Surface::new(width, height);
+        let layout = self.document.layout(surface.bounds(), &WindowsTextMeasurer);
+        let before = self.focus.focused().cloned();
+        let after = move_focus(&mut self.focus, &layout);
+        before != after
     }
 }
 
@@ -207,12 +244,15 @@ fn draw_action(
 ) {
     let bounds = surface.to_canvas_rect(bounds);
     let hovered = lab.hovered.as_ref() == Some(action.id());
+    let focused = lab.focus.focused() == Some(action.id());
     let fill = if hovered {
         palette::PANEL_RAISED
     } else {
         palette::BACKDROP_LIFT
     };
-    let edge = if hovered {
+    let edge = if focused {
+        palette::ACCENT_IPC
+    } else if hovered {
         palette::ACCENT_SHELL
     } else {
         palette::PANEL_EDGE
@@ -221,7 +261,7 @@ fn draw_action(
     canvas.stroke_rounded_rect(
         bounds,
         10.0 * surface.scale,
-        1.0 * surface.scale,
+        if focused { 2.0 } else { 1.0 } * surface.scale,
         &Paint::solid(edge),
     );
 
@@ -325,6 +365,10 @@ mod tests {
     use super::*;
     use anodrel_ui::UiAccessibilityRole;
 
+    fn id(value: &str) -> ElementId {
+        ElementId::new(value).expect("fixed UI Lab ID is valid")
+    }
+
     #[test]
     fn every_action_reports_its_own_semantic_id() {
         let lab = UiLab::new();
@@ -389,6 +433,19 @@ mod tests {
             },
         ));
         assert_eq!(lab.last_action, Some(id));
+    }
+
+    #[test]
+    fn keyboard_focus_traverses_and_activates_only_semantic_actions() {
+        let mut lab = UiLab::new();
+        assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
+        assert_eq!(lab.focus.focused(), Some(&id("ui.lab.inspect")));
+        assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
+        assert_eq!(lab.focus.focused(), Some(&id("ui.lab.hit-test")));
+        assert!(lab.activate_focused(BASE_WIDTH, BASE_HEIGHT));
+        assert_eq!(lab.last_action, Some(id("ui.lab.hit-test")));
+        assert!(lab.focus_previous(BASE_WIDTH, BASE_HEIGHT));
+        assert_eq!(lab.focus.focused(), Some(&id("ui.lab.inspect")));
     }
 
     #[test]

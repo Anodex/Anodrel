@@ -15,6 +15,7 @@
 
 mod accessibility;
 mod error;
+mod focus;
 mod geometry;
 mod id;
 mod layout;
@@ -22,6 +23,7 @@ mod model;
 
 pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
 pub use error::UiError;
+pub use focus::UiFocus;
 pub use geometry::{UiPoint, UiRect, UiSize};
 pub use id::ElementId;
 pub use layout::{

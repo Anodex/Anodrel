@@ -1,10 +1,10 @@
 # Anodrel native UI foundation v1
 
 **Status:** Foundation contract. `anodrel-ui` provides an owned in-memory view
-tree, deterministic layout, clipping, semantic action hit testing, and a
-visible accessibility snapshot. It does not yet accept an application package,
-protocol, script, renderer, native bridge, focus system, or operating-system
-operation.
+tree, deterministic layout, clipping, semantic action hit testing, a visible
+accessibility snapshot, and portable focus traversal. It does not yet accept an
+application package, protocol, script, renderer, native bridge, or
+operating-system operation.
 
 ## Purpose and boundary
 
@@ -56,8 +56,24 @@ deterministically:
   `UiEvent::ActionInvoked(element_id)` only.
 
 The model has no scrolling, wrapping, transforms, z-index, animation, pointer
-capture, keyboard focus, or implicit native behavior. A future version needs a
+capture, text editing, or implicit native behavior. A future version needs a
 new documented contract before adding any of them.
+
+## Focus traversal
+
+`UiFocus` keeps one optional focus target for a specific `UiLayout`. Its
+`move_next` and `move_previous` methods traverse visible enabled actions in
+source order and wrap at each end. Text, stacks, disabled actions, and fully
+clipped actions cannot receive focus. If the current target disappeared after a
+relayout, traversal starts at the appropriate end of the new layout.
+
+`activate(layout)` returns `UiEvent::ActionInvoked(element_id)` only when the
+current target is still a visible enabled action in that layout. It has the same
+semantic-only meaning as a pointer hit: no operating-system work, process
+launch, protocol message, or capability follows from this method. The type does
+not observe raw keyboard events, set an operating-system focus handle, draw a
+focus ring, or provide text editing. A host must deliberately map its keyboard
+and accessibility lifecycle to this portable state.
 
 ## Accessibility semantics
 
@@ -97,17 +113,19 @@ anodrel-windows-host --ui-lab
 It uses the Windows text-measurement seam, Anodrel's software canvas, and a
 validated `UiDocument` to draw a responsive native screen. Hovering and
 clicking an action exercises the same layout hit test and displays its semantic
-element ID. The view has no package input and the event changes only its own
-diagnostic reading: it does not call Windows, open a process, read a file, send
-a protocol message, or grant a capability. It is a renderer-and-input test,
-not an application UI API.
+element ID. Tab and Shift+Tab exercise the portable focus order with a visible
+focus ring; Enter activates only that same semantic action. The view has no
+package input and every event changes only its own diagnostic reading: it does
+not open a process, read a file, send a protocol message, or grant a capability.
+It is a renderer-and-input test, not an application UI API.
 
 ## Verification
 
 The portable crate tests ID validation and every document resource limit,
 unique IDs, vertical and horizontal placement, clipping, responsive bounds,
-disabled actions, top-most action hit testing, and accessibility role/name/
-visibility semantics. It has no operating-system or third-party runtime
-dependency. The Windows host additionally tests that the UI Lab paints content,
-resolves every fixed action to its own ID, tracks scaled hit testing, and changes
-only host-owned diagnostic state on invocation.
+disabled actions, top-most action hit testing, accessibility role/name/
+visibility semantics, and focus traversal/activation. It has no operating-
+system or third-party runtime dependency. The Windows host additionally tests
+that the UI Lab paints content, resolves every fixed action to its own ID,
+tracks scaled hit testing, and changes only host-owned diagnostic state on
+invocation.

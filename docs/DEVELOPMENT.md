@@ -74,7 +74,9 @@ The direct host command without an argument is a manual smoke check: an
 **Anodrel Windows host** window must show a successful internal
 `platform.health` response and close normally. `--ui-lab` is a separate manual
 check for the owned UI foundation: hover actions for the hand cursor, click one,
-and confirm that the screen reports only its semantic ID.
+and confirm that the screen reports only its semantic ID. Press Tab and
+Shift+Tab to move the focus ring through its actions; Enter must report the
+focused action's same semantic ID.
 It needs Windows but does not require WebView2. Do not add privileged
 capabilities or new third-party runtime dependencies. The named-pipe adapter
 already binds a logon-SID DACL and a host-generated credential; the bootstrap
