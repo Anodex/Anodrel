@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{FileDialogFilter, SelectedFilePath};
+use crate::{FileDialogFilter, SaveFilePath, SelectedFilePath};
 
 /// Maximum time a protocol worker may wait for its host UI thread to respond.
 pub const FILE_DIALOG_RESPONSE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -20,6 +20,14 @@ pub trait FileDialogService: fmt::Debug + Send {
         &self,
         filters: &[FileDialogFilter],
     ) -> Result<FileDialogSelection, FileDialogServiceError>;
+
+    /// Requests one save destination from a host-owned picker.
+    fn save_file(
+        &self,
+        _filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        Err(FileDialogServiceError::Unavailable)
+    }
 }
 
 /// The outcome of a completed file-picker request.
@@ -27,8 +35,19 @@ pub trait FileDialogService: fmt::Debug + Send {
 pub enum FileDialogSelection {
     /// The user selected one absolute path.
     Selected(SelectedFilePath),
+    /// The user selected one absolute save destination.
+    Saved(SaveFilePath),
     /// The user dismissed the host-owned picker.
     Cancelled,
+}
+
+/// The host-owned operation represented by one pending dialog request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileDialogRequestKind {
+    /// Select one existing file.
+    Open,
+    /// Select one save destination.
+    Save,
 }
 
 /// A safe host-service failure category.
@@ -50,6 +69,7 @@ impl std::error::Error for FileDialogServiceError {}
 #[derive(Clone, Debug)]
 pub struct FileDialogRequest {
     id: u64,
+    kind: FileDialogRequestKind,
     filters: Vec<FileDialogFilter>,
 }
 
@@ -58,6 +78,12 @@ impl FileDialogRequest {
     #[must_use]
     pub const fn id(&self) -> u64 {
         self.id
+    }
+
+    /// Returns whether the host must show an open or a save picker.
+    #[must_use]
+    pub const fn kind(&self) -> FileDialogRequestKind {
+        self.kind
     }
 
     /// Returns the strict filters requested by the authenticated application.
@@ -131,6 +157,7 @@ impl FileDialogMailbox {
 
     fn request(
         &self,
+        kind: FileDialogRequestKind,
         filters: &[FileDialogFilter],
     ) -> Result<FileDialogSelection, FileDialogServiceError> {
         let response = Arc::new(ResponseSlot::default());
@@ -144,6 +171,7 @@ impl FileDialogMailbox {
             state.active = Some(ActiveRequest {
                 request: FileDialogRequest {
                     id: request_id,
+                    kind,
                     filters: filters.to_vec(),
                 },
                 taken: false,
@@ -176,7 +204,10 @@ impl FileDialogMailbox {
             let Some(active) = state.active.as_ref() else {
                 return false;
             };
-            if active.request.id != request_id || !active.taken {
+            if active.request.id != request_id
+                || !active.taken
+                || !selection_matches_kind(active.request.kind, &result)
+            {
                 return false;
             }
             let response = Arc::clone(&active.response);
@@ -195,8 +226,34 @@ impl FileDialogService for FileDialogMailbox {
         &self,
         filters: &[FileDialogFilter],
     ) -> Result<FileDialogSelection, FileDialogServiceError> {
-        self.request(filters)
+        self.request(FileDialogRequestKind::Open, filters)
     }
+
+    fn save_file(
+        &self,
+        filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        self.request(FileDialogRequestKind::Save, filters)
+    }
+}
+
+fn selection_matches_kind(
+    kind: FileDialogRequestKind,
+    result: &Result<FileDialogSelection, FileDialogServiceError>,
+) -> bool {
+    result.is_err()
+        || matches!(
+            (kind, result),
+            (_, Ok(FileDialogSelection::Cancelled))
+                | (
+                    FileDialogRequestKind::Open,
+                    Ok(FileDialogSelection::Selected(_))
+                )
+                | (
+                    FileDialogRequestKind::Save,
+                    Ok(FileDialogSelection::Saved(_))
+                )
+        )
 }
 
 fn wait_for_response(
@@ -225,9 +282,10 @@ mod tests {
     use std::{sync::mpsc, thread};
 
     use super::{
-        FileDialogMailbox, FileDialogSelection, FileDialogService, FileDialogServiceError,
+        FileDialogMailbox, FileDialogRequestKind, FileDialogSelection, FileDialogService,
+        FileDialogServiceError,
     };
-    use crate::{FileDialogFilter, SelectedFilePath};
+    use crate::{FileDialogFilter, SaveFilePath, SelectedFilePath};
 
     fn filter() -> FileDialogFilter {
         FileDialogFilter::new("Text", vec!["txt".to_owned()]).expect("test filter is valid")
@@ -253,6 +311,7 @@ mod tests {
             thread::yield_now();
         };
         assert_eq!(request.filters(), &[filter()]);
+        assert_eq!(request.kind(), FileDialogRequestKind::Open);
         assert!(mailbox.take().is_none());
         assert!(mailbox.complete(
             request.id(),
@@ -299,5 +358,37 @@ mod tests {
         let mailbox = FileDialogMailbox::new();
         assert!(!mailbox.complete(1, FileDialogSelection::Cancelled));
         assert!(!mailbox.fail(1));
+    }
+
+    #[test]
+    fn keeps_save_destinations_distinct_from_open_file_selections() {
+        let mailbox = FileDialogMailbox::new();
+        let worker = mailbox.clone();
+        let waiting = thread::spawn(move || worker.save_file(&[filter()]));
+        let request = loop {
+            if let Some(request) = mailbox.take() {
+                break request;
+            }
+            thread::yield_now();
+        };
+        assert_eq!(request.kind(), FileDialogRequestKind::Save);
+        assert!(!mailbox.complete(
+            request.id(),
+            FileDialogSelection::Selected(
+                SelectedFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid"),
+            ),
+        ));
+        assert!(mailbox.complete(
+            request.id(),
+            FileDialogSelection::Saved(
+                SaveFilePath::new(r"C:\\Users\\Owner\\draft.txt").expect("path is valid"),
+            ),
+        ));
+        assert_eq!(
+            waiting.join().expect("worker did not panic"),
+            Ok(FileDialogSelection::Saved(
+                SaveFilePath::new(r"C:\\Users\\Owner\\draft.txt").expect("path is valid"),
+            ))
+        );
     }
 }

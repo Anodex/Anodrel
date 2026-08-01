@@ -13,8 +13,8 @@ mod mailbox;
 use std::{fmt, path::PathBuf};
 
 pub use mailbox::{
-    FileDialogMailbox, FileDialogRequest, FileDialogSelection, FileDialogService,
-    FileDialogServiceError,
+    FileDialogMailbox, FileDialogRequest, FileDialogRequestKind, FileDialogSelection,
+    FileDialogService, FileDialogServiceError,
 };
 
 /// Maximum number of extensions in one filter.
