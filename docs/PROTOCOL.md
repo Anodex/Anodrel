@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.11
+**Status:** Foundation contract, version 1.12
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.11 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 11}`.
+the host's. Version 1.12 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 12}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -61,6 +61,9 @@ The current operations are:
 | `platform.capabilities` | `{}` | application ID and current grants | none |
 | `platform.health` | `{}` | ready status, host name, and version | `diagnostics.read` |
 | `diagnostics.entries.read` | `{}` | bounded closed host diagnostic records | `diagnostics.read` |
+| `credential.read` | `{ "name": string }` | exact secret or not found | `credential.read` |
+| `credential.write` | `{ "name": string, "secret": string }` | written | `credential.write` |
+| `credential.delete` | `{ "name": string }` | deleted or not found | `credential.delete` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
@@ -89,6 +92,24 @@ A host that did not explicitly provide a bounded closed diagnostics source
 returns `diagnostics.unavailable`, with no native error, path, request data, or
 application data. The operation is a snapshot read: it does not persist, clear,
 write, or subscribe to diagnostics.
+
+### Credentials
+
+Protocol 1.12 adds exact credential read, write, and delete operations. Their
+`name` is 1 through 64 ASCII bytes of lowercase letters, digits, `.`, `-`, or
+`_`, starting and ending with a lowercase letter or digit. Write's `secret` is
+one non-empty canonical lowercase hexadecimal string of at most 4,096 bytes,
+representing at most 2,048 opaque bytes. Read returns either
+`{ "status": "found", "secret": string }` or `{ "status": "not_found" }`.
+Delete returns `{ "status": "deleted" }` or `{ "status": "not_found" }`; write
+returns `{ "status": "written" }`.
+
+Each operation requires its own immediate host-issued grant. The boundary has
+no target, application ID, metadata, enumeration, search, sharing, prompt,
+subscription, export, acknowledgement, timestamp, or source field. Secret
+values are never placed in diagnostics, events, logs, error text, or details.
+Safe failures are `credential.unavailable`, `credential.access_denied`, and
+`credential.stored_secret_invalid`.
 
 ### Storage state
 

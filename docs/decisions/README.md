@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0056: Credential protocol uses separate exact grants.
+
 - 0055: Windows high contrast uses direct system colours.
 
 - 0054: Native cancellation is bounded, ordered, and pre-execution.

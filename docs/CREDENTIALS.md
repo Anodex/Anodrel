@@ -1,7 +1,6 @@
 # Secure credentials v1
 
-**Status:** Windows host foundation. This is a host-only credential-store
-contract, not a public protocol operation or application permission.
+**Status:** Windows credential-store foundation with a Protocol 1.12 contract.
 
 ## Purpose and boundary
 
@@ -79,11 +78,13 @@ persist policy, and input limits are stable. Changing any of them requires a
 migration plan, a documented compatibility version, and tests that can compare
 the old and new stores.
 
-No `platform.credentials.*` operation exists in Protocol v1. A future public
-surface must define read, write, and delete capabilities; authenticated session
-binding; consent and revocation behavior; cancellation; safe error mapping;
-and mock/native compatibility tests before it can provide a secret to an
-application. Until then, only trusted native host code can use this adapter.
+Protocol 1.12 defines separate `credential.read`, `credential.write`, and
+`credential.delete` grants and exact operations. Each request accepts one
+credential name; write additionally accepts the canonical hex secret. Read and
+delete make absence an explicit ordinary result, rather than exposing a native
+error. The operations have no enumeration, sharing, metadata, prompting,
+watching, export, path, target, or application-ID field. See
+`docs/PROTOCOL.md` and Decision 0056.
 
 ## Verification
 

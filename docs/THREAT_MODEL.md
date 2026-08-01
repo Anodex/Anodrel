@@ -14,7 +14,8 @@ The current operations are `platform.ping`, `platform.capabilities`,
 `clipboard.read`, `clipboard.write`, `external.open`, `dialog.open_file`,
 `dialog.open_file.v2`, `dialog.save_file`, `file.read_text`,
 `storage.state.read`, `storage.state.replace`, `storage.state.clear`, and
-`diagnostics.entries.read`.
+`diagnostics.entries.read`, `credential.read`, `credential.write`, and
+`credential.delete`.
 Clipboard, external-link, file-dialog, selection-scoped file-text, and
 application-state operations each have their own bounded values and separate
 host-issued grants. The development UI-session sample exercises these only with
@@ -58,7 +59,7 @@ authority for permissions.
 | A file operation escapes an approved location. | Canonicalize and validate paths after resolving links; enforce a per-operation scope. |
 | Application data, cache, or log output crosses an application boundary. | Derive the fixed location only from a host-validated application ID below the current user's Local AppData root; accept no application-supplied absolute path, and do not expose the location through the current protocol. |
 | An application-state read, replacement, or clear exceeds its authority or exposes a partial, substituted, or cross-application value. | Keep the first state store to one bounded opaque snapshot per host-validated identity below the host-owned data location; require an independent immediate read, replace, or clear grant; allow no caller path, key, range, or filename; stage and flush a complete replacement before retaining the prior state as a recovery candidate; and expose no content, path, temporary name, recovery source, or native detail in diagnostics. |
-| An application reads, replaces, or leaks another application's credential. | Derive one exact generic Credential Manager target from the host-validated application ID and a restricted credential name; prohibit arbitrary targets and enumeration, keep secrets opaque and bounded, and expose no credential protocol operation until authenticated capability checks exist. |
+| An application reads, replaces, or leaks another application's credential. | Bind one injected credential service to the host-validated application identity; permit only exact restricted names and canonical bounded secret values through separately granted read, write, and delete operations; prohibit arbitrary targets, enumeration, metadata, sharing, and diagnostics or logs carrying secret material. |
 | An application reads rich clipboard data, targets another window, or leaks clipboard contents through diagnostics. | Accept only an immediate `clipboard.read` or `clipboard.write` grant from host policy; permit only bounded Unicode text with no format, source, owner, history, or handle selector; return safe categories and never log clipboard text or native failure detail. |
 | A link launches a command, file, custom protocol, or leaks a destination through diagnostics. | Validate only bounded ASCII HTTPS links with one DNS-style authority before the native call; pass no verb, parameters, directory, or shell string; return a safe unavailable category and never log the address or native status. |
 | A child process gains arbitrary shell authority or outlives the host. | The launch service supplies only the policy-approved `.exe` with no child arguments or shell, retains a child handle, and terminates it on shutdown. |
