@@ -212,6 +212,22 @@ impl UiLab {
         changed
     }
 
+    /// Moves the first visible diagnostic scroll viewport by one local line.
+    pub(super) fn scroll_line(&mut self, width: f32, height: f32, forward: bool) -> bool {
+        let Some(metrics) = self.layout(width, height).scroll_metrics().first().cloned() else {
+            return false;
+        };
+        let changed = self
+            .scroll_offsets
+            .entry(metrics.id().clone())
+            .or_default()
+            .scroll_line(forward, metrics.viewport_height(), metrics.content_height());
+        if changed {
+            self.hovered = None;
+        }
+        changed
+    }
+
     /// Clamps retained scroll positions after a native size change.
     pub(super) fn clamp_scroll_offsets(&mut self, width: f32, height: f32) {
         let metrics = self.layout(width, height).scroll_metrics().to_vec();

@@ -72,6 +72,11 @@ impl UiSessionView {
         self.lab.scroll_page(width, height, forward)
     }
 
+    /// Moves a current v2 scroll viewport by one local native line.
+    pub(super) fn scroll_line(&mut self, width: f32, height: f32, forward: bool) -> bool {
+        self.lab.scroll_line(width, height, forward)
+    }
+
     /// Clamps retained local viewport positions after a native size change.
     pub(super) fn clamp_scroll_offsets(&mut self, width: f32, height: f32) {
         self.lab.clamp_scroll_offsets(width, height);

@@ -58,6 +58,7 @@ const WM_GETMINMAXINFO: Uint = 0x0024;
 const WM_SETICON: Uint = 0x0080;
 const WM_SETCURSOR: Uint = 0x0020;
 const WM_KEYDOWN: Uint = 0x0100;
+const WM_MOUSEWHEEL: Uint = 0x020A;
 const WM_MOUSEMOVE: Uint = 0x0200;
 const WM_LBUTTONUP: Uint = 0x0202;
 const WM_MOUSELEAVE: Uint = 0x02A3;
@@ -781,6 +782,10 @@ fn mouse_position(lparam: Lparam) -> (i32, i32) {
     ((raw & 0xFFFF) as i16 as i32, (raw >> 16) as i16 as i32)
 }
 
+fn wheel_delta(wparam: Wparam) -> i16 {
+    ((wparam >> 16) as u16) as i16
+}
+
 /// Opens an additional native window while the message loop is running.
 fn open_document_window(title: &str, document: Document) -> io::Result<()> {
     let instance = module_handle()?;
@@ -1279,6 +1284,30 @@ unsafe extern "system" fn window_proc(
             }
             0
         }
+        WM_MOUSEWHEEL => {
+            let delta = wheel_delta(wparam);
+            if delta == 0 {
+                return 0;
+            }
+            let rect = client_rect(window);
+            let forward = delta < 0;
+            let changed = registry::with_ui_lab(window, |lab| {
+                lab.scroll_line(rect.width() as f32, rect.height() as f32, forward)
+            })
+            .ok()
+            .flatten()
+            .or_else(|| {
+                registry::with_ui_session(window, |session| {
+                    session.scroll_line(rect.width() as f32, rect.height() as f32, forward)
+                })
+                .ok()
+                .flatten()
+            });
+            if changed.unwrap_or(false) {
+                invalidate(window);
+            }
+            0
+        }
         WM_MOUSEMOVE => {
             let (x, y) = mouse_position(lparam);
             let rect = client_rect(window);
@@ -1476,7 +1505,7 @@ unsafe extern "system" fn window_proc(
 mod tests {
     use super::{
         Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, StartupLab,
-        action_document, document, mouse_position, startup_lab, startup_log_book,
+        action_document, document, mouse_position, startup_lab, startup_log_book, wheel_delta,
         window_size_for_client,
     };
     /// Representative surface state, matching the shipped sample package.
@@ -1530,6 +1559,12 @@ mod tests {
         // A pointer dragged above or left of the client area reports negatives.
         let packed = (((-3_i16) as u16 as u32) << 16 | ((-7_i16) as u16 as u32)) as isize;
         assert_eq!(mouse_position(packed), (-7, -3));
+    }
+
+    #[test]
+    fn wheel_deltas_decode_as_signed_high_words() {
+        assert_eq!(wheel_delta(120usize << 16), 120);
+        assert_eq!(wheel_delta(((-120i16 as u16) as usize) << 16), -120);
     }
 
     #[test]
