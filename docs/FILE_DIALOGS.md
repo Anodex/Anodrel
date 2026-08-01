@@ -37,3 +37,5 @@ mailbox, selecting the host window as the native owner.
 
 Initial-directory policy, file access, folder dialogs, multiple selection,
 additional confirmation UI, and non-Windows adapters need separate decisions.
+`docs/FILE_ACCESS.md` defines the accepted selection-identity requirement for
+the future file-read boundary.

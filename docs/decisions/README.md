@@ -13,6 +13,7 @@ Each record should include:
 
 Current records (newest first):
 
+- 0049: File access requires session-bound selection identity.
 - 0048: Save-file dialogs use a dedicated session capability.
 - 0047: Save-file selection stays separate from writing.
 - 0046: Open-file dialogs use a dedicated session capability.

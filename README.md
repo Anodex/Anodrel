@@ -126,6 +126,8 @@ before process launch.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.
 `docs/EXTERNAL_LINKS.md` defines the validated HTTPS external-link foundation.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
+`docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
+boundary.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
