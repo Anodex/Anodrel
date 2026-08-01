@@ -207,7 +207,8 @@ logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
 `anodrel-ui` is a portable foundation between an application model and a future
 host renderer. It owns only a bounded declarative tree, semantic appearance
 roles, layout, clipping, semantic action hit testing, visible accessibility
-snapshot, and portable focus traversal. `anodrel-ui-document` separately owns
+snapshot, portable focus traversal, and host-retained vertical scroll state.
+`anodrel-ui-document` separately owns
 the exact, bounded JSON interchange form for that tree. The Windows UI Lab
 decodes a fixed compile-time fixture through it, and the separate explicit
 Windows developer preview can render one bounded operator-selected document.
@@ -217,7 +218,9 @@ its single-slot latest-document mailbox can transfer a snapshot to another host
 thread without queueing or I/O, while its separate 32-candidate input mailbox
 keeps host-layout-derived actions bounded until the authenticated
 `ui.events.read` pull validates them. The development-only Windows UI Session
-Lab consumes both supplied mailboxes in one host-created view; it is not a
+Lab consumes both supplied mailboxes in one host-created view. It renders an
+explicit v2 scroll tree with locally retained offsets driven only by native
+wheel and page input; those offsets never enter the protocol. It is not a
 public window capability and delivers no native command. None of these crates
 has operating-system authority. A separate coalescing close signal lets the
 host end only that same authenticated session after a capability-checked
@@ -225,8 +228,8 @@ request; it carries no window target or native handle. The
 host remains responsible for text measurement, mapping appearance roles to an
 actual visual system, rendering, input delivery, operating-system accessibility
 and focus adapters, and every capability decision. See `docs/UI.md`,
-`docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`, and
-Decisions 0025 through 0036.
+`docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`,
+`docs/SCROLLING.md`, and Decisions 0025 through 0039.
 
 ## Communication model
 

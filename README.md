@@ -25,9 +25,11 @@ separately exercises the private pipe path end to end; its host-issued grants
 include bounded text clipboard, validated HTTPS handoff, and UI-thread-routed
 open/save file pickers. Its Protocol 1.9 diagnostic path can also retain one
 UI-selected Windows file object and consume its bounded text once through a
-separate grant, alongside UI-session test grants. The first branded Startup Lab turns those
-foundation checks, including a temporary private IPC health loopback, into a
-direct native visual smoke test.
+separate grant, alongside UI-session test grants. The development client can
+also deliver a version 2 scroll tree and complete an action only after it is
+revealed by host-retained native scrolling. The first branded Startup Lab turns
+those foundation checks, including a temporary private IPC health loopback,
+into a direct native visual smoke test.
 
 The application-state foundation now has a portable whole-snapshot contract,
 a direct Windows adapter that keeps one recovered prior snapshot, and a
@@ -146,7 +148,8 @@ contract.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
-`docs/SCROLLING.md` defines the upcoming owned scroll-container boundary.
+`docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows
+development diagnostic.
 `docs/UI_SESSIONS.md` defines bounded revision and semantic-event state used by
 the first capability-checked authenticated UI document replacement path.
 `docs/UI_PREVIEW.md` defines the bounded Windows developer preview command.

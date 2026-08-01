@@ -3,7 +3,17 @@ import { readFileSync } from "node:fs";
 import { PlatformClient } from "@anodrel/sdk";
 import { WindowsNamedPipeTransport, decodeBootstrapInvitation } from "@anodrel/windows-transport";
 
-const UI_EVENT_WAIT_ATTEMPTS = 100;
+import {
+  SCROLL_SESSION_ACTION,
+  SCROLL_SESSION_DOCUMENT,
+  STANDARD_SESSION_ACTION,
+  STANDARD_SESSION_DOCUMENT,
+} from "./session-documents.js";
+
+// The native diagnostic is intentionally interactive. Two minutes leaves room
+// to inspect, scroll, or dismiss one host-owned dialog without creating an
+// unbounded background event read.
+const UI_EVENT_WAIT_ATTEMPTS = 1_200;
 const UI_EVENT_WAIT_MILLISECONDS = 100;
 
 process.on("uncaughtException", () => {
@@ -33,9 +43,10 @@ async function run(): Promise<number> {
     if (health.status !== "ready") {
       return 13;
     }
-    const update = await client.replaceUiDocument(
-      '{"format":"anodrel.ui.document.v1","root":{"id":"sample.session.root","kind":"stack","axis":"vertical","padding":{"left":56,"top":56,"right":56,"bottom":56},"gap":16,"surfaceTone":"plain","children":[{"id":"sample.session.eyebrow","kind":"text","value":"AUTHENTICATED ANODREL SESSION","fontSize":14,"tone":"accent"},{"id":"sample.session.title","kind":"text","value":"Native document delivered","fontSize":28,"tone":"primary"},{"id":"sample.session.detail","kind":"text","value":"This view came through the private pipe and remains free of native action authority.","fontSize":16,"tone":"secondary"},{"id":"sample.session.action","kind":"action","label":"Visual-only semantic action","fontSize":16,"enabled":true,"tone":"accent"}]}}',
-    );
+    const scrollDiagnostic = process.argv.includes("--request-scroll-document");
+    const update = scrollDiagnostic
+      ? await client.replaceUiDocumentV2(SCROLL_SESSION_DOCUMENT)
+      : await client.replaceUiDocument(STANDARD_SESSION_DOCUMENT);
     if (update.revision !== "1") {
       return 16;
     }
@@ -88,7 +99,11 @@ async function run(): Promise<number> {
     }
 
     if (process.argv.includes("--wait-for-ui-event")) {
-      const eventResult = await waitForSampleAction(client, update.revision);
+      const eventResult = await waitForSampleAction(
+        client,
+        update.revision,
+        scrollDiagnostic ? SCROLL_SESSION_ACTION : STANDARD_SESSION_ACTION,
+      );
       if (eventResult !== 0) {
         return eventResult;
       }
@@ -103,7 +118,11 @@ async function run(): Promise<number> {
   }
 }
 
-async function waitForSampleAction(client: PlatformClient, revision: string): Promise<number> {
+async function waitForSampleAction(
+  client: PlatformClient,
+  revision: string,
+  expectedAction: string,
+): Promise<number> {
   for (let attempt = 0; attempt < UI_EVENT_WAIT_ATTEMPTS; attempt += 1) {
     const result = await client.readUiEvents();
     if (result.dropped !== 0 || result.discarded !== 0) {
@@ -116,7 +135,7 @@ async function waitForSampleAction(client: PlatformClient, revision: string): Pr
       }
       return event.eventName === "ui.action.invoked" &&
         event.payload.revision === revision &&
-        event.payload.action === "sample.session.action"
+        event.payload.action === expectedAction
         ? 0
         : 17;
     }

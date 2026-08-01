@@ -79,9 +79,13 @@ Status: **Direct Windows host in progress**
   development-only Windows UI Session Lab consumes one mailbox in one native
   view, and version-bound pointer/keyboard actions are delivered through a
   bounded authenticated pull operation. A capability-gated request can signal
-  close only for that same host-owned session. It has no product lifecycle.
-  Operating-system accessibility adapters, scrolling, public window lifecycle,
-  subscriptions, and broader action-event transport remain separate gates.
+  close only for that same host-owned session. Its version 2 scroll diagnostic
+  delivers a bounded scroll tree through the same path; the Windows host retains
+  each viewport position and accepts only local wheel and page input, while the
+  client completes a semantic action revealed at the bottom. It has no product
+  lifecycle. Operating-system accessibility adapters, public window lifecycle,
+  subscriptions, scrollbars, gestures, and broader action-event transport remain
+  separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

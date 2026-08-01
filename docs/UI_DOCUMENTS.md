@@ -4,9 +4,10 @@
 `anodrel-ui` model. The Windows UI Lab decodes one compiled-in host fixture to
 exercise the contract, and the separate explicit Windows developer preview can
 render one bounded operator-selected file. The authenticated
-`ui.document.replace` protocol operation can accept one more tightly bounded
-document for its own session state; it does not attach a document to a window
-or deliver action events yet.
+`ui.document.replace` and `ui.document.replace.v2` protocol operations accept
+more tightly bounded documents for one authenticated session. The development
+Windows UI Session Lab consumes that session's latest snapshot and returns only
+revision-bound semantic actions through a separate bounded pull operation.
 
 ## Purpose and boundary
 
@@ -22,8 +23,9 @@ decoded action still carries only its element ID; rendering or invoking it
 cannot open a process, read a file, send a protocol message, or grant a
 capability. The first authenticated replacement operation is documented in
 `docs/PROTOCOL.md`. It has a `ui.document.write` capability, a 24 KiB embedded
-document limit, atomic revision result, and no window or action-event bridge.
-Window lifecycle, event delivery, queues, and rendering remain separate
+document limit and atomic revision result. The separate session-lab diagnostic
+now supplies one host-owned window and bounded semantic-event pull bridge;
+public window lifecycle, subscriptions, and broader rendering remain separate
 contracts.
 
 ## Envelope
@@ -166,4 +168,5 @@ system calls. The Windows host additionally builds and renders its compiled-in
 UI Lab fixture through this decoder, offers a separate bounded developer
 preview input, and uses it from the capability-checked document-replacement
 state in an authenticated transport session. None of those paths attaches
-application data to a native application window or delivers UI events.
+application data to a public native application window or grants UI events
+native authority.

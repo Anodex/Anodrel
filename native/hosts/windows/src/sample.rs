@@ -28,6 +28,7 @@ enum SampleDialogRequest {
     OpenFileWithReference,
     SaveFile,
     Storage,
+    Scroll,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -75,6 +76,14 @@ pub fn run_ui_session_with_storage(
     client_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Storage)
+}
+
+/// Runs the UI session diagnostic and asks its client to submit a scroll tree.
+pub fn run_ui_session_with_scroll(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Scroll)
 }
 
 fn run_ui_session_with_dialog(
@@ -165,6 +174,7 @@ fn run_with_optional_session_view(
             }
             SampleDialogRequest::SaveFile => command.arg("--request-save-file")?,
             SampleDialogRequest::Storage => command.arg("--request-storage-state")?,
+            SampleDialogRequest::Scroll => command.arg("--request-scroll-document")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?

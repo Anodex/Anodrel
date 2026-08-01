@@ -1,7 +1,8 @@
 # Anodrel scroll-container contract
 
 **Status:** Owned model, layout, version 2 interchange, and bounded Windows
-host-input contract.
+host-input contract. The Windows UI Session Lab has an end-to-end development
+diagnostic for the complete path.
 
 ## Boundary
 
@@ -33,6 +34,14 @@ intentionally outside this contract. The portable `UiScrollWheel` translates
 signed input units into owned whole-line steps without retaining device state;
 the Windows diagnostic and session hosts use it to accumulate partial wheel
 reports locally. It is not an application input event.
+
+The `--sample-ui-scroll-client` Windows development command sends one exact v2
+tree whose only enabled action begins below the initial viewport. An operator
+uses local mouse-wheel or Page Down input to reveal it, then activates it. The
+authenticated client receives only that revision-and-action candidate through
+the existing pull operation and requests close for its own session. This proves
+the path without serializing a position, exposing a scroll event, or giving the
+application a native input handle.
 
 ## Format compatibility
 

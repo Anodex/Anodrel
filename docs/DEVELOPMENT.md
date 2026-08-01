@@ -201,6 +201,18 @@ own session. It accepts no application-supplied path and leaves no saved test
 snapshot behind. This is a development diagnostic; installed-application
 policy integration remains separate work.
 
+To exercise a version 2 scroll document through that same session, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-scroll-client $nodePath $clientPath
+~~~
+
+Use the mouse wheel or Page Down until **Complete scroll diagnostic** becomes
+visible, then activate it. The document carries no position: the host retains,
+clamps, and applies the vertical offset locally before the normal authenticated
+semantic-action round trip closes the session. The development client waits at
+most two minutes for the action.
+
 ## Working process
 
 1. Start from an issue or a written task with a clear acceptance condition.

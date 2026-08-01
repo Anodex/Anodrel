@@ -57,13 +57,13 @@ native operation.
 ## Compatibility and future integration
 
 The state API has no client-supplied session ID, request ID, event sequence,
-acknowledgement, or queue. `ui.document.replace` now binds one authenticated
-transport session to this state after its `ui.document.write` capability check;
-it accepts only a 24 KiB encoded document and maps validation failure to a safe
-protocol payload error. The state itself still has no I/O or knowledge of that
-operation. The protocol operation currently calls only `replace_document`, so
-its public v1 contract remains unchanged until a separately documented protocol
-revision opts into v2.
+acknowledgement, or queue. `ui.document.replace` binds one authenticated
+transport session to `replace_document` after its `ui.document.write`
+capability check; `ui.document.replace.v2` separately binds that same session
+to `replace_document_v2`. Each accepts only a 24 KiB encoded document and maps
+validation failure to a safe protocol payload error. The state itself still has
+no I/O or knowledge of either operation. Version 2 is explicit: a v1 document
+cannot enter the v2 operation, and a scroll tree cannot enter the v1 operation.
 
 The transport delivers semantic actions only through the bounded pull contract
 below. It does not expose document readback, subscriptions, callbacks,

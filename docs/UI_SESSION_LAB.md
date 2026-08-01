@@ -25,13 +25,21 @@ destination or cancel it, then activate the visible semantic action. The
 diagnostic verifies picker routing only: it never creates, truncates, or writes
 the selected destination.
 
+To exercise the owned version 2 scroll path, use
+`--sample-ui-scroll-client` instead. Scroll with the mouse wheel or Page Down
+until **Complete scroll diagnostic** appears, then activate it. The action is
+not initially visible, so the run proves that the host retained and applied a
+local viewport offset before it sent the ordinary revision-bound semantic event.
+
 The window starts with an Anodrel-owned waiting document. The private client
 receives its one-time invitation through standard input, authenticates to a
 current-session named pipe, checks `platform.health`, then submits one strict
 `anodrel.ui.document.v1` document using `ui.document.replace`, or an exact
 `anodrel.ui.document.v2` document using `ui.document.replace.v2`. The native
-window must replace the waiting screen with that document. Close the window to
-complete the development run.
+window must replace the waiting screen with that document. The regular and
+scroll diagnostics close only after their expected semantic action has returned
+through `ui.events.read`; closing the native window is the safe manual abort.
+The development client waits at most two minutes for that action.
 
 ## Boundary
 
