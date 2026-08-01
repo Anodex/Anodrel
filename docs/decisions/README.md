@@ -13,6 +13,9 @@ Each record should include:
 
 Current records (newest first):
 
+- 0022 — Windows credentials use a narrow current-user Credential Manager
+  store.
+
 - 0021 — Application directories are derived from host-validated identity.
 
 - 0020 — Windows launch requires a locked and revalidated executable.

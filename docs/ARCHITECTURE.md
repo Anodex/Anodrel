@@ -141,6 +141,14 @@ the protocol. Storage and logging services will define their own permission,
 creation, and recovery rules on top of this layout. See `docs/PATHS.md` and
 Decision 0021.
 
+The Windows credential adapter stores a bounded secret only under the exact
+target derived from a validated application identity and credential name. It
+uses the current user's generic Credential Manager store and exposes no
+enumeration, arbitrary target, renderer, diagnostic, or protocol boundary.
+The portable secret and target types redact their contents; a future public
+credential service must add explicit permission and authenticated-session
+rules. See `docs/CREDENTIALS.md` and Decision 0022.
+
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only
 after the final registered window closes. The `--window-lab` diagnostic proves

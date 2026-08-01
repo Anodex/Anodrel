@@ -11,6 +11,7 @@ members = [
   "crates/bootstrap",
   "crates/application",
   "crates/paths",
+  "crates/credentials",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-instance",
@@ -18,6 +19,7 @@ members = [
   "adapters/windows-policy",
   "adapters/windows-launch",
   "adapters/windows-paths",
+  "adapters/windows-credentials",
   "hosts/windows",
 ]
 resolver = "2"

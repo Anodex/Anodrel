@@ -16,6 +16,10 @@ modules for protocol, policy, and framing.
 - `windows-paths` reads the current user's Windows Local AppData known folder
   and derives host-only application directories through the portable path
   layout. It performs no filesystem mutation or public protocol operation.
+- `windows-credentials` uses the current user's generic Windows Credential
+  Manager store only through the exact target derived from an Anodrel identity
+  and restricted credential name. It cannot enumerate credentials or expose a
+  protocol operation.
 
 Adapters must not place application behavior, public protocol definitions, or
 raw OS calls into the platform core.

@@ -25,6 +25,9 @@ anodrel-windows-launch -> anodrel-windows-policy / anodrel-windows-signature
 anodrel-paths -> anodrel-application
 anodrel-windows-paths -> anodrel-paths -> Shell32 / Ole32
 
+anodrel-credentials -> anodrel-application
+anodrel-windows-credentials -> anodrel-credentials -> Advapi32
+
 anodrel-json -> anodrel-application -> anodrel-windows-host
 ~~~
 
@@ -62,6 +65,13 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
 - `adapters/windows-paths` reads only the current user's Local AppData known
   folder through Shell32, then delegates the directory layout to `crates/paths`.
   It does not create, read, enumerate, or expose a directory to an application.
+- `crates/credentials` owns validated credential names, exact per-application
+  generic-credential targets, and bounded opaque secret values. It has no
+  operating-system calls or public application protocol.
+- `adapters/windows-credentials` reads, writes, and deletes only the exact
+  generic Credential Manager target derived from a validated identity. It
+  cannot enumerate credentials or expose a secret, target, or raw Windows
+  status to diagnostics or an application.
 - `hosts/windows` isolates raw Win32 FFI for a window class, message loop, and
   handle-keyed view registry, client-area drawing, and final-window shutdown.
 
@@ -102,6 +112,7 @@ cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --application apps/sample/anodrel.application.json
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json

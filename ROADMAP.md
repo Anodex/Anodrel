@@ -71,6 +71,10 @@ Status: **Direct Windows host in progress**
   current user's Windows Local AppData root (Decision 0021). Filesystem
   access, directory creation, and a public storage protocol remain deferred.
 - Implement secure credential storage through the operating system.
+  **Completed for the credential-store foundation:** a host-only Windows
+  Credential Manager adapter with per-application target isolation, bounded
+  opaque secrets, and current-user local persistence (Decision 0022). Public
+  credential capabilities, session binding, and consent remain deferred.
 - Add logging, crash reporting boundaries, and shutdown behavior. **Completed
   for the first in-memory diagnostic log:** a bounded closed event
   catalogue with no application input, persistence, export, or protocol
