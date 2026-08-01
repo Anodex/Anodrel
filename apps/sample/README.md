@@ -19,6 +19,11 @@ that authenticated replacement through the native UI Session Lab. Its visible
 action is delivered only as a revision-bound semantic event after the client
 calls `ui.events.read`; it has no direct native authority.
 
+Use `--sample-ui-file-client` or `--sample-ui-save-client` with the Windows
+host to run the same authenticated session through the real open or save
+picker. These diagnostics prove only user-mediated path selection; they never
+read, create, truncate, or write a selected file.
+
 `anodrel.application.json` and `content/main.txt` are a separate static
 application package for the first Windows content surface. The host
 verifies the declared SHA-256 digest and package containment before drawing the

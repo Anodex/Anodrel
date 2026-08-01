@@ -22,7 +22,7 @@ native window lifecycle and protocol core without a runtime framework or a
 webview. It also loads a first digest-verified plain-text application
 package into a host-controlled Win32 surface. A development-only Node sample
 separately exercises the private pipe path end to end; its host-issued grants
-include bounded text clipboard, validated HTTPS handoff, and one UI-thread-routed
+include bounded text clipboard, validated HTTPS handoff, and UI-thread-routed
 open/save file pickers, alongside UI-session test grants. The first branded Startup Lab turns those
 foundation checks, including a temporary private IPC health loopback, into a
 direct native visual smoke test.

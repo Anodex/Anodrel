@@ -14,10 +14,16 @@ npm run build
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-client path-to-node.exe apps/sample/dist/native-client.js
 ~~~
 
-To exercise Protocol 1.7's actual UI-thread-routed file picker in the same
+To exercise Protocol 1.7's UI-thread-routed open picker in the same
 authenticated session, use `--sample-ui-file-client` in place of
 `--sample-ui-client`. Select a `.txt`, `.json`, or `.md` file or cancel the
 picker, then activate the visible semantic action to end the sample.
+
+To exercise Protocol 1.8's independent save picker, use
+`--sample-ui-save-client` instead. Choose a `.txt`, `.json`, or `.md`
+destination or cancel it, then activate the visible semantic action. The
+diagnostic verifies picker routing only: it never creates, truncates, or writes
+the selected destination.
 
 The window starts with an Anodrel-owned waiting document. The private client
 receives its one-time invitation through standard input, authenticates to a

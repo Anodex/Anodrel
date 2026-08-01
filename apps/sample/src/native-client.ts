@@ -49,6 +49,15 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-save-file")) {
+      const dialog = await client.saveFileDialog([
+        { label: "Documents", extensions: ["txt", "json", "md"] },
+      ]);
+      if (dialog.status !== "saved" && dialog.status !== "cancelled") {
+        return 19;
+      }
+    }
+
     if (process.argv.includes("--wait-for-ui-event")) {
       const eventResult = await waitForSampleAction(client, update.revision);
       if (eventResult !== 0) {

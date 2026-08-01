@@ -180,6 +180,11 @@ authenticated `ui.events.read` round trip. The sample then requests
 The action carries only its revision and semantic ID; it cannot invoke a native
 operation. See `docs/UI_SESSION_LAB.md`.
 
+To exercise the actual host-owned open or save picker in that same session,
+replace `--sample-ui-client` with `--sample-ui-file-client` or
+`--sample-ui-save-client`. Both commands accept only the strict sample filters;
+the save diagnostic never writes the selected destination.
+
 ## Working process
 
 1. Start from an issue or a written task with a clear acceptance condition.
