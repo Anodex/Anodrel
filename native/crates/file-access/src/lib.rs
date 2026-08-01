@@ -148,11 +148,51 @@ impl fmt::Display for FileSelectionStoreError {
 
 impl std::error::Error for FileSelectionStoreError {}
 
+/// Reads bounded UTF-8 text from one session-bound selected-file reference.
+///
+/// Implementations must never accept a path, native handle, or caller-selected
+/// filesystem scope. A missing reference is intentionally indistinguishable
+/// from an unavailable host selection at this portable boundary.
+pub trait FileTextService {
+    /// Consumes the reference's retained file object and returns bounded text.
+    fn read_text(&self, reference: &SelectionReference) -> Result<String, FileTextServiceError>;
+}
+
+/// A safe selected-file text service failure category.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileTextServiceError {
+    /// The selected reference was absent, expired, or could not be read.
+    Unavailable,
+    /// The retained file exceeded the fixed reader limit.
+    TooLarge,
+    /// The retained file did not contain valid UTF-8 text.
+    InvalidText,
+}
+
+impl fmt::Display for FileTextServiceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("selected file text is unavailable")
+    }
+}
+
+impl std::error::Error for FileTextServiceError {}
+
+/// A safe default service for hosts that do not expose selected-file reads.
+#[derive(Debug, Default)]
+pub struct UnavailableFileTextService;
+
+impl FileTextService for UnavailableFileTextService {
+    fn read_text(&self, _reference: &SelectionReference) -> Result<String, FileTextServiceError> {
+        Err(FileTextServiceError::Unavailable)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        FileSelectionStore, FileSelectionStoreError, MAX_SESSION_SELECTIONS, SelectionReference,
-        SelectionReferenceError,
+        FileSelectionStore, FileSelectionStoreError, FileTextService, FileTextServiceError,
+        MAX_SESSION_SELECTIONS, SelectionReference, SelectionReferenceError,
+        UnavailableFileTextService,
     };
 
     const FIRST: &str = "AbCdEfGhIjKlMnOpQrStUv";
@@ -206,6 +246,15 @@ mod tests {
         assert_eq!(
             store.insert(overflow, MAX_SESSION_SELECTIONS as u8),
             Err(FileSelectionStoreError::Full)
+        );
+    }
+
+    #[test]
+    fn default_file_text_service_exposes_no_filesystem_authority() {
+        let reference = SelectionReference::new(FIRST).expect("reference is valid");
+        assert_eq!(
+            UnavailableFileTextService.read_text(&reference),
+            Err(FileTextServiceError::Unavailable)
         );
     }
 }

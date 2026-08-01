@@ -51,6 +51,10 @@ The Windows adapter's per-session registry pairs each CNG reference with the
 opened file object. It consumes a reference once and closes all remaining
 objects on session cleanup.
 
+The portable `FileTextService` interface accepts only that opaque reference
+and has a fail-closed unavailable implementation for hosts that do not wire
+selected-file reads.
+
 ## Limits and deferred work
 
 The native text reader is limited to **32 KiB** of bytes, requires strict UTF-8,
