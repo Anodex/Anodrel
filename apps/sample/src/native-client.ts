@@ -109,6 +109,24 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-credentials")) {
+      const name = "sample-session-check";
+      const secret = "00aaff";
+      const written = await client.writeCredential(name, secret);
+      if (written.status !== "written") {
+        return 23;
+      }
+      const read = await client.readCredential(name);
+      const deleted = await client.deleteCredential(name);
+      if (
+        read.status !== "found" ||
+        read.secret !== secret ||
+        deleted.status !== "deleted"
+      ) {
+        return 23;
+      }
+    }
+
     if (process.argv.includes("--wait-for-ui-event")) {
       const eventResult = await waitForSampleAction(
         client,

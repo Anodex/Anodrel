@@ -131,8 +131,11 @@ Status: **Direct Windows host in progress**
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded
-  opaque secrets, and current-user local persistence (Decision 0022). Public
-  credential capabilities, session binding, and consent remain deferred.
+  opaque secrets, and current-user local persistence (Decision 0022). Protocol
+  1.12 now supplies separately granted exact read, write, and delete operations
+  over the authenticated transport, and a development Windows UI-session
+  diagnostic proves the direct Credential Manager path. Installed-policy
+  integration, consent, and non-Windows adapters remain deferred.
 - Add logging, crash reporting boundaries, and shutdown behavior. **Completed
   for the first in-memory diagnostic log and its bounded authenticated read:**
   a closed event catalogue has no application input, persistence, export, or

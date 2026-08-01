@@ -211,6 +211,19 @@ The development client verifies exactly the fixed `core` and `transport` host
 events, then completes the regular semantic UI action. It has no path, free
 text, filter, write, clear, export, or subscription surface.
 
+To exercise the exact Windows Credential Manager boundary through the same
+authenticated session, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-credentials-client $nodePath $clientPath
+~~~
+
+The development client writes, reads, and deletes one fixed secret from the
+host-bound `anodrel.sample` namespace before it waits for the normal semantic
+UI action. The pipe worker performs the synchronous store work; the UI thread
+does not. This is a development diagnostic, not a product credential session;
+it does not show or log the test value.
+
 To exercise a version 2 scroll document through that same session, run:
 
 ~~~powershell

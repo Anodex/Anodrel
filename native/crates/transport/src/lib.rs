@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, fmt};
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
+use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
 use anodrel_diagnostics::DiagnosticsService;
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_file_access::{FileSelectionService, FileTextService};
@@ -217,6 +218,27 @@ impl StorageService for TransportUnavailableStorage {
 
     fn clear(&self) -> Result<(), anodrel_storage::StorageServiceError> {
         Err(anodrel_storage::StorageServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct TransportUnavailableCredentials;
+
+impl CredentialService for TransportUnavailableCredentials {
+    fn read(&self, _name: &CredentialName) -> Result<Secret, CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
+    }
+
+    fn write(
+        &self,
+        _name: &CredentialName,
+        _secret: &Secret,
+    ) -> Result<(), CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
+    }
+
+    fn delete(&self, _name: &CredentialName) -> Result<bool, CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
     }
 }
 
@@ -433,9 +455,45 @@ impl TransportSession {
         storage: impl StorageService + 'static,
         diagnostics: impl DiagnosticsService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            storage,
+            diagnostics,
+            TransportUnavailableCredentials,
+        )
+    }
+
+    /// Creates one session with an identity-bound credential service supplied
+    /// by the native host. The service owns application identity and target
+    /// selection; the pipe peer can supply only a validated local name.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+        diagnostics: impl DiagnosticsService + 'static,
+        credential_service: impl CredentialService + 'static,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+            host: CoreHost::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
                 policy,
                 ui_input_mailbox,
                 session_close_signal,
@@ -446,6 +504,7 @@ impl TransportSession {
                 file_text,
                 storage,
                 diagnostics,
+                credential_service,
             ),
             ui_document_mailbox,
             pending_cancellations: BTreeSet::new(),
@@ -615,6 +674,7 @@ mod tests {
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
     };
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
+    use anodrel_file_access::{UnavailableFileSelectionService, UnavailableFileTextService};
     use anodrel_ui::{ElementId, UiEvent};
 
     use anodrel_protocol::{Capability, JsonValue};
@@ -678,6 +738,12 @@ mod tests {
         )
     }
 
+    fn credential_request(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":12}},"kind":"request","requestId":"credential","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
     #[derive(Debug)]
     struct MemoryClipboard(RefCell<Option<ClipboardText>>);
 
@@ -711,6 +777,28 @@ mod tests {
     impl ExternalLinkService for RecordingExternalLinks {
         fn open(&self, _link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
             Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct FixedCredentialService;
+
+    impl CredentialService for FixedCredentialService {
+        fn read(&self, _name: &CredentialName) -> Result<Secret, CredentialServiceError> {
+            Secret::new(vec![0, 0xaa, 0xff])
+                .map_err(|_| CredentialServiceError::StoredSecretInvalid)
+        }
+
+        fn write(
+            &self,
+            _name: &CredentialName,
+            _secret: &Secret,
+        ) -> Result<(), CredentialServiceError> {
+            Ok(())
+        }
+
+        fn delete(&self, _name: &CredentialName) -> Result<bool, CredentialServiceError> {
+            Ok(false)
         }
     }
 
@@ -777,6 +865,55 @@ mod tests {
                 .expect("result object")["status"]
                 .as_string(),
             Some("ready")
+        );
+    }
+
+    #[test]
+    fn routes_a_granted_credential_read_to_the_injected_service_after_authentication() {
+        let mut transport = TransportSession::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::CredentialRead],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            TransportUnavailableClipboard,
+            TransportUnavailableExternalLinks,
+            TransportUnavailableFileDialogs,
+            UnavailableFileSelectionService,
+            UnavailableFileTextService,
+            TransportUnavailableStorage,
+            TransportUnavailableDiagnostics,
+            FixedCredentialService,
+        );
+        authenticate(&mut transport);
+
+        let response = transport
+            .receive(
+                &encode_json(&credential_request(
+                    "credential.read",
+                    r#"{"name":"refresh-token"}"#,
+                ))
+                .expect("credential request encodes"),
+            )
+            .expect("credential response is returned");
+        let response = decode_response(&response[0]);
+        let result = response
+            .as_object()
+            .and_then(|fields| fields.get("result"))
+            .and_then(JsonValue::as_object)
+            .expect("credential response has a result");
+        assert_eq!(
+            result.get("status").and_then(JsonValue::as_string),
+            Some("found")
+        );
+        assert_eq!(
+            result.get("secret").and_then(JsonValue::as_string),
+            Some("00aaff")
         );
     }
 

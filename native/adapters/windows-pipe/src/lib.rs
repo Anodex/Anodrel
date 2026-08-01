@@ -14,6 +14,7 @@ use std::{fmt, io, thread, time::Duration};
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
 use anodrel_diagnostics::DiagnosticsService;
 use anodrel_external_links::ExternalLinkService;
 use anodrel_file_access::{FileSelectionService, FileTextService};
@@ -63,6 +64,27 @@ impl DiagnosticsService for UnavailableDiagnostics {
         &self,
     ) -> Result<Vec<anodrel_diagnostics::Entry>, anodrel_diagnostics::DiagnosticsServiceError> {
         Err(anodrel_diagnostics::DiagnosticsServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableCredentials;
+
+impl CredentialService for UnavailableCredentials {
+    fn read(&self, _name: &CredentialName) -> Result<Secret, CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
+    }
+
+    fn write(
+        &self,
+        _name: &CredentialName,
+        _secret: &Secret,
+    ) -> Result<(), CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
+    }
+
+    fn delete(&self, _name: &CredentialName) -> Result<bool, CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
     }
 }
 
@@ -451,8 +473,44 @@ impl WindowsPipeServer {
         storage: impl StorageService + 'static,
         diagnostics: impl DiagnosticsService + 'static,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            policy,
+            session_id,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            storage,
+            diagnostics,
+            UnavailableCredentials,
+        )
+    }
+
+    /// Creates one worker-thread pipe endpoint with an identity-bound
+    /// credential service. The service is created by the native host, never by
+    /// the pipe peer or bootstrap invitation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+        diagnostics: impl DiagnosticsService + 'static,
+        credential_service: impl CredentialService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
         Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+            TransportSession::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
                 policy,
                 credentials,
                 ui_document_mailbox,
@@ -465,6 +523,7 @@ impl WindowsPipeServer {
                 file_text,
                 storage,
                 diagnostics,
+                credential_service,
             )
         })
     }

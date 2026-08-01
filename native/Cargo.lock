@@ -39,6 +39,7 @@ name = "anodrel-core"
 version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
+ "anodrel-credentials",
  "anodrel-diagnostics",
  "anodrel-external-links",
  "anodrel-file-access",
@@ -122,6 +123,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
  "anodrel-core",
+ "anodrel-credentials",
  "anodrel-diagnostics",
  "anodrel-external-links",
  "anodrel-file-access",
@@ -212,6 +214,7 @@ dependencies = [
  "anodrel-brand",
  "anodrel-canvas",
  "anodrel-core",
+ "anodrel-credentials",
  "anodrel-diagnostics",
  "anodrel-file-access",
  "anodrel-file-dialog",
@@ -223,6 +226,7 @@ dependencies = [
  "anodrel-windows-appearance",
  "anodrel-windows-bootstrap",
  "anodrel-windows-clipboard",
+ "anodrel-windows-credentials",
  "anodrel-windows-external-links",
  "anodrel-windows-file-access",
  "anodrel-windows-file-dialog",
@@ -263,6 +267,7 @@ dependencies = [
  "anodrel-bootstrap",
  "anodrel-clipboard",
  "anodrel-core",
+ "anodrel-credentials",
  "anodrel-diagnostics",
  "anodrel-external-links",
  "anodrel-file-access",

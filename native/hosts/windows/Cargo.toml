@@ -9,6 +9,7 @@ anodrel-application = { path = "../../crates/application" }
 anodrel-brand = { path = "../../crates/brand" }
 anodrel-canvas = { path = "../../crates/canvas" }
 anodrel-core = { path = "../../crates/core" }
+anodrel-credentials = { path = "../../crates/credentials" }
 anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
@@ -21,6 +22,7 @@ anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
 anodrel-windows-clipboard = { path = "../../adapters/windows-clipboard" }
+anodrel-windows-credentials = { path = "../../adapters/windows-credentials" }
 anodrel-windows-external-links = { path = "../../adapters/windows-external-links" }
 anodrel-windows-file-access = { path = "../../adapters/windows-file-access" }
 anodrel-windows-file-dialog = { path = "../../adapters/windows-file-dialog" }

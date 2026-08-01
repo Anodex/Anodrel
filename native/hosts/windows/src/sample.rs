@@ -14,6 +14,7 @@ use anodrel_protocol::Capability;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
+use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_paths::application_directories;
@@ -31,6 +32,7 @@ enum SampleDialogRequest {
     Storage,
     Scroll,
     Diagnostics,
+    Credentials,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -96,6 +98,15 @@ pub fn run_ui_session_with_diagnostics(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Diagnostics)
 }
 
+/// Runs the UI-session diagnostic against the current user's exact
+/// application-bound Credential Manager namespace.
+pub fn run_ui_session_with_credentials(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Credentials)
+}
+
 fn run_ui_session_with_dialog(
     node_path: &str,
     client_path: &str,
@@ -148,12 +159,15 @@ fn run_with_optional_session_view(
             Capability::StorageStateRead,
             Capability::StorageStateReplace,
             Capability::StorageStateClear,
+            Capability::CredentialRead,
+            Capability::CredentialWrite,
+            Capability::CredentialDelete,
         ],
         "anodrel-windows-host",
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
         Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) => {
-            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
+            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
                 policy,
                 "sample-session",
                 mailbox.clone(),
@@ -166,6 +180,7 @@ fn run_with_optional_session_view(
                 file_text.clone(),
                 sample_storage()?,
                 sample_diagnostics(),
+                sample_credentials()?,
             )?
         }
         None => WindowsPipeServer::create(policy, "sample-session")?,
@@ -187,6 +202,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::Storage => command.arg("--request-storage-state")?,
             SampleDialogRequest::Scroll => command.arg("--request-scroll-document")?,
             SampleDialogRequest::Diagnostics => command.arg("--request-diagnostics")?,
+            SampleDialogRequest::Credentials => command.arg("--request-credentials")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
@@ -226,6 +242,13 @@ fn sample_storage() -> Result<WindowsStorageService, Box<dyn Error>> {
     Ok(WindowsStorageService::new(&application_directories(
         manifest.identity(),
     )?))
+}
+
+fn sample_credentials() -> Result<WindowsCredentialService, Box<dyn Error>> {
+    let manifest = ApplicationManifest::parse(
+        r#"{"manifestVersion":{"major":1,"minor":0},"applicationId":"anodrel.sample","displayName":"Anodrel Sample","content":{"format":"anodrel.text.v1","path":"content/main.txt","sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}}"#,
+    )?;
+    Ok(WindowsCredentialService::new(manifest.identity().clone()))
 }
 
 fn sample_diagnostics() -> LogBook {

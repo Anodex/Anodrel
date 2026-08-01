@@ -40,6 +40,13 @@ Protocol 1.10 capability surface. The development UI-session diagnostic
 exercises its read, replace, and clear path end to end. Installed-application
 policy remains a separate integration gate.
 
+Protocol 1.12 now exposes separately granted exact credential read, write, and
+delete operations through an injected service bound to the host-validated
+application identity. A development-only Windows UI-session diagnostic proves
+the current-user Credential Manager path while writing, reading, and removing
+one fixed test value; it is not an installed product session and never renders
+or logs the credential.
+
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
 blur, bevels, and filtered image scaling. The Anodrel mark ships as the authored

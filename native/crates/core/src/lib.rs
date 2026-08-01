@@ -17,6 +17,7 @@ use std::{
 };
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
+use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
 use anodrel_diagnostics::{DiagnosticsService, DiagnosticsServiceError};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_file_access::{
@@ -115,6 +116,7 @@ pub struct CoreHost {
     file_text: Box<dyn FileTextService>,
     storage: Box<dyn StorageService>,
     diagnostics: Box<dyn DiagnosticsService>,
+    credentials: Box<dyn CredentialService>,
 }
 
 #[derive(Debug)]
@@ -174,6 +176,27 @@ struct UnavailableDiagnostics;
 impl DiagnosticsService for UnavailableDiagnostics {
     fn entries(&self) -> Result<Vec<anodrel_diagnostics::Entry>, DiagnosticsServiceError> {
         Err(DiagnosticsServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableCredentials;
+
+impl CredentialService for UnavailableCredentials {
+    fn read(&self, _name: &CredentialName) -> Result<Secret, CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
+    }
+
+    fn write(
+        &self,
+        _name: &CredentialName,
+        _secret: &Secret,
+    ) -> Result<(), CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
+    }
+
+    fn delete(&self, _name: &CredentialName) -> Result<bool, CredentialServiceError> {
+        Err(CredentialServiceError::Unavailable)
     }
 }
 
@@ -337,6 +360,38 @@ impl CoreHost {
         storage: impl StorageService + 'static,
         diagnostics: impl DiagnosticsService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            file_dialogs,
+            file_selections,
+            file_text,
+            storage,
+            diagnostics,
+            UnavailableCredentials,
+        )
+    }
+
+    /// Creates a host core with an identity-bound credential service. The
+    /// implementation owns the validated application identity and must never
+    /// accept a target or identity from the authenticated request.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+        file_selections: impl FileSelectionService + 'static,
+        file_text: impl FileTextService + 'static,
+        storage: impl StorageService + 'static,
+        diagnostics: impl DiagnosticsService + 'static,
+        credentials: impl CredentialService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
@@ -350,6 +405,7 @@ impl CoreHost {
             file_text: Box::new(file_text),
             storage: Box::new(storage),
             diagnostics: Box::new(diagnostics),
+            credentials: Box::new(credentials),
         }
     }
 
@@ -424,6 +480,15 @@ impl CoreHost {
             "platform.health" => self.handle_health(request),
             "diagnostics.entries.read" if request.protocol_version.minor >= 11 => {
                 self.handle_diagnostics_entries_read(request)
+            }
+            "credential.read" if request.protocol_version.minor >= 12 => {
+                self.handle_credential_read(request)
+            }
+            "credential.write" if request.protocol_version.minor >= 12 => {
+                self.handle_credential_write(request)
+            }
+            "credential.delete" if request.protocol_version.minor >= 12 => {
+                self.handle_credential_delete(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
@@ -1153,6 +1218,85 @@ impl CoreHost {
         }
     }
 
+    fn handle_credential_read(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(name) = credential_name_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "credential.read requires one exact credential name.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::CredentialRead) {
+            return self.capability_denied(request.request_id, "credential.read");
+        }
+        match self.credentials.read(&name) {
+            Ok(secret) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("found".to_owned())),
+                    ("secret", JsonValue::String(secret.to_lower_hex())),
+                ]),
+            ),
+            Err(CredentialServiceError::NotFound) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("not_found".to_owned()))]),
+            ),
+            Err(error) => self.credential_failure(request.request_id, error),
+        }
+    }
+
+    fn handle_credential_write(&self, request: RequestEnvelope) -> JsonValue {
+        let Some((name, secret)) = credential_write_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "credential.write requires one exact credential name and canonical secret.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::CredentialWrite) {
+            return self.capability_denied(request.request_id, "credential.write");
+        }
+        match self.credentials.write(&name, &secret) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("written".to_owned()))]),
+            ),
+            Err(error) => self.credential_failure(request.request_id, error),
+        }
+    }
+
+    fn handle_credential_delete(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(name) = credential_name_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "credential.delete requires one exact credential name.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::CredentialDelete) {
+            return self.capability_denied(request.request_id, "credential.delete");
+        }
+        match self.credentials.delete(&name) {
+            Ok(true) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("deleted".to_owned()))]),
+            ),
+            Ok(false) | Err(CredentialServiceError::NotFound) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("not_found".to_owned()))]),
+            ),
+            Err(error) => self.credential_failure(request.request_id, error),
+        }
+    }
+
     fn capability_denied(&self, request_id: String, capability: &str) -> JsonValue {
         self.failure(
             request_id,
@@ -1196,6 +1340,28 @@ impl CoreHost {
             StorageServiceError::StoredSnapshotTooLarge => (
                 ProtocolErrorCode::StorageSnapshotTooLarge,
                 "stored application state is too large.",
+            ),
+        };
+        self.failure(request_id, code, message, None)
+    }
+
+    fn credential_failure(&self, request_id: String, error: CredentialServiceError) -> JsonValue {
+        let (code, message) = match error {
+            CredentialServiceError::NotFound => (
+                ProtocolErrorCode::CredentialUnavailable,
+                "credential service is unavailable.",
+            ),
+            CredentialServiceError::AccessDenied => (
+                ProtocolErrorCode::CredentialAccessDenied,
+                "credential access is denied.",
+            ),
+            CredentialServiceError::Unavailable => (
+                ProtocolErrorCode::CredentialUnavailable,
+                "credential service is unavailable.",
+            ),
+            CredentialServiceError::StoredSecretInvalid => (
+                ProtocolErrorCode::CredentialStoredSecretInvalid,
+                "stored credential is invalid.",
             ),
         };
         self.failure(request_id, code, message, None)
@@ -1312,6 +1478,25 @@ fn storage_replace_payload(value: &JsonValue) -> Option<&str> {
         .and_then(JsonValue::as_string)
 }
 
+fn credential_name_payload(value: &JsonValue) -> Option<CredentialName> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("name"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+        .and_then(|name| CredentialName::parse(name).ok())
+}
+
+fn credential_write_payload(value: &JsonValue) -> Option<(CredentialName, Secret)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    let name = CredentialName::parse(fields.get("name")?.as_string()?).ok()?;
+    let secret = Secret::from_lower_hex(fields.get("secret")?.as_string()?).ok()?;
+    Some((name, secret))
+}
+
 fn rfc3339_now() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1351,11 +1536,13 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::collections::BTreeMap;
     use std::sync::Mutex;
 
     use anodrel_clipboard::{
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
     };
+    use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
     use anodrel_file_access::{FileSelection, FileSelectionService, FileTextService};
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
@@ -1524,6 +1711,42 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Default)]
+    struct MemoryCredentials(Mutex<BTreeMap<String, Vec<u8>>>);
+
+    impl CredentialService for MemoryCredentials {
+        fn read(&self, name: &CredentialName) -> Result<Secret, CredentialServiceError> {
+            self.0
+                .lock()
+                .expect("credential lock is available")
+                .get(name.as_str())
+                .cloned()
+                .map(|bytes| Secret::new(bytes).expect("stored fixture secret is valid"))
+                .ok_or(CredentialServiceError::NotFound)
+        }
+
+        fn write(
+            &self,
+            name: &CredentialName,
+            secret: &Secret,
+        ) -> Result<(), CredentialServiceError> {
+            self.0
+                .lock()
+                .expect("credential lock is available")
+                .insert(name.as_str().to_owned(), secret.as_bytes().to_vec());
+            Ok(())
+        }
+
+        fn delete(&self, name: &CredentialName) -> Result<bool, CredentialServiceError> {
+            Ok(self
+                .0
+                .lock()
+                .expect("credential lock is available")
+                .remove(name.as_str())
+                .is_some())
+        }
+    }
+
     fn clipboard_host(
         grants: Vec<Capability>,
         clipboard: impl ClipboardService + 'static,
@@ -1594,6 +1817,25 @@ mod tests {
         )
     }
 
+    fn credential_host(
+        grants: Vec<Capability>,
+        credentials: impl CredentialService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            MemoryClipboard::with_text(None),
+            FailingExternalLinks,
+            CancellingFileDialog,
+            CapturingFileDialog,
+            FixedFileText(Err(FileTextServiceError::Unavailable)),
+            MemoryStorage::with_state(StorageRead::Absent),
+            UnavailableDiagnostics,
+            credentials,
+        )
+    }
+
     fn request(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":0}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
@@ -1657,6 +1899,12 @@ mod tests {
     fn request_v1_10(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":10}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_12(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":12}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -2320,6 +2568,93 @@ mod tests {
         assert_eq!(
             field(field(&rejected, "error"), "code").as_string(),
             Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn credential_operations_are_exact_and_independently_granted() {
+        let service_host = credential_host(
+            vec![
+                Capability::CredentialRead,
+                Capability::CredentialWrite,
+                Capability::CredentialDelete,
+            ],
+            MemoryCredentials::default(),
+        );
+        let absent = JsonValue::parse(&service_host.handle_json(&request_v1_12(
+            "credential.read",
+            r#"{"name":"refresh-token"}"#,
+        )))
+        .expect("absent response is JSON");
+        assert_eq!(
+            field(field(&absent, "result"), "status").as_string(),
+            Some("not_found")
+        );
+
+        let written = JsonValue::parse(&service_host.handle_json(&request_v1_12(
+            "credential.write",
+            r#"{"name":"refresh-token","secret":"00aaff"}"#,
+        )))
+        .expect("write response is JSON");
+        assert_eq!(
+            field(field(&written, "result"), "status").as_string(),
+            Some("written")
+        );
+
+        let found = JsonValue::parse(&service_host.handle_json(&request_v1_12(
+            "credential.read",
+            r#"{"name":"refresh-token"}"#,
+        )))
+        .expect("read response is JSON");
+        assert_eq!(
+            field(field(&found, "result"), "secret").as_string(),
+            Some("00aaff")
+        );
+
+        let deleted = JsonValue::parse(&service_host.handle_json(&request_v1_12(
+            "credential.delete",
+            r#"{"name":"refresh-token"}"#,
+        )))
+        .expect("delete response is JSON");
+        assert_eq!(
+            field(field(&deleted, "result"), "status").as_string(),
+            Some("deleted")
+        );
+
+        let invalid = JsonValue::parse(&service_host.handle_json(&request_v1_12(
+            "credential.write",
+            r#"{"name":"refresh-token","secret":"ABCDEF"}"#,
+        )))
+        .expect("invalid response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let denied = JsonValue::parse(
+            &credential_host(
+                vec![Capability::CredentialRead],
+                MemoryCredentials::default(),
+            )
+            .handle_json(&request_v1_12(
+                "credential.write",
+                r#"{"name":"refresh-token","secret":"00aaff"}"#,
+            )),
+        )
+        .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let unsupported = JsonValue::parse(&service_host.handle_json(&request_v1_10(
+            "credential.read",
+            r#"{"name":"refresh-token"}"#,
+        )))
+        .expect("unsupported response is JSON");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
         );
     }
 

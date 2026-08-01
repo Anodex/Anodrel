@@ -8,6 +8,7 @@ license.workspace = true
 anodrel-bootstrap = { path = "../../crates/bootstrap" }
 anodrel-clipboard = { path = "../../crates/clipboard" }
 anodrel-core = { path = "../../crates/core" }
+anodrel-credentials = { path = "../../crates/credentials" }
 anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-external-links = { path = "../../crates/external-links" }
 anodrel-file-access = { path = "../../crates/file-access" }
