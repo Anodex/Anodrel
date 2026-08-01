@@ -184,8 +184,10 @@ impl Layout {
 
         let header_height = unit(76.0);
         let margin = unit(46.0);
-        let mark_width = unit(224.0);
-        let mark_height = unit(232.0);
+        // Square: the authored asset is a square crop and the geometry fills
+        // the unit square, so any other aspect stretches the logo.
+        let mark_side = unit(220.0);
+        let (mark_width, mark_height) = (mark_side, mark_side);
         let mark_top = header_height + unit(38.0);
         let mark = Rect::from_size(
             center_x - mark_width / 2.0,
@@ -211,7 +213,9 @@ impl Layout {
         let card_gap = unit(15.0);
         let cards_top = pill.bottom + unit(38.0);
         let card_width = (width - margin * 2.0 - card_gap * 3.0) / 4.0;
-        let card_height = unit(146.0);
+        // Tall enough for the status line to clear the icon badge above it;
+        // `the_card_status_line_clears_its_badge` holds the two in agreement.
+        let card_height = unit(158.0);
 
         let actions_top = cards_top + card_height + unit(22.0);
         let actions = Rect::from_size(margin, actions_top, width - margin * 2.0, unit(84.0));
@@ -885,13 +889,8 @@ fn draw_cards(canvas: &mut Canvas, layout: &Layout, elapsed_millis: u64) {
             &Paint::solid(palette::PANEL_EDGE.scale_alpha(progress)),
         );
 
-        let badge_size = layout.unit(50.0);
-        let badge = Rect::from_size(
-            rect.left + layout.unit(20.0),
-            rect.top + layout.unit(22.0),
-            badge_size,
-            badge_size,
-        );
+        let badge = card_badge(layout, rect);
+        let badge_size = badge.width();
         canvas.fill_circle(
             badge.center(),
             badge_size / 2.0,
@@ -904,14 +903,14 @@ fn draw_cards(canvas: &mut Canvas, layout: &Layout, elapsed_millis: u64) {
         );
         card.icon.draw(
             canvas,
-            badge.inflate(-layout.unit(14.0)),
+            badge.inflate(-layout.unit(13.0)),
             layout.unit(1.7).max(1.0),
             &Paint::solid(card.accent.scale_alpha(progress)),
         );
 
         let text_left = badge.right + layout.unit(16.0);
         let title = TextSpec::new(card.title, layout.font(17.0), WEIGHT_MEDIUM);
-        let title_top = rect.top + layout.unit(26.0);
+        let title_top = rect.top + layout.unit(24.0);
         text::draw(
             canvas,
             &title,
@@ -928,11 +927,15 @@ fn draw_cards(canvas: &mut Canvas, layout: &Layout, elapsed_millis: u64) {
             &Paint::solid(palette::READY.scale_alpha(progress)),
         );
 
+        // The status and detail lines run the card's full width, so they start
+        // below the badge rather than beside it. They must clear it: the badge
+        // shares their left edge, so an overlap puts the circle's arc straight
+        // through the text.
         let status = TextSpec::new(card.status, layout.font(17.0), WEIGHT_REGULAR);
         text::draw(
             canvas,
             &status,
-            point(rect.left + layout.unit(20.0), rect.top + layout.unit(62.0)),
+            point(rect.left + layout.unit(20.0), card_status_top(layout, rect)),
             Align::Left,
             &Paint::solid(card.accent.scale_alpha(progress)),
         );
@@ -941,7 +944,7 @@ fn draw_cards(canvas: &mut Canvas, layout: &Layout, elapsed_millis: u64) {
         text::draw(
             canvas,
             &detail,
-            point(rect.left + layout.unit(20.0), rect.top + layout.unit(90.0)),
+            point(rect.left + layout.unit(20.0), rect.top + layout.unit(102.0)),
             Align::Left,
             &Paint::solid(palette::INK_MUTED.scale_alpha(progress)),
         );
@@ -951,13 +954,35 @@ fn draw_cards(canvas: &mut Canvas, layout: &Layout, elapsed_millis: u64) {
             layout,
             point(
                 rect.left + layout.unit(20.0),
-                rect.bottom - layout.unit(34.0),
+                rect.bottom - layout.unit(32.0),
             ),
             card.badge,
             card.accent,
             progress,
         );
     }
+}
+
+/// Inset of a card's icon badge from the card's top-left corner.
+const CARD_BADGE_INSET: f32 = 20.0;
+/// Diameter of a card's icon badge.
+const CARD_BADGE_SIZE: f32 = 46.0;
+/// Top of a card's status line, measured from the card's top edge.
+const CARD_STATUS_TOP: f32 = 74.0;
+
+/// Returns a card's icon badge circle.
+fn card_badge(layout: &Layout, rect: Rect) -> Rect {
+    Rect::from_size(
+        rect.left + layout.unit(CARD_BADGE_INSET),
+        rect.top + layout.unit(CARD_BADGE_INSET),
+        layout.unit(CARD_BADGE_SIZE),
+        layout.unit(CARD_BADGE_SIZE),
+    )
+}
+
+/// Returns the top of a card's status line.
+fn card_status_top(layout: &Layout, rect: Rect) -> f32 {
+    rect.top + layout.unit(CARD_STATUS_TOP)
 }
 
 fn draw_chip(
@@ -1265,6 +1290,62 @@ mod tests {
             }
             assert!(layout.actions.right <= width, "action strip overflows");
             assert!(layout.footer_top < height, "footer falls off the surface");
+        }
+    }
+
+    #[test]
+    fn the_card_status_line_clears_its_badge() {
+        // The badge and the status line share a left edge, so any vertical
+        // overlap draws the circle's arc straight through the text. This was
+        // shipped once: the badge ran to `top + 72` while the status line
+        // started at `top + 62`.
+        for (width, height) in [
+            (BASE_WIDTH, BASE_HEIGHT),
+            (900.0, 660.0),
+            (2_480.0, 1_800.0),
+        ] {
+            let layout = Layout::new(width, height);
+            for index in 0..CARDS.len() {
+                let rect = layout.card_rect(index);
+                let badge = super::card_badge(&layout, rect);
+                let status_top = super::card_status_top(&layout, rect);
+                assert!(
+                    status_top >= badge.bottom,
+                    "card {index} at {width}x{height}: status starts at {status_top} \
+                     but the badge runs to {}",
+                    badge.bottom
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_card_element_stays_inside_its_card() {
+        let layout = Layout::new(BASE_WIDTH, BASE_HEIGHT);
+        for index in 0..CARDS.len() {
+            let rect = layout.card_rect(index);
+            let badge = super::card_badge(&layout, rect);
+            assert!(badge.left >= rect.left && badge.right <= rect.right);
+            assert!(badge.top >= rect.top && badge.bottom <= rect.bottom);
+            assert!(
+                super::card_status_top(&layout, rect) < rect.bottom,
+                "card {index}: the status line falls outside the card"
+            );
+        }
+    }
+
+    #[test]
+    fn the_hero_mark_is_square() {
+        // The authored asset is a square crop and the geometry fills the unit
+        // square, so a non-square target stretches the logo.
+        for (width, height) in [(BASE_WIDTH, BASE_HEIGHT), (1_600.0, 1_000.0)] {
+            let mark = Layout::new(width, height).mark;
+            assert!(
+                (mark.width() - mark.height()).abs() < 0.01,
+                "the mark is {}x{} at {width}x{height}",
+                mark.width(),
+                mark.height()
+            );
         }
     }
 

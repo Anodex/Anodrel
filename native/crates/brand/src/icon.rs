@@ -108,20 +108,62 @@ impl Icon {
         }
     }
 
+    /// Returns the glyph's own extent inside the unit square.
+    ///
+    /// Glyphs are authored to fit, not to fill: a shield reaches nearly top to
+    /// bottom while two side-by-side rings occupy a narrow band. The raw
+    /// coordinates therefore say nothing about how large a glyph looks.
+    #[must_use]
+    pub fn unit_bounds(self) -> Rect {
+        let mut bounds: Option<Rect> = None;
+        for polyline in self.unit_polylines() {
+            for vertex in polyline {
+                bounds = Some(match bounds {
+                    None => Rect::new(vertex.x, vertex.y, vertex.x, vertex.y),
+                    Some(current) => Rect::new(
+                        current.left.min(vertex.x),
+                        current.top.min(vertex.y),
+                        current.right.max(vertex.x),
+                        current.bottom.max(vertex.y),
+                    ),
+                });
+            }
+        }
+        bounds.unwrap_or_default()
+    }
+
     /// Strokes the glyph inside `bounds`.
     ///
-    /// The glyph is fitted to the square inscribed in `bounds`, so a
-    /// non-square target pads rather than distorting the artwork.
+    /// The glyph is scaled so its **own** longest dimension spans the square
+    /// inscribed in `bounds`, then centred there. Placing raw coordinates
+    /// instead would render each glyph at whatever size it happened to be
+    /// authored at, which is what makes an icon set look mismatched inside
+    /// identical containers.
+    ///
+    /// Aspect ratio is preserved, so a wide glyph pads vertically rather than
+    /// stretching, and a non-square target pads rather than distorting.
     pub fn draw(self, canvas: &mut Canvas, bounds: Rect, width: f32, paint: &Paint) {
         let side = bounds.width().min(bounds.height());
         if side <= 0.0 {
             return;
         }
-        let square = Rect::centered(bounds.center(), side, side);
+        let glyph = self.unit_bounds();
+        let extent = glyph.width().max(glyph.height());
+        if extent <= 0.0 {
+            return;
+        }
+        let scale = side / extent;
+        let center = bounds.center();
+        let origin = glyph.center();
         for polyline in self.unit_polylines() {
             let placed: Vec<Point> = polyline
                 .into_iter()
-                .map(|vertex| point(square.left + vertex.x * side, square.top + vertex.y * side))
+                .map(|vertex| {
+                    point(
+                        center.x + (vertex.x - origin.x) * scale,
+                        center.y + (vertex.y - origin.y) * scale,
+                    )
+                })
                 .collect();
             canvas.draw_polyline(&placed, width, paint);
         }
@@ -207,6 +249,84 @@ mod tests {
                 .count();
             assert!(lit > 40, "{icon:?} drew only {lit} pixels");
         }
+    }
+
+    /// Returns the bounding box of drawn pixels, as (left, top, right, bottom).
+    fn drawn_extent(icon: Icon, box_side: f32) -> (i32, i32, i32, i32) {
+        let canvas_side = (box_side * 3.0) as u32;
+        let mut canvas = Canvas::new(canvas_side, canvas_side);
+        canvas.clear(Color::BLACK);
+        let center = canvas_side as f32 / 2.0;
+        icon.draw(
+            &mut canvas,
+            Rect::centered(
+                anodrel_canvas::point(center, center),
+                box_side,
+                box_side,
+            ),
+            1.5,
+            &Paint::solid(Color::WHITE),
+        );
+        let lit: Vec<(i32, i32)> = (0..canvas_side as i32)
+            .flat_map(|y| (0..canvas_side as i32).map(move |x| (x, y)))
+            .filter(|(x, y)| canvas.pixel(*x, *y).red > 40)
+            .collect();
+        assert!(!lit.is_empty(), "{icon:?} drew nothing");
+        (
+            lit.iter().map(|(x, _)| *x).min().expect("drew"),
+            lit.iter().map(|(_, y)| *y).min().expect("drew"),
+            lit.iter().map(|(x, _)| *x).max().expect("drew"),
+            lit.iter().map(|(_, y)| *y).max().expect("drew"),
+        )
+    }
+
+    #[test]
+    fn every_glyph_renders_at_the_same_optical_size() {
+        // Glyphs sit inside identical circles on the Startup Lab's cards. If
+        // one is authored shorter than another, it renders smaller and the set
+        // looks mismatched — which is exactly what happened before glyphs were
+        // normalised to their own extent at draw time.
+        let box_side = 60.0;
+        for icon in EVERY_ICON {
+            let (left, top, right, bottom) = drawn_extent(icon, box_side);
+            let extent = (right - left).max(bottom - top) as f32;
+            assert!(
+                (extent - box_side).abs() <= 4.0,
+                "{icon:?} spans {extent} where every glyph should span about {box_side}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_glyph_is_centred_in_its_target() {
+        let box_side = 60.0;
+        for icon in EVERY_ICON {
+            let (left, top, right, bottom) = drawn_extent(icon, box_side);
+            let target = box_side * 3.0 / 2.0;
+            let center_x = (left + right) as f32 / 2.0;
+            let center_y = (top + bottom) as f32 / 2.0;
+            assert!(
+                (center_x - target).abs() <= 2.0 && (center_y - target).abs() <= 2.0,
+                "{icon:?} centres at ({center_x}, {center_y}) rather than ({target}, {target})"
+            );
+        }
+    }
+
+    #[test]
+    fn a_wide_glyph_keeps_its_aspect_ratio() {
+        // Two side-by-side rings are far wider than tall. Normalising must
+        // scale them up, never stretch them into a square.
+        let glyph = Icon::Ipc.unit_bounds();
+        assert!(glyph.width() > glyph.height() * 1.4, "the ring pair is wide");
+
+        let box_side = 60.0;
+        let (left, top, right, bottom) = drawn_extent(Icon::Ipc, box_side);
+        let drawn_ratio = (right - left) as f32 / (bottom - top) as f32;
+        let authored_ratio = glyph.width() / glyph.height();
+        assert!(
+            (drawn_ratio - authored_ratio).abs() < 0.35,
+            "aspect changed: authored {authored_ratio:.2}, drawn {drawn_ratio:.2}"
+        );
     }
 
     #[test]
