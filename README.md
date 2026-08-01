@@ -130,6 +130,7 @@ contract.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
+`docs/SCROLLING.md` defines the upcoming owned scroll-container boundary.
 `docs/UI_SESSIONS.md` defines bounded revision and semantic-event state used by
 the first capability-checked authenticated UI document replacement path.
 `docs/UI_PREVIEW.md` defines the bounded Windows developer preview command.
