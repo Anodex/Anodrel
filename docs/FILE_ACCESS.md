@@ -1,7 +1,7 @@
 # Selection-scoped file access
 
-**Status:** Design accepted; no file read or write protocol operation exists
-yet.
+**Status:** A portable bounded, one-use selection-reference registry is
+implemented; no file read or write protocol operation exists yet.
 
 ## Purpose
 
@@ -46,8 +46,9 @@ bounded references, but only an operating-system adapter may read bytes.
 ## Limits and deferred work
 
 The first text reader must define a strict byte limit below the 64 KiB wire
-frame, UTF-8 behavior, regular-file checks, cancellation, one-use or bounded
-reuse policy, and expiry behavior before code lands. Binary reads, writes,
+frame, UTF-8 behavior, regular-file checks, cancellation, and expiry behavior
+before code lands. A selection reference is single-use and the portable store
+holds at most 32 live references per session. Binary reads, writes,
 directories, multiple selection, persistent grants, bookmarks, drag-and-drop,
 and cross-session sharing remain deferred.
 
