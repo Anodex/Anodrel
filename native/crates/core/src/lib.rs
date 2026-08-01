@@ -684,6 +684,14 @@ impl CoreHost {
                 &self.policy.host_name,
                 object([("status", JsonValue::String("cancelled".to_owned()))]),
             ),
+            // The typed mailbox prevents this, but an injected host service
+            // must never turn a save destination into an open-file result.
+            Ok(FileDialogSelection::Saved(_)) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::DialogUnavailable,
+                "file dialog returned an incompatible result.",
+                None,
+            ),
             Err(FileDialogServiceError::Unavailable) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::DialogUnavailable,

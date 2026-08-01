@@ -17,6 +17,8 @@ The application or pipe worker never invokes a native dialog. A
 and waits only for that UI thread to complete or safely fail it. It times out
 after two minutes and has no queue or history. A selected path remains data; it
 does not grant file read, write, enumeration, handle access, or process launch.
+The Windows UI-session host routes both open and save requests through that
+mailbox, selecting the host window as the native owner.
 
 ## Portable values
 

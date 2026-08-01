@@ -80,22 +80,13 @@ pub(super) fn take_file_dialog_request(window: Hwnd) -> io::Result<Option<FileDi
 pub(super) fn complete_file_dialog_request(
     window: Hwnd,
     request_id: u64,
-    selection: Result<
-        Option<anodrel_file_dialog::SelectedFilePath>,
-        anodrel_windows_file_dialog::FileDialogError,
-    >,
+    selection: Result<FileDialogSelection, anodrel_windows_file_dialog::FileDialogError>,
 ) -> io::Result<Option<bool>> {
     let mut views = lock_views()?;
     match views.get_mut(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.complete_file_dialog_request(
-            request_id,
-            selection.map(|path| {
-                path.map_or(
-                    FileDialogSelection::Cancelled,
-                    FileDialogSelection::Selected,
-                )
-            }),
-        ))),
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_file_dialog_request(request_id, selection),
+        )),
         _ => Ok(None),
     }
 }

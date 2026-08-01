@@ -26,7 +26,7 @@ use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_core::SessionCloseSignal;
 use anodrel_diagnostics::{Event, LogBook};
-use anodrel_file_dialog::FileDialogMailbox;
+use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSelection};
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_instance::PrimaryInstance;
@@ -1201,8 +1201,26 @@ unsafe extern "system" fn window_proc(
                 }
             }
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
-                let selection =
-                    anodrel_windows_file_dialog::open_file_with_owner(window, request.filters());
+                let selection = match request.kind() {
+                    FileDialogRequestKind::Open => {
+                        anodrel_windows_file_dialog::open_file_with_owner(window, request.filters())
+                            .map(|path| {
+                                path.map_or(
+                                    FileDialogSelection::Cancelled,
+                                    FileDialogSelection::Selected,
+                                )
+                            })
+                    }
+                    FileDialogRequestKind::Save => {
+                        anodrel_windows_file_dialog::save_file_with_owner(window, request.filters())
+                            .map(|path| {
+                                path.map_or(
+                                    FileDialogSelection::Cancelled,
+                                    FileDialogSelection::Saved,
+                                )
+                            })
+                    }
+                };
                 let _ = registry::complete_file_dialog_request(window, request.id(), selection);
             }
             0
