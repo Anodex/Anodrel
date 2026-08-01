@@ -113,10 +113,12 @@ boundary.
 
 ## Compatibility
 
-This is a Rust API foundation, not an application file or protocol format. No
-untrusted source can construct a document through Anodrel today. When a package
-or session transports this tree, that surface must have its own version,
-resource limits, compatibility tests, and security decision before reuse.
+This is a Rust API foundation, not an application file or protocol format.
+`docs/UI_DOCUMENTS.md` separately defines the exact capability-free JSON form
+that can decode into this model; no native host accepts that form today. When a
+package or session transports this tree to a host, that surface must still have
+its own lifecycle, resource limits, compatibility tests, and security decision
+before reuse.
 
 ## Windows UI Lab
 

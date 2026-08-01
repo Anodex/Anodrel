@@ -201,11 +201,13 @@ logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
 `anodrel-ui` is a portable foundation between an application model and a future
 host renderer. It owns only a bounded declarative tree, semantic appearance
 roles, layout, clipping, semantic action hit testing, visible accessibility
-snapshot, and portable focus traversal; it accepts no package or protocol input
-and has no operating-system authority. The host remains responsible for text
-measurement, mapping appearance roles to an actual visual system, rendering,
-input delivery, operating-system accessibility and focus adapters, and every
-capability decision. See `docs/UI.md` and Decisions 0025 through 0028.
+snapshot, and portable focus traversal. `anodrel-ui-document` separately owns
+the exact, bounded JSON interchange form for that tree; it has no native host
+consumer. Neither crate has operating-system authority. The host remains
+responsible for text measurement, mapping appearance roles to an actual visual
+system, rendering, input delivery, operating-system accessibility and focus
+adapters, and every capability decision. See `docs/UI.md`,
+`docs/UI_DOCUMENTS.md`, and Decisions 0025 through 0029.
 
 ## Communication model
 

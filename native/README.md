@@ -37,6 +37,7 @@ anodrel-windows-credentials -> anodrel-credentials -> Advapi32
 anodrel-json -> anodrel-application -> anodrel-windows-host
 
 anodrel-ui -> future renderer / input adapter
+anodrel-ui-document -> anodrel-json / anodrel-ui
 ~~~
 
 - `crates/json` is Anodrel's strict JSON codec for protocol messages.
@@ -94,6 +95,9 @@ anodrel-ui -> future renderer / input adapter
   accessibility snapshot, and portable focus traversal. It has no renderer,
   package, protocol, scripting, operating-system dependency, or native
   authority.
+- `crates/ui-document` strictly decodes and deterministically encodes the
+  documented `anodrel.ui.document.v1` data format. It cannot render a document,
+  accept a host session, invoke an action, or make an operating-system call.
 - `adapters/windows-credentials` reads, writes, and deletes only the exact
   generic Credential Manager target derived from a validated identity. It
   cannot enumerate credentials or expose a secret, target, or raw Windows
@@ -147,6 +151,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui
+cargo test --manifest-path native/Cargo.toml -p anodrel-ui-document
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --windows-pipe --iterations 5000
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host

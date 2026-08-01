@@ -99,6 +99,14 @@ name = "anodrel-ui"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-ui-document"
+version = "0.1.0"
+dependencies = [
+ "anodrel-json",
+ "anodrel-ui",
+]
+
+[[package]]
 name = "anodrel-windows-bootstrap"
 version = "0.1.0"
 dependencies = [

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0029 — Native UI document interchange is strict and capability-free.
+
 - 0028 — Native UI appearance is portable semantic data.
 
 - 0027 — Native UI focus starts as owned layout-bound traversal.

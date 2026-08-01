@@ -128,6 +128,8 @@ contract.
 `docs/WINDOW_LIFECYCLE.md` defines the multi-window host foundation.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
+`docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
+format.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

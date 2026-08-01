@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-ui-document"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-json = { path = "../json" }
+anodrel-ui = { path = "../ui" }
