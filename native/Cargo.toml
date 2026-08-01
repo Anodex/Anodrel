@@ -32,6 +32,7 @@ members = [
   "adapters/windows-clipboard",
   "adapters/windows-external-links",
   "adapters/windows-file-dialog",
+  "adapters/windows-file-access",
   "hosts/windows",
   "tools/perf-lab",
 ]

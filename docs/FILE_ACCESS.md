@@ -1,7 +1,8 @@
 # Selection-scoped file access
 
-**Status:** A portable bounded, one-use selection-reference registry is
-implemented; no file read or write protocol operation exists yet.
+**Status:** A portable bounded, one-use selection-reference registry and a
+direct Windows regular-file identity capture are implemented; no file read or
+write protocol operation exists yet.
 
 ## Purpose
 
