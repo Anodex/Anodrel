@@ -8,8 +8,8 @@
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiDocument, UiEvent, UiFocus,
-    UiLayout, UiNode, UiPoint, UiRect, UiSize,
+    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiActionTone, UiDocument, UiEvent,
+    UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiSize, UiSurfaceTone, UiTextTone,
 };
 
 use super::text;
@@ -183,7 +183,7 @@ fn draw_node(
     };
     match node {
         UiNode::Stack(stack) => {
-            if stack.id().as_str() == "ui.lab.actions" {
+            if stack.surface_tone() == UiSurfaceTone::Raised {
                 let bounds = surface.to_canvas_rect(bounds);
                 canvas.fill_rounded_rect(
                     bounds,
@@ -213,17 +213,15 @@ fn draw_text(
     surface: Surface,
     status: &str,
 ) {
-    let id = text_node.id().as_str();
-    let value = if id == "ui.lab.status" {
+    let value = if text_node.id().as_str() == "ui.lab.status" {
         status
     } else {
         text_node.value()
     };
-    let color = match id {
-        "ui.lab.eyebrow" => palette::ACCENT_SHELL,
-        "ui.lab.title" => palette::INK,
-        "ui.lab.status" => palette::ACCENT_PACKAGE,
-        _ => palette::INK_SOFT,
+    let color = match text_node.tone() {
+        UiTextTone::Primary => palette::INK,
+        UiTextTone::Secondary => palette::INK_SOFT,
+        UiTextTone::Accent => palette::ACCENT_SHELL,
     };
     let position = point(bounds.left * surface.scale, bounds.top * surface.scale);
     text::draw(
@@ -245,14 +243,15 @@ fn draw_action(
     let bounds = surface.to_canvas_rect(bounds);
     let hovered = lab.hovered.as_ref() == Some(action.id());
     let focused = lab.focus.focused() == Some(action.id());
-    let fill = if hovered {
-        palette::PANEL_RAISED
-    } else {
-        palette::BACKDROP_LIFT
+    let fill = match (action.tone(), hovered) {
+        (UiActionTone::Accent, true) => palette::ACCENT_CORE,
+        (UiActionTone::Accent, false) => palette::INDIGO,
+        (UiActionTone::Neutral, true) => palette::PANEL_RAISED,
+        (UiActionTone::Neutral, false) => palette::BACKDROP_LIFT,
     };
     let edge = if focused {
         palette::ACCENT_IPC
-    } else if hovered {
+    } else if action.tone() == UiActionTone::Accent || hovered {
         palette::ACCENT_SHELL
     } else {
         palette::PANEL_EDGE
@@ -293,10 +292,19 @@ fn test_document() -> UiDocument {
         Axis::Vertical,
         Insets::new(18, 18, 18, 18).expect("fixed UI Lab padding is valid"),
         10,
+        UiSurfaceTone::Raised,
         vec![
-            action("ui.lab.inspect", "Inspect layout"),
-            action("ui.lab.hit-test", "Test semantic action"),
-            action("ui.lab.report", "Report semantic action"),
+            action("ui.lab.inspect", "Inspect layout", UiActionTone::Neutral),
+            action(
+                "ui.lab.hit-test",
+                "Test semantic action",
+                UiActionTone::Accent,
+            ),
+            action(
+                "ui.lab.report",
+                "Report semantic action",
+                UiActionTone::Neutral,
+            ),
         ],
     );
     UiDocument::new(stack(
@@ -304,38 +312,52 @@ fn test_document() -> UiDocument {
         Axis::Vertical,
         Insets::new(54, 54, 54, 44).expect("fixed UI Lab padding is valid"),
         14,
+        UiSurfaceTone::Plain,
         vec![
-            text("ui.lab.eyebrow", "OWNED NATIVE UI FOUNDATION", 12),
-            text("ui.lab.title", "Anodrel UI Lab", 34),
+            text(
+                "ui.lab.eyebrow",
+                "NATIVE UI FOUNDATION",
+                12,
+                UiTextTone::Accent,
+            ),
+            text("ui.lab.title", "Anodrel UI Lab", 34, UiTextTone::Primary),
             text(
                 "ui.lab.detail",
                 "A direct Windows renderer interpreting Anodrel's bounded layout tree.",
                 16,
+                UiTextTone::Secondary,
             ),
             actions,
-            text("ui.lab.status", "Latest semantic event: none", 14),
+            text(
+                "ui.lab.status",
+                "Latest semantic event: none",
+                14,
+                UiTextTone::Accent,
+            ),
             text(
                 "ui.lab.boundary",
                 "An action reports only its ID. It cannot call Windows or grant a capability.",
                 13,
+                UiTextTone::Secondary,
             ),
         ],
     ))
     .expect("fixed UI Lab document is valid")
 }
 
-fn text(id: &str, value: &str, font_size: u16) -> UiNode {
+fn text(id: &str, value: &str, font_size: u16, tone: UiTextTone) -> UiNode {
     UiNode::Text(
         Text::new(
             ElementId::new(id).expect("fixed UI Lab ID is valid"),
             value,
             font_size,
         )
-        .expect("fixed UI Lab text is valid"),
+        .expect("fixed UI Lab text is valid")
+        .with_tone(tone),
     )
 }
 
-fn action(id: &str, label: &str) -> UiNode {
+fn action(id: &str, label: &str, tone: UiActionTone) -> UiNode {
     UiNode::Action(
         Action::new(
             ElementId::new(id).expect("fixed UI Lab ID is valid"),
@@ -343,11 +365,19 @@ fn action(id: &str, label: &str) -> UiNode {
             15,
             true,
         )
-        .expect("fixed UI Lab action is valid"),
+        .expect("fixed UI Lab action is valid")
+        .with_tone(tone),
     )
 }
 
-fn stack(id: &str, axis: Axis, padding: Insets, gap: u16, children: Vec<UiNode>) -> UiNode {
+fn stack(
+    id: &str,
+    axis: Axis,
+    padding: Insets,
+    gap: u16,
+    surface_tone: UiSurfaceTone,
+    children: Vec<UiNode>,
+) -> UiNode {
     UiNode::Stack(
         Stack::new(
             ElementId::new(id).expect("fixed UI Lab ID is valid"),
@@ -356,7 +386,8 @@ fn stack(id: &str, axis: Axis, padding: Insets, gap: u16, children: Vec<UiNode>)
             gap,
             children,
         )
-        .expect("fixed UI Lab stack is valid"),
+        .expect("fixed UI Lab stack is valid")
+        .with_surface_tone(surface_tone),
     )
 }
 
@@ -471,6 +502,35 @@ mod tests {
                 ("ui.lab.report", Some("Report semantic action"), true),
             ]
         );
+    }
+
+    #[test]
+    fn visual_hierarchy_comes_from_semantic_roles_not_element_names() {
+        let lab = UiLab::new();
+        let UiNode::Stack(root) = lab.document.root() else {
+            panic!("fixed UI Lab root is a stack");
+        };
+
+        let eyebrow = match &root.children()[0] {
+            UiNode::Text(text) => text,
+            _ => panic!("fixed UI Lab eyebrow is text"),
+        };
+        let detail = match &root.children()[2] {
+            UiNode::Text(text) => text,
+            _ => panic!("fixed UI Lab detail is text"),
+        };
+        let UiNode::Stack(actions) = &root.children()[3] else {
+            panic!("fixed UI Lab actions are a stack");
+        };
+        let emphasized_action = match &actions.children()[1] {
+            UiNode::Action(action) => action,
+            _ => panic!("fixed UI Lab action is semantic action"),
+        };
+
+        assert_eq!(eyebrow.tone(), UiTextTone::Accent);
+        assert_eq!(detail.tone(), UiTextTone::Secondary);
+        assert_eq!(actions.surface_tone(), UiSurfaceTone::Raised);
+        assert_eq!(emphasized_action.tone(), UiActionTone::Accent);
     }
 
     #[test]

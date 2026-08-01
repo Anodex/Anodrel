@@ -25,9 +25,9 @@ back-pressure, cancellation, focus, accessibility, and lifecycle behavior.
 
 | Node | Fields | Meaning |
 | --- | --- | --- |
-| `Stack` | element ID, vertical or horizontal axis, padding, gap, children | Places child nodes in source order. |
-| `Text` | element ID, plain text, font size | A non-interactive text run. |
-| `Action` | element ID, plain label, font size, enabled state | A semantic, hit-testable action. |
+| `Stack` | element ID, vertical or horizontal axis, padding, gap, semantic surface tone, children | Places child nodes in source order. |
+| `Text` | element ID, plain text, font size, semantic text tone | A non-interactive text run. |
+| `Action` | element ID, plain label, font size, enabled state, semantic action tone | A semantic, hit-testable action. |
 
 An element ID is 1–64 ASCII bytes containing letters, digits, `.`, `_`, or `-`;
 it starts and ends with a letter or digit. IDs must be unique throughout a
@@ -38,6 +38,22 @@ there is no second command or native operation field.
 The foundation accepts at most 512 nodes, depth 32, 32 KiB of text and labels
 combined, a font size from 8 through 96 logical pixels, and padding or gaps no
 larger than 256 logical pixels. These are validation limits, not layout hints.
+
+## Appearance roles
+
+Nodes may request a small semantic appearance role: a stack is `Plain` or
+`Raised`, text is `Primary`, `Secondary`, or `Accent`, and an action is
+`Neutral` or `Accent`. Constructors choose the least surprising defaults:
+plain stacks, primary text, and neutral actions. The `with_surface_tone` and
+`with_tone` builders let a host-owned document make an explicit request.
+
+These roles are deliberately not a theme engine. They contain no colour,
+font family, size, pixel metric, image, shader, renderer handle, or operating-
+system value. They do not change validation, measurement, layout, clipping,
+accessible semantics, focus order, enabled state, or a semantic action ID. A
+host renderer maps the roles to its own palette and drawing rules, so the same
+document does not depend on special element-ID strings or a particular host's
+visual identity.
 
 ## Layout and input
 
@@ -111,7 +127,10 @@ anodrel-windows-host --ui-lab
 ~~~
 
 It uses the Windows text-measurement seam, Anodrel's software canvas, and a
-validated `UiDocument` to draw a responsive native screen. Hovering and
+validated `UiDocument` to draw a responsive native screen. Its raised action
+group, text prominence, and emphasized action come from the document's
+semantic appearance roles; the renderer does not infer them from element IDs.
+Hovering and
 clicking an action exercises the same layout hit test and displays its semantic
 element ID. Tab and Shift+Tab exercise the portable focus order with a visible
 focus ring; Enter activates only that same semantic action. The view has no
@@ -123,8 +142,9 @@ It is a renderer-and-input test, not an application UI API.
 
 The portable crate tests ID validation and every document resource limit,
 unique IDs, vertical and horizontal placement, clipping, responsive bounds,
-disabled actions, top-most action hit testing, accessibility role/name/
-visibility semantics, and focus traversal/activation. It has no operating-
+disabled actions, top-most action hit testing, appearance-role defaults and
+selection, accessibility role/name/visibility semantics, and focus
+traversal/activation. It has no operating-
 system or third-party runtime dependency. The Windows host additionally tests
 that the UI Lab paints content, resolves every fixed action to its own ID,
 tracks scaled hit testing, and changes only host-owned diagnostic state on

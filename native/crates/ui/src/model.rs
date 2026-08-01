@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::{ElementId, UiError};
+use crate::{ElementId, UiActionTone, UiError, UiSurfaceTone, UiTextTone};
 
 /// The maximum number of nodes in one UI document.
 pub const MAX_NODES: usize = 512;
@@ -100,6 +100,7 @@ pub struct Stack {
     pub(crate) axis: Axis,
     pub(crate) padding: Insets,
     pub(crate) gap: u16,
+    pub(crate) surface_tone: UiSurfaceTone,
     pub(crate) children: Vec<UiNode>,
 }
 
@@ -120,6 +121,7 @@ impl Stack {
             axis,
             padding,
             gap,
+            surface_tone: UiSurfaceTone::default(),
             children,
         })
     }
@@ -148,6 +150,22 @@ impl Stack {
         self.gap
     }
 
+    /// Returns the requested host-rendered surface treatment.
+    #[must_use]
+    pub const fn surface_tone(&self) -> UiSurfaceTone {
+        self.surface_tone
+    }
+
+    /// Requests a host-rendered surface treatment for this stack.
+    ///
+    /// This is semantic presentation data only. It cannot affect layout,
+    /// input, accessibility, or native authority.
+    #[must_use]
+    pub fn with_surface_tone(mut self, surface_tone: UiSurfaceTone) -> Self {
+        self.surface_tone = surface_tone;
+        self
+    }
+
     /// Returns child nodes in source order.
     #[must_use]
     pub fn children(&self) -> &[UiNode] {
@@ -161,6 +179,7 @@ pub struct Text {
     pub(crate) id: ElementId,
     pub(crate) value: String,
     pub(crate) font_size: u16,
+    pub(crate) tone: UiTextTone,
 }
 
 impl Text {
@@ -173,6 +192,7 @@ impl Text {
             id,
             value,
             font_size,
+            tone: UiTextTone::default(),
         })
     }
 
@@ -193,6 +213,22 @@ impl Text {
     pub const fn font_size(&self) -> u16 {
         self.font_size
     }
+
+    /// Returns the requested host-rendered text prominence.
+    #[must_use]
+    pub const fn tone(&self) -> UiTextTone {
+        self.tone
+    }
+
+    /// Requests a host-rendered text prominence for this run.
+    ///
+    /// The tone does not carry a colour or affect text measurement, layout,
+    /// accessibility, input, or native authority.
+    #[must_use]
+    pub fn with_tone(mut self, tone: UiTextTone) -> Self {
+        self.tone = tone;
+        self
+    }
 }
 
 /// A semantic, optionally enabled action.
@@ -202,6 +238,7 @@ pub struct Action {
     pub(crate) label: String,
     pub(crate) font_size: u16,
     pub(crate) enabled: bool,
+    pub(crate) tone: UiActionTone,
 }
 
 impl Action {
@@ -223,6 +260,7 @@ impl Action {
             label,
             font_size,
             enabled,
+            tone: UiActionTone::default(),
         })
     }
 
@@ -248,6 +286,22 @@ impl Action {
     #[must_use]
     pub const fn enabled(&self) -> bool {
         self.enabled
+    }
+
+    /// Returns the requested host-rendered action prominence.
+    #[must_use]
+    pub const fn tone(&self) -> UiActionTone {
+        self.tone
+    }
+
+    /// Requests a host-rendered action prominence.
+    ///
+    /// The tone cannot change whether an action is enabled, its semantic ID,
+    /// focus order, hit testing, or any native authority.
+    #[must_use]
+    pub fn with_tone(mut self, tone: UiActionTone) -> Self {
+        self.tone = tone;
+        self
     }
 }
 
@@ -420,5 +474,32 @@ mod tests {
             .expect("test stack is valid"),
         );
         assert_eq!(UiDocument::new(root), Err(UiError::TextLimitExceeded));
+    }
+
+    #[test]
+    fn appearance_roles_default_and_can_be_selected_without_changing_content() {
+        let stack = Stack::new(id("stack"), Axis::Vertical, Insets::zero(), 0, vec![])
+            .expect("test stack is valid");
+        let text = Text::new(id("text"), "Content", 10).expect("test text is valid");
+        let action = Action::new(id("action"), "Continue", 10, true).expect("test action is valid");
+
+        assert_eq!(stack.surface_tone(), UiSurfaceTone::Plain);
+        assert_eq!(text.tone(), UiTextTone::Primary);
+        assert_eq!(action.tone(), UiActionTone::Neutral);
+
+        assert_eq!(
+            stack
+                .with_surface_tone(UiSurfaceTone::Raised)
+                .surface_tone(),
+            UiSurfaceTone::Raised
+        );
+        assert_eq!(
+            text.with_tone(UiTextTone::Accent).tone(),
+            UiTextTone::Accent
+        );
+        assert_eq!(
+            action.with_tone(UiActionTone::Accent).tone(),
+            UiActionTone::Accent
+        );
     }
 }

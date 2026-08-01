@@ -37,7 +37,9 @@ asserting on pixels without opening a window.
 The native workspace also includes a first-party performance lab for the owned
 wire, authenticated transport, core, and optional local Windows pipe path. It
 reports repeatable release measurements without making a comparison claim or
-bringing in a benchmark framework. See `docs/PERFORMANCE.md`.
+bringing in a benchmark framework. See `docs/PERFORMANCE.md`. Its portable UI
+foundation now carries bounded semantic appearance roles, so host renderers do
+not rely on element names to choose visual hierarchy. See `docs/UI.md`.
 
 ## Goals
 

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0028 — Native UI appearance is portable semantic data.
+
 - 0027 — Native UI focus starts as owned layout-bound traversal.
 
 - 0026 — Native UI accessibility begins with an owned semantic snapshot.

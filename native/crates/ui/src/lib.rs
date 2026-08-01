@@ -14,6 +14,7 @@
 #![deny(missing_docs)]
 
 mod accessibility;
+mod appearance;
 mod error;
 mod focus;
 mod geometry;
@@ -22,6 +23,7 @@ mod layout;
 mod model;
 
 pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
+pub use appearance::{UiActionTone, UiSurfaceTone, UiTextTone};
 pub use error::UiError;
 pub use focus::UiFocus;
 pub use geometry::{UiPoint, UiRect, UiSize};

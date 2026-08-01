@@ -89,10 +89,11 @@ anodrel-ui -> future renderer / input adapter
 - `crates/credentials` owns validated credential names, exact per-application
   generic-credential targets, and bounded opaque secret values. It has no
   operating-system calls or public application protocol.
-- `crates/ui` owns a bounded in-memory native UI document, deterministic layout,
-  clipping, semantic action hit testing, visible accessibility snapshot, and
-  portable focus traversal. It has no renderer, package, protocol, scripting,
-  operating-system dependency, or native authority.
+- `crates/ui` owns a bounded in-memory native UI document, semantic appearance
+  roles, deterministic layout, clipping, semantic action hit testing, visible
+  accessibility snapshot, and portable focus traversal. It has no renderer,
+  package, protocol, scripting, operating-system dependency, or native
+  authority.
 - `adapters/windows-credentials` reads, writes, and deletes only the exact
   generic Credential Manager target derived from a validated identity. It
   cannot enumerate credentials or expose a secret, target, or raw Windows
@@ -128,10 +129,11 @@ registry. Closing one leaves the other open; closing the final window exits the
 message loop. It is a lifecycle diagnostic, not a public window API.
 
 `--ui-lab` opens a fixed host-owned screen built through `anodrel-ui`. Its
-actions use the documented layout hit test and show only their semantic IDs in
-the same screen. Tab and Shift+Tab move the test focus ring; Enter reports the
-focused action's ID. These actions do not create a session or grant a
-capability. See `docs/UI.md`.
+semantic appearance roles, action hit tests, and focus state are interpreted by
+the Windows renderer; actions show only their semantic IDs in the same screen.
+Tab and Shift+Tab move the test focus ring; Enter reports the focused action's
+ID. These actions do not create a session or grant a capability. See
+`docs/UI.md`.
 
 Verify from the repository root:
 

@@ -69,9 +69,10 @@ Status: **Direct Windows host in progress**
   declarative layout tree with semantic actions establishes the first reusable
   UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a
   fixed host-owned document through that contract. Its portable accessibility
-  snapshot and portable focus traversal are available, while authenticated
-  application input, operating-system accessibility adapters, host keyboard
-  focus, scrolling, and an application package format remain separate gates.
+  snapshot, focus traversal, and semantic appearance roles are available, while
+  authenticated application input, operating-system accessibility adapters,
+  host keyboard focus, scrolling, and an application package format remain
+  separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency
