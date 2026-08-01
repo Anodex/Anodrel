@@ -140,7 +140,7 @@ fn health_display(response: &str) -> Result<String, Box<dyn Error>> {
         .ok_or_else(|| io::Error::other("health response minor version is invalid"))?;
 
     Ok(format!(
-        "Anodrel direct Windows host\n\nThe window, message loop, UTF-16 conversion, drawing, JSON codec, and protocol core are owned by Anodrel.\n\nStartup protocol check\nstatus: {status}\nhost: {host_name}\nprotocol: {major}.{minor}"
+        "Anodrel direct Windows host\n\nThe window, message loop, UTF-16 conversion, drawing, JSON codec, and protocol core are built into Anodrel.\n\nStartup protocol check\nstatus: {status}\nhost: {host_name}\nprotocol: {major}.{minor}"
     ))
 }
 
@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn startup_lab_requires_a_successful_owned_core_check() {
+    fn startup_lab_requires_a_successful_core_check() {
         let display = check_core_health().expect("core health check is valid");
         assert!(display.contains("status: success"));
     }

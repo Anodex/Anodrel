@@ -1,4 +1,4 @@
-# Decision 0010: Start application hosting with a verified owned text package
+# Decision 0010: Start application hosting with a verified text package
 
 **Status:** Accepted
 
@@ -12,7 +12,7 @@ The project intentionally does not ship a browser engine, webview framework, or 
 
 ## Decision
 
-Anodrel defines application package manifest 1.0 in `docs/APPLICATIONS.md`. A package contains a strict manifest and one digest-verified `anodrel.text.v1` document. The host canonicalizes paths, enforces package containment, validates bounded plain text, and draws that text in an Anodrel-owned Win32 window.
+Anodrel defines application package manifest 1.0 in `docs/APPLICATIONS.md`. A package contains a strict manifest and one digest-verified `anodrel.text.v1` document. The host canonicalizes paths, enforces package containment, validates bounded plain text, and draws that text in an Anodrel Win32 window.
 
 The validated `applicationId` is the identity associated with this content surface. No request payload, rendered text, command-line child, or pipe client may supply that identity to the host. This increment creates no executable launch authority, native bridge, script execution, navigation, resource loading, application permissions, or publisher-signature claim.
 
@@ -22,7 +22,7 @@ Positive:
 
 - application content has a concrete host-validated identity before a privileged capability or a general renderer is introduced;
 - package traversal, oversized content, malformed manifests, and tampering can be tested without a browser or framework runtime;
-- the text host proves a direct owned content boundary while keeping Win32 UI code and portable package validation in separate modules.
+- the text host proves a direct content boundary while keeping Win32 UI code and portable package validation in separate modules.
 
 Tradeoffs:
 

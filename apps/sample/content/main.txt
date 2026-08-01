@@ -3,5 +3,5 @@ Welcome to Anodrel.
 This text was loaded from a bounded application package after the host verified
 its identity, package containment, and content digest.
 
-This first owned surface has no scripts, browser runtime, navigation, or native
+This first surface has no scripts, browser runtime, navigation, or native
 bridge. It exists to prove a safe content boundary before richer UI work begins.

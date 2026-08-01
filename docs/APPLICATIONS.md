@@ -47,12 +47,12 @@ A manifest is strict UTF-8 JSON no larger than **16 KiB**. Version 1.0 accepts e
 | `content.path` | A relative package path following the containment rules above. |
 | `content.sha256` | The lowercase hexadecimal SHA-256 digest of the raw content bytes. |
 
-The digest algorithm is implemented by Anodrel-owned code. It is a content integrity check, not a secret or a substitute for publisher signing.
+The digest algorithm is implemented in Anodrel. It is a content integrity check, not a secret or a substitute for publisher signing.
 Package distribution must preserve the declared raw content bytes. The sample
 package marks its digest-verified text as `-text` in `.gitattributes` so line
 ending conversion cannot change its digest during checkout.
 
-## The owned text surface
+## The text surface
 
 `anodrel.text.v1` is intentionally small. It is UTF-8 plain text that the host draws directly in its own native window. It contains no HTML, JavaScript, CSS, URLs, links, navigation, resource fetches, forms, or application-to-host bridge.
 
@@ -82,7 +82,7 @@ claim application-scoped host instance
         |
         +-- existing --> bounded activation request --> exit
         |
-        `-- primary --> host-owned Win32 text surface
+        `-- primary --> host-rendered Win32 text surface
 ~~~
 
 `docs/INSTANCE_LIFECYCLE.md` defines the exact Windows coordination behavior.

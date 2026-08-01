@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-//! Closed, host-owned diagnostic events.
+//! Closed, internal diagnostic events.
 //!
 //! The diagnostic ledger is intentionally not a general logging API. It holds
 //! only events from the closed Event catalogue, never application input,

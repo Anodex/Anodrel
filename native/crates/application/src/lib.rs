@@ -1,10 +1,10 @@
 #![forbid(unsafe_code)]
 
-//! Strict, owned application-package validation.
+//! Strict application-package validation.
 //!
 //! This crate validates the documented local application manifest, enforces
-//! package containment, verifies content with an owned SHA-256 implementation,
-//! and returns bounded plain text for the host-owned Windows surface. It does
+//! package containment, verifies content with a built-in SHA-256 implementation,
+//! and returns bounded plain text for the native Windows surface. It does
 //! not verify a publisher, launch a process, or execute application code.
 
 mod manifest;

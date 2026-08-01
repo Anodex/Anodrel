@@ -41,7 +41,7 @@ or application content.
 ## Display and lifecycle
 
 The Windows host creates this log only after all Startup Lab preflight checks
-have passed. The linked **Open Logs** tile opens a host-owned document window
+have passed. The linked **Open Logs** tile opens a native document window
 from the log snapshot. The document can show only the four fields above and
 cannot navigate, export, write a file, or contact another process.
 
@@ -60,6 +60,6 @@ contract, a capability decision, threat-model update, and compatibility tests.
 ## Verification
 
 Unit tests prove that the ledger bounds itself, preserves the order of retained
-events, assigns host-owned sequence numbers, and only exposes the closed event
+events, assigns process-local sequence numbers, and only exposes the closed event
 catalogue. Host tests prove that the linked log action produces a document and
 that no document action carries a filesystem path.

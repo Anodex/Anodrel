@@ -90,7 +90,7 @@ pub struct WindowsPipeServer {
     session: TransportSession,
 }
 
-/// Runs one owned local authentication and `platform.health` round trip.
+/// Runs one internal local authentication and `platform.health` round trip.
 ///
 /// The server remains a one-client, current-session named pipe. This helper
 /// creates a temporary endpoint, connects a private in-process client before

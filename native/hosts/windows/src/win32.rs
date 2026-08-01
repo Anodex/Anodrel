@@ -1,4 +1,4 @@
-//! Direct Win32 window lifecycle and routing for Anodrel-owned surfaces.
+//! Direct Win32 window lifecycle and routing for Anodrel surfaces.
 //!
 //! Raw window management stays here. Everything visible is composed by
 //! [`anodrel_canvas`] into a single bitmap and presented in one blit, so this
@@ -320,12 +320,12 @@ static ACTIVATION_MESSAGE: OnceLock<Uint> = OnceLock::new();
 static WINDOW_CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
 static ICONS: OnceLock<(Option<isize>, Option<isize>)> = OnceLock::new();
 
-/// Opens the simple host-owned document surface.
+/// Opens the simple native document surface.
 pub fn run(title: &str, text: &str) -> io::Result<()> {
     run_windows(
         vec![WindowDefinition::document(
             title,
-            "Host-owned surface",
+            "Native surface",
             text,
             920,
             580,
@@ -377,14 +377,14 @@ pub fn run_startup_lab(
     )
 }
 
-/// Opens two static host-owned windows to exercise the multi-window lifecycle.
+/// Opens two static native windows to exercise the multi-window lifecycle.
 pub fn run_window_lab() -> io::Result<()> {
     run_windows(
         vec![
             WindowDefinition::document(
                 "Anodrel Window Lab - Primary",
                 "Multi-window lifecycle",
-                "This primary window proves that the direct host can keep multiple host-owned windows alive on one User32 message loop.\n\nClose this window first: the companion window remains available. Close the final window to end the host process.",
+                "This primary window proves that the direct host can keep multiple native windows alive on one User32 message loop.\n\nClose this window first: the companion window remains available. Close the final window to end the host process.",
                 760,
                 460,
             ),
@@ -661,7 +661,7 @@ fn message_loop() -> io::Result<()> {
 fn client_rect(window: Hwnd) -> Rect {
     let mut rect = Rect::default();
     // SAFETY: rect is writable stack storage for a synchronous query about a
-    // window owned by this process.
+    // window created by this process.
     unsafe {
         GetClientRect(window, &mut rect);
     }
@@ -697,7 +697,7 @@ fn mouse_position(lparam: Lparam) -> (i32, i32) {
     ((raw & 0xFFFF) as i16 as i32, (raw >> 16) as i16 as i32)
 }
 
-/// Opens an additional host-owned window while the message loop is running.
+/// Opens an additional native window while the message loop is running.
 fn open_document_window(title: &str, document: Document) -> io::Result<()> {
     let instance = module_handle()?;
     let class_name = to_wide_null("Anodrel.DirectWindowsHost");
@@ -728,7 +728,7 @@ fn action_document(
             "Anodrel - Runtime Logs".to_owned(),
             Document {
                 title: "Runtime Logs".to_owned(),
-                subtitle: "Host-owned typed events for this process".to_owned(),
+                subtitle: "Typed events for this process".to_owned(),
                 body: Body::Sections(vec![
                     Section {
                         heading: "STARTUP EVENTS".to_owned(),
@@ -814,7 +814,7 @@ fn action_document(
             "Anodrel - Runtime Diagnostics".to_owned(),
             Document {
                 title: "Runtime Diagnostics".to_owned(),
-                subtitle: "Owned protocol, transport, and renderer state".to_owned(),
+                subtitle: "Protocol, transport, and renderer state".to_owned(),
                 body: Body::Sections(vec![
                     Section {
                         heading: "PROTOCOL".to_owned(),
@@ -1002,7 +1002,7 @@ unsafe extern "system" fn window_proc(
                 .is_some_and(|expected| *expected == message) =>
         {
             // SAFETY: the activation message carries no data and this window is
-            // owned by the current process. Windows remains authoritative over
+            // created by the current process. Windows remains authoritative over
             // whether the foreground request is honored.
             unsafe {
                 ShowWindow(window, SW_RESTORE);
@@ -1199,7 +1199,7 @@ unsafe extern "system" fn window_proc(
         WM_DESTROY => {
             if registry::remove(window).is_ok_and(|remaining| remaining == 0) {
                 // SAFETY: this only posts a quit message after the final
-                // host-owned top-level window is being destroyed.
+                // native top-level window is being destroyed.
                 unsafe { PostQuitMessage(0) };
             }
             0

@@ -14,19 +14,19 @@ platform has a stable contract and a working host.
 
 The first implementation slice defines the transport-neutral protocol, client
 SDK, mock host, sample application, shared contract tests, a bounded native
-transport engine, an authenticated direct Windows named-pipe adapter, and an
-owned direct Windows host. The native layer also has a bounded, private
+transport engine, an authenticated direct Windows named-pipe adapter, and a
+direct Windows host. The native layer also has a bounded, private
 host-to-child bootstrap adapter for delivering a named-pipe invitation without
 command-line or environment-variable secrets. The Windows host proves the
 native window lifecycle and protocol core without a runtime framework or a
-webview. It also loads a first owned, digest-verified plain-text application
+webview. It also loads a first digest-verified plain-text application
 package into a host-controlled Win32 surface. A development-only Node sample
 separately exercises the private pipe path end to end; it exposes no privileged
 operating-system capability. The first branded Startup Lab turns those
 foundation checks, including a temporary private IPC health loopback, into a
 direct native visual smoke test.
 
-First-party surfaces are drawn by an owned software renderer rather than by
+First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
 blur, bevels, and filtered image scaling. The Anodrel mark ships as the authored
 artwork, committed pre-decoded so the platform displays its real logo while
@@ -71,7 +71,7 @@ Native Host
     └── Linux
 ~~~
 
-The current Windows host uses Anodrel-owned modules over direct User32,
+The current Windows host uses direct Anodrel modules over User32,
 Kernel32, and GDI APIs. The direct pipe adapter is restricted to the current Windows
 logon session and requires host-created credentials; a separate direct launcher
 delivers those credentials once through a child-only anonymous standard-input
@@ -105,13 +105,13 @@ Anodrel/
 
 `docs/TRANSPORT.md` defines the native frame and session contract.
 `docs/APPLICATIONS.md` defines the validated application-package contract.
-`docs/RENDERER.md` documents the owned renderer and brand API.
+`docs/RENDERER.md` documents the renderer and brand API.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/SIGNING.md` defines the Windows executable-signature foundation.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
-`docs/WINDOW_LIFECYCLE.md` defines the owned multi-window host foundation.
+`docs/WINDOW_LIFECYCLE.md` defines the multi-window host foundation.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses

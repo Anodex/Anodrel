@@ -1,4 +1,4 @@
-//! Per-window host-owned view storage for the Win32 message loop.
+//! Per-window view storage for the Win32 message loop.
 
 use std::{
     collections::BTreeMap,
@@ -30,7 +30,7 @@ pub(super) fn view_for(window: Hwnd) -> io::Result<Option<View>> {
 /// Returns `Ok(None)` when the window is absent or is not a Startup Lab, which
 /// is the ordinary case for pointer and timer messages arriving at a document
 /// window. Interaction state lives here rather than in the drawing code so that
-/// a view stays a single owned value per window handle.
+/// a view stays a single host value per window handle.
 pub(super) fn with_startup_lab<R>(
     window: Hwnd,
     change: impl FnOnce(&mut StartupLab) -> R,

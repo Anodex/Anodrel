@@ -2,7 +2,7 @@
 
 //! Bounded, no-data primary-instance coordination for an Anodrel Windows host.
 //!
-//! This adapter coordinates only a host-owned window for a validated
+//! This adapter coordinates only a native window for a validated
 //! application identity. It is not authentication, command forwarding, or a
 //! public application-to-host channel.
 
@@ -94,7 +94,7 @@ impl ExistingInstance {
     }
 }
 
-/// Claims a host-owned instance from a validated application ID and scope.
+/// Claims a native instance from a validated application ID and scope.
 pub fn claim(application_id: &str, scope: InstanceScope) -> io::Result<InstanceClaim> {
     if !is_valid_application_id(application_id) {
         return Err(io::Error::new(

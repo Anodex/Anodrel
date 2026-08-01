@@ -37,7 +37,7 @@ comparison. A result is only meaningful for the named application and workload.
 
 ## Initial verification
 
-`cargo tree --manifest-path native/Cargo.toml` verifies the owned native graph.
+`cargo tree --manifest-path native/Cargo.toml` verifies the native dependency graph.
 Rendering is measured in a release build only; an unoptimised build is roughly
 ten times slower and is not representative. Because software rendering costs
 real time, expensive invariant layers are cached by the host rather than

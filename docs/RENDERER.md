@@ -1,6 +1,6 @@
 # Anodrel Renderer
 
-**Status:** Owned, portable, and used by every first-party Windows surface.
+**Status:** Portable and used by every first-party Windows surface.
 
 This is the public contract for how Anodrel draws. It covers two portable
 crates — `anodrel-canvas` (how to draw) and `anodrel-brand` (what Anodrel looks
@@ -172,7 +172,7 @@ first.
 | `pixels()` | Packed `0xAARRGGBB`, row-major — the buffer to present. |
 
 Compositing is source-over. Against an opaque destination it reduces to a plain
-interpolation, which is the path an owned surface takes almost everywhere; the
+interpolation, which is the path an Anodrel surface takes almost everywhere; the
 general form is used when the destination is itself translucent.
 
 `pixel` matters more than it looks: it lets a host resolve a colour against the

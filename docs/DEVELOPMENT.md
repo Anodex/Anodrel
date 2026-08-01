@@ -3,7 +3,7 @@
 ## Current state
 
 Anodrel has a TypeScript workspace for the versioned protocol, SDK, mock host,
-sample application, and contract tests. It also has an owned bounded wire and
+sample application, and contract tests. It also has a bounded wire and
 host-session engine plus a direct Windows host for native window lifecycle and
 the core protocol handlers.
 
@@ -42,7 +42,7 @@ The Rust workspace is under `native/`. It has no third-party runtime
 dependencies: `anodrel-json`, `anodrel-protocol`, `anodrel-core`,
 `anodrel-wire`, `anodrel-transport`, `anodrel-bootstrap`,
 `anodrel-application`, `anodrel-windows-pipe`, `anodrel-windows-bootstrap`, and the Windows host are
-all owned source modules. The host calls User32 and Kernel32 directly for its
+all source modules. The host calls User32 and Kernel32 directly for its
 window lifecycle and drawing; the pipe adapter uses direct Win32 and CNG APIs
 on a worker thread, while the bootstrap adapter uses an explicit Windows child
 handle list:
@@ -81,7 +81,7 @@ create another application window; it waits at most one second for the primary
 window and requests that Windows restore and foreground it. The second process
 forwards no data. See `docs/INSTANCE_LIFECYCLE.md` for the exact boundary.
 
-To verify the owned multi-window lifecycle, run:
+To verify the multi-window lifecycle, run:
 
 ~~~text
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-lab
@@ -93,7 +93,7 @@ open; closing the final window must exit the host. See
 
 For the quickest Windows smoke test, double-click `start.bat` in the repository
 root. It checks for Cargo, builds the host if necessary, validates the sample
-package and internal protocol core, completes one owned private IPC loopback,
+package and internal protocol core, completes one private IPC loopback,
 then opens the Anodrel Startup Lab. It pauses with a clear error if startup
 fails. See `docs/STARTUP_LAB.md` for the visual test contract.
 

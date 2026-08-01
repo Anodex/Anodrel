@@ -1,4 +1,4 @@
-//! Strict manifest parsing for the owned application package contract.
+//! Strict manifest parsing for the application package contract.
 
 use std::collections::BTreeMap;
 

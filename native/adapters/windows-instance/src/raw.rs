@@ -137,7 +137,7 @@ pub fn register_activation_message(name: &[u16]) -> io::Result<Uint> {
 }
 
 pub fn post_activation_message(message: Uint) -> io::Result<()> {
-    // SAFETY: HWND_BROADCAST sends the host-owned registered message without
+    // SAFETY: HWND_BROADCAST sends the host-registered message without
     // pointers or payload to top-level windows in the current desktop.
     if unsafe { PostMessageW(HWND_BROADCAST, message, 0, 0) } != 0 {
         Ok(())

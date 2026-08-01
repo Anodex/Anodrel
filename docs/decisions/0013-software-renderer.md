@@ -1,4 +1,4 @@
-# Decision 0013: Draw first-party surfaces with an owned software renderer
+# Decision 0013: Draw first-party surfaces with a software renderer
 
 **Status:** Accepted. The asset reasoning below is superseded by Decision 0015.
 
@@ -33,7 +33,7 @@ Three ways forward were considered:
 
 ## Decision
 
-First-party surfaces are composed by two owned, portable crates and presented
+First-party surfaces are composed by two portable crates and presented
 by the host in a single blit.
 
 `anodrel-canvas` is a software rasterizer: closed polygonal paths, non-zero
@@ -47,7 +47,7 @@ four-piece `A` mark as normalised geometry, and the icon set. It draws through
 
 The Windows host keeps the platform-specific parts and nothing more:
 
-- the client area is composed into an owned canvas and reaches the screen
+- the client area is composed into an Anodrel canvas and reaches the screen
   through one `StretchDIBits` call, so a frame is never partially visible;
 - text is rasterized by GDI into a private memory bitmap and lifted out as a
   coverage mask, so Windows still owns fonts and shaping while compositing,

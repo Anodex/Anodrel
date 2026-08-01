@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! A deliberately small, strict JSON codec owned by Anodrel.
+//! A deliberately small, strict JSON codec built into Anodrel.
 //!
 //! The host protocol is JSON, so keeping parsing here avoids making a general
 //! serialization framework part of the shipped native runtime. This module

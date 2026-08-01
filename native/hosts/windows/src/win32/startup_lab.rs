@@ -1,6 +1,6 @@
 //! The Anodrel Startup Lab surface.
 //!
-//! Everything on screen is composed into an owned canvas and presented in one
+//! Everything on screen is composed into an Anodrel canvas and presented in one
 //! blit. The layout is resolution-independent: it is authored against a base
 //! size and scaled, so the same code serves a 100% and a 200% display.
 //!
@@ -53,7 +53,7 @@ const CARDS: [Card; 4] = [
     Card {
         icon: Icon::Core,
         accent: palette::ACCENT_CORE,
-        title: "Owned Core",
+        title: "Platform Core",
         status: "platform.health: ready",
         detail: "strict JSON + policy core",
         badge: "HEALTHY",
@@ -78,8 +78,8 @@ const CARDS: [Card; 4] = [
         icon: Icon::Shell,
         accent: palette::ACCENT_SHELL,
         title: "Native Shell",
-        status: "owned surface: ready",
-        detail: "direct Win32 + owned renderer",
+        status: "native surface: ready",
+        detail: "direct Win32 + software renderer",
         badge: "ACTIVE",
     },
 ];
@@ -91,9 +91,9 @@ pub(super) enum ActionKind {
     LaunchSample,
     /// Show runtime logs. Requires a logging boundary.
     OpenLogs,
-    /// Open a host-owned view of the verified package facts.
+    /// Open a native view of the verified package facts.
     InspectPackage,
-    /// Open a host-owned view of the runtime and renderer state.
+    /// Open a native view of the runtime and renderer state.
     RuntimeDiagnostics,
 }
 
@@ -1223,7 +1223,7 @@ fn draw_footer(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, progress:
     // frame's cost, measured by the host that drew it.
     let renderer = TextSpec::new(
         format!(
-            "OWNED RENDERER  ·  {}×{}  ·  {:.1} ms",
+            "SOFTWARE RENDERER  ·  {}×{}  ·  {:.1} ms",
             canvas.width(),
             canvas.height(),
             lab.last_frame_micros as f32 / 1000.0

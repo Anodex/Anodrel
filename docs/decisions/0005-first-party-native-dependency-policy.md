@@ -16,7 +16,7 @@ trust, and work around.
 
 Production Anodrel runtime code may depend only on:
 
-- Anodrel-owned modules;
+- Anodrel modules;
 - the Rust and TypeScript standard libraries; and
 - the directly targeted Windows, macOS, or Linux operating-system APIs and SDKs.
 
@@ -31,7 +31,7 @@ production runtime dependencies. They remain subject to normal supply-chain
 review.
 
 The Tao/Wry/Serde/Time Windows host was removed and replaced by the
-Anodrel-owned direct Windows API host in Decision 0006. It must not be restored
+direct Anodrel Windows API host in Decision 0006. It must not be restored
 or used as a production dependency.
 
 ## Consequences

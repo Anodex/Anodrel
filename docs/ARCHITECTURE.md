@@ -74,7 +74,7 @@ The native host owns operating-system integration:
 The first host is expected to target Windows. Other operating systems should be
 added as adapters behind the same service contracts.
 
-The current Windows host uses Anodrel-owned modules over direct User32,
+The current Windows host uses direct Anodrel modules over User32,
 Kernel32, and GDI APIs. Its raw FFI is isolated from the portable protocol and
 policy layers. It paints an internal diagnostics view and a bounded,
 digest-verified `anodrel.text.v1` application package surface; it has no
@@ -92,25 +92,25 @@ and supplies only three things: a blit, a source of glyph coverage, and a
 display-density signal. The host's remaining drawing code is the seam for those
 three. See `docs/RENDERER.md` and Decision 0013.
 
-The Windows host also has an Anodrel-owned Startup Lab. It validates a supplied
+The Windows host also has an Anodrel Startup Lab. It validates a supplied
 application package and performs its internal protocol health check before
 composing a branded visual test surface. The lab is host-controlled
 diagnostics: it displays only safe validated identity, foundation status, and
 this process's own readings; it does not render package text or open a public
 pipe client or privileged service. Before the window is created, it performs a
-temporary owned loopback through the named-pipe authentication and
+temporary internal loopback through the named-pipe authentication and
 `platform.health` path; this is a transport check, not an application session.
 
 The lab also shows every action the platform intends to offer, each carrying a
 declared linked or planned state. A planned tile is drawn dimmed, states the
 gate it waits on, and is inert; hit-testing and drawing read the same value, so
 a tile cannot be enabled by changing its appearance. Its three linked tiles
-open host-owned windows that display values the host already held, introducing
+open native windows that display values the host already held, introducing
 no capability. The log view reads a bounded typed event ledger that cannot
 accept dynamic application or native diagnostic text. See `docs/STARTUP_LAB.md`,
 `docs/LOGGING.md`, Decisions 0014 and 0016.
 
-The owned Windows instance adapter gives the package text surface one bounded,
+The Windows instance adapter gives the package text surface one bounded,
 current-session primary instance per validated application identity. A second
 host invocation sends no data: it makes only a best-effort native activation
 request to the existing window. The Startup Lab has a separate diagnostic scope
@@ -141,7 +141,7 @@ application may import native host internals.
 
 Public packages should have no import-time side effects, avoid framework-wide
 global state, and keep their dependency surface minimal. Production runtime
-packages use only Anodrel-owned code, language standard libraries, and direct
+packages use Anodrel code, language standard libraries, and direct
 operating-system APIs. Validate messages at a trust boundary rather than
 repeatedly in internal layers. The native wire limits encoded messages to 64 KiB
 before UTF-8 or JSON parsing and accepts at most four complete frames from one
@@ -162,7 +162,7 @@ not depend on transport-specific details.
 
 The initial protocol contract is documented in `docs/PROTOCOL.md`. Its SDK,
 mock host, and contract tests are transport-neutral; the mock does not select a
-native transport implementation. `docs/TRANSPORT.md` defines the owned bounded
+native transport implementation. `docs/TRANSPORT.md` defines the bounded
 frame/session engine, direct one-client Windows named-pipe adapter, and the
 separate private child-bootstrap format. The bootstrap adapter can launch a
 caller-selected executable but is not integrated with application package trust

@@ -47,7 +47,7 @@ authority for permissions.
 | --- | --- |
 | Rendered content forges a capability or application identity. | Bind identity and grants to an authenticated host session; never accept them from a request payload. |
 | A malformed or future message reaches native code. | Validate the envelope, version, operation, and payload at the transport boundary; return only structured safe errors. |
-| An application uses an operation it was not granted. | Check the host-owned capability immediately before executing every privileged operation. |
+| An application uses an operation it was not granted. | Check the host capability immediately before executing every privileged operation. |
 | A file operation escapes an approved location. | Canonicalize and validate paths after resolving links; enforce a per-operation scope. |
 | A child process gains arbitrary shell authority or outlives the host. | Expose allowlisted operations, avoid shell interpolation, track child processes, and terminate them during shutdown. |
 | A mutable package substitutes a trusted but unauthorized executable. | Do not treat a package-held manifest or an Authenticode result alone as launch authority; contain and digest the executable, then match its verified signer to an installed publisher policy bound to the application ID. |
@@ -81,7 +81,7 @@ The core protocol uses small JSON-compatible envelopes and does no I/O during
 module import. It validates once at the host boundary and keeps SDK, mock-host,
 and protocol packages independently buildable.
 
-The owned wire codec rejects encoded messages larger than 64 KiB before UTF-8
+The wire codec rejects encoded messages larger than 64 KiB before UTF-8
 or JSON parsing and stops a receive burst after four complete frames. The core
 then rejects duplicate JSON keys, malformed Unicode, trailing bytes, and nesting
 beyond 64 levels. The session engine owns host-created capability policy, but
@@ -97,13 +97,13 @@ adapter sends that invitation once over a child-only inherited standard-input
 handle, with output handles redirected to `NUL`; it does not establish
 executable identity. The Windows host separately establishes a content identity
 by parsing a strict 16 KiB manifest, canonicalizing and containing the declared
-file, checking its owned SHA-256 digest, and drawing only bounded plain text.
+file, checking its built-in SHA-256 digest, and drawing only bounded plain text.
 This detects content tampering but does not authenticate a publisher who can
 replace the entire unpackaged directory. The surface has no queue, origin,
 navigation, native bridge, or executable trust; those controls remain required
 before untrusted application code or a privileged operation is accepted.
 
-The package text surface also uses an owned current-session instance mutex and
+The package text surface also uses a current-session instance mutex and
 readiness event derived from its validated application ID. A second invocation
 cannot forward arguments or application data; it only sends a bounded
 best-effort User32 activation message after the primary has created its window.
@@ -117,7 +117,7 @@ closing one window does not end the host while another registered window exists.
 
 ## Rendering boundary
 
-First-party surfaces are composed by owned, portable crates that forbid unsafe
+First-party surfaces are composed by portable crates that forbid unsafe
 code and read nothing but the values passed to them. Rendering is a pure
 function from host-supplied data to pixels: it opens no handle, reads no file,
 and reaches no operating-system API. The host's drawing seam is narrow by
@@ -150,7 +150,7 @@ boundary. `docs/LOGGING.md` and Decision 0016 define the catalogue and its
 extension gate.
 
 The development sample exercises this private path with a developer-supplied
-Node.js executable and an owned sample script. It has no executable identity
+Node.js executable and an Anodrel sample script. It has no executable identity
 verification and ends with the host process, so it creates no production
 application-launch authority. Its output is intentionally discarded; an exit
 status is the only result used by the host.

@@ -19,10 +19,10 @@ bridge before that security boundary exists.
 
 ## Decision
 
-Add `anodrel-windows-instance`, an owned direct-Win32 adapter. It creates a
+Add `anodrel-windows-instance`, a direct-Win32 adapter. It creates a
 current-session `Local\\` mutex and readiness event from a validated
 application ID plus a host-controlled scope. The primary holds both handles
-until its owned window closes. A second host invocation waits no longer than one
+until its native window closes. A second host invocation waits no longer than one
 second for readiness and broadcasts a matching registered User32 message that
 asks the primary window to restore and request foreground activation.
 
@@ -45,7 +45,7 @@ Tradeoffs:
 
 - focus activation is subject to Windows foreground policy and is intentionally
   best effort;
-- the feature coordinates only a host-owned window, not a product application
+- the feature coordinates only a native window, not a product application
   executable;
 - a same-session process can cause a local denial of availability, but cannot
   acquire platform authority or receive data through this mechanism.

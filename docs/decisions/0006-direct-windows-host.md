@@ -1,4 +1,4 @@
-# Decision 0006: First production-path Windows host uses owned Win32 modules
+# Decision 0006: First production-path Windows host uses direct Win32 modules
 
 **Status:** Accepted
 
@@ -17,7 +17,7 @@ framework, browser wrapper, serialization framework, or date library.
 
 ## Decision
 
-The first Windows host is composed only of Anodrel-owned Rust crates, the Rust
+The first Windows host is composed only of Anodrel Rust crates, the Rust
 standard library, and direct Win32 APIs:
 
 ~~~text
@@ -29,7 +29,7 @@ anodrel-json -> anodrel-protocol -> anodrel-core -> anodrel-windows-host
 - `anodrel-json` owns strict JSON parsing and serialization for the public
   protocol. It rejects duplicate object keys, malformed Unicode, trailing data,
   and nesting deeper than 64 levels.
-- `anodrel-protocol` maps the documented v1 envelope to owned data types and
+- `anodrel-protocol` maps the documented v1 envelope to defined data types and
   ignores unknown additive fields.
 - `anodrel-core` performs the 64 KiB encoded-message check before parsing,
   applies host-created capability policy, and formats the small timestamp it

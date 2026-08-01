@@ -1,4 +1,4 @@
-# Decision 0016: Keep the first diagnostic log typed and host-owned
+# Decision 0016: Keep the first diagnostic log typed and internal
 
 **Status:** Accepted
 
@@ -23,7 +23,7 @@ human-readable event text all originate in Anodrel code. The API accepts an
 event enum, never a caller-provided message or structured payload.
 
 The Windows Startup Lab records only its completed preflight checks and opens a
-host-owned document for the **Open Logs** tile. The log is process-local,
+native document for the **Open Logs** tile. The log is process-local,
 non-persistent, non-exportable, and has no protocol, SDK, application, or
 filesystem interface.
 

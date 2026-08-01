@@ -1,12 +1,12 @@
 # Anodrel Windows window lifecycle
 
 **Status:** Windows foundation contract. The native host now supports multiple
-host-owned top-level windows on one UI thread. It is not a public application
+native top-level windows on one UI thread. It is not a public application
 window API yet.
 
 ## Purpose
 
-Anodrel needs an owned equivalent of a basic desktop window lifecycle before a
+Anodrel needs a direct equivalent of a basic desktop window lifecycle before a
 future application can safely use multiple windows. The first host used one
 process-global view slot and posted process quit when any window closed. That
 was suitable for a smoke test but could not support a primary window and a
@@ -27,7 +27,7 @@ failure rather than entering a partial message loop.
 
 The existing package window and Startup Lab remain one-window host surfaces.
 `--window-lab` is an Anodrel diagnostic that creates a primary and a companion
-window to exercise the owned registry and final-window shutdown behavior.
+window to exercise the view registry and final-window shutdown behavior.
 
 ## Boundaries
 

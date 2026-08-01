@@ -22,13 +22,13 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
 - `crates/json` is Anodrel's strict JSON codec for protocol messages.
 - `crates/protocol` validates the documented public envelope and builds safe
   responses.
-- `crates/core` applies host-owned capability policy and message-size limits.
+- `crates/core` applies host capability policy and message-size limits.
 - `crates/wire` owns the bounded, versioned byte-stream frame format.
 - `crates/transport` converts complete frames to policy-bound core responses.
 - `crates/bootstrap` owns the bounded private child-invitation record and
   redacts its token from diagnostics.
 - `crates/application` validates the strict application manifest, canonical
-  package containment, owned SHA-256 content digest, and bounded no-script text
+  package containment, built-in SHA-256 content digest, and bounded no-script text
   surface data. It does not authenticate a publisher or launch an executable.
 - `adapters/windows-pipe` creates a logon-SID-restricted, one-client named pipe
   and authenticates its first frame with a CNG-generated credential; it can
@@ -45,7 +45,7 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
 The initial window displays a host-created `platform.health` response. With
 `--application <manifest>`, it can also display the documented, digest-verified
 plain-text application package. It has no webview, script runtime, navigation,
-native bridge, or privileged platform service. Its owned named-pipe adapter and
+native bridge, or privileged platform service. Its named-pipe adapter and
 bootstrap launcher can deliver a private invitation to a child process. The
 Windows host's development-only sample launches the compiled Node client to
 prove the real authenticated health path. Publisher trust, executable launch,
@@ -53,7 +53,7 @@ and a capability bridge still require separate threat-model work.
 
 `--showcase <manifest>` opens the Anodrel Startup Lab. Before any window is
 created, it loads the supplied package, performs the internal protocol health
-check, and completes one temporary owned named-pipe authentication and health
+check, and completes one temporary internal named-pipe authentication and health
 loopback. The direct GDI screen then displays only safe application identity and
 foundation status. It has no webview, renderer bridge, public pipe client, or
 application launch.
@@ -63,7 +63,7 @@ package identity. A second invocation sends no data and makes only a bounded
 best-effort activation request to the primary window. Startup Lab uses a
 separate diagnostic scope. See `docs/INSTANCE_LIFECYCLE.md`.
 
-`--window-lab` opens two static host-owned windows to verify the multi-window
+`--window-lab` opens two static native windows to verify the multi-window
 registry. Closing one leaves the other open; closing the final window exits the
 message loop. It is a lifecycle diagnostic, not a public window API.
 

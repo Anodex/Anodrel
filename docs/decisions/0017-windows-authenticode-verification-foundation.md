@@ -42,7 +42,7 @@ Positive:
 
 - executable-signature handling is isolated from the renderer, protocol, and
   eventual child-process lifecycle;
-- the platform uses only Windows APIs and a small owned Rust interface;
+- the platform uses only Windows APIs and a small Rust interface;
 - later launch policy can compare stable binary fingerprints instead of
   localized, mutable certificate display text.
 

@@ -1,4 +1,4 @@
-# Decision 0008: Windows transport uses an owned authenticated named pipe
+# Decision 0008: Windows transport uses an authenticated named pipe
 
 **Status:** Accepted
 

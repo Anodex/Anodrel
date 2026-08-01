@@ -1,4 +1,4 @@
-//! Small, allocation-free SHA-256 implementation owned by Anodrel.
+//! Small, allocation-free SHA-256 implementation built into Anodrel.
 
 const INITIAL_STATE: [u32; 8] = [
     0x6A09_E667,

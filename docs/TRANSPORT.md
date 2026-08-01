@@ -2,7 +2,7 @@
 
 **Status:** Foundation contract. The frame codec, authenticated host session,
 one-client Windows named-pipe adapter, and private child-bootstrap adapter are
-implemented. A separate owned, no-script application package surface is
+implemented. A separate no-script application package surface is
 implemented in `docs/APPLICATIONS.md`; it does not use this transport.
 
 ## Purpose
@@ -108,7 +108,7 @@ thread; the Windows message loop must never call `serve_one` directly.
 The Windows Startup Lab uses a temporary private loopback only as a native
 transport smoke test. Before it creates its diagnostic window, the host creates
 one ordinary current-session pipe with a CNG-generated invitation, connects an
-owned in-process client, and runs the server on a worker thread. The client
+internal in-process client, and runs the server on a worker thread. The client
 sends the invitation-derived `session.authenticate` frame, then one
 `platform.health` request, and the host waits for both valid responses before
 the visual card can report ready. The invitation is never rendered or logged

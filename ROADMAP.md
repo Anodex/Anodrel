@@ -12,17 +12,17 @@ Status: **In progress**
 - Define the initial architecture and security boundaries.
 - Record the repository-separation decision.
 - Choose the first supported operating system. **Completed: Windows.**
-- Define the first direct Windows API host. **Completed:** an owned Win32
+- Define the first direct Windows API host. **Completed:** a direct Win32
   window, JSON codec, protocol core, and lifecycle smoke test (Decision 0006).
 - Define a bounded application-to-host frame and session engine. **Completed:**
-  owned wire framing and host session limits (Decision 0007).
+  direct wire framing and host session limits (Decision 0007).
 - Implement the authenticated Windows named-pipe adapter. **Completed:**
   logon-SID-restricted one-client adapter with CNG invitation (Decision 0008).
 - Implement private invitation delivery. **Completed:** bounded `ANBI` record
   over a child-only inherited handle (Decision 0009).
 - Define controlled application-content hosting and application identity.
   **Completed for the first no-script package surface:** strict manifest,
-  canonical containment, owned SHA-256 verification, and direct Win32 text
+  canonical containment, built-in SHA-256 verification, and direct Win32 text
   rendering (Decision 0010). Publisher trust and executable identity remain
   required before product process launch.
 
@@ -57,18 +57,18 @@ Status: **Direct Windows host in progress**
   instance claim, bounded readiness, and no-data activation request (Decision
   0011). A verified product executable lifecycle remains required.
 - Implement window creation and controlled application content loading.
-  **Completed for host-owned Windows surfaces:** per-window immutable view
+  **Completed for native Windows surfaces:** per-window immutable view
   routing, final-window shutdown, a two-window diagnostic, and the verified
   no-script text package surface (Decision 0012). A public application window
   capability remains deferred.
-- Draw first-party surfaces with an owned renderer. **Completed:** a portable
+- Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
   per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
 - Implement secure credential storage through the operating system.
 - Add logging, crash reporting boundaries, and shutdown behavior. **Completed
-  for the first host-owned in-memory diagnostic log:** a bounded closed event
+  for the first in-memory diagnostic log:** a bounded closed event
   catalogue with no application input, persistence, export, or protocol
   surface (Decision 0016). Crash reporting and public/application logging
   remain separate work.
@@ -80,7 +80,7 @@ Status: **Direct Windows host in progress**
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
 
-The direct Windows host creates and paints an Anodrel-owned Win32 window and
+The direct Windows host creates and paints an Anodrel Win32 window and
 validates the core protocol shape under Decision 0006. Decision 0007 adds the
 bounded framing and session engine. Decision 0008 adds the authenticated direct
 Windows named-pipe adapter. Decision 0009 adds private one-time invitation

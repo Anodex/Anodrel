@@ -17,7 +17,7 @@ documented in `docs/DEVELOPMENT.md`; it is not a packaged or trusted content
 host.
 
 `anodrel.application.json` and `content/main.txt` are a separate static
-application package for the first owned Windows content surface. The host
+application package for the first Windows content surface. The host
 verifies the declared SHA-256 digest and package containment before drawing the
 text. To view it, run:
 

@@ -1,4 +1,4 @@
-//! Presenting an owned canvas through a device-independent bitmap.
+//! Presenting an Anodrel canvas through a device-independent bitmap.
 //!
 //! The whole client area is composed in memory and reaches the screen in one
 //! call. Nothing is drawn directly to the window device context, so there is no

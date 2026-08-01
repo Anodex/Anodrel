@@ -2,13 +2,13 @@
 
 **Date:** 2026-07-31  
 **Project path:** C:\Users\Owner\Desktop\Platform X  
-**Status:** Protocol-first foundation implementation underway; owned wire,
+**Status:** Protocol-first foundation implementation underway; direct wire,
 authenticated named-pipe, private child bootstrap, direct Windows host, and
 strict application package modules prove bounded protocol handling, local
 session protection, private credential delivery, window lifecycle, a
 development-only end-to-end health probe, a digest-verified no-script text
 surface, and a branded native Startup Lab visual smoke test. First-party
-surfaces are composed by an owned, portable software renderer and presented in a
+surfaces are composed by a portable software renderer and presented in a
 single blit; the Startup Lab shows every intended action tile, each in a
 declared linked or planned state tracked in ROADMAP.md.
 
@@ -55,7 +55,7 @@ This repository has its own Git history root and currently contains:
 - docs/PROTOCOL.md, docs/TRANSPORT.md, docs/THREAT_MODEL.md, and
   docs/PERFORMANCE.md — public contracts, security baseline, and performance
   measurement rules for future native work.
-- native/ — owned Rust JSON, protocol, core, wire, transport, authenticated
+- native/ — Rust JSON, protocol, core, wire, transport, authenticated
   Windows named-pipe, and direct Win32 window modules;
   the deployed dependency graph contains no third-party runtime library.
 - native/crates/canvas and native/crates/brand — a portable software rasterizer

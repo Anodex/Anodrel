@@ -1,4 +1,4 @@
-//! Private in-process probe for the owned named-pipe transport.
+//! Private in-process probe for the named-pipe transport.
 //!
 //! This module deliberately stays below the adapter's public surface. It is
 //! used by the Windows Startup Lab to prove the DACL, invitation,

@@ -1,4 +1,4 @@
-//! Anodrel's owned software rasterizer.
+//! Anodrel's software rasterizer.
 //!
 //! `anodrel-canvas` draws anti-aliased vector graphics into a plain 32-bit
 //! pixel buffer. It has no operating-system dependency, no third-party crate,
@@ -10,7 +10,7 @@
 //!
 //! The platform's brand surfaces need gradients, soft glows, and chamfered
 //! edges. Windows GDI cannot draw those, and adopting a graphics library would
-//! break the rule that shipped runtime code is Anodrel-owned (Decision 0005).
+//! break the rule that shipped runtime code is implemented in Anodrel (Decision 0005).
 //! A focused rasterizer is a few hundred lines and keeps that rule intact.
 //!
 //! # Model

@@ -1,4 +1,4 @@
-//! The host-owned document surface.
+//! The native document surface.
 //!
 //! Every window that is not the Startup Lab renders through here: the validated
 //! package text, the window-lifecycle diagnostics, and the views opened from the
@@ -37,7 +37,7 @@ pub(super) enum Body {
     Sections(Vec<Section>),
 }
 
-/// A host-owned informational window.
+/// A native informational window.
 #[derive(Clone)]
 pub(super) struct Document {
     /// Headline, shown beside the mark.
@@ -290,7 +290,7 @@ mod tests {
         let mut canvas = Canvas::new(760, 460);
         draw(
             &mut canvas,
-            &Document::from_text("Anodrel", "Owned surface", "A body paragraph to render."),
+            &Document::from_text("Anodrel", "Native surface", "A body paragraph to render."),
         );
         let lit = (0..460)
             .flat_map(|y| (0..760).map(move |x| (x, y)))

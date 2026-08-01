@@ -25,7 +25,7 @@ Every action tile is shown. Each carries an explicit state:
 
 - **linked** — a documented host operation exists behind it. The tile is drawn
   at full strength, shows a chevron, takes a pointer cursor, and opens a
-  host-owned window when clicked.
+  native window when clicked.
 - **planned** — no documented host operation exists behind it. The tile is dimmed, is labelled
   `PLANNED` where the chevron would be, states the gate it is waiting on in
   place of a description, and does not respond to hover or to a click.
@@ -35,7 +35,7 @@ same value the renderer does. A unit test asserts that exactly the tiles with a
 documented host operation behind them are marked linked, so a tile cannot be enabled by editing
 its appearance.
 
-The linked tiles open host-owned document windows that report facts already
+The linked tiles open native document windows that report facts already
 verified during startup: the package's identity, declared content path, verified
 digest and limits; the protocol, transport, and process readings; and the
 closed diagnostic event catalogue. None introduces a new capability — they

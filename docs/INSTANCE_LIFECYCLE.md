@@ -5,7 +5,7 @@ public application protocol or an executable-trust mechanism.
 
 ## Purpose
 
-Anodrel must not let two copies of the same host-owned application surface race
+Anodrel must not let two copies of the same application surface race
 to create competing top-level windows. The first lifecycle slice scopes one
 active `--application` window to the validated `applicationId`. The Startup
 Lab uses a separate diagnostic scope so it remains independently runnable.
@@ -61,7 +61,7 @@ claim current-session instance
         |
         +-- existing --> wait (at most 1 second) --> activation broadcast --> exit
         |
-        `-- primary --> create owned window --> signal ready --> message loop --> release
+        `-- primary --> create native window --> signal ready --> message loop --> release
 ~~~
 
 The host has no public second-instance event, command forwarding, relaunch

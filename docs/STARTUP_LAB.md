@@ -9,7 +9,7 @@ Win32 diagnostic screen, not an Electron clone, a web page, or an application
 renderer. It gives a developer a fast visual smoke test and shows, in one look,
 which parts of the platform are real.
 
-The lab uses only Anodrel-owned Rust, the owned renderer described in
+The lab uses Anodrel Rust and the software renderer described in
 `docs/RENDERER.md`, and direct User32/GDI/Kernel32 calls. It contains no
 webview, browser engine, JavaScript, external resource fetch, link, navigation,
 script execution, or native bridge.
@@ -26,7 +26,7 @@ Before creating a window, this route must:
 
 1. validate the supplied application package through `anodrel-application`;
 2. perform the host's internal `platform.health` protocol-core check;
-3. complete one temporary, owned named-pipe loopback: authenticate the first
+3. complete one temporary internal named-pipe loopback: authenticate the first
    `ANDR` frame and make one `platform.health` request; and
 4. fail closed with a safe error if any check fails.
 
@@ -44,9 +44,9 @@ requirement of the route, not a preference — see `docs/RENDERER.md`.
 
 | Card | Actual condition | What it does not claim |
 | --- | --- | --- |
-| Owned Core | The host constructed and processed its internal `platform.health` request. | A public application session or a privileged capability. |
+| Platform Core | The host constructed and processed its internal `platform.health` request. | A public application session or a privileged capability. |
 | Verified Package | The supplied manifest and its bounded text content passed containment and digest checks. | Publisher signing or verified executable identity. |
-| Private IPC | A temporary current-session pipe accepted an owned in-process loopback client, which authenticated and completed one `platform.health` round trip. | A public application client, executable launch, bootstrap selection, or any privileged capability. |
+| Private IPC | A temporary current-session pipe accepted an internal loopback client, which authenticated and completed one `platform.health` round trip. | A public application client, executable launch, bootstrap selection, or any privileged capability. |
 | Native Shell | The host created and owns this Win32 window and composed this frame with its own renderer. | A public window API, an application window capability, or a native bridge. |
 
 ### Action strip
@@ -59,9 +59,9 @@ records the reasoning.
 | Tile | State | Behaviour |
 | --- | --- | --- |
 | Launch Sample | **Planned** — needs verified executable identity | Dimmed, labelled, inert. |
-| Open Logs | **Linked** | Opens a host-owned view of the safe typed startup-event ledger. |
-| Inspect Package | **Linked** | Opens a host-owned window showing the verified package facts. |
-| Runtime Diagnostics | **Linked** | Opens a host-owned window showing protocol, transport, and process readings. |
+| Open Logs | **Linked** | Opens a native view of the safe typed startup-event ledger. |
+| Inspect Package | **Linked** | Opens a native window showing the verified package facts. |
+| Runtime Diagnostics | **Linked** | Opens a native window showing protocol, transport, and process readings. |
 
 A planned tile states the gate it is waiting on instead of a description, does
 not respond to hover, and takes no pointer cursor. `ROADMAP.md` tracks each one
@@ -100,7 +100,7 @@ resolves to may not.
 
 ## Visual contract
 
-The screen owns its complete client-area drawing. It is composed into an owned
+The screen draws its complete client area. It is composed into an Anodrel
 canvas and reaches the screen in a single blit, so a partial frame is never
 visible.
 
@@ -142,10 +142,10 @@ Startup Lab** window opens and shows:
 - the Anodrel mark in the taskbar and title bar, generated at run time from the
   brand crate rather than from a compiled icon resource;
 - the `org.anodrel.sample` identity below the hero mark;
-- Owned Core, Verified Package, Private IPC, and Native Shell as ready;
+- Platform Core, Verified Package, Private IPC, and Native Shell as ready;
 - Launch Sample dimmed and marked `PLANNED`;
 - Open Logs, Inspect Package, and Runtime Diagnostics highlighting under the
-  pointer, taking a hand cursor, and each opening a host-owned window when
+  pointer, taking a hand cursor, and each opening a native window when
   clicked;
 - a smooth reveal that settles into low-frequency mark motion.
 

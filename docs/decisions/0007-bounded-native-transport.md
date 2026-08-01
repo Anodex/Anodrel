@@ -1,4 +1,4 @@
-# Decision 0007: Native transport starts with an owned bounded session engine
+# Decision 0007: Native transport starts with a bounded session engine
 
 **Status:** Accepted
 

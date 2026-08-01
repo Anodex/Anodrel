@@ -141,7 +141,7 @@ request lifecycle behavior, while hosts own policy and operating-system work.
 The mock host is structurally compatible with the SDK transport but does not
 depend on the SDK module, which keeps the dependency graph one-way.
 
-The protocol's owned framing contract is documented in `docs/TRANSPORT.md`.
+The protocol framing contract is documented in `docs/TRANSPORT.md`.
 Wire 1.0 limits one UTF-8 JSON payload to 64 KiB and one receive burst to four
 complete frames before protocol parsing. The future OS adapter must additionally
 set and test authenticated-session queue, timeout, and cancellation limits
@@ -160,6 +160,6 @@ host acceptance gate.
 `tests/contract/src/protocol-contract.test.ts` is the initial compatibility
 suite. It verifies successful messages, capability enforcement, version
 rejection, validation failures, cancellation before execution, and SDK error
-mapping against the mock host. The owned native core has matching Rust unit
+mapping against the mock host. The native core has matching Rust unit
 tests for its implemented request paths; a future SDK-native transport must run
 the shared contract suite before it can expose these operations to an app.

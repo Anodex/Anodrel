@@ -6,7 +6,7 @@ process launch.
 ## Purpose
 
 Anodrel needs a way to identify the publisher of a Windows executable before a
-future host may launch it. The first owned adapter, an
+future host may launch it. The first adapter, an
 anodrel-windows-signature crate, calls Windows Authenticode and certificate
 APIs directly. It introduces no third-party runtime, command shell, scripting
 host, or browser component.
@@ -46,7 +46,7 @@ names are not a stable authorization primitive.
 | --- | --- |
 | Embedded executable signature is accepted by Windows policy | Yes |
 | Leaf signer certificate fingerprint is available for comparison | Yes |
-| A package-owned executable is contained below its package root | No — future package loader responsibility |
+| An executable is contained below its package root | No — future package loader responsibility |
 | Executable bytes match a declared digest | No — future package loader responsibility |
 | The signer is authorized for a specific application identity | No — future installed publisher-policy responsibility |
 | A package manifest itself is trusted | No |

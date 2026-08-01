@@ -9,7 +9,7 @@ use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 /// A glyph in the Anodrel icon set.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Icon {
-    /// A cube: the owned protocol core.
+    /// A cube: the platform protocol core.
     Core,
     /// A shield with a check: a verified package.
     Package,
