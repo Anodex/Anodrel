@@ -198,6 +198,35 @@ export class MockHost {
           revision: uiDocument.revision.toString(),
         });
 
+      case "ui.events.read":
+        if (request.protocolVersion.minor < 2) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "ui.events.read requires protocol 1.2 or later.",
+          );
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "ui.events.read does not accept a payload.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "ui.events.read")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "ui.events.read requires the ui.events.read capability.",
+            { capability: "ui.events.read" },
+          );
+        }
+        return this.success("ui.events.read", request.requestId, {
+          events: [],
+          dropped: 0,
+          discarded: 0,
+        });
+
       default:
         return this.failure(
           request.requestId,

@@ -66,6 +66,18 @@ pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<bool>> {
     }
 }
 
+/// Mutates only the explicitly associated native UI session view.
+pub(super) fn with_ui_session<R>(
+    window: Hwnd,
+    change: impl FnOnce(&mut super::ui_session_view::UiSessionView) -> R,
+) -> io::Result<Option<R>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(Some(change(session))),
+        _ => Ok(None),
+    }
+}
+
 /// Removes a window and returns the number of host windows that remain.
 pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
     let mut views = lock_views()?;

@@ -1,9 +1,9 @@
 # Anodrel UI session state v1
 
 **Status:** Foundation contract. `anodrel-ui-session` owns in-memory document
-replacement and revision-bound semantic-event validation. It has no transport,
-native host, renderer, package, application identity, event queue, or operating-
-system authority.
+replacement, revision-bound semantic-event validation, and a bounded input
+mailbox. It has no transport, native host, renderer, package, application
+identity, or operating-system authority.
 
 ## Purpose and boundary
 
@@ -61,10 +61,10 @@ it accepts only a 24 KiB encoded document and maps validation failure to a safe
 protocol payload error. The state itself still has no I/O or knowledge of that
 operation.
 
-The transport does not yet deliver events, expose document readback, attach the
-state to a native window, or implement cancellation and back-pressure for
-updates. Those need their own contracts before this becomes an interactive
-application surface.
+The transport delivers semantic actions only through the bounded pull contract
+below. It does not expose document readback, subscriptions, callbacks,
+cancellation, or update back-pressure. Those need their own contracts before
+this becomes a broader interactive application surface.
 
 ## Latest-document delivery
 
@@ -83,8 +83,23 @@ notified or polls it. It must never use the mailbox for semantic action events.
 
 The Windows UI Session Lab is the first consumer. It polls one explicitly
 supplied mailbox on its UI thread and applies only a newer revision to its own
-host-created view. It is a development diagnostic with inert session actions,
-not a public application window or event bridge. See `docs/UI_SESSION_LAB.md`.
+host-created view. It is a development diagnostic, not a public application
+window. See `docs/UI_SESSION_LAB.md`.
+
+## Semantic input delivery
+
+`UiInputMailbox` is a separate per-session queue of at most 32 raw semantic
+input candidates. The native view can add only a revision and an
+`ActionInvoked` element ID that it derived from its own current layout. It
+cannot name a different session, attach data, run a command, or make an
+operating-system call.
+
+`ui.events.read` drains that queue through the authenticated transport. The
+core reuses `UiDocumentSession::accept_event` to reject stale, removed, or
+disabled actions before returning a typed `ui.action.invoked` protocol event.
+The queue drops newer candidates when full and records the count; a read also
+reports candidates rejected during revision validation. This is a bounded pull
+delivery path, not an event subscription, callback, or background queue.
 
 ## Verification
 

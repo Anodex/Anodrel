@@ -15,8 +15,9 @@ Windows host launches it with a private standard-input invitation so it can
 authenticate to the real named pipe, call `platform.health`, and submit one
 strict UI document. Its command is documented in `docs/DEVELOPMENT.md`; it is
 not a packaged or trusted content host. Use `--sample-ui-client` to display
-that authenticated replacement through the native UI Session Lab; its visible
-action remains inert.
+that authenticated replacement through the native UI Session Lab. Its visible
+action is delivered only as a revision-bound semantic event after the client
+calls `ui.events.read`; it has no direct native authority.
 
 `anodrel.application.json` and `content/main.txt` are a separate static
 application package for the first Windows content surface. The host

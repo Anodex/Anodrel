@@ -7,3 +7,6 @@ license.workspace = true
 [dependencies]
 anodrel-protocol = { path = "../protocol" }
 anodrel-ui-session = { path = "../ui-session" }
+
+[dev-dependencies]
+anodrel-ui = { path = "../ui" }

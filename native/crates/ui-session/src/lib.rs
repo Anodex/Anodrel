@@ -2,8 +2,9 @@
 //!
 //! The crate atomically validates and replaces a strict UI document, exposes
 //! its monotonic revision, and validates semantic actions against that revision.
-//! It has no application identity, transport, event queue, renderer, native
-//! host, package, callback, protocol operation, or operating-system authority.
+//! It has no application identity, transport, renderer, native host, package,
+//! callback, protocol operation, or operating-system authority. Its bounded
+//! input mailbox stores only native-layout-derived semantic candidates.
 //!
 //! See `docs/UI_SESSIONS.md` and Decision 0030 for the complete contract.
 
@@ -12,6 +13,7 @@
 
 mod error;
 mod event;
+mod input_mailbox;
 mod mailbox;
 mod revision;
 mod session;
@@ -19,6 +21,7 @@ mod snapshot;
 
 pub use error::UiSessionError;
 pub use event::UiApplicationEvent;
+pub use input_mailbox::{UI_INPUT_QUEUE_CAPACITY, UiInputBatch, UiInputCandidate, UiInputMailbox};
 pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;
 pub use session::UiDocumentSession;
@@ -29,7 +32,10 @@ mod tests {
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_document::UiDocumentError;
 
-    use super::{UiDocumentMailbox, UiDocumentRevision, UiDocumentSession, UiSessionError};
+    use super::{
+        UI_INPUT_QUEUE_CAPACITY, UiDocumentMailbox, UiDocumentRevision, UiDocumentSession,
+        UiInputCandidate, UiInputMailbox, UiSessionError,
+    };
 
     fn action_document(enabled: bool) -> String {
         format!(
@@ -178,5 +184,23 @@ mod tests {
         assert_ne!(snapshot.revision(), first);
         assert_eq!(snapshot.document().root().id().as_str(), "root");
         assert!(mailbox.take().is_none());
+    }
+
+    #[test]
+    fn input_mailbox_bounds_candidates_and_reports_overflow() {
+        let mailbox = UiInputMailbox::new();
+        let revision = UiDocumentRevision::INITIAL
+            .next()
+            .expect("first revision exists");
+        for _ in 0..UI_INPUT_QUEUE_CAPACITY + 2 {
+            mailbox.push(UiInputCandidate::new(revision, event()));
+        }
+
+        let batch = mailbox.drain();
+        assert_eq!(batch.dropped(), 2);
+        assert_eq!(batch.into_candidates().len(), UI_INPUT_QUEUE_CAPACITY);
+        let empty = mailbox.drain();
+        assert_eq!(empty.dropped(), 0);
+        assert!(empty.into_candidates().is_empty());
     }
 }

@@ -26,7 +26,7 @@ use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_ui::UiDocument;
-use anodrel_ui_session::UiDocumentMailbox;
+use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_instance::PrimaryInstance;
 
 use document::{Body, Document, Section};
@@ -450,15 +450,16 @@ pub fn run_ui_preview(document: UiDocument) -> io::Result<()> {
 }
 
 /// Opens one host-controlled native view that consumes exactly one authenticated
-/// session mailbox. Session document actions remain inert in this diagnostic.
-pub fn run_ui_session(mailbox: UiDocumentMailbox) -> io::Result<()> {
+/// session's mailboxes. Actions enter only the bounded semantic-input mailbox
+/// and remain incapable of native operations in this diagnostic.
+pub fn run_ui_session(mailbox: UiDocumentMailbox, input_mailbox: UiInputMailbox) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
         vec![WindowDefinition {
             title: "Anodrel UI Session Lab".to_owned(),
             width: (920.0 * scale) as i32,
             height: (660.0 * scale) as i32,
-            view: View::UiSession(ui_session_view::UiSessionView::new(mailbox)),
+            view: View::UiSession(ui_session_view::UiSessionView::new(mailbox, input_mailbox)),
         }],
         None,
     )
@@ -1191,7 +1192,7 @@ unsafe extern "system" fn window_proc(
             // effect and returns a value owned by the current thread's input
             // state.
             let shift_down = unsafe { GetKeyState(VK_SHIFT) } < 0;
-            let Some(changed) = registry::with_ui_lab(window, |lab| match wparam {
+            let changed = registry::with_ui_lab(window, |lab| match wparam {
                 VK_TAB if shift_down => {
                     lab.focus_previous(rect.width() as f32, rect.height() as f32)
                 }
@@ -1200,10 +1201,24 @@ unsafe extern "system" fn window_proc(
                 _ => false,
             })
             .ok()
-            .flatten() else {
-                // The only host keyboard adapter is deliberately UI Lab
-                // specific. Startup Lab and document views retain the native
-                // default behavior until their own input contracts exist.
+            .flatten()
+            .or_else(|| {
+                registry::with_ui_session(window, |session| match wparam {
+                    VK_TAB if shift_down => {
+                        session.focus_previous(rect.width() as f32, rect.height() as f32)
+                    }
+                    VK_TAB => session.focus_next(rect.width() as f32, rect.height() as f32),
+                    VK_RETURN => {
+                        session.activate_focused(rect.width() as f32, rect.height() as f32)
+                    }
+                    _ => false,
+                })
+                .ok()
+                .flatten()
+            });
+            let Some(changed) = changed else {
+                // Startup Lab and document views retain native default keyboard
+                // behavior until their own input contracts exist.
                 return unsafe { DefWindowProcW(window, message, wparam, lparam) };
             };
             if changed {
@@ -1224,20 +1239,31 @@ unsafe extern "system" fn window_proc(
             .ok()
             .flatten()
             .unwrap_or_else(|| {
-                let hovered = startup_lab::action_at(
-                    rect.width() as f32,
-                    rect.height() as f32,
-                    point(x as f32, y as f32),
-                )
-                .filter(|index| startup_lab::ACTIONS[*index].linked);
-                registry::with_startup_lab(window, |lab| {
-                    let changed = lab.hovered != hovered;
-                    lab.hovered = hovered;
-                    changed
+                registry::with_ui_session(window, |session| {
+                    session.update_hover(
+                        rect.width() as f32,
+                        rect.height() as f32,
+                        point(x as f32, y as f32),
+                    )
                 })
                 .ok()
                 .flatten()
-                .unwrap_or(false)
+                .unwrap_or_else(|| {
+                    let hovered = startup_lab::action_at(
+                        rect.width() as f32,
+                        rect.height() as f32,
+                        point(x as f32, y as f32),
+                    )
+                    .filter(|index| startup_lab::ACTIONS[*index].linked);
+                    registry::with_startup_lab(window, |lab| {
+                        let changed = lab.hovered != hovered;
+                        lab.hovered = hovered;
+                        changed
+                    })
+                    .ok()
+                    .flatten()
+                    .unwrap_or(false)
+                })
             });
             if changed {
                 invalidate(window);
@@ -1260,14 +1286,19 @@ unsafe extern "system" fn window_proc(
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| {
-                    registry::with_startup_lab(window, |lab| {
-                        let changed = lab.hovered.is_some();
-                        lab.hovered = None;
-                        changed
-                    })
-                    .ok()
-                    .flatten()
-                    .unwrap_or(false)
+                    registry::with_ui_session(window, |session| session.clear_hover())
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| {
+                            registry::with_startup_lab(window, |lab| {
+                                let changed = lab.hovered.is_some();
+                                lab.hovered = None;
+                                changed
+                            })
+                            .ok()
+                            .flatten()
+                            .unwrap_or(false)
+                        })
                 });
             if changed {
                 invalidate(window);
@@ -1279,11 +1310,16 @@ unsafe extern "system" fn window_proc(
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| {
-                    registry::with_startup_lab(window, |lab| lab.hovered)
+                    registry::with_ui_session(window, |session| session.is_hovered())
                         .ok()
                         .flatten()
-                        .flatten()
-                        .is_some()
+                        .unwrap_or_else(|| {
+                            registry::with_startup_lab(window, |lab| lab.hovered)
+                                .ok()
+                                .flatten()
+                                .flatten()
+                                .is_some()
+                        })
                 });
             let cursor_id = if hovered { IDC_HAND } else { IDC_ARROW };
             // SAFETY: both identifiers are documented integer resources, and
@@ -1298,6 +1334,21 @@ unsafe extern "system" fn window_proc(
             let rect = client_rect(window);
             if let Some(changed) = registry::with_ui_lab(window, |lab| {
                 lab.invoke(
+                    rect.width() as f32,
+                    rect.height() as f32,
+                    point(x as f32, y as f32),
+                )
+            })
+            .ok()
+            .flatten()
+            {
+                if changed {
+                    invalidate(window);
+                }
+                return 0;
+            }
+            if let Some(changed) = registry::with_ui_session(window, |session| {
+                session.invoke(
                     rect.width() as f32,
                     rect.height() as f32,
                     point(x as f32, y as f32),

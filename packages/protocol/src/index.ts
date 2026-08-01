@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 1 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 2 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -15,7 +15,7 @@ export interface ProtocolVersion {
 }
 
 /** Capabilities are granted by the host policy, never by rendered application content. */
-export type Capability = "diagnostics.read" | "ui.document.write";
+export type Capability = "diagnostics.read" | "ui.document.write" | "ui.events.read";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -42,6 +42,14 @@ export interface PlatformOperationMap {
   "ui.document.replace": {
     readonly payload: { readonly document: string };
     readonly result: { readonly revision: string };
+  };
+  "ui.events.read": {
+    readonly payload: EmptyPayload;
+    readonly result: {
+      readonly events: readonly UiActionInvokedEvent[];
+      readonly dropped: number;
+      readonly discarded: number;
+    };
   };
 }
 
@@ -144,6 +152,14 @@ export interface EventEnvelope<TPayload = unknown> {
   readonly source: string;
   readonly schemaVersion: ProtocolVersion;
   readonly payload: TPayload;
+}
+
+/** A current, enabled semantic UI action observed by a native host. */
+export interface UiActionInvokedEvent
+  extends EventEnvelope<{ readonly revision: string; readonly action: string }> {
+  readonly eventName: "ui.action.invoked";
+  readonly source: "native.ui";
+  readonly schemaVersion: { readonly major: 1; readonly minor: 0 };
 }
 
 export function createRequest<TOperation extends PlatformOperation>(

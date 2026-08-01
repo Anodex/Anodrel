@@ -56,6 +56,33 @@ test("UI document replacement requires a host-issued grant", async () => {
   );
 });
 
+test("SDK and host agree on a bounded granted UI event read", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["ui.events.read"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.readUiEvents(), {
+    events: [],
+    dropped: 0,
+    discarded: 0,
+  });
+});
+
+test("UI event reads require a host-issued grant", async () => {
+  const host = new MockHost({ applicationId: "test.application" });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  await assert.rejects(
+    () => client.readUiEvents(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "ui.events.read",
+  );
+});
+
 test("host derives grants from policy and ignores a forged request context", async () => {
   const host = new MockHost({ applicationId: "test.application", now: fixedTime });
   const request = {

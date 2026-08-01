@@ -7,7 +7,7 @@ use std::{error::Error, io, thread};
 
 use anodrel_core::HostPolicy;
 use anodrel_protocol::Capability;
-use anodrel_ui_session::UiDocumentMailbox;
+use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_pipe::WindowsPipeServer;
 
@@ -21,34 +21,46 @@ pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
 /// authenticated document mailbox.
 pub fn run_ui_session(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
     let mailbox = UiDocumentMailbox::new();
-    run_with_optional_session_view(node_path, client_path, Some(mailbox))
+    let input_mailbox = UiInputMailbox::new();
+    run_with_optional_session_view(node_path, client_path, Some((mailbox, input_mailbox)))
 }
 
 fn run_with_optional_session_view(
     node_path: &str,
     client_path: &str,
-    mailbox: Option<UiDocumentMailbox>,
+    mailboxes: Option<(UiDocumentMailbox, UiInputMailbox)>,
 ) -> Result<(), Box<dyn Error>> {
     let policy = HostPolicy::new(
         "anodrel.sample",
-        vec![Capability::DiagnosticsRead, Capability::UiDocumentWrite],
+        vec![
+            Capability::DiagnosticsRead,
+            Capability::UiDocumentWrite,
+            Capability::UiEventsRead,
+        ],
         "anodrel-windows-host",
     )?;
-    let (server, invitation) = match mailbox.as_ref() {
-        Some(mailbox) => WindowsPipeServer::create_with_ui_document_mailbox(
+    let (server, invitation) = match mailboxes.as_ref() {
+        Some((mailbox, input_mailbox)) => WindowsPipeServer::create_with_ui_mailboxes(
             policy,
             "sample-session",
             mailbox.clone(),
+            input_mailbox.clone(),
         )?,
         None => WindowsPipeServer::create(policy, "sample-session")?,
     };
     let bootstrap = invitation.bootstrap_invitation()?;
     let server_thread = thread::spawn(move || server.serve_one());
 
-    let command = BootstrapCommand::new(node_path)?.arg(client_path)?;
+    let command = if mailboxes.is_some() {
+        BootstrapCommand::new(node_path)?
+            .arg(client_path)?
+            .arg("--wait-for-ui-event")?
+    } else {
+        BootstrapCommand::new(node_path)?.arg(client_path)?
+    };
     let child = launch(&command, &bootstrap)?;
-    if let Some(mailbox) = mailbox {
-        crate::win32::run_ui_session(mailbox)?;
+    if let Some((mailbox, input_mailbox)) = mailboxes {
+        crate::win32::run_ui_session(mailbox, input_mailbox)?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;
     if exit_code != 0 {

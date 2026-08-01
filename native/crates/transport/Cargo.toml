@@ -9,3 +9,6 @@ anodrel-core = { path = "../core" }
 anodrel-protocol = { path = "../protocol" }
 anodrel-ui-session = { path = "../ui-session" }
 anodrel-wire = { path = "../wire" }
+
+[dev-dependencies]
+anodrel-ui = { path = "../ui" }

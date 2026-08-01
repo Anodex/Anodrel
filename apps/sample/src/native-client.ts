@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { PlatformClient } from "@anodrel/sdk";
 import { WindowsNamedPipeTransport, decodeBootstrapInvitation } from "@anodrel/windows-transport";
 
+const UI_EVENT_WAIT_ATTEMPTS = 100;
+const UI_EVENT_WAIT_MILLISECONDS = 100;
+
 process.on("uncaughtException", () => {
   process.exitCode = 14;
 });
@@ -36,12 +39,43 @@ async function run(): Promise<number> {
     if (update.revision !== "1") {
       return 16;
     }
+
+    if (process.argv.includes("--wait-for-ui-event")) {
+      return waitForSampleAction(client, update.revision);
+    }
     return 0;
   } catch {
     return 13;
   } finally {
     await transport.close();
   }
+}
+
+async function waitForSampleAction(client: PlatformClient, revision: string): Promise<number> {
+  for (let attempt = 0; attempt < UI_EVENT_WAIT_ATTEMPTS; attempt += 1) {
+    const result = await client.readUiEvents();
+    if (result.dropped !== 0 || result.discarded !== 0) {
+      return 17;
+    }
+    if (result.events.length > 0) {
+      const event = result.events[0];
+      if (event === undefined) {
+        return 17;
+      }
+      return event.eventName === "ui.action.invoked" &&
+        event.payload.revision === revision &&
+        event.payload.action === "sample.session.action"
+        ? 0
+        : 17;
+    }
+    await delay(UI_EVENT_WAIT_MILLISECONDS);
+  }
+
+  return 17;
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 // The bootstrap launcher directs child output to NUL. Never serialize an error

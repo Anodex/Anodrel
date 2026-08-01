@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.1
+**Status:** Foundation contract, version 1.2
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.1 accepts `{"major": 1, "minor": 0}` and
-`{"major": 1, "minor": 1}`.
+the host's. Version 1.2 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 2}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -61,6 +61,7 @@ The current operations are:
 | `platform.capabilities` | `{}` | application ID and current grants | none |
 | `platform.health` | `{}` | ready status, host name, and version | `diagnostics.read` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
+| `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
 
 ### `ui.document.replace`
 
@@ -84,6 +85,43 @@ it exactly rather than interpreting it as a JavaScript number. A replacement
 always advances the revision. This operation has no incremental patch form,
 window selection, document readback, action event, renderer attachment, or
 native side effect.
+
+### `ui.events.read`
+
+This operation takes up to **32** queued semantic input candidates from the
+already authenticated session. It requires the host-issued `ui.events.read`
+capability. Before returning a candidate, the host validates its document
+revision and enabled action identity against the current session document. A
+stale, removed, disabled, or missing action is never delivered.
+
+The result is `{ "events": array, "dropped": number, "discarded": number }`.
+`events` contains at most 32 typed event envelopes in input order. `dropped`
+is the number of newer input candidates that could not enter the fixed 32-slot
+host queue since the last read. `discarded` is the number taken from that queue
+but rejected as stale or unavailable during validation. Both are nonnegative
+safe integers. A caller that observes either nonzero value must treat its UI
+state as potentially out of date and may replace the document again.
+
+Version 1.2 defines the one event envelope below. It is carried in the read
+result because Wire 1.0 has request/response framing; it is not an unsolicited
+pipe write.
+
+~~~json
+{
+  "protocolVersion": { "major": 1, "minor": 2 },
+  "kind": "event",
+  "eventName": "ui.action.invoked",
+  "source": "native.ui",
+  "schemaVersion": { "major": 1, "minor": 0 },
+  "payload": { "revision": "7", "action": "welcome.continue" }
+}
+~~~
+
+`revision` is the exact canonical revision string returned by document
+replacement. `action` is the document-unique enabled action element ID; it has
+no command, callback, native operation, or capability meaning. Reading events
+does not grant additional authority and never returns document content, paths,
+credentials, or native diagnostics.
 
 ### Request example
 
@@ -133,7 +171,7 @@ diagnostics containing only `hostName`. Responses have one of two forms:
 }
 ~~~
 
-Version 1.1 defines these stable error codes: `capability.denied`,
+Version 1 defines these stable error codes: `capability.denied`,
 `operation.unsupported`, `protocol.version_unsupported`, `request.cancelled`,
 `request.invalid`, and `request.payload_invalid`. Error messages are suitable
 for a developer log but must not contain secrets, raw paths, or native errors.
@@ -146,8 +184,9 @@ it returns `request.cancelled` for a request that it observes before execution.
 Later host operations will document operation-specific cancellation behavior.
 
 Events are opt-in. Every event must include `protocolVersion`, `kind: "event"`,
-`eventName`, `source`, `schemaVersion`, and a typed payload. No events are
-implemented in version 1.1.
+`eventName`, `source`, `schemaVersion`, and a typed payload. Version 1.2
+implements `ui.action.invoked` only through `ui.events.read`; it does not yet
+provide subscriptions, unsolicited delivery, acknowledgements, or cancellation.
 
 ## Security rules
 
@@ -177,10 +216,11 @@ KiB before JSON parsing. The codec rejects duplicate keys, malformed Unicode,
 trailing data, and nesting beyond 64 levels. An authenticated transport can
 publish a successful UI document replacement into a bounded per-session
 mailbox. The development-only Windows UI Session Lab consumes one supplied
-mailbox in one inert native view; it is not a public application window. The
-host does not yet support action event delivery, asynchronous privileged
-operations, or a production event queue; those requirements remain part of the
-host acceptance gate.
+mailbox in one host-controlled native view; it is not a public application
+window. Its separate 32-candidate semantic-input mailbox is exposed only
+through the capability-gated `ui.events.read` pull operation. The host still
+has no subscriptions, asynchronous privileged operations, or production event
+queue; those requirements remain part of the host acceptance gate.
 
 ## Compatibility tests
 

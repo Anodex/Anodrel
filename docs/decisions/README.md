@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0035 — UI actions use bounded authenticated pull delivery.
+
 - 0034 — Windows UI Session Lab consumes one bounded mailbox.
 
 - 0033 — UI document delivery coalesces in one session mailbox.

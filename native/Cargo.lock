@@ -35,6 +35,7 @@ name = "anodrel-core"
 version = "0.1.0"
 dependencies = [
  "anodrel-protocol",
+ "anodrel-ui",
  "anodrel-ui-session",
 ]
 
@@ -92,6 +93,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-core",
  "anodrel-protocol",
+ "anodrel-ui",
  "anodrel-ui-session",
  "anodrel-wire",
 ]

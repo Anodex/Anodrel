@@ -349,6 +349,7 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
             let capability = match value.as_string() {
                 Some("diagnostics.read") => Capability::DiagnosticsRead,
                 Some("ui.document.write") => Capability::UiDocumentWrite,
+                Some("ui.events.read") => Capability::UiEventsRead,
                 _ => return Err(InstalledApplicationError::InvalidRecord),
             };
             if grants.contains(&capability) {
@@ -681,9 +682,20 @@ mod tests {
             &[anodrel_protocol::Capability::UiDocumentWrite]
         );
 
+        let event_grant = fs::read_to_string(&fixture.record_path)
+            .expect("validated record is read")
+            .replace("ui.document.write", "ui.events.read");
+        fs::write(&fixture.record_path, event_grant).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("UI event grant is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[anodrel_protocol::Capability::UiEventsRead]
+        );
+
         let unsupported = fs::read_to_string(&fixture.record_path)
             .expect("validated record is read")
-            .replace("ui.document.write", "credentials.read");
+            .replace("ui.events.read", "credentials.read");
         fs::write(&fixture.record_path, unsupported).expect("record is updated");
         assert!(matches!(
             InstalledApplication::load(&fixture.record_path, &fixture.policy_root),

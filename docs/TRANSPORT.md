@@ -101,6 +101,14 @@ bounded session handoff without blocking the pipe worker. A default transport
 with no externally retained mailbox still handles the request and response but
 does not attach that visual state to any window.
 
+A caller may also supply one `UiInputMailbox` for that same session. A native
+view may add at most 32 layout-derived revision-and-action candidates to it;
+the transport does not push them across the pipe. The authenticated
+`ui.events.read` operation drains and revalidates them through the core before
+returning event envelopes, dropped-input count, and discarded-stale count.
+The mailbox has no pointer coordinates, renderer work, callback, pipe I/O, or
+native authority.
+
 The invitation is sensitive bootstrap material. It must not pass through
 command-line arguments, environment variables, logs, or a predictable on-disk
 location.

@@ -20,7 +20,8 @@ use anodrel_protocol::Capability;
 /// The application identity and grants are copied only from a record that
 /// `anodrel-application` already validated. A version 1.0 installed record
 /// supplies an empty grant list; a version 1.1 record supplies its validated
-/// machine-policy grants, including a possible `ui.document.write` grant.
+/// machine-policy grants, including possible `ui.document.write` and
+/// `ui.events.read` grants.
 pub fn host_policy_for_installed_application(
     application: &InstalledApplication,
     host_name: impl Into<String>,

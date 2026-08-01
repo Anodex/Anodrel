@@ -16,7 +16,7 @@ use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
 };
-use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot};
+use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
@@ -62,14 +62,22 @@ impl HostPolicy {
 pub struct CoreHost {
     policy: HostPolicy,
     ui_document_session: RefCell<UiDocumentSession>,
+    ui_input_mailbox: UiInputMailbox,
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
 }
 
 impl CoreHost {
     pub fn new(policy: HostPolicy) -> Self {
+        Self::with_ui_input_mailbox(policy, UiInputMailbox::new())
+    }
+
+    /// Creates a host core that validates semantic input from one supplied
+    /// per-session mailbox.
+    pub fn with_ui_input_mailbox(policy: HostPolicy, ui_input_mailbox: UiInputMailbox) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
+            ui_input_mailbox,
             pending_ui_document_update: RefCell::new(None),
         }
     }
@@ -129,6 +137,9 @@ impl CoreHost {
             "platform.health" => self.handle_health(request),
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request)
+            }
+            "ui.events.read" if request.protocol_version.minor >= 2 => {
+                self.handle_ui_events_read(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -274,6 +285,53 @@ impl CoreHost {
         )
     }
 
+    fn handle_ui_events_read(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.events.read does not accept a payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::UiEventsRead) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::CapabilityDenied,
+                "ui.events.read requires the ui.events.read capability.",
+                Some(BTreeMap::from([(
+                    "capability".to_owned(),
+                    JsonValue::String("ui.events.read".to_owned()),
+                )])),
+            );
+        }
+
+        let batch = self.ui_input_mailbox.drain();
+        let dropped = batch.dropped();
+        let mut discarded = 0_u32;
+        let mut events = Vec::new();
+        for candidate in batch.into_candidates() {
+            let (revision, event) = candidate.into_parts();
+            match self
+                .ui_document_session
+                .borrow()
+                .accept_event(revision, event)
+            {
+                Ok(event) => events.push(ui_action_event(event)),
+                Err(_) => discarded = discarded.saturating_add(1),
+            }
+        }
+        ResponseEnvelope::success(
+            request.request_id,
+            &self.policy.host_name,
+            object([
+                ("events", JsonValue::Array(events)),
+                ("dropped", JsonValue::Number(dropped.to_string())),
+                ("discarded", JsonValue::Number(discarded.to_string())),
+            ]),
+        )
+    }
+
     fn failure(
         &self,
         request_id: String,
@@ -283,6 +341,35 @@ impl CoreHost {
     ) -> JsonValue {
         ResponseEnvelope::failure(request_id, &self.policy.host_name, code, message, details)
     }
+}
+
+fn ui_action_event(event: anodrel_ui_session::UiApplicationEvent) -> JsonValue {
+    object([
+        ("protocolVersion", ProtocolVersion::CURRENT.to_json()),
+        ("kind", JsonValue::String("event".to_owned())),
+        (
+            "eventName",
+            JsonValue::String("ui.action.invoked".to_owned()),
+        ),
+        ("source", JsonValue::String("native.ui".to_owned())),
+        (
+            "schemaVersion",
+            ProtocolVersion { major: 1, minor: 0 }.to_json(),
+        ),
+        (
+            "payload",
+            object([
+                (
+                    "revision",
+                    JsonValue::String(event.revision().value().to_string()),
+                ),
+                (
+                    "action",
+                    JsonValue::String(event.action().as_str().to_owned()),
+                ),
+            ]),
+        ),
+    ])
 }
 
 fn ui_document_payload(value: &JsonValue) -> Option<&str> {
@@ -331,6 +418,9 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
 
 #[cfg(test)]
 mod tests {
+    use anodrel_ui::{ElementId, UiEvent};
+    use anodrel_ui_session::UiInputCandidate;
+
     use super::*;
 
     fn host(grants: Vec<Capability>) -> CoreHost {
@@ -348,6 +438,12 @@ mod tests {
     fn request_v1_1(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":1}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_2(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":2}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -460,6 +556,74 @@ mod tests {
         assert_eq!(
             field(field(&oversized, "error"), "code").as_string(),
             Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn reads_only_current_enabled_ui_actions_from_the_supplied_input_mailbox() {
+        let mailbox = UiInputMailbox::new();
+        let host = CoreHost::with_ui_input_mailbox(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiDocumentWrite, Capability::UiEventsRead],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            mailbox.clone(),
+        );
+        let document = valid_ui_document("Continue");
+        let update = JsonValue::parse(&host.handle_json(&request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(&document),
+        )))
+        .expect("update response is JSON");
+        assert_eq!(
+            field(field(&update, "result"), "revision").as_string(),
+            Some("1")
+        );
+
+        let current = host
+            .take_ui_document_update()
+            .expect("accepted document is available")
+            .revision();
+        let action = UiEvent::ActionInvoked(ElementId::new("root").expect("test ID is valid"));
+        mailbox.push(UiInputCandidate::new(current, action.clone()));
+        let read = JsonValue::parse(&host.handle_json(&request_v1_2("ui.events.read", "{}")))
+            .expect("event response is JSON");
+        let result = field(&read, "result");
+        assert_eq!(field(result, "dropped"), &JsonValue::Number("0".to_owned()));
+        assert_eq!(
+            field(result, "discarded"),
+            &JsonValue::Number("0".to_owned())
+        );
+        let JsonValue::Array(events) = field(result, "events") else {
+            panic!("events is an array");
+        };
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            field(&events[0], "eventName").as_string(),
+            Some("ui.action.invoked")
+        );
+        assert_eq!(
+            field(field(&events[0], "payload"), "action").as_string(),
+            Some("root")
+        );
+
+        let replacement = valid_ui_document("Continue safely");
+        let _ = host.handle_json(&request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(&replacement),
+        ));
+        mailbox.push(UiInputCandidate::new(current, action));
+        let stale = JsonValue::parse(&host.handle_json(&request_v1_2("ui.events.read", "{}")))
+            .expect("stale event response is JSON");
+        let JsonValue::Array(events) = field(field(&stale, "result"), "events") else {
+            panic!("events is an array");
+        };
+        assert!(events.is_empty());
+        assert_eq!(
+            field(field(&stale, "result"), "discarded"),
+            &JsonValue::Number("1".to_owned())
         );
     }
 

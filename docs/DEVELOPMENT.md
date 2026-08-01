@@ -173,10 +173,11 @@ cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host --
 ~~~
 
 The **Anodrel UI Session Lab** opens with a host-owned waiting screen, then
-replaces it with the document the client submits after authentication. Close the
-window to finish the command. Actions in that delivered document are visibly
-drawn but intentionally inert; there is no action-event bridge yet. See
-`docs/UI_SESSION_LAB.md`.
+replaces it with the document the client submits after authentication. Click
+the delivered action (or focus it with Tab and press Enter) to complete its
+authenticated `ui.events.read` round trip, then close the window to finish the
+command. The action carries only its revision and semantic ID; it cannot invoke
+a native operation. See `docs/UI_SESSION_LAB.md`.
 
 ## Working process
 

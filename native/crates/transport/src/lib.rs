@@ -10,7 +10,7 @@ use std::fmt;
 
 use anodrel_core::{CoreHost, HostPolicy};
 use anodrel_protocol::{JsonValue, object};
-pub use anodrel_ui_session::UiDocumentMailbox;
+pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
 
 pub const MAX_SESSION_ID_BYTES: usize = 128;
@@ -153,9 +153,25 @@ impl TransportSession {
         credentials: SessionCredentials,
         ui_document_mailbox: UiDocumentMailbox,
     ) -> Self {
+        Self::with_ui_mailboxes(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            UiInputMailbox::new(),
+        )
+    }
+
+    /// Creates one session with explicit bounded document and semantic-input
+    /// mailboxes for its host-controlled native view.
+    pub fn with_ui_mailboxes(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::new(policy),
+            host: CoreHost::with_ui_input_mailbox(policy, ui_input_mailbox),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),
         }
@@ -270,6 +286,8 @@ fn constant_time_equals(candidate: &[u8], expected: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use anodrel_ui::{ElementId, UiEvent};
+
     use anodrel_protocol::{Capability, JsonValue};
     use anodrel_wire::{FrameDecoder, WireError, encode_json};
 
@@ -293,6 +311,14 @@ mod tests {
 
     fn ui_document_request() -> String {
         r#"{"protocolVersion":{"major":1,"minor":1},"kind":"request","requestId":"ui-document","operation":"ui.document.replace","payload":{"document":"{\"format\":\"anodrel.ui.document.v1\",\"root\":{\"id\":\"root\",\"kind\":\"text\",\"value\":\"Hello\",\"fontSize\":16,\"tone\":\"primary\"}}"}}"#.to_owned()
+    }
+
+    fn ui_action_document_request() -> String {
+        r#"{"protocolVersion":{"major":1,"minor":1},"kind":"request","requestId":"ui-document","operation":"ui.document.replace","payload":{"document":"{\"format\":\"anodrel.ui.document.v1\",\"root\":{\"id\":\"root\",\"kind\":\"action\",\"label\":\"Continue\",\"fontSize\":16,\"enabled\":true,\"tone\":\"accent\"}}"}}"#.to_owned()
+    }
+
+    fn ui_events_read_request() -> String {
+        r#"{"protocolVersion":{"major":1,"minor":2},"kind":"request","requestId":"ui-events","operation":"ui.events.read","payload":{}}"#.to_owned()
     }
 
     fn decode_response(frame: &[u8]) -> JsonValue {
@@ -417,6 +443,58 @@ mod tests {
         assert_eq!(snapshot.revision().value(), 1);
         assert_eq!(snapshot.document().root().id().as_str(), "root");
         assert!(mailbox.take().is_none());
+    }
+
+    #[test]
+    fn returns_current_semantic_ui_actions_through_an_authenticated_session() {
+        let documents = UiDocumentMailbox::new();
+        let inputs = UiInputMailbox::new();
+        let mut transport = TransportSession::with_ui_mailboxes(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiDocumentWrite, Capability::UiEventsRead],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            documents.clone(),
+            inputs.clone(),
+        );
+        authenticate(&mut transport);
+        let replacement = transport
+            .receive(&encode_json(&ui_action_document_request()).expect("request encodes"))
+            .expect("document replacement succeeds");
+        assert_eq!(
+            decode_response(&replacement[0])
+                .as_object()
+                .expect("response object")["status"]
+                .as_string(),
+            Some("success")
+        );
+
+        let revision = documents
+            .take()
+            .expect("accepted document is published")
+            .revision();
+        inputs.push(anodrel_ui_session::UiInputCandidate::new(
+            revision,
+            UiEvent::ActionInvoked(ElementId::new("root").expect("test ID is valid")),
+        ));
+        let response = transport
+            .receive(&encode_json(&ui_events_read_request()).expect("request encodes"))
+            .expect("event read succeeds");
+        let decoded = decode_response(&response[0]);
+        let result = &decoded
+            .as_object()
+            .expect("response object")["result"];
+        let JsonValue::Array(events) = &result.as_object().expect("result object")["events"] else {
+            panic!("events array");
+        };
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_object().expect("event object")["eventName"].as_string(),
+            Some("ui.action.invoked")
+        );
     }
 
     #[test]

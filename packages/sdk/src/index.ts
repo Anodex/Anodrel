@@ -64,6 +64,10 @@ export class PlatformClient {
     return this.request("ui.document.replace", { document });
   }
 
+  readUiEvents(): Promise<ResultFor<"ui.events.read">> {
+    return this.request("ui.events.read", {});
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,

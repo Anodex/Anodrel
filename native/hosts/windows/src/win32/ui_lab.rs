@@ -159,6 +159,20 @@ impl UiLab {
         changed
     }
 
+    /// Returns the semantic pointer event at one current layout position.
+    pub(super) fn event_at(&self, width: f32, height: f32, at: Point) -> Option<UiEvent> {
+        self.action_at(width, height, at)
+            .map(UiEvent::ActionInvoked)
+    }
+
+    /// Returns the current focused semantic event without recording local
+    /// diagnostic action state.
+    pub(super) fn focused_event(&mut self, width: f32, height: f32) -> Option<UiEvent> {
+        let surface = Surface::new(width, height);
+        let layout = self.document.layout(surface.bounds(), &WindowsTextMeasurer);
+        self.focus.activate(&layout)
+    }
+
     fn action_at(&self, width: f32, height: f32, at: Point) -> Option<ElementId> {
         let surface = Surface::new(width, height);
         let event = self

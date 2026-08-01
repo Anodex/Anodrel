@@ -29,7 +29,10 @@ mailbox and redraws only when the revision advances. The lab reads no document
 file, package, URL, asset, or policy from the client, and it never shows the
 pipe name, token, bootstrap material, raw path, or native error.
 
-Visible actions in the delivered document are deliberately inert: the lab has
-no pointer, keyboard, accessibility, or application event bridge. It does not
-grant a capability or execute a native operation. See `docs/UI_SESSIONS.md`,
-`docs/TRANSPORT.md`, and Decision 0034.
+The lab maps pointer hit tests and Tab/Shift+Tab/Enter only into bounded
+revision-and-action candidates. The sample client reads them through
+`ui.events.read`, which revalidates them in the authenticated session before
+returning a `ui.action.invoked` event. An action still has no native operation
+or capability meaning. The lab has no accessibility adapter, unsolicited event
+delivery, callback, or background task. See `docs/UI_SESSIONS.md`,
+`docs/TRANSPORT.md`, and Decision 0035.

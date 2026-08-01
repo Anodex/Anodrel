@@ -10,8 +10,8 @@ controls a Windows native host must satisfy; it does not claim that the current
 in-memory mock provides operating-system isolation.
 
 The current operations are `platform.ping`, `platform.capabilities`,
-`platform.health`, and `ui.document.replace`. They expose no filesystem,
-process, credential, window, or network authority.
+`platform.health`, `ui.document.replace`, and `ui.events.read`. They expose no
+filesystem, process, credential, window, or network authority.
 
 ## Assets to protect
 
@@ -66,9 +66,11 @@ authority for permissions.
 | A future application supplies malformed or oversized UI data. | Decode only the exact `anodrel.ui.document.v1` schema through the 64 KiB strict JSON boundary and validate every existing UI model limit before returning a document. The host accepts an external document only through its separate explicit bounded developer preview command, never an application session. |
 | An operator-selected preview file creates broader host access. | The preview opens only one bounded regular UTF-8 file named directly on the local command line, validates it before window creation, and loads no companion file, package, policy, session, asset, executable, URL, or native capability. |
 | A late input event targets a replaced UI document. | Bind every accepted semantic action to the exact monotonic document revision that produced its layout; reject events for an empty, replaced, removed, or disabled action. The current state crate has no I/O or application delivery path. |
-| An authenticated application overwhelms or corrupts its UI session. | Require the host-issued `ui.document.write` grant immediately before `ui.document.replace`; limit its encoded document string to 24 KiB within the 64 KiB wire message; use the strict v1 codec and atomic replacement; expose only a revision string and retain the prior state on failure. No window binding, document readback, or event delivery exists yet. |
+| An authenticated application overwhelms or corrupts its UI session. | Require the host-issued `ui.document.write` grant immediately before `ui.document.replace`; limit its encoded document string to 24 KiB within the 64 KiB wire message; use the strict v1 codec and atomic replacement; expose only a revision string and retain the prior state on failure. A separate `ui.events.read` grant provides no document readback or native authority. |
 | UI replacement traffic builds an unbounded cross-thread backlog. | Transfer accepted snapshots only through one per-session mailbox slot. A newer revision replaces the pending older revision; no update callback, pipe I/O, renderer work, or semantic event enters that slot. |
 | A pipe worker manipulates a native window or a session document drives another window. | Give a UI Session Lab exactly one mailbox and poll it only from its own Windows UI thread; accept only a newer revision into that one view. The pipe worker never calls User32, and session documents have no window-selection field. |
+| A stale or forged UI action reaches application logic. | The UI thread queues only a revision and action ID from its current host-rendered layout. `ui.events.read` checks the host-issued `ui.events.read` grant, then revalidates each candidate against the current session document and enabled action before delivery; stale or unavailable candidates are counted and discarded. |
+| UI input exhausts memory or silently loses state. | Keep a per-session queue of 32 candidates. Drop newer candidates only when full and report the exact dropped count on the next `ui.events.read`; return a separate discarded count for stale or unavailable actions. |
 | Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
 | A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
 | Two native windows render each other's state or one close ends the host early. | Keep immutable host-created views in a handle-keyed registry and exit the UI loop only after the final registered window is destroyed. |
