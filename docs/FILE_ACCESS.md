@@ -1,8 +1,8 @@
 # Selection-scoped file access
 
 **Status:** A portable bounded, one-use selection-reference registry and a
-direct Windows regular-file identity capture are implemented; no file read or
-write protocol operation exists yet.
+direct Windows session registry for retained regular-file identities are
+implemented; no file read or write protocol operation exists yet.
 
 ## Purpose
 
@@ -46,6 +46,10 @@ rather than cause the host to read a different file.
 The selection reference must therefore resolve to host-retained native state,
 not merely a saved path string. The portable core may track lifetime and
 bounded references, but only an operating-system adapter may read bytes.
+
+The Windows adapter's per-session registry pairs each CNG reference with the
+opened file object. It consumes a reference once and closes all remaining
+objects on session cleanup.
 
 ## Limits and deferred work
 

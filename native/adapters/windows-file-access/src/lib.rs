@@ -7,9 +7,12 @@
 //! Windows identity, and never returns a raw handle or file bytes.
 
 mod raw;
+mod session;
 
 use anodrel_file_access::SelectionReference;
 use anodrel_file_dialog::SelectedFilePath;
+
+pub use session::{SessionSelectionError, WindowsSessionSelections};
 
 /// Creates one CNG-backed opaque reference for a selected-file session entry.
 pub fn new_selection_reference() -> Result<SelectionReference, FileAccessError> {
