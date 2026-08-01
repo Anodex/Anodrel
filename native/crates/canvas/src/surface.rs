@@ -140,14 +140,33 @@ impl Canvas {
     /// Layers are pre-rendered at their final size, so this is a straight
     /// per-pixel blend with no resampling — cheap enough to run every frame.
     pub fn draw_canvas(&mut self, source: &Self, x: i32, y: i32, opacity: f32) {
+        self.draw_canvas_clipped(source, x, y, opacity, self.bounds());
+    }
+
+    /// Composites another canvas at an offset inside one explicit destination clip.
+    ///
+    /// The clip is intersected with this canvas and rounded out to whole target
+    /// pixels. It is an argument to this one operation, never retained drawing
+    /// state, so callers can compose a pre-rendered layer into a viewport
+    /// without affecting later drawing.
+    pub fn draw_canvas_clipped(&mut self, source: &Self, x: i32, y: i32, opacity: f32, clip: Rect) {
         let opacity = opacity.clamp(0.0, 1.0);
-        if opacity <= 0.0 {
+        let clip = clip.intersect(self.bounds());
+        if opacity <= 0.0 || clip.is_empty() {
             return;
         }
-        let column_start = (-x).max(0) as u32;
-        let column_end = source.width.min((self.width as i32 - x).max(0) as u32);
-        let row_start = (-y).max(0) as u32;
-        let row_end = source.height.min((self.height as i32 - y).max(0) as u32);
+        let clip_left = clip.left.floor() as i32;
+        let clip_right = clip.right.ceil() as i32;
+        let clip_top = clip.top.floor() as i32;
+        let clip_bottom = clip.bottom.ceil() as i32;
+        let column_start =
+            (i64::from(clip_left) - i64::from(x)).clamp(0, i64::from(source.width)) as u32;
+        let column_end =
+            (i64::from(clip_right) - i64::from(x)).clamp(0, i64::from(source.width)) as u32;
+        let row_start =
+            (i64::from(clip_top) - i64::from(y)).clamp(0, i64::from(source.height)) as u32;
+        let row_end =
+            (i64::from(clip_bottom) - i64::from(y)).clamp(0, i64::from(source.height)) as u32;
 
         for row in row_start..row_end {
             let source_row = (row as usize) * (source.width as usize);
@@ -747,6 +766,21 @@ mod tests {
         let blended = canvas.pixel(1, 1);
         assert!((i16::from(blended.red) - 128).abs() <= 2);
         assert_eq!(blended.alpha, 255);
+    }
+
+    #[test]
+    fn compositing_a_layer_respects_an_explicit_destination_clip() {
+        let mut source = Canvas::new(4, 4);
+        source.clear(Color::WHITE);
+        let mut target = Canvas::new(6, 6);
+        target.clear(Color::BLACK);
+
+        target.draw_canvas_clipped(&source, 1, 1, 1.0, Rect::new(2.0, 2.0, 4.0, 4.0));
+
+        assert_eq!(target.pixel(1, 1), Color::BLACK);
+        assert_eq!(target.pixel(2, 2), Color::WHITE);
+        assert_eq!(target.pixel(3, 3), Color::WHITE);
+        assert_eq!(target.pixel(4, 4), Color::BLACK);
     }
 
     #[test]

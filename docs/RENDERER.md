@@ -168,6 +168,7 @@ first.
 | `draw_glow(path, radius, passes, paint)` | Soft bloom around a shape. |
 | `draw_shadow(path, offset, radius, color)` | Blurred offset shadow. |
 | `copy_from(other)` | Copies a same-sized canvas; `false` if sizes differ. |
+| `draw_canvas_clipped(other, x, y, opacity, clip)` | Composites a layer inside one explicit destination rectangle. |
 | `pixel(x, y)` / `sample(point)` | Reads back a pixel. |
 | `pixels()` | Packed `0xAARRGGBB`, row-major — the buffer to present. |
 
@@ -433,8 +434,9 @@ Deliberately absent, and the reason:
 
 - **No transform stack.** Paths carry their own placement. A global transform
   would make a call's effect depend on invisible state.
-- **No clip regions.** Clipping is to the canvas bounds. Nothing has needed
-  more.
+- **No retained clip regions.** Drawing is clipped to the canvas bounds. A
+  pre-rendered layer may be composed through one explicit rectangle with
+  `draw_canvas_clipped`, but that clip cannot affect later calls.
 - **No curves in the pipeline.** Builders flatten; the rasterizer handles
   polygons only.
 - **No text layout.** The canvas composites glyph coverage. Line breaking and
