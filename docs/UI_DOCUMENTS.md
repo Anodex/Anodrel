@@ -149,16 +149,18 @@ only this node object:
 
 No scroll position, input policy, callback, command, native operation,
 scrollbar, or accessibility handle is encoded. The host retains each position
-separately under this node's element ID. A v2 decoder rejects unknown or
-missing fields exactly as v1 does; a v1 decoder continues to reject `scroll`.
-The v2 codec implementation and its document-session compatibility tests are
-the next implementation work under Decision 0039.
+separately under this node's element ID. `decode_v2` and `encode_v2` implement
+this exact form, while the existing `decode` and `encode` functions remain v1
+only. A v2 decoder rejects unknown or missing fields exactly as v1 does; a v1
+decoder continues to reject `scroll`. Document-session compatibility is a
+separate opt-in step under Decision 0039.
 
 ## Verification
 
-`anodrel-ui-document` tests a known document round trip, every version 1 node kind and
-appearance roles, unknown and missing fields, malformed values, unsupported
-format identifiers, size limits, and model-level document limits. It has only
+`anodrel-ui-document` tests known version 1 and version 2 round trips, every
+version 1 node kind and appearance role, exact scroll objects, unknown and
+missing fields, malformed values, unsupported format identifiers, size limits,
+and model-level document limits. It has only
 first-party `anodrel-ui` and `anodrel-json` dependencies and no operating-
 system calls. The Windows host additionally builds and renders its compiled-in
 UI Lab fixture through this decoder, offers a separate bounded developer

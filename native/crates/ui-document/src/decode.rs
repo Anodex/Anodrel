@@ -4,37 +4,56 @@ use std::collections::BTreeMap;
 
 use anodrel_json::JsonValue;
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Stack, Text, UiActionTone, UiDocument, UiNode, UiSurfaceTone,
-    UiTextTone,
+    Action, Axis, ElementId, Insets, Scroll, Stack, Text, UiActionTone, UiDocument, UiNode,
+    UiSurfaceTone, UiTextTone,
 };
 
-use crate::{MAX_ENCODED_DOCUMENT_BYTES, UI_DOCUMENT_FORMAT_V1, UiDocumentError};
+use crate::{
+    MAX_ENCODED_DOCUMENT_BYTES, UI_DOCUMENT_FORMAT_V1, UI_DOCUMENT_FORMAT_V2, UiDocumentError,
+};
 
 /// Decodes one exact, bounded version 1 UI document.
 pub fn decode(input: &str) -> Result<UiDocument, UiDocumentError> {
+    decode_format(input, UI_DOCUMENT_FORMAT_V1, false)
+}
+
+/// Decodes one exact, bounded version 2 UI document.
+pub fn decode_v2(input: &str) -> Result<UiDocument, UiDocumentError> {
+    decode_format(input, UI_DOCUMENT_FORMAT_V2, true)
+}
+
+fn decode_format(
+    input: &str,
+    expected_format: &str,
+    allows_scroll: bool,
+) -> Result<UiDocument, UiDocumentError> {
     if input.len() > MAX_ENCODED_DOCUMENT_BYTES {
         return Err(UiDocumentError::EncodedLimitExceeded);
     }
     let value = JsonValue::parse(input).map_err(|_| UiDocumentError::InvalidJson)?;
     let fields = object(&value)?;
     require_fields(fields, &["format", "root"])?;
-    if string_field(fields, "format")? != UI_DOCUMENT_FORMAT_V1 {
+    if string_field(fields, "format")? != expected_format {
         return Err(UiDocumentError::UnsupportedFormat);
     }
-    UiDocument::new(node(required_field(fields, "root")?)?).map_err(Into::into)
+    UiDocument::new(node(required_field(fields, "root")?, allows_scroll)?).map_err(Into::into)
 }
 
-fn node(value: &JsonValue) -> Result<UiNode, UiDocumentError> {
+fn node(value: &JsonValue, allows_scroll: bool) -> Result<UiNode, UiDocumentError> {
     let fields = object(value)?;
     match string_field(fields, "kind")? {
-        "stack" => stack(fields),
+        "stack" => stack(fields, allows_scroll),
+        "scroll" if allows_scroll => scroll(fields),
         "text" => text(fields),
         "action" => action(fields),
         _ => Err(UiDocumentError::UnsupportedNodeKind),
     }
 }
 
-fn stack(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentError> {
+fn stack(
+    fields: &BTreeMap<String, JsonValue>,
+    allows_scroll: bool,
+) -> Result<UiNode, UiDocumentError> {
     require_fields(
         fields,
         &[
@@ -59,7 +78,7 @@ fn stack(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentError
     };
     let children = array(required_field(fields, "children")?)?
         .iter()
-        .map(node)
+        .map(|child| node(child, allows_scroll))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(UiNode::Stack(
         Stack::new(
@@ -71,6 +90,14 @@ fn stack(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentError
         )?
         .with_surface_tone(surface_tone),
     ))
+}
+
+fn scroll(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentError> {
+    require_fields(fields, &["id", "kind", "child"])?;
+    Ok(UiNode::Scroll(Scroll::new(
+        element_id(fields)?,
+        node(required_field(fields, "child")?, true)?,
+    )))
 }
 
 fn text(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentError> {

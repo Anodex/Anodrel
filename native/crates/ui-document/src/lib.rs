@@ -1,9 +1,9 @@
 //! Strict, capability-free interchange for Anodrel's native UI document.
 //!
-//! This crate decodes and encodes only `anodrel.ui.document.v1`, a bounded JSON
-//! form of [`anodrel_ui::UiDocument`]. Version 1 deliberately does not encode
-//! an in-memory scroll container; an attempt returns `UnsupportedFormat` until
-//! a later exact format defines its fields. It has no renderer, operating-system
+//! This crate decodes and encodes the exact `anodrel.ui.document.v1` and version
+//! 2 forms of [`anodrel_ui::UiDocument`]. The existing [`decode`] and [`encode`]
+//! entry points remain version 1 only; [`decode_v2`] and [`encode_v2`] are an
+//! explicit opt-in for the scroll-container form. It has no renderer, operating-system
 //! call, package loader, protocol operation, session, callback, or capability.
 //! A future consumer must establish those boundaries separately.
 //!
@@ -16,12 +16,14 @@ mod decode;
 mod encode;
 mod error;
 
-pub use decode::decode;
-pub use encode::encode;
+pub use decode::{decode, decode_v2};
+pub use encode::{encode, encode_v2};
 pub use error::UiDocumentError;
 
 /// The only accepted version 1 external UI document format identifier.
 pub const UI_DOCUMENT_FORMAT_V1: &str = "anodrel.ui.document.v1";
+/// The exact version 2 UI document format identifier with scroll containers.
+pub const UI_DOCUMENT_FORMAT_V2: &str = "anodrel.ui.document.v2";
 /// The largest accepted UTF-8 JSON document in bytes.
 pub const MAX_ENCODED_DOCUMENT_BYTES: usize = 64 * 1024;
 
@@ -32,7 +34,9 @@ mod tests {
         UiNode, UiSurfaceTone, UiTextTone,
     };
 
-    use super::{MAX_ENCODED_DOCUMENT_BYTES, UiDocumentError, decode, encode};
+    use super::{
+        MAX_ENCODED_DOCUMENT_BYTES, UiDocumentError, decode, decode_v2, encode, encode_v2,
+    };
 
     fn id(value: &str) -> ElementId {
         ElementId::new(value).expect("test ID is valid")
@@ -155,5 +159,52 @@ mod tests {
         .expect("scroll model is valid");
 
         assert_eq!(encode(&document), Err(UiDocumentError::UnsupportedFormat));
+    }
+
+    #[test]
+    fn version_two_round_trips_scroll_and_preserves_version_one_strictness() {
+        let document = UiDocument::new(UiNode::Scroll(Scroll::new(
+            id("viewport"),
+            UiNode::Stack(
+                Stack::new(
+                    id("content"),
+                    Axis::Vertical,
+                    Insets::zero(),
+                    4,
+                    vec![UiNode::Text(
+                        Text::new(id("label"), "Scrollable content", 16).expect("text is valid"),
+                    )],
+                )
+                .expect("content stack is valid"),
+            ),
+        )))
+        .expect("scroll document is valid");
+
+        let encoded = encode_v2(&document).expect("version two document encodes");
+        assert!(encoded.contains(r#""format":"anodrel.ui.document.v2""#));
+        assert_eq!(decode_v2(&encoded), Ok(document));
+        assert_eq!(decode(&encoded), Err(UiDocumentError::UnsupportedFormat));
+    }
+
+    #[test]
+    fn version_two_rejects_an_incomplete_or_extended_scroll_object() {
+        assert_eq!(
+            decode_v2(
+                r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll"}}"#
+            ),
+            Err(UiDocumentError::MissingField)
+        );
+        assert_eq!(
+            decode_v2(
+                r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"text","value":"Content","fontSize":16,"tone":"primary"},"offset":10}}"#
+            ),
+            Err(UiDocumentError::UnknownField)
+        );
+        assert_eq!(
+            decode(
+                r#"{"format":"anodrel.ui.document.v1","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"text","value":"Content","fontSize":16,"tone":"primary"}}}"#
+            ),
+            Err(UiDocumentError::UnsupportedNodeKind)
+        );
     }
 }
