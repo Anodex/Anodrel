@@ -13,12 +13,14 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod accessibility;
 mod error;
 mod geometry;
 mod id;
 mod layout;
 mod model;
 
+pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
 pub use error::UiError;
 pub use geometry::{UiPoint, UiRect, UiSize};
 pub use id::ElementId;

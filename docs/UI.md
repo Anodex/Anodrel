@@ -1,9 +1,10 @@
 # Anodrel native UI foundation v1
 
 **Status:** Foundation contract. `anodrel-ui` provides an owned in-memory view
-tree, deterministic layout, clipping, and semantic action hit testing. It does
-not yet accept an application package, protocol, script, renderer, native
-bridge, accessibility tree, focus system, or operating-system operation.
+tree, deterministic layout, clipping, semantic action hit testing, and a
+visible accessibility snapshot. It does not yet accept an application package,
+protocol, script, renderer, native bridge, focus system, or operating-system
+operation.
 
 ## Purpose and boundary
 
@@ -58,6 +59,26 @@ The model has no scrolling, wrapping, transforms, z-index, animation, pointer
 capture, keyboard focus, or implicit native behavior. A future version needs a
 new documented contract before adding any of them.
 
+## Accessibility semantics
+
+`UiDocument::accessibility_snapshot(layout)` returns the visible elements of a
+specific layout pass in source order. Every entry has the stable element ID,
+clipped logical-pixel bounds, role, enabled state, and, for text or actions, a
+plain-text accessible name.
+
+| UI node | Accessibility role | Accessible name | Enabled |
+| --- | --- | --- | --- |
+| `Stack` | `Group` | none | false |
+| `Text` | `StaticText` | text value | false |
+| `Action` | `Button` | action label | action enabled state |
+
+The snapshot contains no invisible or fully clipped node. It does not expose a
+native UI Automation, AT-SPI, NSAccessibility, or Assistive Technology Service
+API; it does not set focus, manage keyboard navigation, make announcements, or
+invoke an action. A future operating-system accessibility adapter must consume
+this bounded snapshot through its own documented lifecycle and permission
+boundary.
+
 ## Compatibility
 
 This is a Rust API foundation, not an application file or protocol format. No
@@ -85,7 +106,8 @@ not an application UI API.
 
 The portable crate tests ID validation and every document resource limit,
 unique IDs, vertical and horizontal placement, clipping, responsive bounds,
-disabled actions, and top-most action hit testing. It has no operating-system
-or third-party runtime dependency. The Windows host additionally tests that the
-UI Lab paints content, resolves every fixed action to its own ID, tracks scaled
-hit testing, and changes only host-owned diagnostic state on invocation.
+disabled actions, top-most action hit testing, and accessibility role/name/
+visibility semantics. It has no operating-system or third-party runtime
+dependency. The Windows host additionally tests that the UI Lab paints content,
+resolves every fixed action to its own ID, tracks scaled hit testing, and changes
+only host-owned diagnostic state on invocation.

@@ -323,6 +323,7 @@ fn stack(id: &str, axis: Axis, padding: Insets, gap: u16, children: Vec<UiNode>)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anodrel_ui::UiAccessibilityRole;
 
     #[test]
     fn every_action_reports_its_own_semantic_id() {
@@ -388,6 +389,31 @@ mod tests {
             },
         ));
         assert_eq!(lab.last_action, Some(id));
+    }
+
+    #[test]
+    fn exposes_the_same_button_semantics_that_the_lab_draws() {
+        let lab = UiLab::new();
+        let layout = lab.document.layout(
+            UiRect::from_size(0.0, 0.0, BASE_WIDTH, BASE_HEIGHT),
+            &WindowsTextMeasurer,
+        );
+        let snapshot = lab.document.accessibility_snapshot(&layout);
+        let buttons = snapshot
+            .nodes()
+            .iter()
+            .filter(|node| node.role() == UiAccessibilityRole::Button)
+            .map(|node| (node.id().as_str(), node.name(), node.enabled()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            buttons,
+            vec![
+                ("ui.lab.inspect", Some("Inspect layout"), true),
+                ("ui.lab.hit-test", Some("Test semantic action"), true),
+                ("ui.lab.report", Some("Report semantic action"), true),
+            ]
+        );
     }
 
     #[test]

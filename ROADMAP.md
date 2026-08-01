@@ -68,8 +68,9 @@ Status: **Direct Windows host in progress**
 - Define an owned native application UI foundation. **In progress:** a portable
   declarative layout tree with semantic actions establishes the first reusable
   UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a
-  fixed host-owned document through that contract. Authenticated application
-  input, accessibility, focus, scrolling, and an application package format
+  fixed host-owned document through that contract. Its portable accessibility
+  snapshot is available, while authenticated application input, operating-system
+  accessibility adapters, focus, scrolling, and an application package format
   remain separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a

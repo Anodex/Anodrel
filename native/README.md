@@ -90,8 +90,9 @@ anodrel-ui -> future renderer / input adapter
   generic-credential targets, and bounded opaque secret values. It has no
   operating-system calls or public application protocol.
 - `crates/ui` owns a bounded in-memory native UI document, deterministic layout,
-  clipping, and semantic action hit testing. It has no renderer, package,
-  protocol, scripting, operating-system dependency, or native authority.
+  clipping, semantic action hit testing, and visible accessibility snapshot. It
+  has no renderer, package, protocol, scripting, operating-system dependency,
+  or native authority.
 - `adapters/windows-credentials` reads, writes, and deletes only the exact
   generic Credential Manager target derived from a validated identity. It
   cannot enumerate credentials or expose a secret, target, or raw Windows

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0026 — Native UI accessibility begins with an owned semantic snapshot.
+
 - 0025 — Native UI starts with a constrained declarative foundation.
 
 - 0024 — Native transport performance uses an owned repeatable measurement
