@@ -13,7 +13,9 @@ use std::{fmt, io, thread, time::Duration};
 
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_core::HostPolicy;
-use anodrel_transport::{SessionCredentials, TransportSession, authentication_message};
+use anodrel_transport::{
+    SessionCredentials, TransportSession, UiDocumentMailbox, authentication_message,
+};
 use anodrel_wire::encode_json;
 
 use crate::{raw::PIPE_BUFFER_BYTES, security::CurrentSessionSecurity};
@@ -172,6 +174,19 @@ impl WindowsPipeServer {
         policy: HostPolicy,
         session_id: impl Into<String>,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_ui_document_mailbox(policy, session_id, UiDocumentMailbox::new())
+    }
+
+    /// Creates one endpoint whose accepted UI document snapshots are published
+    /// into the supplied per-session mailbox.
+    ///
+    /// The caller owns the mailbox's consumer and must keep it separate from
+    /// the pipe worker thread and from all other sessions.
+    pub fn create_with_ui_document_mailbox(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+    ) -> io::Result<(Self, SessionInvitation)> {
         let session_id = session_id.into();
         let pipe_name = format!(r"\\.\pipe\anodrel.v1.{}", random_hex()?);
         let token = random_hex()?;
@@ -188,7 +203,11 @@ impl WindowsPipeServer {
         Ok((
             Self {
                 handle,
-                session: TransportSession::new(policy, credentials),
+                session: TransportSession::with_ui_document_mailbox(
+                    policy,
+                    credentials,
+                    ui_document_mailbox,
+                ),
             },
             SessionInvitation {
                 pipe_name,

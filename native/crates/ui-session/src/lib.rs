@@ -12,20 +12,24 @@
 
 mod error;
 mod event;
+mod mailbox;
 mod revision;
 mod session;
+mod snapshot;
 
 pub use error::UiSessionError;
 pub use event::UiApplicationEvent;
+pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;
 pub use session::UiDocumentSession;
+pub use snapshot::UiDocumentSnapshot;
 
 #[cfg(test)]
 mod tests {
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_document::UiDocumentError;
 
-    use super::{UiDocumentRevision, UiDocumentSession, UiSessionError};
+    use super::{UiDocumentMailbox, UiDocumentRevision, UiDocumentSession, UiSessionError};
 
     fn action_document(enabled: bool) -> String {
         format!(
@@ -152,5 +156,27 @@ mod tests {
             session.accept_event(disabled, event()),
             Err(UiSessionError::ActionUnavailable)
         );
+    }
+
+    #[test]
+    fn mailbox_coalesces_to_the_newest_pending_snapshot() {
+        let mut session = UiDocumentSession::new();
+        let first = session
+            .replace_document(&action_document(true))
+            .expect("first document is valid");
+        let first_snapshot = session.snapshot().expect("first snapshot is available");
+        let second = session
+            .replace_document(text_document())
+            .expect("second document is valid");
+        let second_snapshot = session.snapshot().expect("second snapshot is available");
+        let mailbox = UiDocumentMailbox::new();
+
+        mailbox.publish(second_snapshot);
+        mailbox.publish(first_snapshot);
+        let snapshot = mailbox.take().expect("newest snapshot is retained");
+        assert_eq!(snapshot.revision(), second);
+        assert_ne!(snapshot.revision(), first);
+        assert_eq!(snapshot.document().root().id().as_str(), "root");
+        assert!(mailbox.take().is_none());
     }
 }

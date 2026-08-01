@@ -66,6 +66,21 @@ state to a native window, or implement cancellation and back-pressure for
 updates. Those need their own contracts before this becomes an interactive
 application surface.
 
+## Latest-document delivery
+
+`UiDocumentMailbox` is a portable, per-session handoff for a host that must
+move an already accepted document from a transport worker to another host
+thread. It retains at most one immutable `UiDocumentSnapshot`: the latest
+document and its revision. Publishing a newer snapshot replaces an older
+pending snapshot; publishing an older revision has no effect. Taking a snapshot
+clears that one pending value.
+
+The mailbox has no I/O, timer, callback, application identity, renderer,
+protocol event, or operating-system operation. It deliberately coalesces visual
+updates rather than promising every intermediate frame. A host must create one
+mailbox for one authenticated session and define how a native window is
+notified or polls it. It must never use the mailbox for semantic action events.
+
 ## Verification
 
 The crate tests successful replacement, deterministic revisions, failed-update

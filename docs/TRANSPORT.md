@@ -92,6 +92,15 @@ or capability grant. `anodrel-windows-registered-session` is the Windows
 composition adapter for that policy and endpoint creation; its caller still
 starts `serve_one` on a worker and securely delivers the separate invitation.
 
+When a caller supplies one `UiDocumentMailbox` while creating an authenticated
+transport session, a successful `ui.document.replace` publishes the accepted
+immutable snapshot into that mailbox after the core has made the replacement.
+The mailbox retains only the newest pending revision and performs no pipe I/O,
+event delivery, renderer work, or callback. This lets a native UI thread poll a
+bounded session handoff without blocking the pipe worker. A default transport
+with no externally retained mailbox still handles the request and response but
+does not attach that visual state to any window.
+
 The invitation is sensitive bootstrap material. It must not pass through
 command-line arguments, environment variables, logs, or a predictable on-disk
 location.

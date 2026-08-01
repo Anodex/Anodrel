@@ -10,6 +10,7 @@ use std::fmt;
 
 use anodrel_core::{CoreHost, HostPolicy};
 use anodrel_protocol::{JsonValue, object};
+pub use anodrel_ui_session::UiDocumentMailbox;
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
 
 pub const MAX_SESSION_ID_BYTES: usize = 128;
@@ -134,6 +135,7 @@ enum SessionState {
 pub struct TransportSession {
     decoder: FrameDecoder,
     host: CoreHost,
+    ui_document_mailbox: UiDocumentMailbox,
     state: SessionState,
 }
 
@@ -141,9 +143,20 @@ impl TransportSession {
     /// Creates one session with both host-issued policy and host-created
     /// credentials. Stream input cannot modify either after construction.
     pub fn new(policy: HostPolicy, credentials: SessionCredentials) -> Self {
+        Self::with_ui_document_mailbox(policy, credentials, UiDocumentMailbox::new())
+    }
+
+    /// Creates one session that publishes accepted UI documents into one
+    /// caller-owned bounded mailbox.
+    pub fn with_ui_document_mailbox(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
             host: CoreHost::new(policy),
+            ui_document_mailbox,
             state: SessionState::Pending(credentials),
         }
     }
@@ -179,7 +192,13 @@ impl TransportSession {
             SessionState::Authenticated if has_kind(message, AUTHENTICATE_KIND) => {
                 self.close_with(TransportError::AuthenticationFailed)
             }
-            SessionState::Authenticated => Ok(self.host.handle_json(message)),
+            SessionState::Authenticated => {
+                let response = self.host.handle_json(message);
+                if let Some(snapshot) = self.host.take_ui_document_update() {
+                    self.ui_document_mailbox.publish(snapshot);
+                }
+                Ok(response)
+            }
             SessionState::Closed => Err(TransportError::SessionClosed),
         }
     }
@@ -367,7 +386,17 @@ mod tests {
 
     #[test]
     fn accepts_a_granted_ui_document_replacement_after_authentication() {
-        let mut transport = session(vec![Capability::UiDocumentWrite]);
+        let mailbox = UiDocumentMailbox::new();
+        let mut transport = TransportSession::with_ui_document_mailbox(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiDocumentWrite],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            mailbox.clone(),
+        );
         authenticate(&mut transport);
         let response = transport
             .receive(&encode_json(&ui_document_request()).expect("request encodes"))
@@ -384,6 +413,10 @@ mod tests {
                 .as_string(),
             Some("1")
         );
+        let snapshot = mailbox.take().expect("accepted document is published");
+        assert_eq!(snapshot.revision().value(), 1);
+        assert_eq!(snapshot.document().root().id().as_str(), "root");
+        assert!(mailbox.take().is_none());
     }
 
     #[test]

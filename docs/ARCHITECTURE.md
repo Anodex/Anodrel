@@ -207,15 +207,14 @@ decodes a fixed compile-time fixture through it, and the separate explicit
 Windows developer preview can render one bounded operator-selected document.
 `anodrel-ui-session` owns the revision-bound state behind one authenticated
 transport session's capability-checked 24 KiB document replacement operation;
-it is not attached to a window and cannot deliver action events. None of these
-crates has operating-system authority. The
-`anodrel-ui-session` separately owns one revision-bound current document and
-semantic-action validation, but does not authenticate or deliver events. The
+its single-slot latest-document mailbox can transfer a snapshot to another host
+thread without queueing or I/O. It is not attached to a window and cannot
+deliver action events. None of these crates has operating-system authority. The
 host remains responsible for text measurement, mapping appearance roles to an
 actual visual system, rendering, input delivery, operating-system accessibility
 and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`, and
-Decisions 0025 through 0031.
+Decisions 0025 through 0033.
 
 ## Communication model
 

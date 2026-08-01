@@ -3,7 +3,7 @@
 use anodrel_ui::{ElementId, UiDocument, UiEvent, UiNode};
 use anodrel_ui_document::decode;
 
-use crate::{UiApplicationEvent, UiDocumentRevision, UiSessionError};
+use crate::{UiApplicationEvent, UiDocumentRevision, UiDocumentSnapshot, UiSessionError};
 
 /// One revision-bound current UI document.
 ///
@@ -31,6 +31,14 @@ impl UiDocumentSession {
         self.document
             .as_ref()
             .map(|document| (document, self.revision))
+    }
+
+    /// Clones the current document into a revision-bound delivery snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> Option<UiDocumentSnapshot> {
+        self.document
+            .as_ref()
+            .map(|document| UiDocumentSnapshot::new(document.clone(), self.revision))
     }
 
     /// Validates and atomically replaces the current document.

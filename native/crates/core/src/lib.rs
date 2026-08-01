@@ -16,7 +16,7 @@ use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
 };
-use anodrel_ui_session::UiDocumentSession;
+use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
@@ -62,6 +62,7 @@ impl HostPolicy {
 pub struct CoreHost {
     policy: HostPolicy,
     ui_document_session: RefCell<UiDocumentSession>,
+    pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
 }
 
 impl CoreHost {
@@ -69,7 +70,14 @@ impl CoreHost {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
+            pending_ui_document_update: RefCell::new(None),
         }
+    }
+
+    /// Takes the latest accepted document snapshot not yet observed by the
+    /// transport that owns this core host.
+    pub fn take_ui_document_update(&self) -> Option<UiDocumentSnapshot> {
+        self.pending_ui_document_update.borrow_mut().take()
     }
 
     pub fn handle_json(&self, message: &str) -> String {
@@ -241,21 +249,24 @@ impl CoreHost {
             );
         }
 
-        let revision = match self
-            .ui_document_session
-            .borrow_mut()
-            .replace_document(document)
-        {
-            Ok(revision) => revision,
-            Err(_) => {
-                return self.failure(
-                    request.request_id,
-                    ProtocolErrorCode::RequestPayloadInvalid,
-                    "ui.document.replace document is invalid.",
-                    None,
-                );
-            }
+        let Some(snapshot) = ({
+            let mut session = self.ui_document_session.borrow_mut();
+            let revision = session.replace_document(document);
+            revision.ok().and_then(|revision| {
+                session
+                    .snapshot()
+                    .filter(|snapshot| snapshot.revision() == revision)
+            })
+        }) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.document.replace document is invalid.",
+                None,
+            );
         };
+        let revision = snapshot.revision();
+        *self.pending_ui_document_update.borrow_mut() = Some(snapshot);
         ResponseEnvelope::success(
             request.request_id,
             &self.policy.host_name,
@@ -404,6 +415,12 @@ mod tests {
             field(field(&first, "result"), "revision").as_string(),
             Some("1")
         );
+        let first_snapshot = host
+            .take_ui_document_update()
+            .expect("accepted document is available to the transport");
+        assert_eq!(first_snapshot.revision().value(), 1);
+        assert_eq!(first_snapshot.document().root().id().as_str(), "root");
+        assert!(host.take_ui_document_update().is_none());
 
         let invalid = request_v1_1("ui.document.replace", &ui_document_payload("not JSON"));
         let invalid =

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0033 — UI document delivery coalesces in one session mailbox.
+
 - 0032 — UI document replacement is capability-checked and session-bound.
 
 - 0031 — Windows UI preview is an explicit bounded developer tool.
