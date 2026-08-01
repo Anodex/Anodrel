@@ -77,6 +77,7 @@ impl UiScrollMetrics {
 pub struct UiLayoutItem {
     id: ElementId,
     bounds: UiRect,
+    paint_bounds: UiRect,
     kind: UiLayoutKind,
     enabled: bool,
 }
@@ -92,6 +93,16 @@ impl UiLayoutItem {
     #[must_use]
     pub const fn bounds(&self) -> UiRect {
         self.bounds
+    }
+
+    /// Returns the element's logical bounds before ancestor clipping.
+    ///
+    /// A renderer uses these coordinates to preserve the element's geometry,
+    /// then clips its output to [`Self::bounds`]. Input, focus, and
+    /// accessibility must use only the visible bounds.
+    #[must_use]
+    pub const fn paint_bounds(&self) -> UiRect {
+        self.paint_bounds
     }
 
     /// Returns the element kind.
@@ -242,6 +253,7 @@ fn layout_node(
             layout.items.push(UiLayoutItem {
                 id: stack.id.clone(),
                 bounds: visible_bounds,
+                paint_bounds: bounds,
                 kind: UiLayoutKind::Stack,
                 enabled: false,
             });
@@ -251,6 +263,7 @@ fn layout_node(
             layout.items.push(UiLayoutItem {
                 id: scroll.id.clone(),
                 bounds: visible_bounds,
+                paint_bounds: bounds,
                 kind: UiLayoutKind::Scroll,
                 enabled: false,
             });
@@ -266,12 +279,14 @@ fn layout_node(
         UiNode::Text(text) => layout.items.push(UiLayoutItem {
             id: text.id.clone(),
             bounds: visible_bounds,
+            paint_bounds: bounds,
             kind: UiLayoutKind::Text,
             enabled: false,
         }),
         UiNode::Action(action) => layout.items.push(UiLayoutItem {
             id: action.id.clone(),
             bounds: visible_bounds,
+            paint_bounds: bounds,
             kind: UiLayoutKind::Action,
             enabled: action.enabled,
         }),
@@ -577,12 +592,14 @@ mod tests {
         let lower = UiLayoutItem {
             id: id("lower"),
             bounds: UiRect::from_size(0.0, 0.0, 50.0, 50.0),
+            paint_bounds: UiRect::from_size(0.0, 0.0, 50.0, 50.0),
             kind: UiLayoutKind::Action,
             enabled: true,
         };
         let upper = UiLayoutItem {
             id: id("upper"),
             bounds: UiRect::from_size(0.0, 0.0, 50.0, 50.0),
+            paint_bounds: UiRect::from_size(0.0, 0.0, 50.0, 50.0),
             kind: UiLayoutKind::Action,
             enabled: true,
         };
@@ -674,6 +691,15 @@ mod tests {
             }]
         );
         assert_eq!(layout.bounds(&id("first")), None);
+        assert_eq!(
+            layout
+                .items()
+                .iter()
+                .find(|item| item.id() == &id("second"))
+                .expect("second action is visible")
+                .paint_bounds(),
+            UiRect::new(0.0, 0.0, 100.0, 36.0)
+        );
         assert_eq!(
             layout.bounds(&id("second")),
             Some(UiRect::new(0.0, 0.0, 100.0, 36.0))

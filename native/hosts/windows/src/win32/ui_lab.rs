@@ -274,9 +274,10 @@ fn draw_node(
     status_target: Option<&ElementId>,
     status: Option<&str>,
 ) {
-    let Some(bounds) = layout.bounds(node.id()) else {
+    let Some(item) = layout.items().iter().find(|item| item.id() == node.id()) else {
         return;
     };
+    let bounds = item.paint_bounds();
     match node {
         UiNode::Stack(stack) => {
             if stack.surface_tone() == UiSurfaceTone::Raised {
@@ -298,8 +299,9 @@ fn draw_node(
             }
         }
         UiNode::Scroll(scroll) => {
+            let mut content = Canvas::new(canvas.width(), canvas.height());
             draw_node(
-                canvas,
+                &mut content,
                 lab,
                 layout,
                 scroll.child(),
@@ -307,6 +309,7 @@ fn draw_node(
                 status_target,
                 status,
             );
+            canvas.draw_canvas_clipped(&content, 0, 0, 1.0, surface.to_canvas_rect(item.bounds()));
         }
         UiNode::Text(text_node) => {
             draw_text(canvas, text_node, bounds, surface, status_target, status);

@@ -85,6 +85,12 @@ inertia, wrapping, transforms, z-index, animation, pointer capture, text
 editing, or implicit native behavior. See `docs/SCROLLING.md` and Decision
 0038.
 
+Every visible `UiLayoutItem` carries both clipped `bounds` and un-clipped
+`paint_bounds`. Renderers draw the latter then clip their own output to the
+former; hit testing, focus, and accessibility use only `bounds`. This preserves
+the original shape and text position of an item that is only partly visible in
+a scroll viewport.
+
 ## Focus traversal
 
 `UiFocus` keeps one optional focus target for a specific `UiLayout`. Its
