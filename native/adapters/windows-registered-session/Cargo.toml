@@ -1,0 +1,13 @@
+[package]
+name = "anodrel-windows-registered-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-windows-pipe = { path = "../windows-pipe" }
+anodrel-windows-policy = { path = "../windows-policy" }
+
+[dev-dependencies]
+anodrel-protocol = { path = "../../crates/protocol" }

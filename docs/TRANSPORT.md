@@ -88,7 +88,9 @@ The host compares the token without an early exit. For a registered
 application, the host must create its policy before the pipe session by mapping
 only the already validated machine record through `anodrel-session-policy`.
 Neither this handshake nor its bootstrap invitation carries an application ID
-or capability grant.
+or capability grant. `anodrel-windows-registered-session` is the Windows
+composition adapter for that policy and endpoint creation; its caller still
+starts `serve_one` on a worker and securely delivers the separate invitation.
 
 The invitation is sensitive bootstrap material. It must not pass through
 command-line arguments, environment variables, logs, or a predictable on-disk

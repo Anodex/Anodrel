@@ -103,6 +103,12 @@ only the record's application ID and its strict machine-selected capability
 array. The adapter does not create the pipe, bootstrap a child, launch a
 process, or make a record visible to an application.
 
+`anodrel-windows-registered-session` composes this derived policy with the
+owner-restricted Windows pipe listener. It returns the listener and its
+separate sensitive invitation, but does not begin I/O, launch the executable,
+or deliver the invitation. The native host must still perform locked executable
+and signer verification before using the private bootstrap adapter.
+
 ## Compatibility and failures
 
 Records are exact at their declared version because they influence process

@@ -21,6 +21,8 @@ anodrel-windows-policy -> anodrel-application
 
 anodrel-session-policy -> anodrel-application / anodrel-core
 
+anodrel-windows-registered-session -> anodrel-windows-policy / anodrel-windows-pipe
+
 anodrel-windows-launch -> anodrel-windows-policy / anodrel-windows-signature
                         -> anodrel-windows-bootstrap / Kernel32
 
@@ -62,6 +64,10 @@ anodrel-json -> anodrel-application -> anodrel-windows-host
   ID and machine-selected capabilities into one `anodrel-core` host policy. It
   does not select policy storage, launch a process, create a transport, or
   accept grants from an application-facing value.
+- `adapters/windows-registered-session` derives that host policy from the
+  fixed Windows machine store and creates one owner-restricted named-pipe
+  endpoint. It leaves process launch, invitation delivery, and worker-thread
+  pipe service to their dedicated adapters.
 - `adapters/windows-launch` is the host-only registered-process service. It
   locks the policy-approved executable, revalidates its digest and signer,
   launches no shell or application arguments, delivers one private bootstrap

@@ -183,6 +183,12 @@ authority; platform adapters select the record before calling it. A version
 1.0 record produces no grants, while version 1.1 uses only its strict validated
 capability array. See Decision 0023.
 
+`anodrel-windows-registered-session` is the Windows composition boundary for
+that policy and the owner-restricted named-pipe adapter. It returns an endpoint
+and a separate sensitive invitation, but does not start a process, deliver the
+invitation, or perform pipe I/O. Those remain explicit caller-owned lifecycle
+steps.
+
 ## Communication model
 
 The application-to-host boundary must use a documented, versioned protocol.
