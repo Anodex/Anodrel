@@ -1,7 +1,8 @@
 # Anodrel file-dialog foundation
 
-**Status:** Portable open-dialog values and the direct Windows adapter are
-implemented; the protocol capability remains deferred.
+**Status:** Portable open-dialog values, a direct Windows adapter, and a
+bounded UI-thread request bridge are implemented; the protocol capability
+remains deferred.
 
 ## Boundary
 
@@ -10,6 +11,12 @@ application supplies no native window handle, initial directory, raw filter
 string, file-system path, multiple-selection flag, save location, or dialog
 flag. Hosts later select a documented dialog configuration and return either a
 bounded selected path or cancellation.
+
+The application or pipe worker never invokes a native dialog. A
+`FileDialogMailbox` holds at most one request, lets the host UI thread take it,
+and waits only for that UI thread to complete or safely fail it. It times out
+after two minutes and has no queue or history. A selected path remains data; it
+does not grant file read, write, enumeration, handle access, or process launch.
 
 ## Portable values
 
@@ -23,6 +30,6 @@ bounded selected path or cancellation.
 
 ## Deferred
 
-The Windows Common Dialog adapter, session-bound `dialog.open_file` capability,
-initial-directory policy, file access, save dialogs, folder dialogs, multiple
-selection, confirmation UI, and non-Windows adapters need separate decisions.
+The session-bound `dialog.open_file` capability, initial-directory policy, file
+access, save dialogs, folder dialogs, multiple selection, confirmation UI, and
+non-Windows adapters need separate decisions.

@@ -14,6 +14,7 @@ Each record should include:
 Current records (newest first):
 
 - 0044: File dialogs start with bounded portable values.
+- 0045: Modal file dialogs cross through a bounded UI-thread bridge.
 
 - 0043: External link protocol access is capability-checked.
 

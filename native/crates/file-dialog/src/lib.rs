@@ -1,12 +1,21 @@
 //! Bounded portable values for host-owned file dialogs.
 //!
 //! This crate has no operating-system dialog, filesystem, or protocol call.
-//! See `docs/FILE_DIALOGS.md` and Decision 0044.
+//! Its bounded mailbox can hand one modal request to a host UI thread without
+//! allowing the protocol worker to invoke a native dialog directly.
+//! See `docs/FILE_DIALOGS.md` and Decisions 0044 and 0045.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod mailbox;
+
 use std::{fmt, path::PathBuf};
+
+pub use mailbox::{
+    FileDialogMailbox, FileDialogRequest, FileDialogSelection, FileDialogService,
+    FileDialogServiceError,
+};
 
 /// Maximum number of extensions in one filter.
 pub const MAX_FILTER_EXTENSIONS: usize = 8;

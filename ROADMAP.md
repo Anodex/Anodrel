@@ -101,8 +101,9 @@ Status: **Direct Windows host in progress**
   0043). Rich clipboard formats, consent, subscriptions, custom link schemes,
   and non-Windows adapters remain deferred. The file-dialog foundation defines
   strict portable filters and bounded selected-path values (Decision 0044),
-  with a direct Windows open-file adapter. File access and the protocol
-  capability remain deferred.
+  with a direct Windows open-file adapter and a bounded UI-thread request
+  bridge (Decision 0045). File access and the protocol capability remain
+  deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded
