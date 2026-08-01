@@ -26,6 +26,7 @@ use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_core::SessionCloseSignal;
 use anodrel_diagnostics::{Event, LogBook};
+use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_instance::PrimaryInstance;
@@ -460,6 +461,7 @@ pub fn run_ui_session(
     mailbox: UiDocumentMailbox,
     input_mailbox: UiInputMailbox,
     close_signal: SessionCloseSignal,
+    file_dialog_mailbox: FileDialogMailbox,
 ) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
@@ -471,6 +473,7 @@ pub fn run_ui_session(
                 mailbox,
                 input_mailbox,
                 close_signal,
+                file_dialog_mailbox,
             )),
         }],
         None,
@@ -1196,6 +1199,11 @@ unsafe extern "system" fn window_proc(
                 if changed {
                     invalidate(window);
                 }
+            }
+            if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
+                let selection =
+                    anodrel_windows_file_dialog::open_file_with_owner(window, request.filters());
+                let _ = registry::complete_file_dialog_request(window, request.id(), selection);
             }
             0
         }

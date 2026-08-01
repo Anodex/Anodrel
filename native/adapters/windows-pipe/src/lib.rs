@@ -15,12 +15,27 @@ use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
 use anodrel_external_links::ExternalLinkService;
+use anodrel_file_dialog::{
+    FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
+};
 use anodrel_transport::{
     SessionCredentials, TransportSession, UiDocumentMailbox, UiInputMailbox, authentication_message,
 };
 use anodrel_wire::encode_json;
 
 use crate::{raw::PIPE_BUFFER_BYTES, security::CurrentSessionSecurity};
+
+#[derive(Debug)]
+struct UnavailableFileDialogs;
+
+impl FileDialogService for UnavailableFileDialogs {
+    fn open_file(
+        &self,
+        _filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        Err(FileDialogServiceError::Unavailable)
+    }
+}
 
 pub struct SessionInvitation {
     pipe_name: String,
@@ -266,8 +281,33 @@ impl WindowsPipeServer {
         clipboard: impl ClipboardService + 'static,
         external_links: impl ExternalLinkService + 'static,
     ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_with_session_components_and_all_services(
+            policy,
+            session_id,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            UnavailableFileDialogs,
+        )
+    }
+
+    /// Creates one endpoint with all platform services for its authenticated
+    /// application session.
+    #[allow(clippy::too_many_arguments)] // The host supplies each session-bound service explicitly.
+    pub fn create_with_session_components_and_all_services(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
         Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_services(
+            TransportSession::with_session_components_and_all_services(
                 policy,
                 credentials,
                 ui_document_mailbox,
@@ -275,6 +315,7 @@ impl WindowsPipeServer {
                 session_close_signal,
                 clipboard,
                 external_links,
+                file_dialogs,
             )
         })
     }

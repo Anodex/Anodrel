@@ -4,6 +4,7 @@ import {
   isCancellationEnvelope,
   isClipboardWritePayload,
   isExternalOpenPayload,
+  isFileDialogOpenPayload,
   isEmptyPayload,
   isUiDocumentReplacePayload,
   isPingPayload,
@@ -347,6 +348,31 @@ export class MockHost {
           );
         }
         return this.success("external.open", request.requestId, { status: "opened" });
+
+      case "dialog.open_file":
+        if (request.protocolVersion.minor < 7) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "dialog.open_file requires protocol 1.7 or later.",
+          );
+        }
+        if (!isFileDialogOpenPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "dialog.open_file requires strict bounded filters.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "dialog.open_file")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "dialog.open_file requires the dialog.open_file capability.",
+            { capability: "dialog.open_file" },
+          );
+        }
+        return this.success("dialog.open_file", request.requestId, { status: "cancelled" });
 
       default:
         return this.failure(

@@ -6,7 +6,17 @@ use anodrel_file_dialog::{FileDialogFilter, SelectedFilePath};
 pub fn open_file(
     filters: &[FileDialogFilter],
 ) -> Result<Option<SelectedFilePath>, FileDialogError> {
-    raw::open_file(filters).map_err(|_| FileDialogError::Unavailable)
+    open_file_with_owner(0, filters)
+}
+/// Opens one host-owned picker attached to the supplied host window.
+///
+/// The owner is selected only by trusted host code; applications never pass a
+/// native handle through Anodrel's protocol.
+pub fn open_file_with_owner(
+    owner_window: isize,
+    filters: &[FileDialogFilter],
+) -> Result<Option<SelectedFilePath>, FileDialogError> {
+    raw::open_file(owner_window, filters).map_err(|_| FileDialogError::Unavailable)
 }
 /// Safe Windows file-dialog failure category.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

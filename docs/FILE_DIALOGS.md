@@ -1,8 +1,8 @@
 # Anodrel file-dialog foundation
 
 **Status:** Portable open-dialog values, a direct Windows adapter, and a
-bounded UI-thread request bridge are implemented; the protocol capability
-remains deferred.
+bounded UI-thread request bridge are implemented. Protocol 1.7 exposes the
+session-bound `dialog.open_file` capability through that bridge.
 
 ## Boundary
 
@@ -30,6 +30,5 @@ does not grant file read, write, enumeration, handle access, or process launch.
 
 ## Deferred
 
-The session-bound `dialog.open_file` capability, initial-directory policy, file
-access, save dialogs, folder dialogs, multiple selection, confirmation UI, and
-non-Windows adapters need separate decisions.
+Initial-directory policy, file access, save dialogs, folder dialogs, multiple
+selection, confirmation UI, and non-Windows adapters need separate decisions.

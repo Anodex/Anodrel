@@ -3,13 +3,15 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 6 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 7 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
 export const MAX_UI_DOCUMENT_REQUEST_BYTES = 24 * 1024;
 export const MAX_CLIPBOARD_TEXT_REQUEST_BYTES = 24 * 1024;
 export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
+export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
+export const MAX_FILE_DIALOG_FILTERS = 8;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -24,7 +26,8 @@ export type Capability =
   | "session.close"
   | "clipboard.read"
   | "clipboard.write"
-  | "external.open";
+  | "external.open"
+  | "dialog.open_file";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -81,6 +84,14 @@ export interface PlatformOperationMap {
   "external.open": {
     readonly payload: { readonly url: string };
     readonly result: { readonly status: "opened" };
+  };
+  "dialog.open_file": {
+    readonly payload: {
+      readonly filters: readonly { readonly label: string; readonly extensions: readonly string[] }[];
+    };
+    readonly result:
+      | { readonly status: "selected"; readonly path: string }
+      | { readonly status: "cancelled" };
   };
 }
 
@@ -149,7 +160,8 @@ export type ProtocolErrorCode =
   | "clipboard.unavailable"
   | "clipboard.text_invalid"
   | "clipboard.text_too_large"
-  | "external.unavailable";
+  | "external.unavailable"
+  | "dialog.unavailable";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -293,6 +305,39 @@ export function isExternalOpenPayload(
     typeof value.url === "string" &&
     new TextEncoder().encode(value.url).byteLength <= MAX_EXTERNAL_LINK_REQUEST_BYTES &&
     isValidatedHttpsUrl(value.url)
+  );
+}
+
+/** Validates strict structured filters for one host-owned file picker. */
+export function isFileDialogOpenPayload(
+  value: unknown,
+): value is PayloadFor<"dialog.open_file"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    Array.isArray(value.filters) &&
+    value.filters.length > 0 &&
+    value.filters.length <= MAX_FILE_DIALOG_FILTERS &&
+    new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_FILE_DIALOG_REQUEST_BYTES &&
+    value.filters.every(isFileDialogFilter)
+  );
+}
+
+function isFileDialogFilter(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    typeof value.label === "string" &&
+    value.label.length > 0 &&
+    value.label.length <= 64 &&
+    /^[\x20-\x7e]+$/.test(value.label) &&
+    Array.isArray(value.extensions) &&
+    value.extensions.length > 0 &&
+    value.extensions.length <= 8 &&
+    value.extensions.every(
+      (extension) =>
+        typeof extension === "string" && extension.length > 0 && extension.length <= 16 && /^[a-z0-9]+$/.test(extension),
+    )
   );
 }
 

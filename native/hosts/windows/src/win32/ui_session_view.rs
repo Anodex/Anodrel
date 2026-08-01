@@ -2,6 +2,7 @@
 
 use anodrel_canvas::Point;
 use anodrel_core::SessionCloseSignal;
+use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{UiDocumentMailbox, UiDocumentRevision, UiInputCandidate, UiInputMailbox};
 
@@ -14,6 +15,7 @@ pub(super) struct UiSessionView {
     mailbox: UiDocumentMailbox,
     input_mailbox: UiInputMailbox,
     close_signal: SessionCloseSignal,
+    file_dialog_mailbox: FileDialogMailbox,
     revision: UiDocumentRevision,
 }
 
@@ -23,12 +25,14 @@ impl UiSessionView {
         mailbox: UiDocumentMailbox,
         input_mailbox: UiInputMailbox,
         close_signal: SessionCloseSignal,
+        file_dialog_mailbox: FileDialogMailbox,
     ) -> Self {
         Self {
             lab: UiLab::waiting_for_session(),
             mailbox,
             input_mailbox,
             close_signal,
+            file_dialog_mailbox,
             revision: UiDocumentRevision::INITIAL,
         }
     }
@@ -45,6 +49,23 @@ impl UiSessionView {
         self.revision = snapshot.revision();
         self.lab.replace_document(snapshot.document().clone());
         (true, close_requested)
+    }
+
+    /// Takes a pending modal request for the host UI thread.
+    pub(super) fn take_file_dialog_request(&self) -> Option<FileDialogRequest> {
+        self.file_dialog_mailbox.take()
+    }
+
+    /// Completes a modal request after the host UI thread returns from Windows.
+    pub(super) fn complete_file_dialog_request(
+        &self,
+        request_id: u64,
+        selection: Result<FileDialogSelection, anodrel_windows_file_dialog::FileDialogError>,
+    ) -> bool {
+        match selection {
+            Ok(selection) => self.file_dialog_mailbox.complete(request_id, selection),
+            Err(_) => self.file_dialog_mailbox.fail(request_id),
+        }
     }
 
     /// Updates hover state through this view's current native layout.
@@ -121,6 +142,7 @@ impl UiSessionView {
 #[cfg(test)]
 mod tests {
     use anodrel_core::SessionCloseSignal;
+    use anodrel_file_dialog::FileDialogMailbox;
     use anodrel_ui::UiEvent;
     use anodrel_ui_session::{UiDocumentMailbox, UiDocumentSession, UiInputMailbox};
 
@@ -137,6 +159,7 @@ mod tests {
             mailbox.clone(),
             UiInputMailbox::new(),
             SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
         );
         let mut session = UiDocumentSession::new();
         session
@@ -155,6 +178,7 @@ mod tests {
             UiDocumentMailbox::new(),
             UiInputMailbox::new(),
             signal.clone(),
+            FileDialogMailbox::new(),
         );
 
         assert_eq!(view.poll(), (false, false));
@@ -171,6 +195,7 @@ mod tests {
             mailbox.clone(),
             inputs.clone(),
             SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
         );
         let mut session = UiDocumentSession::new();
         session
@@ -201,6 +226,7 @@ mod tests {
             mailbox.clone(),
             UiInputMailbox::new(),
             SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
         );
         let mut session = UiDocumentSession::new();
         session

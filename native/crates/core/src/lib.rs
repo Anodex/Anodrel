@@ -18,6 +18,9 @@ use std::{
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
+use anodrel_file_dialog::{
+    FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
+};
 use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
@@ -28,6 +31,8 @@ pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
 pub const MAX_CLIPBOARD_TEXT_REQUEST_BYTES: usize = 24 * 1024;
 pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
+pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
+pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
 
 /// One host-created, coalescing request to end an authenticated session.
 ///
@@ -96,6 +101,7 @@ pub struct CoreHost {
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
+    file_dialogs: Box<dyn FileDialogService>,
 }
 
 #[derive(Debug)]
@@ -120,6 +126,18 @@ impl ExternalLinkService for UnavailableExternalLinks {
     }
 }
 
+#[derive(Debug)]
+struct UnavailableFileDialogs;
+
+impl FileDialogService for UnavailableFileDialogs {
+    fn open_file(
+        &self,
+        _filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        Err(FileDialogServiceError::Unavailable)
+    }
+}
+
 impl CoreHost {
     pub fn new(policy: HostPolicy) -> Self {
         Self::with_session_components(policy, UiInputMailbox::new(), SessionCloseSignal::default())
@@ -137,12 +155,13 @@ impl CoreHost {
         ui_input_mailbox: UiInputMailbox,
         session_close_signal: SessionCloseSignal,
     ) -> Self {
-        Self::with_session_components_and_services(
+        Self::with_session_components_and_all_services(
             policy,
             ui_input_mailbox,
             session_close_signal,
             UnavailableClipboard,
             UnavailableExternalLinks,
+            UnavailableFileDialogs,
         )
     }
 
@@ -154,12 +173,13 @@ impl CoreHost {
         session_close_signal: SessionCloseSignal,
         clipboard: impl ClipboardService + 'static,
     ) -> Self {
-        Self::with_session_components_and_services(
+        Self::with_session_components_and_all_services(
             policy,
             ui_input_mailbox,
             session_close_signal,
             clipboard,
             UnavailableExternalLinks,
+            UnavailableFileDialogs,
         )
     }
 
@@ -172,6 +192,27 @@ impl CoreHost {
         clipboard: impl ClipboardService + 'static,
         external_links: impl ExternalLinkService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            UnavailableFileDialogs,
+        )
+    }
+
+    /// Creates a host core with all currently supported injected platform
+    /// services. Dialog implementations must route native UI through the host
+    /// UI thread rather than invoking an OS dialog from this core.
+    pub fn with_session_components_and_all_services(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
@@ -180,6 +221,7 @@ impl CoreHost {
             pending_ui_document_update: RefCell::new(None),
             clipboard: Box::new(clipboard),
             external_links: Box::new(external_links),
+            file_dialogs: Box::new(file_dialogs),
         }
     }
 
@@ -256,6 +298,9 @@ impl CoreHost {
             }
             "external.open" if request.protocol_version.minor >= 6 => {
                 self.handle_external_open(request)
+            }
+            "dialog.open_file" if request.protocol_version.minor >= 7 => {
+                self.handle_file_dialog_open(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -602,6 +647,52 @@ impl CoreHost {
         }
     }
 
+    fn handle_file_dialog_open(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(filters) = file_dialog_open_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.open_file requires strict bounded filters.",
+                None,
+            );
+        };
+        if request.payload.to_json().len() > MAX_FILE_DIALOG_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.open_file filters exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::DialogOpenFile) {
+            return self.capability_denied(request.request_id, "dialog.open_file");
+        }
+        match self.file_dialogs.open_file(&filters) {
+            Ok(FileDialogSelection::Selected(path)) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("selected".to_owned())),
+                    (
+                        "path",
+                        JsonValue::String(path.as_path().to_string_lossy().into_owned()),
+                    ),
+                ]),
+            ),
+            Ok(FileDialogSelection::Cancelled) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("cancelled".to_owned()))]),
+            ),
+            Err(FileDialogServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::DialogUnavailable,
+                "file dialog is unavailable.",
+                None,
+            ),
+        }
+    }
+
     fn capability_denied(&self, request_id: String, capability: &str) -> JsonValue {
         self.failure(
             request_id,
@@ -694,6 +785,37 @@ fn external_open_payload(value: &JsonValue) -> Option<&str> {
         .then(|| fields.get("url"))
         .flatten()
         .and_then(JsonValue::as_string)
+}
+
+fn file_dialog_open_payload(value: &JsonValue) -> Option<Vec<FileDialogFilter>> {
+    let fields = value.as_object()?;
+    if fields.len() != 1 {
+        return None;
+    }
+    let JsonValue::Array(filters) = fields.get("filters")? else {
+        return None;
+    };
+    if filters.is_empty() || filters.len() > MAX_FILE_DIALOG_FILTERS {
+        return None;
+    }
+    filters
+        .iter()
+        .map(|filter| {
+            let fields = filter.as_object()?;
+            if fields.len() != 2 {
+                return None;
+            }
+            let label = fields.get("label")?.as_string()?.to_owned();
+            let JsonValue::Array(extensions) = fields.get("extensions")? else {
+                return None;
+            };
+            let extensions = extensions
+                .iter()
+                .map(|extension| extension.as_string().map(str::to_owned))
+                .collect::<Option<Vec<_>>>()?;
+            FileDialogFilter::new(label, extensions).ok()
+        })
+        .collect()
 }
 
 fn rfc3339_now() -> String {
@@ -814,6 +936,18 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct CancellingFileDialog;
+
+    impl FileDialogService for CancellingFileDialog {
+        fn open_file(
+            &self,
+            _filters: &[FileDialogFilter],
+        ) -> Result<FileDialogSelection, FileDialogServiceError> {
+            Ok(FileDialogSelection::Cancelled)
+        }
+    }
+
     fn clipboard_host(
         grants: Vec<Capability>,
         clipboard: impl ClipboardService + 'static,
@@ -836,6 +970,20 @@ mod tests {
             SessionCloseSignal::default(),
             MemoryClipboard::with_text(None),
             external_links,
+        )
+    }
+
+    fn file_dialog_host(
+        grants: Vec<Capability>,
+        dialogs: impl FileDialogService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_session_components_and_all_services(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            MemoryClipboard::with_text(None),
+            FailingExternalLinks,
+            dialogs,
         )
     }
 
@@ -878,6 +1026,12 @@ mod tests {
     fn request_v1_6(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":6}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_7(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":7}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -1266,6 +1420,42 @@ mod tests {
             field(field(&response, "error"), "message")
                 .as_string()
                 .is_some_and(|message| !message.contains("private"))
+        );
+    }
+
+    #[test]
+    fn file_dialog_requires_its_own_grant_and_returns_only_cancellation_or_a_path() {
+        let accepted_host =
+            file_dialog_host(vec![Capability::DialogOpenFile], CancellingFileDialog);
+        let accepted = JsonValue::parse(&accepted_host.handle_json(&request_v1_7(
+            "dialog.open_file",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("dialog response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "status").as_string(),
+            Some("cancelled")
+        );
+
+        let denied = JsonValue::parse(&host(vec![]).handle_json(&request_v1_7(
+            "dialog.open_file",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("denied dialog response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&accepted_host.handle_json(&request_v1_7(
+            "dialog.open_file",
+            r#"{"filters":[{"label":"Raw","extensions":["*.txt"]}]}"#,
+        )))
+        .expect("invalid dialog response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
         );
     }
 

@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.6
+**Status:** Foundation contract, version 1.7
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -29,7 +29,7 @@ of this protocol.
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
 the host's. Version 1.6 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 6}`.
+`{"major": 1, "minor": 7}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -67,6 +67,24 @@ The current operations are:
 | `clipboard.read` | `{}` | bounded Unicode text or no text | `clipboard.read` |
 | `clipboard.write` | `{ "text": string }` | accepted write | `clipboard.write` |
 | `external.open` | `{ "url": string }` | accepted operating-system handoff | `external.open` |
+| `dialog.open_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path or cancellation | `dialog.open_file` |
+
+### `dialog.open_file`
+
+Protocol 1.7 adds one host-owned open-file picker. It requires the host-issued
+`dialog.open_file` capability and accepts exactly one `filters` array of one to
+eight structured filters. Every filter has an ASCII non-control label of at
+most 64 bytes and one to eight lowercase ASCII alphanumeric extensions of at
+most 16 bytes. The full encoded payload is limited to **2 KiB**.
+
+The result is either `{ "status": "selected", "path": string }` or
+`{ "status": "cancelled" }`. A selected absolute path is opaque application
+data, not filesystem authority; it does not allow reading, writing, directory
+enumeration, process launch, or native-handle access. The native host displays
+the modal picker on its own UI thread and may return only `dialog.unavailable`
+when it cannot service the request. It exposes no raw Windows error, initial
+directory, owner window, dialog flags, native handle, saved-history choice, or
+path in a failure or diagnostic.
 
 ### `external.open`
 
@@ -248,6 +266,7 @@ Version 1 defines these stable error codes: `capability.denied`,
 suitable for a developer log but must not contain secrets, raw paths, native
 errors, clipboard text, or external-link URLs. Protocol 1.6 adds
 `external.unavailable`.
+Protocol 1.7 adds `dialog.unavailable`.
 
 ## Cancellation and events
 

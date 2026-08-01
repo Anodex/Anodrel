@@ -13,6 +13,7 @@ Each record should include:
 
 Current records (newest first):
 
+- 0046: Open-file dialogs use a dedicated session capability.
 - 0044: File dialogs start with bounded portable values.
 - 0045: Modal file dialogs cross through a bounded UI-thread bridge.
 

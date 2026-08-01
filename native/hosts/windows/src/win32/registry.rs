@@ -7,6 +7,7 @@ use std::{
 };
 
 use super::{Hwnd, StartupLab, View, ui_lab::UiLab};
+use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 
@@ -62,6 +63,39 @@ pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<(bool, bool)>> 
     let mut views = lock_views()?;
     match views.get_mut(&window) {
         Some(View::UiSession(session)) => Ok(Some(session.poll())),
+        _ => Ok(None),
+    }
+}
+
+/// Takes one pending modal dialog request only from its associated UI session.
+pub(super) fn take_file_dialog_request(window: Hwnd) -> io::Result<Option<FileDialogRequest>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_file_dialog_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one request from its owning native UI session.
+pub(super) fn complete_file_dialog_request(
+    window: Hwnd,
+    request_id: u64,
+    selection: Result<
+        Option<anodrel_file_dialog::SelectedFilePath>,
+        anodrel_windows_file_dialog::FileDialogError,
+    >,
+) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.complete_file_dialog_request(
+            request_id,
+            selection.map(|path| {
+                path.map_or(
+                    FileDialogSelection::Cancelled,
+                    FileDialogSelection::Selected,
+                )
+            }),
+        ))),
         _ => Ok(None),
     }
 }

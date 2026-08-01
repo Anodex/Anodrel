@@ -8,6 +8,7 @@ license.workspace = true
 anodrel-clipboard = { path = "../clipboard" }
 anodrel-core = { path = "../core" }
 anodrel-external-links = { path = "../external-links" }
+anodrel-file-dialog = { path = "../file-dialog" }
 anodrel-protocol = { path = "../protocol" }
 anodrel-ui-session = { path = "../ui-session" }
 anodrel-wire = { path = "../wire" }

@@ -201,12 +201,11 @@ The native-host decision must extend this model with:
 
 No application-facing filesystem, process, credential, dialog, notification,
 or external-link operation may be implemented until its contract and these
-host-specific controls are documented and tested. The bounded text clipboard is
-the explicit current application-facing exception: `docs/CLIPBOARD.md`,
-Decisions 0040 and 0041, capability checks, portable and native-boundary tests,
-and the authenticated transport integration test define and verify its
-development-session exposure. The external-link exception is likewise bounded:
-`docs/EXTERNAL_LINKS.md`, Decisions 0042 and 0043, the `external.open`
-capability, portable and native-boundary tests, and the authenticated transport
-integration test define and verify a validated HTTPS handoff. Production
-executable trust, consent, and richer platform features remain separate gates.
+host-specific controls are documented and tested. The bounded text clipboard,
+validated external links, and UI-thread-routed open-file dialog are the current
+application-facing exceptions: `docs/CLIPBOARD.md`, `docs/EXTERNAL_LINKS.md`,
+and `docs/FILE_DIALOGS.md` define their separate controls.
+Decisions 0040 through 0046, capability checks, portable and native-boundary
+tests, and authenticated transport coverage define and verify their
+development-session exposure. Production executable trust, consent, and richer
+platform features remain separate gates.

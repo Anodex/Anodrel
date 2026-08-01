@@ -36,12 +36,15 @@ unsafe extern "system" {
     fn GetOpenFileNameW(value: *mut OpenFileNameW) -> i32;
     fn CommDlgExtendedError() -> u32;
 }
-pub(super) fn open_file(filters: &[FileDialogFilter]) -> Result<Option<SelectedFilePath>, ()> {
+pub(super) fn open_file(
+    owner_window: isize,
+    filters: &[FileDialogFilter],
+) -> Result<Option<SelectedFilePath>, ()> {
     let filter = filter_string(filters);
     let mut file = vec![0_u16; MAX_PATH_UNITS];
     let mut value = OpenFileNameW {
         l_struct_size: mem::size_of::<OpenFileNameW>() as u32,
-        hwnd_owner: 0,
+        hwnd_owner: owner_window,
         h_instance: 0,
         filter: filter.as_ptr(),
         custom_filter: ptr::null_mut(),

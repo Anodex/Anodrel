@@ -11,6 +11,9 @@ use std::fmt;
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
 use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
+use anodrel_file_dialog::{
+    FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
+};
 use anodrel_protocol::{JsonValue, object};
 pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
@@ -156,6 +159,18 @@ impl ExternalLinkService for TransportUnavailableExternalLinks {
 }
 
 #[derive(Debug)]
+struct TransportUnavailableFileDialogs;
+
+impl FileDialogService for TransportUnavailableFileDialogs {
+    fn open_file(
+        &self,
+        _filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        Err(FileDialogServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
 pub struct TransportSession {
     decoder: FrameDecoder,
     host: CoreHost,
@@ -252,14 +267,39 @@ impl TransportSession {
         clipboard: impl ClipboardService + 'static,
         external_links: impl ExternalLinkService + 'static,
     ) -> Self {
+        Self::with_session_components_and_all_services(
+            policy,
+            credentials,
+            ui_document_mailbox,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            external_links,
+            TransportUnavailableFileDialogs,
+        )
+    }
+
+    /// Creates one session with all injected platform services.
+    #[allow(clippy::too_many_arguments)] // Explicit per-session native service seams stay visible.
+    pub fn with_session_components_and_all_services(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+        file_dialogs: impl FileDialogService + 'static,
+    ) -> Self {
         Self {
             decoder: FrameDecoder::new(),
-            host: CoreHost::with_session_components_and_services(
+            host: CoreHost::with_session_components_and_all_services(
                 policy,
                 ui_input_mailbox,
                 session_close_signal,
                 clipboard,
                 external_links,
+                file_dialogs,
             ),
             ui_document_mailbox,
             state: SessionState::Pending(credentials),
