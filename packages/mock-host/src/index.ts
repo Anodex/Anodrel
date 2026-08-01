@@ -3,6 +3,7 @@ import {
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   isCancellationEnvelope,
   isClipboardWritePayload,
+  isExternalOpenPayload,
   isEmptyPayload,
   isUiDocumentReplacePayload,
   isPingPayload,
@@ -321,6 +322,31 @@ export class MockHost {
         }
         this.clipboardText = request.payload.text;
         return this.success("clipboard.write", request.requestId, { status: "written" });
+
+      case "external.open":
+        if (request.protocolVersion.minor < 6) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "external.open requires protocol 1.6 or later.",
+          );
+        }
+        if (!isExternalOpenPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "external.open requires one bounded URL string.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "external.open")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "external.open requires the external.open capability.",
+            { capability: "external.open" },
+          );
+        }
+        return this.success("external.open", request.requestId, { status: "opened" });
 
       default:
         return this.failure(

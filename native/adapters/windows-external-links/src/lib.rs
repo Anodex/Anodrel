@@ -8,26 +8,19 @@
 
 mod raw;
 
-use std::fmt;
+use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 
-use anodrel_external_links::ExternalLink;
+/// Direct Windows external-link service.
+#[derive(Debug, Default)]
+pub struct WindowsExternalLinks;
+
+impl ExternalLinkService for WindowsExternalLinks {
+    fn open(&self, link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
+        open(link)
+    }
+}
 
 /// Opens one validated HTTPS link through the ordinary Windows association.
 pub fn open(link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
     raw::open(link.as_str()).map_err(|_| ExternalLinkOpenError::Unavailable)
 }
-
-/// A safe category for a Windows external-link opening failure.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ExternalLinkOpenError {
-    /// Windows could not hand the link to an associated handler.
-    Unavailable,
-}
-
-impl fmt::Display for ExternalLinkOpenError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("external link handler is unavailable")
-    }
-}
-
-impl std::error::Error for ExternalLinkOpenError {}

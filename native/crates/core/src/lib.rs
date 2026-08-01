@@ -17,6 +17,7 @@ use std::{
 };
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
+use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
@@ -26,6 +27,7 @@ use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
 pub const MAX_CLIPBOARD_TEXT_REQUEST_BYTES: usize = 24 * 1024;
+pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
 
 /// One host-created, coalescing request to end an authenticated session.
 ///
@@ -93,6 +95,7 @@ pub struct CoreHost {
     session_close_signal: SessionCloseSignal,
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
     clipboard: Box<dyn ClipboardService>,
+    external_links: Box<dyn ExternalLinkService>,
 }
 
 #[derive(Debug)]
@@ -105,6 +108,15 @@ impl ClipboardService for UnavailableClipboard {
 
     fn write_text(&self, _text: &ClipboardText) -> Result<(), ClipboardServiceError> {
         Err(ClipboardServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableExternalLinks;
+
+impl ExternalLinkService for UnavailableExternalLinks {
+    fn open(&self, _link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
+        Err(ExternalLinkOpenError::Unavailable)
     }
 }
 
@@ -125,11 +137,12 @@ impl CoreHost {
         ui_input_mailbox: UiInputMailbox,
         session_close_signal: SessionCloseSignal,
     ) -> Self {
-        Self::with_session_components_and_clipboard(
+        Self::with_session_components_and_services(
             policy,
             ui_input_mailbox,
             session_close_signal,
             UnavailableClipboard,
+            UnavailableExternalLinks,
         )
     }
 
@@ -141,6 +154,24 @@ impl CoreHost {
         session_close_signal: SessionCloseSignal,
         clipboard: impl ClipboardService + 'static,
     ) -> Self {
+        Self::with_session_components_and_services(
+            policy,
+            ui_input_mailbox,
+            session_close_signal,
+            clipboard,
+            UnavailableExternalLinks,
+        )
+    }
+
+    /// Creates a host core with explicit native components and injected
+    /// portable clipboard and external-link services.
+    pub fn with_session_components_and_services(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+    ) -> Self {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
@@ -148,6 +179,7 @@ impl CoreHost {
             session_close_signal,
             pending_ui_document_update: RefCell::new(None),
             clipboard: Box::new(clipboard),
+            external_links: Box::new(external_links),
         }
     }
 
@@ -221,6 +253,9 @@ impl CoreHost {
             }
             "clipboard.write" if request.protocol_version.minor >= 5 => {
                 self.handle_clipboard_write(request)
+            }
+            "external.open" if request.protocol_version.minor >= 6 => {
+                self.handle_external_open(request)
             }
             _ => self.failure(
                 request.request_id,
@@ -521,6 +556,52 @@ impl CoreHost {
         }
     }
 
+    fn handle_external_open(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(url) = external_open_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "external.open requires one bounded URL string.",
+                None,
+            );
+        };
+        if url.len() > MAX_EXTERNAL_LINK_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "external.open URL exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::ExternalOpen) {
+            return self.capability_denied(request.request_id, "external.open");
+        }
+        let link = match ExternalLink::parse(url) {
+            Ok(link) => link,
+            Err(_) => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::RequestPayloadInvalid,
+                    "external.open URL is invalid.",
+                    None,
+                );
+            }
+        };
+        match self.external_links.open(&link) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("opened".to_owned()))]),
+            ),
+            Err(ExternalLinkOpenError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::ExternalUnavailable,
+                "external link handler is unavailable.",
+                None,
+            ),
+        }
+    }
+
     fn capability_denied(&self, request_id: String, capability: &str) -> JsonValue {
         self.failure(
             request_id,
@@ -607,6 +688,14 @@ fn clipboard_write_payload(value: &JsonValue) -> Option<&str> {
         .and_then(JsonValue::as_string)
 }
 
+fn external_open_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("url"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
 fn rfc3339_now() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -650,6 +739,7 @@ mod tests {
     use anodrel_clipboard::{
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
     };
+    use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
 
@@ -705,6 +795,25 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Default)]
+    struct RecordingExternalLinks(RefCell<Option<ExternalLink>>);
+
+    impl ExternalLinkService for RecordingExternalLinks {
+        fn open(&self, link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
+            *self.0.borrow_mut() = Some(link.clone());
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct FailingExternalLinks;
+
+    impl ExternalLinkService for FailingExternalLinks {
+        fn open(&self, _link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
+            Err(ExternalLinkOpenError::Unavailable)
+        }
+    }
+
     fn clipboard_host(
         grants: Vec<Capability>,
         clipboard: impl ClipboardService + 'static,
@@ -714,6 +823,19 @@ mod tests {
             UiInputMailbox::new(),
             SessionCloseSignal::default(),
             clipboard,
+        )
+    }
+
+    fn external_host(
+        grants: Vec<Capability>,
+        external_links: impl ExternalLinkService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_session_components_and_services(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            MemoryClipboard::with_text(None),
+            external_links,
         )
     }
 
@@ -750,6 +872,12 @@ mod tests {
     fn request_v1_5(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":5}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_6(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":6}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -1081,6 +1209,63 @@ mod tests {
             field(field(&response, "error"), "message")
                 .as_string()
                 .is_some_and(|message| !message.contains("before"))
+        );
+    }
+
+    #[test]
+    fn external_open_requires_its_own_grant_and_validated_https_url() {
+        let external_host = external_host(
+            vec![Capability::ExternalOpen],
+            RecordingExternalLinks::default(),
+        );
+        let accepted = JsonValue::parse(&external_host.handle_json(&request_v1_6(
+            "external.open",
+            r#"{"url":"https://docs.anodrel.dev/guide"}"#,
+        )))
+        .expect("external open response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "status").as_string(),
+            Some("opened")
+        );
+
+        let denied = JsonValue::parse(&host(vec![]).handle_json(&request_v1_6(
+            "external.open",
+            r#"{"url":"https://docs.anodrel.dev/guide"}"#,
+        )))
+        .expect("denied external open response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&external_host.handle_json(&request_v1_6(
+            "external.open",
+            r#"{"url":"file:///C:/private.txt"}"#,
+        )))
+        .expect("invalid external open response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+    }
+
+    #[test]
+    fn external_service_failure_never_exposes_a_url_or_native_status() {
+        let host = external_host(vec![Capability::ExternalOpen], FailingExternalLinks);
+        let response = JsonValue::parse(&host.handle_json(&request_v1_6(
+            "external.open",
+            r#"{"url":"https://docs.anodrel.dev/private"}"#,
+        )))
+        .expect("external failure response is JSON");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("external.unavailable")
+        );
+        assert!(
+            field(field(&response, "error"), "message")
+                .as_string()
+                .is_some_and(|message| !message.contains("private"))
         );
     }
 

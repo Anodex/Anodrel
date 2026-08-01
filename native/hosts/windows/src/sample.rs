@@ -10,6 +10,7 @@ use anodrel_protocol::Capability;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
+use anodrel_windows_external_links::WindowsExternalLinks;
 use anodrel_windows_pipe::WindowsPipeServer;
 
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
@@ -45,18 +46,20 @@ fn run_with_optional_session_view(
             Capability::SessionClose,
             Capability::ClipboardRead,
             Capability::ClipboardWrite,
+            Capability::ExternalOpen,
         ],
         "anodrel-windows-host",
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
         Some((mailbox, input_mailbox, close_signal)) => {
-            WindowsPipeServer::create_with_session_components_and_clipboard(
+            WindowsPipeServer::create_with_session_components_and_services(
                 policy,
                 "sample-session",
                 mailbox.clone(),
                 input_mailbox.clone(),
                 close_signal.clone(),
                 WindowsClipboard::new(0),
+                WindowsExternalLinks,
             )?
         }
         None => WindowsPipeServer::create(policy, "sample-session")?,

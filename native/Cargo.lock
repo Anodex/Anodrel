@@ -39,6 +39,7 @@ name = "anodrel-core"
 version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
+ "anodrel-external-links",
  "anodrel-protocol",
  "anodrel-ui",
  "anodrel-ui-session",
@@ -102,6 +103,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-clipboard",
  "anodrel-core",
+ "anodrel-external-links",
  "anodrel-protocol",
  "anodrel-ui",
  "anodrel-ui-session",
@@ -176,6 +178,7 @@ dependencies = [
  "anodrel-ui-session",
  "anodrel-windows-bootstrap",
  "anodrel-windows-clipboard",
+ "anodrel-windows-external-links",
  "anodrel-windows-instance",
  "anodrel-windows-pipe",
  "anodrel-wire",
@@ -211,6 +214,7 @@ dependencies = [
  "anodrel-bootstrap",
  "anodrel-clipboard",
  "anodrel-core",
+ "anodrel-external-links",
  "anodrel-protocol",
  "anodrel-transport",
  "anodrel-wire",

@@ -49,6 +49,30 @@ impl ExternalLink {
     }
 }
 
+/// The portable service boundary used by a host core.
+///
+/// Implementations own the operating-system handoff. They must not construct
+/// shell commands, retain process handles, or log a link value.
+pub trait ExternalLinkService: fmt::Debug + Send {
+    /// Hands one previously validated HTTPS link to the operating system.
+    fn open(&self, link: &ExternalLink) -> Result<(), ExternalLinkOpenError>;
+}
+
+/// A safe failure category returned by an external-link service.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExternalLinkOpenError {
+    /// The operating system could not accept the HTTPS handoff.
+    Unavailable,
+}
+
+impl fmt::Display for ExternalLinkOpenError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("external link handler is unavailable")
+    }
+}
+
+impl std::error::Error for ExternalLinkOpenError {}
+
 fn validate_authority(authority: &str) -> Result<(), ExternalLinkInputError> {
     if authority.is_empty() || authority.contains('@') {
         return Err(ExternalLinkInputError::InvalidAuthority);

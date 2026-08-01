@@ -97,9 +97,9 @@ Status: **Direct Windows host in progress**
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and
   hands them directly to the Windows association with no command construction
-  (Decision 0042); its protocol capability remains deferred. Rich clipboard
-  formats, consent, subscriptions, custom link schemes, and non-Windows
-  adapters remain deferred.
+  through the separate Protocol 1.6 `external.open` grant (Decisions 0042 and
+  0043). Rich clipboard formats, consent, subscriptions, custom link schemes,
+  and non-Windows adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded

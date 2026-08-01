@@ -14,6 +14,7 @@ use std::{fmt, io, thread, time::Duration};
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
 use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_external_links::ExternalLinkService;
 use anodrel_transport::{
     SessionCredentials, TransportSession, UiDocumentMailbox, UiInputMailbox, authentication_message,
 };
@@ -250,6 +251,30 @@ impl WindowsPipeServer {
                 ui_input_mailbox,
                 session_close_signal,
                 clipboard,
+            )
+        })
+    }
+
+    /// Creates one endpoint with explicit native components and the portable
+    /// services required by its authenticated application session.
+    pub fn create_with_session_components_and_services(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        clipboard: impl ClipboardService + 'static,
+        external_links: impl ExternalLinkService + 'static,
+    ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_session_components_and_services(
+                policy,
+                credentials,
+                ui_document_mailbox,
+                ui_input_mailbox,
+                session_close_signal,
+                clipboard,
+                external_links,
             )
         })
     }

@@ -3,12 +3,13 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 5 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 6 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
 export const MAX_UI_DOCUMENT_REQUEST_BYTES = 24 * 1024;
 export const MAX_CLIPBOARD_TEXT_REQUEST_BYTES = 24 * 1024;
+export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -22,7 +23,8 @@ export type Capability =
   | "ui.events.read"
   | "session.close"
   | "clipboard.read"
-  | "clipboard.write";
+  | "clipboard.write"
+  | "external.open";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -75,6 +77,10 @@ export interface PlatformOperationMap {
   "clipboard.write": {
     readonly payload: { readonly text: string };
     readonly result: { readonly status: "written" };
+  };
+  "external.open": {
+    readonly payload: { readonly url: string };
+    readonly result: { readonly status: "opened" };
   };
 }
 
@@ -142,7 +148,8 @@ export type ProtocolErrorCode =
   | "request.payload_invalid"
   | "clipboard.unavailable"
   | "clipboard.text_invalid"
-  | "clipboard.text_too_large";
+  | "clipboard.text_too_large"
+  | "external.unavailable";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -273,6 +280,60 @@ export function isClipboardWritePayload(
     Object.keys(value).length === 1 &&
     typeof value.text === "string" &&
     new TextEncoder().encode(value.text).byteLength <= MAX_CLIPBOARD_TEXT_REQUEST_BYTES
+  );
+}
+
+/** Validates the exact bounded URL payload for an external HTTPS handoff. */
+export function isExternalOpenPayload(
+  value: unknown,
+): value is PayloadFor<"external.open"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.url === "string" &&
+    new TextEncoder().encode(value.url).byteLength <= MAX_EXTERNAL_LINK_REQUEST_BYTES &&
+    isValidatedHttpsUrl(value.url)
+  );
+}
+
+function isValidatedHttpsUrl(value: string): boolean {
+  if (value.length === 0 || !/^[\x21-\x7e]+$/.test(value) || value.includes("\\")) {
+    return false;
+  }
+  const match = /^https:\/\/([^/?#]+)(?:[/?#].*)?$/.exec(value);
+  if (match === null) {
+    return false;
+  }
+  const authority = match[1];
+  if (authority === undefined) {
+    return false;
+  }
+  if (authority.includes("@")) {
+    return false;
+  }
+  const separator = authority.lastIndexOf(":");
+  const host = separator === -1 ? authority : authority.slice(0, separator);
+  const port = separator === -1 ? undefined : authority.slice(separator + 1);
+  if (
+    !isDnsStyleHost(host) ||
+    (port !== undefined && (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65_535))
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isDnsStyleHost(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= 253 &&
+    !value.endsWith(".") &&
+    value.split(".").every(
+      (label) =>
+        label.length > 0 &&
+        label.length <= 63 &&
+        /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label),
+    )
   );
 }
 

@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.5
+**Status:** Foundation contract, version 1.6
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.5 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 5}`.
+the host's. Version 1.6 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 6}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -66,6 +66,23 @@ The current operations are:
 | `session.close` | `{}` | accepted close request | `session.close` |
 | `clipboard.read` | `{}` | bounded Unicode text or no text | `clipboard.read` |
 | `clipboard.write` | `{ "text": string }` | accepted write | `clipboard.write` |
+| `external.open` | `{ "url": string }` | accepted operating-system handoff | `external.open` |
+
+### `external.open`
+
+Protocol 1.6 adds one external-link handoff operation. It requires the
+host-issued `external.open` capability and accepts exactly `{ "url": string }`.
+The UTF-8 URL is limited to **2 KiB** and must be one exact validated HTTPS
+address defined by `docs/EXTERNAL_LINKS.md`. On success the result is
+`{ "status": "opened" }`; it is only evidence that the operating system
+accepted the handoff, not that a browser loaded a page or a user viewed it.
+
+The operation never accepts an owner window, browser, handler, executable,
+argument, working directory, scheme selector, file path, callback, or link
+history selector. The host checks its capability immediately before invoking
+the injected external-link service. A system handoff failure returns only
+`external.unavailable`, with no native status, handler detail, or URL in the
+error or diagnostics.
 
 ### `clipboard.read` and `clipboard.write`
 
@@ -229,7 +246,8 @@ Version 1 defines these stable error codes: `capability.denied`,
 `request.invalid`, `request.payload_invalid`, `clipboard.unavailable`,
 `clipboard.text_invalid`, and `clipboard.text_too_large`. Error messages are
 suitable for a developer log but must not contain secrets, raw paths, native
-errors, or clipboard text.
+errors, clipboard text, or external-link URLs. Protocol 1.6 adds
+`external.unavailable`.
 
 ## Cancellation and events
 

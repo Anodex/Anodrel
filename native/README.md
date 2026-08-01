@@ -122,11 +122,12 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
 The initial window displays a host-created `platform.health` response. With
 `--application <manifest>`, it can also display the documented, digest-verified
 plain-text application package. It has no webview, script runtime, navigation,
-native bridge, or privileged platform service. Its named-pipe adapter and
-bootstrap launcher can deliver a private invitation to a child process. The
-Windows host's development-only sample launches the compiled Node client to
-prove the real authenticated health path. Publisher trust, executable launch,
-and a capability bridge still require separate threat-model work. The
+or general native bridge. Its named-pipe adapter and bootstrap launcher can
+deliver a private invitation to a child process. The Windows host's
+development-only sample launches the compiled Node client to prove the real
+authenticated health path and bounded clipboard/external-link service seams.
+Publisher trust, executable launch, and a product capability bridge still
+require separate threat-model work. The
 host-only registered launch service is separate from the visual surface until
 a signed application record is provisioned.
 

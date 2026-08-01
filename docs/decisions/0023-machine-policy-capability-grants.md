@@ -15,7 +15,8 @@ The session-policy module converts only a validated installed record
 into the existing host policy. Packages, bootstrap data, pipe clients, protocol
 messages, and UI cannot select or elevate these grants. Supported grants now
 include separate `clipboard.read` and `clipboard.write` values; adding either
-does not grant the other.
+does not grant the other. `external.open` is a separately selected grant and
+does not imply clipboard, process, file, or custom-protocol authority.
 
 ## Consequences
 

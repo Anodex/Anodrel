@@ -353,6 +353,7 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
                 Some("session.close") => Capability::SessionClose,
                 Some("clipboard.read") => Capability::ClipboardRead,
                 Some("clipboard.write") => Capability::ClipboardWrite,
+                Some("external.open") => Capability::ExternalOpen,
                 _ => return Err(InstalledApplicationError::InvalidRecord),
             };
             if grants.contains(&capability) {
@@ -729,9 +730,20 @@ mod tests {
             &[anodrel_protocol::Capability::ClipboardWrite]
         );
 
+        let external_open_grant = fs::read_to_string(&fixture.record_path)
+            .expect("validated record is read")
+            .replace("clipboard.write", "external.open");
+        fs::write(&fixture.record_path, external_open_grant).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("external open grant is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[anodrel_protocol::Capability::ExternalOpen]
+        );
+
         let unsupported = fs::read_to_string(&fixture.record_path)
             .expect("validated record is read")
-            .replace("clipboard.write", "credentials.read");
+            .replace("external.open", "credentials.read");
         fs::write(&fixture.record_path, unsupported).expect("record is updated");
         assert!(matches!(
             InstalledApplication::load(&fixture.record_path, &fixture.policy_root),

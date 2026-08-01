@@ -84,6 +84,10 @@ export class PlatformClient {
     return this.request("clipboard.write", { text });
   }
 
+  openExternalLink(url: string): Promise<ResultFor<"external.open">> {
+    return this.request("external.open", { url });
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,

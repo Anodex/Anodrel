@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 anodrel-clipboard = { path = "../clipboard" }
+anodrel-external-links = { path = "../external-links" }
 anodrel-protocol = { path = "../protocol" }
 anodrel-ui-session = { path = "../ui-session" }
 

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 5;
+pub const PROTOCOL_MINOR: u16 = 6;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -48,6 +48,7 @@ pub enum Capability {
     SessionClose,
     ClipboardRead,
     ClipboardWrite,
+    ExternalOpen,
 }
 
 impl Capability {
@@ -59,6 +60,7 @@ impl Capability {
             Self::SessionClose => "session.close",
             Self::ClipboardRead => "clipboard.read",
             Self::ClipboardWrite => "clipboard.write",
+            Self::ExternalOpen => "external.open",
         }
     }
 }
@@ -73,6 +75,7 @@ pub enum ProtocolErrorCode {
     ClipboardUnavailable,
     ClipboardTextInvalid,
     ClipboardTextTooLarge,
+    ExternalUnavailable,
 }
 
 impl ProtocolErrorCode {
@@ -86,6 +89,7 @@ impl ProtocolErrorCode {
             Self::ClipboardUnavailable => "clipboard.unavailable",
             Self::ClipboardTextInvalid => "clipboard.text_invalid",
             Self::ClipboardTextTooLarge => "clipboard.text_too_large",
+            Self::ExternalUnavailable => "external.unavailable",
         }
     }
 }

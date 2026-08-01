@@ -19,4 +19,5 @@ anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
 anodrel-windows-clipboard = { path = "../../adapters/windows-clipboard" }
+anodrel-windows-external-links = { path = "../../adapters/windows-external-links" }
 anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0043: External link protocol access is capability-checked.
+
 - 0042: External links start as validated HTTPS handoff.
 
 - 0041: Clipboard protocol operations are separate and bounded.

@@ -11,9 +11,10 @@ in-memory mock provides operating-system isolation.
 
 The current operations are `platform.ping`, `platform.capabilities`,
 `platform.health`, `ui.document.replace`, `ui.events.read`, `session.close`,
-`clipboard.read`, and `clipboard.write`. Clipboard operations are the only
-current operations with operating-system data authority; they are limited to
-bounded ordinary Unicode text and separate host-issued grants.
+`clipboard.read`, `clipboard.write`, and `external.open`. Clipboard and
+external-link operations are the only current operations with operating-system
+data authority; they are limited to bounded Unicode text or validated HTTPS
+handoff and separate host-issued grants.
 
 ## Assets to protect
 
@@ -203,7 +204,8 @@ host-specific controls are documented and tested. The bounded text clipboard is
 the explicit current application-facing exception: `docs/CLIPBOARD.md`,
 Decisions 0040 and 0041, capability checks, portable and native-boundary tests,
 and the authenticated transport integration test define and verify its
-development-session exposure. `docs/EXTERNAL_LINKS.md` and Decision 0042 define
-the validated HTTPS host adapter, but it has no protocol operation or
-application capability yet. Production executable trust, consent, and richer
-platform features remain separate gates.
+development-session exposure. The external-link exception is likewise bounded:
+`docs/EXTERNAL_LINKS.md`, Decisions 0042 and 0043, the `external.open`
+capability, portable and native-boundary tests, and the authenticated transport
+integration test define and verify a validated HTTPS handoff. Production
+executable trust, consent, and richer platform features remain separate gates.

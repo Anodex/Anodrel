@@ -1,7 +1,7 @@
 # Anodrel external-link foundation
 
-**Status:** Portable HTTPS link validation and the direct Windows opener are
-implemented; protocol capability exposure remains deferred.
+**Status:** Portable HTTPS link validation, the direct Windows opener, and the
+capability-checked Protocol 1.6 surface are implemented.
 
 ## Boundary
 
@@ -38,11 +38,13 @@ native status code.
 
 ## Security and privacy
 
-An external link can lead a user away from the application. It is never treated
-as a file path, shell command, executable, callback, navigation instruction, or
-native handle. Its full text must not enter diagnostics, errors, persistent
-host state, or logs. The first protocol operation will require a distinct
-`external.open` capability and an immediate capability check.
+An external link can lead a user away from the application. Protocol 1.6 maps
+one exact `{ "url": string }` payload to `external.open`, which requires the
+separate `external.open` host-issued capability. It is never treated as a file
+path, shell command, executable, callback, navigation instruction, or native
+handle. Its full text must not enter diagnostics, errors, persistent host state,
+or logs. The host checks that capability immediately before handing the
+previously validated value to the operating-system adapter.
 
 ## Deferred
 
