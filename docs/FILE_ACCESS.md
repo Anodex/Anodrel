@@ -53,7 +53,8 @@ objects on session cleanup.
 
 The portable `FileTextService` interface accepts only that opaque reference
 and has a fail-closed unavailable implementation for hosts that do not wire
-selected-file reads.
+selected-file reads. The Windows implementation is thread-safe for one
+authenticated session and consumes its retained object before reading.
 
 ## Limits and deferred work
 

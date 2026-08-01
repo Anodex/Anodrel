@@ -12,7 +12,7 @@ mod session;
 use anodrel_file_access::SelectionReference;
 use anodrel_file_dialog::SelectedFilePath;
 
-pub use session::{SessionSelectionError, WindowsSessionSelections};
+pub use session::{SessionSelectionError, WindowsFileTextService, WindowsSessionSelections};
 
 /// Maximum UTF-8 bytes the first selected-file text reader returns.
 pub const MAX_SELECTED_TEXT_BYTES: usize = 32 * 1024;
