@@ -194,6 +194,8 @@ The native-host decision must extend this model with:
 - tests for traversal, malformed input, capability bypass, shutdown races, and
   overload handling.
 
-No filesystem, process, credential, clipboard, dialog, notification, or
-external-link operation may be implemented until its contract and these
-host-specific controls are documented and tested.
+No filesystem, process, credential, dialog, notification, or external-link
+operation may be implemented until its contract and these host-specific
+controls are documented and tested. `docs/CLIPBOARD.md` and Decision 0040 now
+define the clipboard foundation; its adapter and protocol controls still require
+their own verification before it is exposed to applications.

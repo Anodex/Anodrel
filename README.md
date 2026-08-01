@@ -122,6 +122,7 @@ host-only Windows launch sequence that binds executable and publisher policy
 before process launch.
 `docs/PATHS.md` defines the host-owned per-application directory layout.
 `docs/CREDENTIALS.md` defines the host-only Windows credential-store boundary.
+`docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
