@@ -154,10 +154,13 @@ semantic appearance roles; the renderer does not infer them from element IDs.
 Hovering and
 clicking an action exercises the same layout hit test and displays its semantic
 element ID. Tab and Shift+Tab exercise the portable focus order with a visible
-focus ring; Enter activates only that same semantic action. The view has no
-package input and every event changes only its own diagnostic reading: it does
-not open a process, read a file, send a protocol message, or grant a capability.
-It is a renderer-and-input test, not an application UI API.
+focus ring; Enter activates only that same semantic action. The host-owned Lab
+also places its compiled v1 fixture inside an in-memory scroll viewport and
+adds local diagnostic exercises. Page Up and Page Down move only that retained
+viewport state. The view has no package input and every event changes only its
+own diagnostic reading or viewport position: it does not open a process, read
+a file, send a protocol message, or grant a capability. It is a renderer-and-
+input test, not an application UI API.
 
 ## Verification
 

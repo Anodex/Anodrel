@@ -8,8 +8,9 @@
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiActionTone, UiDocument, UiEvent,
-    UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiSize, UiSurfaceTone, UiTextTone,
+    Action, Axis, ElementId, Insets, Scroll, Stack, Text, TextMeasurer, UiActionTone, UiDocument,
+    UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiScrollOffsets, UiSize, UiSurfaceTone,
+    UiTextTone,
 };
 use anodrel_ui_document::decode;
 
@@ -27,6 +28,7 @@ pub(super) struct UiLab {
     document: UiDocument,
     status_target: Option<ElementId>,
     focus: UiFocus,
+    scroll_offsets: UiScrollOffsets,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
 }
@@ -98,6 +100,7 @@ impl UiLab {
     pub(super) fn replace_document(&mut self, document: UiDocument) {
         self.document = document;
         self.focus = UiFocus::new();
+        self.scroll_offsets.clear();
         self.hovered = None;
         self.last_action = None;
     }
@@ -107,6 +110,7 @@ impl UiLab {
             document,
             status_target,
             focus: UiFocus::new(),
+            scroll_offsets: UiScrollOffsets::new(),
             hovered: None,
             last_action: None,
         }
@@ -149,8 +153,7 @@ impl UiLab {
 
     /// Records the semantic action associated with the current valid focus.
     pub(super) fn activate_focused(&mut self, width: f32, height: f32) -> bool {
-        let surface = Surface::new(width, height);
-        let layout = self.document.layout(surface.bounds(), &WindowsTextMeasurer);
+        let layout = self.layout(width, height);
         let Some(UiEvent::ActionInvoked(action)) = self.focus.activate(&layout) else {
             return false;
         };
@@ -168,17 +171,13 @@ impl UiLab {
     /// Returns the current focused semantic event without recording local
     /// diagnostic action state.
     pub(super) fn focused_event(&mut self, width: f32, height: f32) -> Option<UiEvent> {
-        let surface = Surface::new(width, height);
-        let layout = self.document.layout(surface.bounds(), &WindowsTextMeasurer);
+        let layout = self.layout(width, height);
         self.focus.activate(&layout)
     }
 
     fn action_at(&self, width: f32, height: f32, at: Point) -> Option<ElementId> {
         let surface = Surface::new(width, height);
-        let event = self
-            .document
-            .layout(surface.bounds(), &WindowsTextMeasurer)
-            .hit_test(surface.to_ui_point(at));
+        let event = self.layout(width, height).hit_test(surface.to_ui_point(at));
         event.map(|UiEvent::ActionInvoked(id)| id)
     }
 
@@ -188,11 +187,49 @@ impl UiLab {
         height: f32,
         move_focus: fn(&mut UiFocus, &UiLayout) -> Option<ElementId>,
     ) -> bool {
-        let surface = Surface::new(width, height);
-        let layout = self.document.layout(surface.bounds(), &WindowsTextMeasurer);
+        let layout = self.layout(width, height);
         let before = self.focus.focused().cloned();
         let after = move_focus(&mut self.focus, &layout);
         before != after
+    }
+
+    /// Moves the first visible diagnostic scroll viewport by one page.
+    ///
+    /// This is local Windows Lab behavior only. It does not produce an
+    /// application event or carry native authority.
+    pub(super) fn scroll_page(&mut self, width: f32, height: f32, forward: bool) -> bool {
+        let Some(metrics) = self.layout(width, height).scroll_metrics().first().cloned() else {
+            return false;
+        };
+        let changed = self
+            .scroll_offsets
+            .entry(metrics.id().clone())
+            .or_default()
+            .scroll_page(forward, metrics.viewport_height(), metrics.content_height());
+        if changed {
+            self.hovered = None;
+        }
+        changed
+    }
+
+    /// Clamps retained scroll positions after a native size change.
+    pub(super) fn clamp_scroll_offsets(&mut self, width: f32, height: f32) {
+        let metrics = self.layout(width, height).scroll_metrics().to_vec();
+        for metric in metrics {
+            self.scroll_offsets
+                .entry(metric.id().clone())
+                .or_default()
+                .clamp(metric.viewport_height(), metric.content_height());
+        }
+    }
+
+    fn layout(&self, width: f32, height: f32) -> UiLayout {
+        let surface = Surface::new(width, height);
+        self.document.layout_with_scroll_offsets(
+            surface.bounds(),
+            &WindowsTextMeasurer,
+            &self.scroll_offsets,
+        )
     }
 }
 
@@ -200,7 +237,7 @@ impl UiLab {
 pub(super) fn draw(canvas: &mut Canvas, lab: &UiLab) {
     canvas.clear(palette::BACKDROP);
     let surface = Surface::new(canvas.width() as f32, canvas.height() as f32);
-    let layout = lab.document.layout(surface.bounds(), &WindowsTextMeasurer);
+    let layout = lab.layout(canvas.width() as f32, canvas.height() as f32);
     let status = status_text(lab);
     draw_node(
         canvas,
@@ -401,7 +438,46 @@ fn status_text(lab: &UiLab) -> Option<String> {
 }
 
 fn test_document() -> UiDocument {
-    decode(UI_LAB_DOCUMENT_JSON).expect("compiled UI Lab document matches the v1 contract")
+    let fixture =
+        decode(UI_LAB_DOCUMENT_JSON).expect("compiled UI Lab document matches the v1 contract");
+    let scroll_exercises = UiNode::Stack(
+        Stack::new(
+            ElementId::new("ui.lab.scroll.exercises").expect("fixed scroll ID is valid"),
+            Axis::Vertical,
+            Insets::all(18).expect("fixed scroll padding is valid"),
+            10,
+            (1..=9)
+                .map(|index| {
+                    UiNode::Action(
+                        Action::new(
+                            ElementId::new(format!("ui.lab.scroll.exercise-{index}"))
+                                .expect("fixed scroll action ID is valid"),
+                            format!("Scroll exercise {index}"),
+                            15,
+                            true,
+                        )
+                        .expect("fixed scroll action is valid"),
+                    )
+                })
+                .collect(),
+        )
+        .expect("fixed scroll stack is valid")
+        .with_surface_tone(UiSurfaceTone::Raised),
+    );
+    UiDocument::new(UiNode::Scroll(Scroll::new(
+        ElementId::new("ui.lab.viewport").expect("fixed scroll viewport ID is valid"),
+        UiNode::Stack(
+            Stack::new(
+                ElementId::new("ui.lab.scroll.content").expect("fixed scroll content ID is valid"),
+                Axis::Vertical,
+                Insets::zero(),
+                18,
+                vec![fixture.root().clone(), scroll_exercises],
+            )
+            .expect("fixed scroll content stack is valid"),
+        ),
+    )))
+    .expect("fixed scroll document is valid")
 }
 
 #[cfg(test)]
@@ -508,8 +584,8 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(
-            buttons,
-            vec![
+            &buttons[..3],
+            [
                 ("ui.lab.inspect", Some("Inspect layout"), true),
                 ("ui.lab.hit-test", Some("Test semantic action"), true),
                 ("ui.lab.report", Some("Report semantic action"), true),
@@ -520,8 +596,14 @@ mod tests {
     #[test]
     fn visual_hierarchy_comes_from_semantic_roles_not_element_names() {
         let lab = UiLab::new();
-        let UiNode::Stack(root) = lab.document.root() else {
-            panic!("fixed UI Lab root is a stack");
+        let UiNode::Scroll(viewport) = lab.document.root() else {
+            panic!("fixed UI Lab root is a scroll viewport");
+        };
+        let UiNode::Stack(content) = viewport.child() else {
+            panic!("fixed UI Lab viewport has a content stack");
+        };
+        let UiNode::Stack(root) = &content.children()[0] else {
+            panic!("fixed UI Lab fixture is a stack");
         };
 
         let eyebrow = match &root.children()[0] {
@@ -544,6 +626,19 @@ mod tests {
         assert_eq!(detail.tone(), UiTextTone::Secondary);
         assert_eq!(actions.surface_tone(), UiSurfaceTone::Raised);
         assert_eq!(emphasized_action.tone(), UiActionTone::Accent);
+    }
+
+    #[test]
+    fn page_scrolling_changes_only_the_lab_owned_viewport_position() {
+        let mut lab = UiLab::new();
+
+        assert!(lab.scroll_page(BASE_WIDTH, BASE_HEIGHT, true));
+        assert!(lab.scroll_offsets[&id("ui.lab.viewport")].offset_y() > 0.0);
+        assert!(
+            lab.layout(BASE_WIDTH, BASE_HEIGHT)
+                .bounds(&id("ui.lab.scroll.exercise-9"))
+                .is_some()
+        );
     }
 
     #[test]

@@ -78,6 +78,8 @@ const HTCLIENT: isize = 1;
 const VK_SHIFT: i32 = 0x10;
 const VK_TAB: Wparam = 0x09;
 const VK_RETURN: Wparam = 0x0D;
+const VK_PRIOR: Wparam = 0x21;
+const VK_NEXT: Wparam = 0x22;
 
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 const REVEAL_TIMER: usize = 1;
@@ -1198,10 +1200,14 @@ unsafe extern "system" fn window_proc(
         }
         WM_SIZE => {
             set_ambient_running(window, wparam != SIZE_MINIMIZED);
+            let rect = client_rect(window);
+            let _ = registry::with_ui_lab(window, |lab| {
+                lab.clamp_scroll_offsets(rect.width() as f32, rect.height() as f32);
+            });
             0
         }
         WM_KEYDOWN => {
-            if !matches!(wparam, VK_TAB | VK_RETURN) {
+            if !matches!(wparam, VK_TAB | VK_RETURN | VK_PRIOR | VK_NEXT) {
                 // SAFETY: an unsupported key is forwarded unchanged to the
                 // documented default Win32 procedure.
                 return unsafe { DefWindowProcW(window, message, wparam, lparam) };
@@ -1211,6 +1217,20 @@ unsafe extern "system" fn window_proc(
             // effect and returns a value owned by the current thread's input
             // state.
             let shift_down = unsafe { GetKeyState(VK_SHIFT) } < 0;
+            if matches!(wparam, VK_PRIOR | VK_NEXT) {
+                let changed = registry::with_ui_lab(window, |lab| {
+                    lab.scroll_page(rect.width() as f32, rect.height() as f32, wparam == VK_NEXT)
+                })
+                .ok()
+                .flatten();
+                let Some(changed) = changed else {
+                    return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+                };
+                if changed {
+                    invalidate(window);
+                }
+                return 0;
+            }
             let changed = registry::with_ui_lab(window, |lab| match wparam {
                 VK_TAB if shift_down => {
                     lab.focus_previous(rect.width() as f32, rect.height() as f32)
