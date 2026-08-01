@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 7;
+pub const PROTOCOL_MINOR: u16 = 8;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -50,6 +50,7 @@ pub enum Capability {
     ClipboardWrite,
     ExternalOpen,
     DialogOpenFile,
+    DialogSaveFile,
 }
 
 impl Capability {
@@ -63,6 +64,7 @@ impl Capability {
             Self::ClipboardWrite => "clipboard.write",
             Self::ExternalOpen => "external.open",
             Self::DialogOpenFile => "dialog.open_file",
+            Self::DialogSaveFile => "dialog.save_file",
         }
     }
 }

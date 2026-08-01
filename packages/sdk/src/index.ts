@@ -94,6 +94,12 @@ export class PlatformClient {
     return this.request("dialog.open_file", { filters });
   }
 
+  saveFileDialog(
+    filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
+  ): Promise<ResultFor<"dialog.save_file"> {
+    return this.request("dialog.save_file", { filters });
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,

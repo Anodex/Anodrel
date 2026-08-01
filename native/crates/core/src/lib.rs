@@ -302,6 +302,9 @@ impl CoreHost {
             "dialog.open_file" if request.protocol_version.minor >= 7 => {
                 self.handle_file_dialog_open(request)
             }
+            "dialog.save_file" if request.protocol_version.minor >= 8 => {
+                self.handle_file_dialog_save(request)
+            }
             _ => self.failure(
                 request.request_id,
                 ProtocolErrorCode::OperationUnsupported,
@@ -698,6 +701,53 @@ impl CoreHost {
                 "file dialog is unavailable.",
                 None,
             ),
+        }
+    }
+
+    fn handle_file_dialog_save(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(filters) = file_dialog_open_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.save_file requires strict bounded filters.",
+                None,
+            );
+        };
+        if request.payload.to_json().len() > MAX_FILE_DIALOG_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.save_file filters exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::DialogSaveFile) {
+            return self.capability_denied(request.request_id, "dialog.save_file");
+        }
+        match self.file_dialogs.save_file(&filters) {
+            Ok(FileDialogSelection::Saved(path)) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("saved".to_owned())),
+                    (
+                        "path",
+                        JsonValue::String(path.as_path().to_string_lossy().into_owned()),
+                    ),
+                ]),
+            ),
+            Ok(FileDialogSelection::Cancelled) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("cancelled".to_owned()))]),
+            ),
+            Ok(FileDialogSelection::Selected(_)) | Err(FileDialogServiceError::Unavailable) => self
+                .failure(
+                    request.request_id,
+                    ProtocolErrorCode::DialogUnavailable,
+                    "file dialog is unavailable.",
+                    None,
+                ),
         }
     }
 

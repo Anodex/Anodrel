@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 7 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 8 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -27,7 +27,8 @@ export type Capability =
   | "clipboard.read"
   | "clipboard.write"
   | "external.open"
-  | "dialog.open_file";
+  | "dialog.open_file"
+  | "dialog.save_file";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -91,6 +92,14 @@ export interface PlatformOperationMap {
     };
     readonly result:
       | { readonly status: "selected"; readonly path: string }
+      | { readonly status: "cancelled" };
+  };
+  "dialog.save_file": {
+    readonly payload: {
+      readonly filters: readonly { readonly label: string; readonly extensions: readonly string[] }[];
+    };
+    readonly result:
+      | { readonly status: "saved"; readonly path: string }
       | { readonly status: "cancelled" };
   };
 }

@@ -73,6 +73,7 @@ fn run_with_optional_session_view(
             Capability::ClipboardWrite,
             Capability::ExternalOpen,
             Capability::DialogOpenFile,
+            Capability::DialogSaveFile,
         ],
         "anodrel-windows-host",
     )?;

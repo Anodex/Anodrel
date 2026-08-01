@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.7
+**Status:** Foundation contract, version 1.8
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.7 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 7}`.
+the host's. Version 1.8 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 8}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -68,6 +68,14 @@ The current operations are:
 | `clipboard.write` | `{ "text": string }` | accepted write | `clipboard.write` |
 | `external.open` | `{ "url": string }` | accepted operating-system handoff | `external.open` |
 | `dialog.open_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path or cancellation | `dialog.open_file` |
+| `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
+
+### `dialog.save_file`
+
+Protocol 1.8 adds the matching host-owned save picker. It uses the same strict
+2 KiB filter payload and UI-thread boundary as `dialog.open_file`, but requires
+the independent `dialog.save_file` capability. Its result is either a saved
+destination or cancellation; selection never creates, truncates, or writes.
 
 ### `dialog.open_file`
 
