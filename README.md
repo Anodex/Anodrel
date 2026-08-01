@@ -21,8 +21,9 @@ command-line or environment-variable secrets. The Windows host proves the
 native window lifecycle and protocol core without a runtime framework or a
 webview. It also loads a first digest-verified plain-text application
 package into a host-controlled Win32 surface. A development-only Node sample
-separately exercises the private pipe path end to end; it exposes no privileged
-operating-system capability. The first branded Startup Lab turns those
+separately exercises the private pipe path end to end; its host-issued grants
+include only the bounded text clipboard service, alongside UI-session test
+grants. The first branded Startup Lab turns those
 foundation checks, including a temporary private IPC health loopback, into a
 direct native visual smoke test.
 

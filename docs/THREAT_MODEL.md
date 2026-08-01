@@ -183,7 +183,7 @@ tracked child lifetime, and post-verification bootstrap binding. Record
 provisioning and host UI integration remain before the first Launch Sample
 capability becomes available.
 
-## Before the first privileged capability
+## Before additional privileged capabilities
 
 The native-host decision must extend this model with:
 
@@ -198,6 +198,8 @@ The native-host decision must extend this model with:
 
 No filesystem, process, credential, dialog, notification, or external-link
 operation may be implemented until its contract and these host-specific
-controls are documented and tested. `docs/CLIPBOARD.md` and Decision 0040 now
-define the clipboard foundation; its adapter and protocol controls still require
-their own verification before it is exposed to applications.
+controls are documented and tested. The bounded text clipboard is the explicit
+exception: `docs/CLIPBOARD.md`, Decisions 0040 and 0041, capability checks,
+portable and native-boundary tests, and the authenticated transport integration
+test define and verify its development-session exposure. Production executable
+trust, consent, and every richer clipboard feature remain separate gates.
