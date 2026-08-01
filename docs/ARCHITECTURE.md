@@ -140,9 +140,12 @@ application identity; it never creates, enumerates, or exposes those paths to
 the protocol. The portable state-store foundation reserves one bounded opaque
 snapshot below `data`; its direct Windows adapter stages and flushes complete
 values before retaining the prior committed state as a recovery candidate.
-Protocol grants remain separate work. Logging and future storage services
-define their own permission, creation, and recovery rules on top of this
-layout. See `docs/PATHS.md`, `docs/STORAGE.md`, Decisions 0021 and 0051.
+Protocol 1.10 exposes that service only through separate immediate state read,
+replace, and clear grants. The development UI-session diagnostic supplies the
+host-derived service explicitly; installed-application policy integration
+remains separate work. Logging and future storage services define their own
+permission, creation, and recovery rules on top of this layout. See
+`docs/PATHS.md`, `docs/STORAGE.md`, Decisions 0021, 0051, and 0052.
 
 The Windows credential adapter stores a bounded secret only under the exact
 target derived from a validated application identity and credential name. It

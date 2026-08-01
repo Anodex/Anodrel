@@ -11,10 +11,13 @@ in-memory mock provides operating-system isolation.
 
 The current operations are `platform.ping`, `platform.capabilities`,
 `platform.health`, `ui.document.replace`, `ui.events.read`, `session.close`,
-`clipboard.read`, `clipboard.write`, and `external.open`. Clipboard and
-external-link operations are the only current operations with operating-system
-data authority; they are limited to bounded Unicode text or validated HTTPS
-handoff and separate host-issued grants.
+`clipboard.read`, `clipboard.write`, `external.open`, `dialog.open_file`,
+`dialog.open_file.v2`, `dialog.save_file`, `file.read_text`,
+`storage.state.read`, `storage.state.replace`, and `storage.state.clear`.
+Clipboard, external-link, file-dialog, selection-scoped file-text, and
+application-state operations each have their own bounded values and separate
+host-issued grants. The development UI-session sample exercises these only with
+a host-derived test identity; installed-application policy remains separate.
 
 ## Assets to protect
 

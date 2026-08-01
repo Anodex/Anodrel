@@ -1,7 +1,8 @@
 # Application state storage v1
 
-**Status:** Portable value, direct Windows host-service, and Protocol 1.10
-contract foundation. Protocol wiring remains in progress.
+**Status:** Implemented portable value, direct Windows host service, and
+Protocol 1.10 development-session path. Installed-application policy
+integration remains separate work.
 
 ## Purpose and boundary
 
@@ -79,6 +80,9 @@ The portable foundation tests absent versus empty state, the fixed size limit,
 value redaction, and error categories. The Windows adapter tests whole-value
 replacement, recovery from an interrupted staging file, and path redaction.
 Its direct file boundary rejects directories and reparse points. Shared
-protocol contract coverage will be added with the implementation wiring.
+protocol contract tests cover the exact read, replace, and clear messages,
+their independent grants, and the protocol request bound. The Windows
+development UI-session diagnostic replaces, reads, and clears one test snapshot
+through the authenticated pipe before completing its semantic UI round trip.
 
 Decisions 0051 and 0052 record these boundaries.

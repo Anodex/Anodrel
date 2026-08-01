@@ -96,8 +96,11 @@ Status: **Direct Windows host in progress**
   The first bounded whole-snapshot application-state store now has portable
   values and a direct Windows adapter that stages, flushes, replaces, and
   recovers one host-derived state file (Decision 0051). Protocol 1.10 now
-  defines separate state read, replace, and clear grants (Decision 0052); core,
-  SDK, transport, and product-session wiring remain separate work.
+  defines separate state read, replace, and clear grants (Decision 0052).
+  Core, SDK, authenticated transport, and the development UI-session diagnostic
+  now exercise the complete path; installed-application policy integration,
+  durable product-session lifecycle, and non-Windows adapters remain separate
+  work.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

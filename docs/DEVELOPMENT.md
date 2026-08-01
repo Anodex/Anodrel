@@ -187,6 +187,20 @@ replace `--sample-ui-client` with `--sample-ui-file-client` or
 `--sample-ui-save-client`. Both commands accept only the strict sample filters;
 the save diagnostic never writes the selected destination.
 
+To exercise the bounded application-state service through the same authenticated
+session, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-storage-client $nodePath $clientPath
+~~~
+
+The diagnostic derives the fixed `anodrel.sample` development identity on the
+host, replaces its state with a fixed test snapshot, reads that exact snapshot,
+and clears it before waiting for the regular semantic action and closing its
+own session. It accepts no application-supplied path and leaves no saved test
+snapshot behind. This is a development diagnostic; installed-application
+policy integration remains separate work.
+
 ## Working process
 
 1. Start from an issue or a written task with a clear acceptance condition.

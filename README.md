@@ -29,9 +29,11 @@ separate grant, alongside UI-session test grants. The first branded Startup Lab 
 foundation checks, including a temporary private IPC health loopback, into a
 direct native visual smoke test.
 
-The storage foundation now has a portable whole-snapshot contract and a direct
-Windows adapter that keeps one recovered prior snapshot; it remains unavailable
-to protocol clients until its own capability contract is defined.
+The application-state foundation now has a portable whole-snapshot contract,
+a direct Windows adapter that keeps one recovered prior snapshot, and a
+Protocol 1.10 capability surface. The development UI-session diagnostic
+exercises its read, replace, and clear path end to end. Installed-application
+policy remains a separate integration gate.
 
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
@@ -134,8 +136,8 @@ before process launch.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
 boundary.
-`docs/STORAGE.md` defines the planned bounded application-state storage
-boundary and its portable value foundation.
+`docs/STORAGE.md` defines the bounded application-state storage boundary and
+its recovery and capability contract.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
