@@ -58,6 +58,8 @@ other.
   operation. A late cancellation cannot undo completed work. A malformed or
   unsupported control, or a 33rd unresolved ID, ends the session rather than
   retaining unbounded state.
+  The Windows adapter's private test also carries one cancellation and its
+  matching health request across a real named pipe.
 - The frame contains no identity or capability grant. The host creates policy
   before it constructs the session; client-supplied context remains untrusted.
 

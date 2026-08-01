@@ -16,6 +16,10 @@ use anodrel_wire::{FrameDecoder, encode_json};
 use crate::{SessionInvitation, raw};
 
 const HEALTH_REQUEST: &str = r#"{"protocolVersion":{"major":1,"minor":0},"kind":"request","requestId":"startup-lab-health","operation":"platform.health","payload":{}}"#;
+#[cfg(test)]
+const CANCELLED_HEALTH_REQUEST: &str = r#"{"protocolVersion":{"major":1,"minor":0},"kind":"request","requestId":"startup-lab-cancelled-health","operation":"platform.health","payload":{},"cancellationId":"startup-lab-stop"}"#;
+#[cfg(test)]
+const HEALTH_CANCELLATION: &str = r#"{"protocolVersion":{"major":1,"minor":0},"kind":"cancel","cancellationId":"startup-lab-stop"}"#;
 
 pub(super) fn authenticated_health(
     client: &raw::OwnedHandle,
@@ -30,6 +34,23 @@ pub(super) fn authenticated_health(
         .and_then(|fields| fields.get("result"))
         .ok_or_else(failed)?;
     require_field(result, "status", "ready")
+}
+
+#[cfg(test)]
+pub(super) fn authenticated_cancelled_health(
+    client: &raw::OwnedHandle,
+    invitation: &SessionInvitation,
+) -> io::Result<()> {
+    authenticate(client, invitation)?;
+    write_json(client, HEALTH_CANCELLATION)?;
+    write_json(client, CANCELLED_HEALTH_REQUEST)?;
+    let response = read_json(client)?;
+    require_field(&response, "status", "failure")?;
+    let error = response
+        .as_object()
+        .and_then(|fields| fields.get("error"))
+        .ok_or_else(failed)?;
+    require_field(error, "code", "request.cancelled")
 }
 
 pub(super) fn measure_authenticated_request(

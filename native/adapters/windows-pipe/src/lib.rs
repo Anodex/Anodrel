@@ -165,6 +165,31 @@ pub fn run_health_self_test(policy: HostPolicy) -> io::Result<()> {
     server_result
 }
 
+/// Runs one private local authenticated cancellation round trip.
+///
+/// This verifies the real Windows pipe carries a response-less cancellation
+/// control followed by one pre-execution cancelled request. It is a native
+/// adapter smoke test, not an application-facing client API.
+#[cfg(test)]
+fn run_cancellation_self_test(policy: HostPolicy) -> io::Result<()> {
+    let (server, invitation) = WindowsPipeServer::create(policy, "cancellation-loopback")
+        .map_err(|_| self_test_failed())?;
+    let pipe_name = wide_null(invitation.pipe_name());
+    let client = raw::connect_client(&pipe_name).map_err(|_| self_test_failed())?;
+    let server_thread = thread::spawn(move || server.serve_one());
+
+    let client_result = loopback::authenticated_cancelled_health(&client, &invitation);
+    drop(client);
+    drop(invitation);
+
+    let server_result = server_thread
+        .join()
+        .map_err(|_| self_test_failed())?
+        .map_err(|_| self_test_failed());
+    client_result?;
+    server_result
+}
+
 /// Measures repeated local request/response round trips through one temporary
 /// owner-restricted named pipe.
 ///
@@ -551,6 +576,17 @@ mod tests {
         )
         .expect("test policy is valid");
         run_health_self_test(policy).expect("private IPC self-test succeeds");
+    }
+
+    #[test]
+    fn cancels_a_not_started_request_over_a_real_windows_pipe() {
+        let policy = HostPolicy::new(
+            "test.application",
+            vec![Capability::DiagnosticsRead],
+            "test-host",
+        )
+        .expect("test policy is valid");
+        run_cancellation_self_test(policy).expect("private cancellation self-test succeeds");
     }
 
     #[test]
