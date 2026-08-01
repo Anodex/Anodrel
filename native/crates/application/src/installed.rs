@@ -668,6 +668,15 @@ mod tests {
             installed.capabilities(),
             &[anodrel_protocol::Capability::DiagnosticsRead]
         );
+
+        let unsupported = fs::read_to_string(&fixture.record_path)
+            .expect("validated record is read")
+            .replace("diagnostics.read", "credentials.read");
+        fs::write(&fixture.record_path, unsupported).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
         fixture.remove();
     }
 

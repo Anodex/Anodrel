@@ -99,9 +99,11 @@ policy adapter; it is not a public application API.
 
 ## Compatibility and failures
 
-Records are exact at version 1.0 because they influence future process
+Records are exact at their declared version because they influence process
 authority. A compatible extension requires a new minor version, documentation,
 and tests before acceptance. A breaking change requires a new major version.
+Version 1.0 remains a no-grants migration format; version 1.1 accepts only the
+supported machine-policy grants.
 
 The parser fails closed if the record is outside the selected policy root,
 inside the package root, malformed, oversized, mismatched with the package, or
@@ -166,4 +168,4 @@ strict installed application record
 ~~~
 
 See `docs/SIGNING.md`, `docs/APPLICATIONS.md`, and Decisions 0018 through
-0020.
+0023.
