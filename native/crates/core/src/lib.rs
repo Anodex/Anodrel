@@ -36,6 +36,13 @@ impl HostPolicy {
         if application_id.trim().is_empty() || host_name.trim().is_empty() {
             return Err("application ID and host name must not be empty");
         }
+        if granted_capabilities
+            .iter()
+            .enumerate()
+            .any(|(index, capability)| granted_capabilities[..index].contains(capability))
+        {
+            return Err("host capability grants must not contain duplicates");
+        }
         Ok(Self {
             application_id,
             granted_capabilities,
@@ -289,6 +296,18 @@ mod tests {
         assert_eq!(
             field(field(&response, "error"), "code").as_string(),
             Some("capability.denied")
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_host_capability_grants() {
+        assert!(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::DiagnosticsRead, Capability::DiagnosticsRead],
+                "test-host",
+            )
+            .is_err()
         );
     }
 
