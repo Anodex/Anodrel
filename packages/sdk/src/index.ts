@@ -96,7 +96,7 @@ export class PlatformClient {
 
   saveFileDialog(
     filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
-  ): Promise<ResultFor<"dialog.save_file"> {
+  ): Promise<ResultFor<"dialog.save_file">> {
     return this.request("dialog.save_file", { filters });
   }
 
