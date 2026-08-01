@@ -202,11 +202,12 @@ logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
 host renderer. It owns only a bounded declarative tree, semantic appearance
 roles, layout, clipping, semantic action hit testing, visible accessibility
 snapshot, and portable focus traversal. `anodrel-ui-document` separately owns
-the exact, bounded JSON interchange form for that tree; it has no native host
-consumer. Neither crate has operating-system authority. The host remains
-responsible for text measurement, mapping appearance roles to an actual visual
-system, rendering, input delivery, operating-system accessibility and focus
-adapters, and every capability decision. See `docs/UI.md`,
+the exact, bounded JSON interchange form for that tree. The Windows UI Lab
+decodes a fixed compile-time fixture through it, but no native host accepts an
+externally supplied document. Neither crate has operating-system authority. The
+host remains responsible for text measurement, mapping appearance roles to an
+actual visual system, rendering, input delivery, operating-system accessibility
+and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/UI_DOCUMENTS.md`, and Decisions 0025 through 0029.
 
 ## Communication model

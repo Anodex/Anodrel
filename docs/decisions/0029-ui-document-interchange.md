@@ -27,9 +27,12 @@ limits. It carries neither capability declarations nor callbacks, renderer
 objects, native handles, file paths, URLs, scripts, package locations, or
 window instructions.
 
-No native host, application package, protocol operation, or authenticated
-session accepts this format in this decision. Such a consumer requires a
-separate lifecycle, queue, permission, and threat-model decision.
+The Windows UI Lab may decode one compile-time fixture held in host source to
+exercise the full schema-to-renderer path. It does not read a document from a
+package, command line, file, pipe, protocol operation, or application session.
+No native host accepts an externally supplied format in this decision. Such a
+consumer requires a separate lifecycle, queue, permission, and threat-model
+decision.
 
 ## Consequences
 

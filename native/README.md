@@ -132,11 +132,13 @@ separate diagnostic scope. See `docs/INSTANCE_LIFECYCLE.md`.
 registry. Closing one leaves the other open; closing the final window exits the
 message loop. It is a lifecycle diagnostic, not a public window API.
 
-`--ui-lab` opens a fixed host-owned screen built through `anodrel-ui`. Its
-semantic appearance roles, action hit tests, and focus state are interpreted by
-the Windows renderer; actions show only their semantic IDs in the same screen.
-Tab and Shift+Tab move the test focus ring; Enter reports the focused action's
-ID. These actions do not create a session or grant a capability. See
+`--ui-lab` opens a fixed host-owned screen built through `anodrel-ui`. The
+screen's JSON is compiled into the host and decoded through
+`anodrel-ui-document`; it is not loaded from an application or external source.
+Its semantic appearance roles, action hit tests, and focus state are interpreted
+by the Windows renderer; actions show only their semantic IDs in the same
+screen. Tab and Shift+Tab move the test focus ring; Enter reports the focused
+action's ID. These actions do not create a session or grant a capability. See
 `docs/UI.md`.
 
 Verify from the repository root:

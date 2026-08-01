@@ -1,0 +1,82 @@
+{
+  "format": "anodrel.ui.document.v1",
+  "root": {
+    "id": "ui.lab.root",
+    "kind": "stack",
+    "axis": "vertical",
+    "padding": { "left": 54, "top": 54, "right": 54, "bottom": 44 },
+    "gap": 14,
+    "surfaceTone": "plain",
+    "children": [
+      {
+        "id": "ui.lab.eyebrow",
+        "kind": "text",
+        "value": "NATIVE UI FOUNDATION",
+        "fontSize": 12,
+        "tone": "accent"
+      },
+      {
+        "id": "ui.lab.title",
+        "kind": "text",
+        "value": "Anodrel UI Lab",
+        "fontSize": 34,
+        "tone": "primary"
+      },
+      {
+        "id": "ui.lab.detail",
+        "kind": "text",
+        "value": "A direct Windows renderer interpreting Anodrel's bounded layout tree.",
+        "fontSize": 16,
+        "tone": "secondary"
+      },
+      {
+        "id": "ui.lab.actions",
+        "kind": "stack",
+        "axis": "vertical",
+        "padding": { "left": 18, "top": 18, "right": 18, "bottom": 18 },
+        "gap": 10,
+        "surfaceTone": "raised",
+        "children": [
+          {
+            "id": "ui.lab.inspect",
+            "kind": "action",
+            "label": "Inspect layout",
+            "fontSize": 15,
+            "enabled": true,
+            "tone": "neutral"
+          },
+          {
+            "id": "ui.lab.hit-test",
+            "kind": "action",
+            "label": "Test semantic action",
+            "fontSize": 15,
+            "enabled": true,
+            "tone": "accent"
+          },
+          {
+            "id": "ui.lab.report",
+            "kind": "action",
+            "label": "Report semantic action",
+            "fontSize": 15,
+            "enabled": true,
+            "tone": "neutral"
+          }
+        ]
+      },
+      {
+        "id": "ui.lab.status",
+        "kind": "text",
+        "value": "Latest semantic event: none",
+        "fontSize": 14,
+        "tone": "accent"
+      },
+      {
+        "id": "ui.lab.boundary",
+        "kind": "text",
+        "value": "An action reports only its ID. It cannot call Windows or grant a capability.",
+        "fontSize": 13,
+        "tone": "secondary"
+      }
+    ]
+  }
+}

@@ -1,8 +1,9 @@
 # Anodrel UI document interchange v1
 
 **Status:** Foundation contract. This format can be decoded into the portable
-`anodrel-ui` model. No native host, package loader, protocol operation, or
-application session accepts it yet.
+`anodrel-ui` model. The Windows UI Lab decodes one compiled-in host fixture to
+exercise the contract; no native host accepts an externally supplied document,
+package loader, protocol operation, or application session yet.
 
 ## Purpose and boundary
 
@@ -130,4 +131,6 @@ non-semantic.
 appearance roles, unknown and missing fields, malformed values, unsupported
 format identifiers, size limits, and model-level document limits. It has only
 first-party `anodrel-ui` and `anodrel-json` dependencies and no operating-
-system calls.
+system calls. The Windows host additionally builds and renders its compiled-in
+UI Lab fixture through this decoder; it never reads UI JSON from an application
+or external source.

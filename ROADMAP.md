@@ -70,10 +70,11 @@ Status: **Direct Windows host in progress**
   UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a
   fixed host-owned document through that contract. Its portable accessibility
   snapshot, focus traversal, semantic appearance roles, and a strict external
-  document format are available. No host accepts that format yet; authenticated
-  application input, operating-system accessibility adapters, host keyboard
-  focus, scrolling, and application document/session lifecycle remain separate
-  gates.
+  document format are available. The Windows UI Lab renders one compiled-in
+  format fixture, but no host accepts an externally supplied document;
+  authenticated application input, operating-system accessibility adapters,
+  host keyboard focus, scrolling, and application document/session lifecycle
+  remain separate gates.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

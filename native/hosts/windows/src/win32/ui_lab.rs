@@ -1,16 +1,17 @@
 //! A host-owned visual and input test for `anodrel-ui`.
 //!
 //! This module is intentionally a diagnostic surface, not an application UI
-//! runtime. It renders a fixed document constructed by the host and reports a
+//! runtime. It renders a fixed document compiled into the host and reports a
 //! clicked action ID back into the same host-owned screen. No UI event opens a
 //! process, reads a file, sends a protocol message, or grants a capability.
 
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Paint, Point, Rect, point};
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiActionTone, UiDocument, UiEvent,
-    UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiSize, UiSurfaceTone, UiTextTone,
+    Action, ElementId, Text, TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFocus, UiLayout,
+    UiNode, UiPoint, UiRect, UiSize, UiSurfaceTone, UiTextTone,
 };
+use anodrel_ui_document::decode;
 
 use super::text;
 use super::text::{Align, TextSpec};
@@ -18,6 +19,7 @@ use super::text::{Align, TextSpec};
 const BASE_WIDTH: f32 = 920.0;
 const BASE_HEIGHT: f32 = 660.0;
 const WEIGHT_REGULAR: i32 = 400;
+const UI_LAB_DOCUMENT_JSON: &str = include_str!("ui_lab_document.json");
 
 /// Host-owned state for the UI Lab view.
 #[derive(Clone)]
@@ -287,108 +289,7 @@ fn status_text(lab: &UiLab) -> String {
 }
 
 fn test_document() -> UiDocument {
-    let actions = stack(
-        "ui.lab.actions",
-        Axis::Vertical,
-        Insets::new(18, 18, 18, 18).expect("fixed UI Lab padding is valid"),
-        10,
-        UiSurfaceTone::Raised,
-        vec![
-            action("ui.lab.inspect", "Inspect layout", UiActionTone::Neutral),
-            action(
-                "ui.lab.hit-test",
-                "Test semantic action",
-                UiActionTone::Accent,
-            ),
-            action(
-                "ui.lab.report",
-                "Report semantic action",
-                UiActionTone::Neutral,
-            ),
-        ],
-    );
-    UiDocument::new(stack(
-        "ui.lab.root",
-        Axis::Vertical,
-        Insets::new(54, 54, 54, 44).expect("fixed UI Lab padding is valid"),
-        14,
-        UiSurfaceTone::Plain,
-        vec![
-            text(
-                "ui.lab.eyebrow",
-                "NATIVE UI FOUNDATION",
-                12,
-                UiTextTone::Accent,
-            ),
-            text("ui.lab.title", "Anodrel UI Lab", 34, UiTextTone::Primary),
-            text(
-                "ui.lab.detail",
-                "A direct Windows renderer interpreting Anodrel's bounded layout tree.",
-                16,
-                UiTextTone::Secondary,
-            ),
-            actions,
-            text(
-                "ui.lab.status",
-                "Latest semantic event: none",
-                14,
-                UiTextTone::Accent,
-            ),
-            text(
-                "ui.lab.boundary",
-                "An action reports only its ID. It cannot call Windows or grant a capability.",
-                13,
-                UiTextTone::Secondary,
-            ),
-        ],
-    ))
-    .expect("fixed UI Lab document is valid")
-}
-
-fn text(id: &str, value: &str, font_size: u16, tone: UiTextTone) -> UiNode {
-    UiNode::Text(
-        Text::new(
-            ElementId::new(id).expect("fixed UI Lab ID is valid"),
-            value,
-            font_size,
-        )
-        .expect("fixed UI Lab text is valid")
-        .with_tone(tone),
-    )
-}
-
-fn action(id: &str, label: &str, tone: UiActionTone) -> UiNode {
-    UiNode::Action(
-        Action::new(
-            ElementId::new(id).expect("fixed UI Lab ID is valid"),
-            label,
-            15,
-            true,
-        )
-        .expect("fixed UI Lab action is valid")
-        .with_tone(tone),
-    )
-}
-
-fn stack(
-    id: &str,
-    axis: Axis,
-    padding: Insets,
-    gap: u16,
-    surface_tone: UiSurfaceTone,
-    children: Vec<UiNode>,
-) -> UiNode {
-    UiNode::Stack(
-        Stack::new(
-            ElementId::new(id).expect("fixed UI Lab ID is valid"),
-            axis,
-            padding,
-            gap,
-            children,
-        )
-        .expect("fixed UI Lab stack is valid")
-        .with_surface_tone(surface_tone),
-    )
+    decode(UI_LAB_DOCUMENT_JSON).expect("compiled UI Lab document matches the v1 contract")
 }
 
 #[cfg(test)]
