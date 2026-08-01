@@ -60,6 +60,10 @@ export class PlatformClient {
     return this.request("platform.health", {});
   }
 
+  replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {
+    return this.request("ui.document.replace", { document });
+  }
+
   async cancel(cancellationId: string): Promise<void> {
     await this.transport.cancel({
       protocolVersion: PROTOCOL_VERSION,

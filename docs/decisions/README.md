@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0032 — UI document replacement is capability-checked and session-bound.
+
 - 0031 — Windows UI preview is an explicit bounded developer tool.
 
 - 0030 — Native UI session state uses atomic document revisions.

@@ -1,6 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.0
+**Status:** Foundation contract, version 1.1
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. It is intentionally limited to core operations
@@ -28,7 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.0 therefore accepts only `{"major": 1, "minor": 0}`.
+the host's. Version 1.1 accepts `{"major": 1, "minor": 0}` and
+`{"major": 1, "minor": 1}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -59,6 +60,30 @@ The current operations are:
 | `platform.ping` | `{ "sentAt": string }` | host receive time and host name | none |
 | `platform.capabilities` | `{}` | application ID and current grants | none |
 | `platform.health` | `{}` | ready status, host name, and version | `diagnostics.read` |
+| `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
+
+### `ui.document.replace`
+
+This operation replaces the one current native UI document for the already
+authenticated application session. `document` is one exact
+`anodrel.ui.document.v1` JSON document as defined by `docs/UI_DOCUMENTS.md`.
+It is data, not HTML, script, a window request, a callback, or a capability
+declaration.
+
+The encoded UTF-8 `document` string is limited to **24 KiB**. The stricter
+limit sits below both the document format's 64 KiB maximum and Wire 1.0's 64
+KiB message limit, leaving bounded space for the envelope and JSON escaping.
+The host validates the whole document atomically through the strict document
+codec. On failure it returns `request.payload_invalid`, exposes no raw document
+content in diagnostics, and retains the prior document and revision.
+
+On success, the result is `{ "revision": string }`. `revision` is a canonical,
+nonzero base-10 unsigned integer string with no leading zero. It is opaque to
+the application except for later event correlation; applications must preserve
+it exactly rather than interpreting it as a JavaScript number. A replacement
+always advances the revision. This operation has no incremental patch form,
+window selection, document readback, action event, renderer attachment, or
+native side effect.
 
 ### Request example
 
@@ -108,7 +133,7 @@ diagnostics containing only `hostName`. Responses have one of two forms:
 }
 ~~~
 
-Version 1.0 defines these stable error codes: `capability.denied`,
+Version 1.1 defines these stable error codes: `capability.denied`,
 `operation.unsupported`, `protocol.version_unsupported`, `request.cancelled`,
 `request.invalid`, and `request.payload_invalid`. Error messages are suitable
 for a developer log but must not contain secrets, raw paths, or native errors.
@@ -122,7 +147,7 @@ Later host operations will document operation-specific cancellation behavior.
 
 Events are opt-in. Every event must include `protocolVersion`, `kind: "event"`,
 `eventName`, `source`, `schemaVersion`, and a typed payload. No events are
-implemented in version 1.0.
+implemented in version 1.1.
 
 ## Security rules
 

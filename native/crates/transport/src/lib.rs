@@ -272,6 +272,10 @@ mod tests {
         )
     }
 
+    fn ui_document_request() -> String {
+        r#"{"protocolVersion":{"major":1,"minor":1},"kind":"request","requestId":"ui-document","operation":"ui.document.replace","payload":{"document":"{\"format\":\"anodrel.ui.document.v1\",\"root\":{\"id\":\"root\",\"kind\":\"text\",\"value\":\"Hello\",\"fontSize\":16,\"tone\":\"primary\"}}"}}"#.to_owned()
+    }
+
     fn decode_response(frame: &[u8]) -> JsonValue {
         let messages = FrameDecoder::new()
             .push(frame)
@@ -358,6 +362,27 @@ mod tests {
                 .expect("error object")["code"]
                 .as_string(),
             Some("capability.denied")
+        );
+    }
+
+    #[test]
+    fn accepts_a_granted_ui_document_replacement_after_authentication() {
+        let mut transport = session(vec![Capability::UiDocumentWrite]);
+        authenticate(&mut transport);
+        let response = transport
+            .receive(&encode_json(&ui_document_request()).expect("request encodes"))
+            .expect("authenticated request succeeds");
+        let response = decode_response(&response[0]);
+        assert_eq!(
+            response.as_object().expect("response object")["status"].as_string(),
+            Some("success")
+        );
+        assert_eq!(
+            response.as_object().expect("response object")["result"]
+                .as_object()
+                .expect("result object")["revision"]
+                .as_string(),
+            Some("1")
         );
     }
 

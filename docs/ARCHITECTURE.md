@@ -205,7 +205,10 @@ snapshot, and portable focus traversal. `anodrel-ui-document` separately owns
 the exact, bounded JSON interchange form for that tree. The Windows UI Lab
 decodes a fixed compile-time fixture through it, and the separate explicit
 Windows developer preview can render one bounded operator-selected document.
-Neither crate has operating-system authority. The
+`anodrel-ui-session` owns the revision-bound state behind one authenticated
+transport session's capability-checked 24 KiB document replacement operation;
+it is not attached to a window and cannot deliver action events. None of these
+crates has operating-system authority. The
 `anodrel-ui-session` separately owns one revision-bound current document and
 semantic-action validation, but does not authenticate or deliver events. The
 host remains responsible for text measurement, mapping appearance roles to an

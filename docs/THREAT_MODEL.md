@@ -9,9 +9,9 @@ This model covers the protocol, SDK, and mock-host foundation. It defines the
 controls a Windows native host must satisfy; it does not claim that the current
 in-memory mock provides operating-system isolation.
 
-The only current operations are `platform.ping`, `platform.capabilities`, and
-`platform.health`. They expose no filesystem, process, credential, window, or
-network authority.
+The current operations are `platform.ping`, `platform.capabilities`,
+`platform.health`, and `ui.document.replace`. They expose no filesystem,
+process, credential, window, or network authority.
 
 ## Assets to protect
 
@@ -66,6 +66,7 @@ authority for permissions.
 | A future application supplies malformed or oversized UI data. | Decode only the exact `anodrel.ui.document.v1` schema through the 64 KiB strict JSON boundary and validate every existing UI model limit before returning a document. The host accepts an external document only through its separate explicit bounded developer preview command, never an application session. |
 | An operator-selected preview file creates broader host access. | The preview opens only one bounded regular UTF-8 file named directly on the local command line, validates it before window creation, and loads no companion file, package, policy, session, asset, executable, URL, or native capability. |
 | A late input event targets a replaced UI document. | Bind every accepted semantic action to the exact monotonic document revision that produced its layout; reject events for an empty, replaced, removed, or disabled action. The current state crate has no I/O or application delivery path. |
+| An authenticated application overwhelms or corrupts its UI session. | Require the host-issued `ui.document.write` grant immediately before `ui.document.replace`; limit its encoded document string to 24 KiB within the 64 KiB wire message; use the strict v1 codec and atomic replacement; expose only a revision string and retain the prior state on failure. No window binding, document readback, or event delivery exists yet. |
 | Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
 | A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
 | Two native windows render each other's state or one close ends the host early. | Keep immutable host-created views in a handle-keyed registry and exit the UI loop only after the final registered window is destroyed. |

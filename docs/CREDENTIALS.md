@@ -66,7 +66,7 @@ persist policy, and input limits are stable. Changing any of them requires a
 migration plan, a documented compatibility version, and tests that can compare
 the old and new stores.
 
-No `platform.credentials.*` operation exists in Protocol 1.0. A future public
+No `platform.credentials.*` operation exists in Protocol v1. A future public
 surface must define read, write, and delete capabilities; authenticated session
 binding; consent and revocation behavior; cancellation; safe error mapping;
 and mock/native compatibility tests before it can provide a secret to an

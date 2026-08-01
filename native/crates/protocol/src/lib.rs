@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 0;
+pub const PROTOCOL_MINOR: u16 = 1;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -29,9 +29,7 @@ impl ProtocolVersion {
     };
 
     pub const fn is_supported(self) -> bool {
-        // Version 1.0 has no earlier minor version to retain. Update this rule
-        // alongside docs/PROTOCOL.md before a new v1 minor release ships.
-        self.major == PROTOCOL_MAJOR && self.minor == PROTOCOL_MINOR
+        self.major == PROTOCOL_MAJOR && self.minor <= PROTOCOL_MINOR
     }
 
     pub fn to_json(self) -> JsonValue {
@@ -45,12 +43,14 @@ impl ProtocolVersion {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Capability {
     DiagnosticsRead,
+    UiDocumentWrite,
 }
 
 impl Capability {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DiagnosticsRead => "diagnostics.read",
+            Self::UiDocumentWrite => "ui.document.write",
         }
     }
 }

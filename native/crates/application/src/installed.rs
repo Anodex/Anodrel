@@ -348,6 +348,7 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
         for value in values {
             let capability = match value.as_string() {
                 Some("diagnostics.read") => Capability::DiagnosticsRead,
+                Some("ui.document.write") => Capability::UiDocumentWrite,
                 _ => return Err(InstalledApplicationError::InvalidRecord),
             };
             if grants.contains(&capability) {
@@ -654,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn record_v1_1_accepts_only_the_supported_machine_grant() {
+    fn record_v1_1_accepts_only_supported_machine_grants() {
         let fixture = fixture();
         let record = fs::read_to_string(&fixture.record_path).expect("record is read");
         let record = record.replace("\"minor\": 0", "\"minor\": 1").replace(
@@ -669,9 +670,20 @@ mod tests {
             &[anodrel_protocol::Capability::DiagnosticsRead]
         );
 
+        let ui_grant = fs::read_to_string(&fixture.record_path)
+            .expect("validated record is read")
+            .replace("diagnostics.read", "ui.document.write");
+        fs::write(&fixture.record_path, ui_grant).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("UI document grant is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[anodrel_protocol::Capability::UiDocumentWrite]
+        );
+
         let unsupported = fs::read_to_string(&fixture.record_path)
             .expect("validated record is read")
-            .replace("diagnostics.read", "credentials.read");
+            .replace("ui.document.write", "credentials.read");
         fs::write(&fixture.record_path, unsupported).expect("record is updated");
         assert!(matches!(
             InstalledApplication::load(&fixture.record_path, &fixture.policy_root),

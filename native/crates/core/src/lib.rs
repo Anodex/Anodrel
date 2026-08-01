@@ -7,6 +7,7 @@
 //! can authorize a privileged operation.
 
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -15,8 +16,10 @@ use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
 };
+use anodrel_ui_session::UiDocumentSession;
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
+pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
 
 #[derive(Clone, Debug)]
 pub struct HostPolicy {
@@ -58,11 +61,15 @@ impl HostPolicy {
 #[derive(Debug)]
 pub struct CoreHost {
     policy: HostPolicy,
+    ui_document_session: RefCell<UiDocumentSession>,
 }
 
 impl CoreHost {
     pub fn new(policy: HostPolicy) -> Self {
-        Self { policy }
+        Self {
+            policy,
+            ui_document_session: RefCell::new(UiDocumentSession::new()),
+        }
     }
 
     pub fn handle_json(&self, message: &str) -> String {
@@ -112,6 +119,9 @@ impl CoreHost {
             "platform.ping" => self.handle_ping(request),
             "platform.capabilities" => self.handle_capabilities(request),
             "platform.health" => self.handle_health(request),
+            "ui.document.replace" if request.protocol_version.minor >= 1 => {
+                self.handle_ui_document_replace(request)
+            }
             _ => self.failure(
                 request.request_id,
                 ProtocolErrorCode::OperationUnsupported,
@@ -202,6 +212,57 @@ impl CoreHost {
         )
     }
 
+    fn handle_ui_document_replace(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(document) = ui_document_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.document.replace requires one document string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::UiDocumentWrite) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::CapabilityDenied,
+                "ui.document.replace requires the ui.document.write capability.",
+                Some(BTreeMap::from([(
+                    "capability".to_owned(),
+                    JsonValue::String("ui.document.write".to_owned()),
+                )])),
+            );
+        }
+        if document.len() > MAX_UI_DOCUMENT_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.document.replace document exceeded the operation size limit.",
+                None,
+            );
+        }
+
+        let revision = match self
+            .ui_document_session
+            .borrow_mut()
+            .replace_document(document)
+        {
+            Ok(revision) => revision,
+            Err(_) => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::RequestPayloadInvalid,
+                    "ui.document.replace document is invalid.",
+                    None,
+                );
+            }
+        };
+        ResponseEnvelope::success(
+            request.request_id,
+            &self.policy.host_name,
+            object([("revision", JsonValue::String(revision.value().to_string()))]),
+        )
+    }
+
     fn failure(
         &self,
         request_id: String,
@@ -211,6 +272,14 @@ impl CoreHost {
     ) -> JsonValue {
         ResponseEnvelope::failure(request_id, &self.policy.host_name, code, message, details)
     }
+}
+
+fn ui_document_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("document"))
+        .flatten()
+        .and_then(JsonValue::as_string)
 }
 
 fn rfc3339_now() -> String {
@@ -265,6 +334,22 @@ mod tests {
         )
     }
 
+    fn request_v1_1(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":1}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn ui_document_payload(document: &str) -> String {
+        object([("document", JsonValue::String(document.to_owned()))]).to_json()
+    }
+
+    fn valid_ui_document(label: &str) -> String {
+        format!(
+            r#"{{"format":"anodrel.ui.document.v1","root":{{"id":"root","kind":"action","label":"{label}","fontSize":16,"enabled":true,"tone":"accent"}}}}"#
+        )
+    }
+
     fn field<'a>(value: &'a JsonValue, field: &str) -> &'a JsonValue {
         &value.as_object().expect("response is an object")[field]
     }
@@ -296,6 +381,68 @@ mod tests {
         assert_eq!(
             field(field(&response, "error"), "code").as_string(),
             Some("capability.denied")
+        );
+    }
+
+    #[test]
+    fn replaces_ui_documents_only_with_the_current_capability_and_protocol_minor() {
+        let document = valid_ui_document("Continue");
+        let update_request = request_v1_1("ui.document.replace", &ui_document_payload(&document));
+
+        let denied = JsonValue::parse(&host(vec![]).handle_json(&update_request))
+            .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let host = host(vec![Capability::UiDocumentWrite]);
+        let first =
+            JsonValue::parse(&host.handle_json(&update_request)).expect("response JSON is valid");
+        assert_eq!(field(&first, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&first, "result"), "revision").as_string(),
+            Some("1")
+        );
+
+        let invalid = request_v1_1("ui.document.replace", &ui_document_payload("not JSON"));
+        let invalid =
+            JsonValue::parse(&host.handle_json(&invalid)).expect("response JSON is valid");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let second_document = valid_ui_document("Continue safely");
+        let second = JsonValue::parse(&host.handle_json(&request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(&second_document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&second, "result"), "revision").as_string(),
+            Some("2")
+        );
+
+        let old_minor = JsonValue::parse(&host.handle_json(&request(
+            "ui.document.replace",
+            &ui_document_payload(&document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&old_minor, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+
+        let oversized = request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(&"x".repeat(MAX_UI_DOCUMENT_REQUEST_BYTES + 1)),
+        );
+        let oversized =
+            JsonValue::parse(&host.handle_json(&oversized)).expect("response JSON is valid");
+        assert_eq!(
+            field(field(&oversized, "error"), "code").as_string(),
+            Some("request.payload_invalid")
         );
     }
 

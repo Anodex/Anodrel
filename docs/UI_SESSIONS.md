@@ -54,11 +54,17 @@ native operation.
 
 ## Compatibility and future integration
 
-This is a Rust state API, not an application wire operation. It has no client-
-supplied session ID, request ID, event sequence, acknowledgement, or queue. A
-future protocol or authenticated transport must define those fields, bounded
-back-pressure, cancellation, error mapping, application identity binding, and
-window lifecycle before it connects an external client to this state machine.
+The state API has no client-supplied session ID, request ID, event sequence,
+acknowledgement, or queue. `ui.document.replace` now binds one authenticated
+transport session to this state after its `ui.document.write` capability check;
+it accepts only a 24 KiB encoded document and maps validation failure to a safe
+protocol payload error. The state itself still has no I/O or knowledge of that
+operation.
+
+The transport does not yet deliver events, expose document readback, attach the
+state to a native window, or implement cancellation and back-pressure for
+updates. Those need their own contracts before this becomes an interactive
+application surface.
 
 ## Verification
 

@@ -47,7 +47,7 @@ extension may add a new named location. Renaming a location, changing the root,
 or changing an application-ID-to-directory mapping needs an explicit migration
 and a new documented version.
 
-No `platform.paths` operation exists in Protocol 1.0. Until a host exposes a
+No `platform.paths` operation exists in Protocol v1. Until a host exposes a
 documented storage or logging capability, these absolute paths remain native
 host values and must not appear in rendered content, protocol diagnostics, or
 the typed diagnostic log.

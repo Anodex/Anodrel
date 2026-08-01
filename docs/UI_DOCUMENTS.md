@@ -3,8 +3,10 @@
 **Status:** Foundation contract. This format can be decoded into the portable
 `anodrel-ui` model. The Windows UI Lab decodes one compiled-in host fixture to
 exercise the contract, and the separate explicit Windows developer preview can
-render one bounded operator-selected file. No package loader, protocol
-operation, or application session accepts this format yet.
+render one bounded operator-selected file. The authenticated
+`ui.document.replace` protocol operation can accept one more tightly bounded
+document for its own session state; it does not attach a document to a window
+or deliver action events yet.
 
 ## Purpose and boundary
 
@@ -17,9 +19,11 @@ a window request, or a capability declaration.
 Decoding validates the complete document before returning it. A successfully
 decoded action still carries only its element ID; rendering or invoking it
 cannot open a process, read a file, send a protocol message, or grant a
-capability. A future authenticated application session must define its own
-lifecycle, quotas, update behavior, event delivery, and capability checks
-before passing externally supplied documents to a native host.
+capability. The first authenticated replacement operation is documented in
+`docs/PROTOCOL.md`. It has a `ui.document.write` capability, a 24 KiB embedded
+document limit, atomic revision result, and no window or action-event bridge.
+Window lifecycle, event delivery, queues, and rendering remain separate
+contracts.
 
 ## Envelope
 
@@ -133,5 +137,7 @@ appearance roles, unknown and missing fields, malformed values, unsupported
 format identifiers, size limits, and model-level document limits. It has only
 first-party `anodrel-ui` and `anodrel-json` dependencies and no operating-
 system calls. The Windows host additionally builds and renders its compiled-in
-UI Lab fixture through this decoder and offers a separate bounded developer
-preview input; neither path reads UI JSON from an application session.
+UI Lab fixture through this decoder, offers a separate bounded developer
+preview input, and uses it from the capability-checked document-replacement
+state in an authenticated transport session. None of those paths attaches
+application data to a native application window or delivers UI events.

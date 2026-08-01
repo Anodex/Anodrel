@@ -30,6 +30,32 @@ test("SDK and host agree on successful core operations", async () => {
   });
 });
 
+test("SDK and host bind UI document revisions to one granted transport session", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["ui.document.write"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+  const document =
+    '{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"Hello","fontSize":16,"tone":"primary"}}';
+
+  assert.deepEqual(await client.replaceUiDocument(document), { revision: "1" });
+  assert.deepEqual(await client.replaceUiDocument(document), { revision: "2" });
+});
+
+test("UI document replacement requires a host-issued grant", async () => {
+  const host = new MockHost({ applicationId: "test.application" });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  await assert.rejects(
+    () => client.replaceUiDocument('{"format":"anodrel.ui.document.v1","root":{}}'),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "ui.document.write",
+  );
+});
+
 test("host derives grants from policy and ignores a forged request context", async () => {
   const host = new MockHost({ applicationId: "test.application", now: fixedTime });
   const request = {

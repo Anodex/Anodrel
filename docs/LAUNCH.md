@@ -46,7 +46,7 @@ fields are rejected.
   "publisher": {
     "leafCertificateSha256": "64 lowercase hexadecimal characters"
   },
-  "capabilities": ["diagnostics.read"]
+  "capabilities": ["diagnostics.read", "ui.document.write"]
 }
 ~~~
 
@@ -58,7 +58,7 @@ fields are rejected.
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
-| `capabilities` | Required only in 1.1. Exact non-duplicate supported grants selected by machine policy; 1.1 currently supports only `diagnostics.read`. |
+| `capabilities` | Required only in 1.1. Exact non-duplicate supported grants selected by machine policy; 1.1 supports `diagnostics.read` and `ui.document.write`. |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's

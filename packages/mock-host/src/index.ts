@@ -2,6 +2,7 @@ import {
   PROTOCOL_VERSION,
   isCancellationEnvelope,
   isEmptyPayload,
+  isUiDocumentReplacePayload,
   isPingPayload,
   isSupportedProtocolVersion,
   isWireRequestEnvelope,
@@ -39,6 +40,9 @@ export interface MockHostTransport {
 /**
  * A deterministic host for application and contract tests. It deliberately
  * derives capability context from host configuration rather than request data.
+ * It validates the bounded replacement payload but does not duplicate the
+ * native strict UI document decoder; that decoder remains the authority at the
+ * authenticated host boundary.
  */
 export class MockHost {
   private readonly applicationId: string;
@@ -60,12 +64,13 @@ export class MockHost {
 
   createTransport(sessionId = `mock-session-${++this.sessionCount}`): MockHostTransport {
     const cancelled = new Set<string>();
+    const uiDocument = { revision: 0 };
 
     return {
       send: async <TOperation extends PlatformOperation>(
         request: RequestEnvelope<TOperation>,
       ) =>
-        this.handle(request, sessionId, cancelled) as Promise<ResponseEnvelope<TOperation>>,
+        this.handle(request, sessionId, cancelled, uiDocument) as Promise<ResponseEnvelope<TOperation>>,
       cancel: async (cancellation: CancellationEnvelope) => {
         if (!isCancellationEnvelope(cancellation)) {
           throw new Error("MockHost received an invalid cancellation envelope.");
@@ -84,6 +89,7 @@ export class MockHost {
     request: unknown,
     sessionId = `direct-session-${++this.sessionCount}`,
     cancelled: ReadonlySet<string> = new Set(),
+    uiDocument: UiDocumentState = { revision: 0 },
   ): Promise<ResponseEnvelope> {
     const requestId = extractRequestId(request);
 
@@ -107,10 +113,14 @@ export class MockHost {
       );
     }
 
-    return this.dispatch(request, sessionId);
+    return this.dispatch(request, sessionId, uiDocument);
   }
 
-  private dispatch(request: WireRequestEnvelope, sessionId: string): ResponseEnvelope {
+  private dispatch(
+    request: WireRequestEnvelope,
+    sessionId: string,
+    uiDocument: UiDocumentState,
+  ): ResponseEnvelope {
     switch (request.operation) {
       case "platform.ping":
         if (!isPingPayload(request.payload)) {
@@ -158,6 +168,34 @@ export class MockHost {
           status: "ready",
           hostName: this.hostName,
           protocolVersion: PROTOCOL_VERSION,
+        });
+
+      case "ui.document.replace":
+        if (request.protocolVersion.minor < 1) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "ui.document.replace requires protocol 1.1 or later.",
+          );
+        }
+        if (!isUiDocumentReplacePayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "ui.document.replace requires one bounded document string.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "ui.document.write")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "ui.document.replace requires the ui.document.write capability.",
+            { capability: "ui.document.write" },
+          );
+        }
+        uiDocument.revision += 1;
+        return this.success("ui.document.replace", request.requestId, {
+          revision: uiDocument.revision.toString(),
         });
 
       default:
@@ -209,6 +247,10 @@ export class MockHost {
   private diagnostics(): ResponseDiagnostics {
     return { hostName: this.hostName };
   }
+}
+
+interface UiDocumentState {
+  revision: number;
 }
 
 function extractRequestId(value: unknown): string {

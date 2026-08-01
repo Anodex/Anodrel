@@ -3,10 +3,11 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 0 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 1 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
+export const MAX_UI_DOCUMENT_REQUEST_BYTES = 24 * 1024;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -14,7 +15,7 @@ export interface ProtocolVersion {
 }
 
 /** Capabilities are granted by the host policy, never by rendered application content. */
-export type Capability = "diagnostics.read";
+export type Capability = "diagnostics.read" | "ui.document.write";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -37,6 +38,10 @@ export interface PlatformOperationMap {
       readonly hostName: string;
       readonly protocolVersion: ProtocolVersion;
     };
+  };
+  "ui.document.replace": {
+    readonly payload: { readonly document: string };
+    readonly result: { readonly revision: string };
   };
 }
 
@@ -201,6 +206,18 @@ export function isPingPayload(value: unknown): value is PayloadFor<"platform.pin
 
 export function isEmptyPayload(value: unknown): value is EmptyPayload {
   return isRecord(value) && Object.keys(value).length === 0;
+}
+
+/** Validates the bounded outer payload for an authenticated UI document update. */
+export function isUiDocumentReplacePayload(
+  value: unknown,
+): value is PayloadFor<"ui.document.replace"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.document === "string" &&
+    new TextEncoder().encode(value.document).byteLength <= MAX_UI_DOCUMENT_REQUEST_BYTES
+  );
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
