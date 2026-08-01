@@ -15,8 +15,11 @@ if errorlevel 1 (
   goto :failure
 )
 
-echo Starting the Anodrel Startup Lab...
-cargo run --manifest-path native\Cargo.toml -p anodrel-windows-host -- --showcase apps\sample\anodrel.application.json
+echo Building and starting the Anodrel Startup Lab...
+echo The first build takes a moment; later runs start immediately.
+rem Release is required, not a preference: the Startup Lab composes every frame
+rem in software, and an unoptimised build cannot hold the reveal's frame rate.
+cargo run --release --manifest-path native\Cargo.toml -p anodrel-windows-host -- --showcase apps\sample\anodrel.application.json
 set "exit_code=%ERRORLEVEL%"
 
 if not "%exit_code%"=="0" (

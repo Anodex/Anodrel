@@ -7,7 +7,10 @@ authenticated named-pipe, private child bootstrap, direct Windows host, and
 strict application package modules prove bounded protocol handling, local
 session protection, private credential delivery, window lifecycle, a
 development-only end-to-end health probe, a digest-verified no-script text
-surface, and a branded native Startup Lab visual smoke test.
+surface, and a branded native Startup Lab visual smoke test. First-party
+surfaces are composed by an owned, portable software renderer and presented in a
+single blit; the Startup Lab shows every intended action tile, each in a
+declared linked or planned state tracked in ROADMAP.md.
 
 ## What this project is
 
@@ -55,6 +58,12 @@ This repository has its own Git history root and currently contains:
 - native/ — owned Rust JSON, protocol, core, wire, transport, authenticated
   Windows named-pipe, and direct Win32 window modules;
   the deployed dependency graph contains no third-party runtime library.
+- native/crates/canvas and native/crates/brand — a portable software rasterizer
+  and the Anodrel identity: the authored mark committed pre-decoded, plus colour
+  tokens and small-size geometry. Both crates are free of operating-system and
+  third-party dependencies and forbid unsafe code, so a future macOS or Linux
+  host reuses them unchanged.
+- docs/RENDERER.md — the renderer and brand API contract.
 
 ## Current architectural direction
 
@@ -140,9 +149,10 @@ Read these files in order:
 5. docs/DEVELOPMENT.md
 6. docs/PROTOCOL.md
 7. docs/TRANSPORT.md
-8. docs/PERFORMANCE.md
-9. docs/THREAT_MODEL.md
-10. docs/decisions/
+8. docs/RENDERER.md
+9. docs/PERFORMANCE.md
+10. docs/THREAT_MODEL.md
+11. docs/decisions/
 
 Before adding application content or privileged native behavior, review the
 open decisions and extend the threat model. The foundation is published to the

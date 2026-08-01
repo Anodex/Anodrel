@@ -15,9 +15,46 @@ const MAX_TEXT_SCALARS: usize = 4_096;
 const MAX_TEXT_LINES: usize = 128;
 const MAX_TEXT_LINE_SCALARS: usize = 160;
 
+/// Facts about content that has already passed containment and digest checks.
+///
+/// Every field here is safe for a host surface to display: the path is the
+/// manifest's declared relative path, never the resolved filesystem location,
+/// and the digest is the value that was verified rather than one recomputed on
+/// demand.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedContent {
+    format: String,
+    path: String,
+    digest: String,
+    byte_length: usize,
+}
+
+impl VerifiedContent {
+    /// Returns the declared content format.
+    pub fn format(&self) -> &str {
+        &self.format
+    }
+
+    /// Returns the package-relative content path declared by the manifest.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Returns the verified SHA-256 digest as lower-case hexadecimal.
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    /// Returns the number of content bytes that were hashed.
+    pub fn byte_length(&self) -> usize {
+        self.byte_length
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ApplicationPackage {
     identity: ApplicationIdentity,
+    content: VerifiedContent,
     text: String,
 }
 
@@ -41,17 +78,29 @@ impl ApplicationPackage {
         if sha256::digest(&content_bytes) != *manifest.content_digest() {
             return Err(ApplicationError::ContentDigestMismatch);
         }
+        let byte_length = content_bytes.len();
         let text = String::from_utf8(content_bytes).map_err(|_| ApplicationError::InvalidText)?;
         validate_text(&text)?;
 
         Ok(Self {
             identity: manifest.identity().clone(),
+            content: VerifiedContent {
+                format: crate::TEXT_CONTENT_FORMAT.to_owned(),
+                path: manifest.content_path().to_owned(),
+                digest: sha256::to_lower_hex(manifest.content_digest()),
+                byte_length,
+            },
             text,
         })
     }
 
     pub fn identity(&self) -> &ApplicationIdentity {
         &self.identity
+    }
+
+    /// Returns the verified facts about the package's content.
+    pub fn content(&self) -> &VerifiedContent {
+        &self.content
     }
 
     /// Returns text that has passed the documented size and character limits.

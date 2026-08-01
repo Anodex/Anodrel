@@ -1,2 +1,6 @@
 # Digest-verified package content must retain its exact authored bytes.
 /apps/sample/content/main.txt -text
+
+# Pre-decoded brand artwork. These are raw pixels, not text; any line-ending
+# translation would corrupt them silently.
+*.bgra binary

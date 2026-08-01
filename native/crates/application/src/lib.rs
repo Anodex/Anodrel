@@ -14,7 +14,7 @@ mod sha256;
 use std::{fmt, io};
 
 pub use manifest::{ApplicationIdentity, ApplicationManifest};
-pub use package::ApplicationPackage;
+pub use package::{ApplicationPackage, VerifiedContent};
 
 /// Maximum manifest size accepted before UTF-8 or JSON decoding.
 pub const MAX_MANIFEST_BYTES: usize = 16 * 1024;

@@ -113,6 +113,33 @@ the current package and Startup Lab surfaces cannot supply entries to it. A
 failed multi-window creation is rolled back before the message loop starts, and
 closing one window does not end the host while another registered window exists.
 
+## Rendering boundary
+
+First-party surfaces are composed by owned, portable crates that forbid unsafe
+code and read nothing but the values passed to them. Rendering is a pure
+function from host-supplied data to pixels: it opens no handle, reads no file,
+and reaches no operating-system API. The host's drawing seam is narrow by
+construction — a bitmap blit, a private memory device context used only to
+rasterize glyphs the host itself chose, and a display-density query.
+
+Application text reaching a surface is laid out, never interpreted. Content
+arrives as opaque paragraphs that are measured and wrapped; no character carries
+markup, link, or script meaning, and no glyph run can address anything outside
+the canvas it is composited into.
+
+The window layer receives a copy of the display-safe facts about a validated
+package rather than the package itself. It therefore cannot reach a canonical
+filesystem path, an unvalidated manifest field, or content that failed a digest
+check. A manifest's declared relative content path may be displayed; the
+absolute path it resolves to may not.
+
+Diagnostic readings shown on a surface are limited to measurements this process
+can take about itself. Interactive tiles that are not backed by an existing
+capability carry a declared pending state that both drawing and hit-testing
+read, so a control cannot be made live by changing how it looks. Any tile that
+would carry a privileged capability — process launch in particular — requires an
+entry in this document before it becomes active.
+
 The development sample exercises this private path with a developer-supplied
 Node.js executable and an owned sample script. It has no executable identity
 verification and ends with the host process, so it creates no production

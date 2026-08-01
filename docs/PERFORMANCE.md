@@ -12,7 +12,8 @@ Anodrel application is automatically faster.
 | Area | Anodrel requirement | Current protection |
 | --- | --- | --- |
 | Runtime ownership | No third-party shipped native runtime dependency. | Native dependency tree contains only Anodrel crates. |
-| Native work | Keep raw OS calls isolated behind small adapters. | Win32 calls live only in `native/hosts/windows/src/win32.rs`. |
+| Native work | Keep raw OS calls isolated behind small adapters. | Win32 calls live only under `native/hosts/windows/src/win32/`; the renderer and brand crates reach no OS API at all. |
+| Rendering | A frame must compose inside the animation timer's interval, or motion drops frames. | Measured and asserted by `an_animated_frame_fits_inside_the_timer_interval` in a release build; roughly 10 ms for the 1240×900 Startup Lab. |
 | Message memory | Bound bytes before parsing and bound a single receive burst. | 64 KiB payload; four framed messages per receive. |
 | Startup | Do no application I/O, network work, or deferred-service initialization before the first window is responsive. | Current host performs only its internal health check. |
 | UI responsiveness | Never block the Windows message loop on stream I/O or expensive work. | Required by the transport contract; adapter work is not implemented yet. |
@@ -37,6 +38,10 @@ comparison. A result is only meaningful for the named application and workload.
 ## Initial verification
 
 `cargo tree --manifest-path native/Cargo.toml` verifies the owned native graph.
+Rendering is measured in a release build only; an unoptimised build is roughly
+ten times slower and is not representative. Because software rendering costs
+real time, expensive invariant layers are cached by the host rather than
+recomposed each frame — see `docs/RENDERER.md`.
 The wire and session unit tests verify framing, limits, fragmentation,
 coalescing, authentication, and capability policy without timing-sensitive
 assertions. The Windows adapter integration test exercises a real local named

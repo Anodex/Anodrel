@@ -3,6 +3,8 @@ members = [
   "crates/json",
   "crates/protocol",
   "crates/core",
+  "crates/canvas",
+  "crates/brand",
   "crates/wire",
   "crates/transport",
   "crates/bootstrap",

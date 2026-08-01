@@ -3,7 +3,7 @@
 mod sample;
 mod win32;
 
-use std::{env, error::Error, io};
+use std::{env, error::Error, io, time::Instant};
 
 use anodrel_application::ApplicationPackage;
 use anodrel_core::{CoreHost, HostPolicy};
@@ -12,6 +12,10 @@ use anodrel_windows_instance::{InstanceClaim, InstanceScope, claim};
 use anodrel_windows_pipe::run_health_self_test;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let started = Instant::now();
+    // Requested before any window exists, so the surface is composed at the
+    // display's real pixel density instead of being scaled up by the system.
+    win32::enable_dpi_awareness();
     let arguments = env::args().skip(1).collect::<Vec<_>>();
     if let [command, node_path, client_path] = arguments.as_slice()
         && command == "--sample-client"
@@ -26,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let [command, manifest_path] = arguments.as_slice()
         && command == "--showcase"
     {
-        return run_startup_lab(manifest_path);
+        return run_startup_lab(manifest_path, started);
     }
     if arguments.as_slice() == ["--window-lab"] {
         return win32::run_window_lab().map_err(Into::into);
@@ -47,7 +51,7 @@ fn run_diagnostics_window() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_startup_lab(manifest_path: &str) -> Result<(), Box<dyn Error>> {
+fn run_startup_lab(manifest_path: &str, started: Instant) -> Result<(), Box<dyn Error>> {
     let package = ApplicationPackage::load(manifest_path)?;
     let instance = match claim(
         package.identity().application_id(),
@@ -62,12 +66,23 @@ fn run_startup_lab(manifest_path: &str) -> Result<(), Box<dyn Error>> {
         vec![Capability::DiagnosticsRead],
         "anodrel-windows-host",
     )?)?;
-    win32::run_startup_lab(
-        package.identity().display_name(),
-        package.identity().application_id(),
-        &instance,
-    )?;
+    win32::run_startup_lab(package_facts(&package), &instance, started.elapsed())?;
     Ok(())
+}
+
+/// Copies the display-safe facts out of a validated package.
+///
+/// The window layer never receives the package itself, so it cannot reach a
+/// resolved filesystem path or any value that skipped validation.
+fn package_facts(package: &ApplicationPackage) -> win32::PackageFacts {
+    win32::PackageFacts {
+        display_name: package.identity().display_name().to_owned(),
+        application_id: package.identity().application_id().to_owned(),
+        content_format: package.content().format().to_owned(),
+        content_path: package.content().path().to_owned(),
+        content_digest: package.content().digest().to_owned(),
+        content_bytes: package.content().byte_length(),
+    }
 }
 
 fn check_core_health() -> Result<String, Box<dyn Error>> {
@@ -92,17 +107,12 @@ fn run_application_window(manifest_path: &str) -> Result<(), Box<dyn Error>> {
         InstanceClaim::Existing(existing) => return Ok(existing.activate()?),
     };
     let title = format!("Anodrel - {}", package.identity().display_name());
-    let display = application_display(&package);
-    win32::run_application(&title, &display, &instance)?;
+    let subtitle = format!(
+        "Verified package  ·  {}",
+        package.identity().application_id()
+    );
+    win32::run_application(&title, &subtitle, package.text(), &instance)?;
     Ok(())
-}
-
-fn application_display(package: &ApplicationPackage) -> String {
-    format!(
-        "Anodrel verified application package\n\napplication: {}\ncontent integrity: verified\nformat: anodrel.text.v1\n\n{}",
-        package.identity().application_id(),
-        package.text()
-    )
 }
 
 fn health_display(response: &str) -> Result<String, Box<dyn Error>> {
@@ -148,7 +158,7 @@ fn string_field<'a>(
 mod tests {
     use anodrel_application::ApplicationPackage;
 
-    use super::{application_display, check_core_health, health_display};
+    use super::{check_core_health, health_display, package_facts};
 
     #[test]
     fn displays_a_valid_health_response() {
@@ -185,10 +195,20 @@ mod tests {
 
         let package = ApplicationPackage::load(root.join("anodrel.application.json"))
             .expect("fixture package is valid");
-        let display = application_display(&package);
+        let facts = package_facts(&package);
 
-        assert!(display.contains("application: org.anodrel.sample"));
-        assert!(display.contains("Verified package text."));
+        assert_eq!(facts.application_id, "org.anodrel.sample");
+        assert_eq!(facts.display_name, "Anodrel Sample");
+        assert_eq!(facts.content_format, "anodrel.text.v1");
+        assert_eq!(facts.content_path, "content/main.txt");
+        assert_eq!(facts.content_bytes, "Verified package text.".len());
+        // The facts handed to the window layer carry the verified digest and
+        // the declared relative path, never a resolved filesystem location.
+        assert_eq!(
+            facts.content_digest,
+            "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585"
+        );
+        assert!(!facts.content_path.contains(':'));
         std::fs::remove_dir_all(root).expect("fixture directory is removed");
     }
 }

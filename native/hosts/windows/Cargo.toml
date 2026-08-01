@@ -6,8 +6,12 @@ license.workspace = true
 
 [dependencies]
 anodrel-application = { path = "../../crates/application" }
+anodrel-brand = { path = "../../crates/brand" }
+anodrel-canvas = { path = "../../crates/canvas" }
 anodrel-core = { path = "../../crates/core" }
+anodrel-json = { path = "../../crates/json" }
 anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
 anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

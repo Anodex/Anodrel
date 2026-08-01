@@ -61,6 +61,10 @@ Status: **Direct Windows host in progress**
   routing, final-window shutdown, a two-window diagnostic, and the verified
   no-script text package surface (Decision 0012). A public application window
   capability remains deferred.
+- Draw first-party surfaces with an owned renderer. **Completed:** a portable
+  software rasterizer and brand crate, single-blit presentation, glyph coverage
+  lifted from the platform text engine, a run-time generated window icon, and
+  per-monitor DPI awareness (Decision 0013). See `docs/RENDERER.md`.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
 - Implement secure credential storage through the operating system.
 - Add logging, crash reporting boundaries, and shutdown behavior.
@@ -77,6 +81,24 @@ text surface. A development-only Node sample now proves the full bootstrap,
 authentication, and `platform.health` path over the real pipe. Remaining
 acceptance work includes verified executable launch bound to an application
 identity, a capability bridge, and operation-specific native tests.
+
+## Startup Lab action tiles
+
+The Startup Lab shows every action the platform intends to offer, each in a
+declared **linked** or **planned** state (Decision 0014). This table is the
+list to work through: a tile moves to linked when the capability behind it
+exists, is documented, and — where it is privileged — has a threat-model entry.
+Linking a tile is then a data change plus its capability, not a redesign.
+
+| Tile | State | Gate to link it |
+| --- | --- | --- |
+| Launch Sample | Planned | Signed package distribution and verified executable identity, bound to a validated application ID through the existing private bootstrap boundary. This is the Phase 2 acceptance item and carries the largest threat-model change; it must not be linked before that entry exists. |
+| Open Logs | Planned | A logging boundary with defined redaction: logs must not carry credentials, raw secret material, canonical paths, or untrusted application text. Needs the "logging, crash reporting boundaries" item above. |
+| Inspect Package | **Linked** | Done. Displays facts already verified at startup; introduces no capability. |
+| Runtime Diagnostics | **Linked** | Done. Displays this process's own readings; introduces no capability. |
+
+Adding a tile beyond these four requires the same treatment: show it planned
+with its gate stated, and link it only once the capability is real.
 
 ## Phase 3 — Reusable SDK and tooling
 

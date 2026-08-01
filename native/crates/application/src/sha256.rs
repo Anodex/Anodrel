@@ -84,6 +84,17 @@ pub fn digest(input: &[u8]) -> [u8; 32] {
     hasher.finish()
 }
 
+/// Renders a digest as lower-case hexadecimal.
+pub fn to_lower_hex(digest: &[u8; 32]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(64);
+    for byte in digest {
+        out.push(DIGITS[usize::from(byte >> 4)] as char);
+        out.push(DIGITS[usize::from(byte & 0x0F)] as char);
+    }
+    out
+}
+
 pub fn parse_lower_hex(input: &str) -> Option<[u8; 32]> {
     if input.len() != 64 {
         return None;

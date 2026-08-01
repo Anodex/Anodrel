@@ -72,7 +72,12 @@ impl ApplicationManifest {
         &self.identity
     }
 
-    pub(crate) fn content_path(&self) -> &str {
+    /// Returns the package-relative content path exactly as the manifest
+    /// declared it.
+    ///
+    /// This is the declared path, never the canonical filesystem path. A host
+    /// surface may display it; the resolved absolute path stays internal.
+    pub fn content_path(&self) -> &str {
         &self.content_path
     }
 

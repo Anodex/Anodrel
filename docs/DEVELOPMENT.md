@@ -97,6 +97,26 @@ package and internal protocol core, completes one owned private IPC loopback,
 then opens the Anodrel Startup Lab. It pauses with a clear error if startup
 fails. See `docs/STARTUP_LAB.md` for the visual test contract.
 
+`start.bat` builds in release. The Startup Lab composes every frame in software,
+and an unoptimised build is roughly ten times slower — far too slow to hold the
+reveal's frame rate. When running the host by hand for a visual check, pass
+`--release` for the same reason:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json
+~~~
+
+The frame budget is enforced by a test that only runs in an optimised build, so
+include a release test run when changing anything the renderer touches:
+
+~~~text
+cargo test --release --manifest-path native/Cargo.toml
+~~~
+
+Rendering itself is tested headless by asserting on pixels, so most visual
+regressions surface in `cargo test` without opening a window. See
+`docs/RENDERER.md` for the renderer's API and its testing approach.
+
 ### Windows end-to-end development sample
 
 After `npm run build`, run this PowerShell command from the repository root:

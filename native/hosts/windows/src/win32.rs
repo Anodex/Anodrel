@@ -1,22 +1,34 @@
 //! Direct Win32 window lifecycle and routing for Anodrel-owned surfaces.
 //!
-//! Raw window management remains here. GDI painting is split into small focused
-//! modules so the startup lab can evolve without mixing visual layout into the
-//! host's lifecycle code.
+//! Raw window management stays here. Everything visible is composed by
+//! [`anodrel_canvas`] into a single bitmap and presented in one blit, so this
+//! module deals with messages and handles rather than with drawing.
+//!
+//! Submodules split that responsibility: [`present`] moves a canvas to the
+//! screen, [`text`] turns GDI glyphs into canvas coverage, [`appicon`] builds
+//! the window icon from brand geometry, and [`startup_lab`] and [`document`]
+//! own the two surfaces the host can show.
 
 #![allow(non_snake_case)]
 
-mod paint;
+mod appicon;
+mod document;
+mod present;
 mod registry;
 mod startup_lab;
+mod stats;
+mod text;
 
-use std::{io, ptr, sync::OnceLock};
+use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
+use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_windows_instance::PrimaryInstance;
 
+use document::{Body, Document, Section};
+
 type Atom = u16;
-type Bool = i32;
-type Dword = u32;
+pub(super) type Bool = i32;
+pub(super) type Dword = u32;
 type Hbrush = isize;
 type Hcursor = isize;
 pub(super) type Hdc = isize;
@@ -24,7 +36,7 @@ type Hinstance = isize;
 type Hwnd = isize;
 type Lparam = isize;
 type Lresult = isize;
-type Uint = u32;
+pub(super) type Uint = u32;
 type Wparam = usize;
 
 const CS_HREDRAW: Uint = 0x0002;
@@ -35,7 +47,46 @@ const SW_SHOW: i32 = 5;
 const SW_RESTORE: i32 = 9;
 const WM_DESTROY: Uint = 0x0002;
 const WM_PAINT: Uint = 0x000F;
+const WM_ERASEBKGND: Uint = 0x0014;
+const WM_GETMINMAXINFO: Uint = 0x0024;
+const WM_SETICON: Uint = 0x0080;
+const WM_SETCURSOR: Uint = 0x0020;
+const WM_MOUSEMOVE: Uint = 0x0200;
+const WM_LBUTTONUP: Uint = 0x0202;
+const WM_MOUSELEAVE: Uint = 0x02A3;
+const WM_TIMER: Uint = 0x0113;
+const WM_DPICHANGED: Uint = 0x02E0;
+const WM_ACTIVATE: Uint = 0x0006;
+const WM_SIZE: Uint = 0x0005;
+const WA_INACTIVE: Wparam = 0;
+const SIZE_MINIMIZED: Wparam = 1;
 const IDC_ARROW: usize = 32_512;
+const IDC_HAND: usize = 32_649;
+const ICON_SMALL: Wparam = 0;
+const ICON_BIG: Wparam = 1;
+const TME_LEAVE: Dword = 0x0000_0002;
+const SWP_NOZORDER: Uint = 0x0004;
+const SWP_NOACTIVATE: Uint = 0x0010;
+const HTCLIENT: isize = 1;
+
+/// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
+const REVEAL_TIMER: usize = 1;
+const REVEAL_INTERVAL_MILLIS: Uint = 16;
+
+/// Interval the surface settles to once the reveal completes.
+///
+/// Ambient motion is slow and confined to the mark, so it needs far fewer
+/// frames than the reveal. At 30 per second it repaints a region rather than a
+/// surface, which is what keeps a living screen from costing a busy one.
+const AMBIENT_INTERVAL_MILLIS: Uint = 33;
+
+/// Per-monitor DPI awareness, version 2.
+const DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: isize = -4;
+const USER_DEFAULT_SCREEN_DPI: u32 = 96;
+
+/// Smallest client area the layout is designed to remain legible in.
+const MIN_CLIENT_WIDTH: i32 = 900;
+const MIN_CLIENT_HEIGHT: i32 = 660;
 
 type WndProc = unsafe extern "system" fn(Hwnd, Uint, Wparam, Lparam) -> Lresult;
 
@@ -111,15 +162,63 @@ struct Msg {
     lPrivate: Dword,
 }
 
+#[repr(C)]
+#[derive(Default)]
+struct MinMaxInfo {
+    reserved: Point,
+    maxSize: Point,
+    maxPosition: Point,
+    minTrackSize: Point,
+    maxTrackSize: Point,
+}
+
+#[repr(C)]
+struct TrackMouseEventStruct {
+    cbSize: Dword,
+    dwFlags: Dword,
+    hwndTrack: Hwnd,
+    dwHoverTime: Dword,
+}
+
+/// Facts about a validated package that a host surface may display.
+///
+/// The host copies these out of the application crate so the window layer never
+/// holds a package, a filesystem path, or any unvalidated text.
+#[derive(Clone)]
+pub struct PackageFacts {
+    /// Display name from the validated manifest.
+    pub display_name: String,
+    /// Application identity from the validated manifest.
+    pub application_id: String,
+    /// Declared content format.
+    pub content_format: String,
+    /// Package-relative content path, never the resolved filesystem path.
+    pub content_path: String,
+    /// Verified content digest, lower-case hexadecimal.
+    pub content_digest: String,
+    /// Number of content bytes that were hashed.
+    pub content_bytes: usize,
+}
+
+/// Live state behind the Startup Lab surface.
 #[derive(Clone)]
 pub(super) struct StartupLab {
-    pub(super) display_name: String,
-    pub(super) application_id: String,
+    pub(super) package: PackageFacts,
+    /// Time from process start to the surface being ready.
+    pub(super) startup_millis: u64,
+    pub(super) working_set_bytes: u64,
+    /// Cost of the previous frame, reported on the current one.
+    pub(super) last_frame_micros: u64,
+    revealed_at: Instant,
+    /// Index of the action tile under the pointer, if any.
+    pub(super) hovered: Option<usize>,
+    /// `true` once the reveal has finished and the surface is breathing.
+    ambient: bool,
 }
 
 #[derive(Clone)]
 enum View {
-    Text(Vec<u16>),
+    Document(Document),
     StartupLab(StartupLab),
 }
 
@@ -131,12 +230,12 @@ struct WindowDefinition {
 }
 
 impl WindowDefinition {
-    fn text(title: &str, text: &str, width: i32, height: i32) -> Self {
+    fn document(title: &str, subtitle: &str, text: &str, width: i32, height: i32) -> Self {
         Self {
             title: title.to_owned(),
             width,
             height,
-            view: View::Text(to_wide_null(text)),
+            view: View::Document(Document::from_text(title, subtitle, text)),
         }
     }
 }
@@ -144,6 +243,7 @@ impl WindowDefinition {
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetModuleHandleW(module_name: *const u16) -> Hinstance;
+    fn GetProcAddress(module: Hinstance, name: *const u8) -> *const core::ffi::c_void;
 }
 
 #[link(name = "user32")]
@@ -176,38 +276,78 @@ unsafe extern "system" {
     fn EndPaint(window: Hwnd, paint: *const PaintStruct) -> Bool;
     fn GetClientRect(window: Hwnd, rectangle: *mut Rect) -> Bool;
     fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
+    fn SetCursor(cursor: Hcursor) -> Hcursor;
+    fn InvalidateRect(window: Hwnd, rectangle: *const Rect, erase: Bool) -> Bool;
+    fn SendMessageW(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult;
+    fn SetTimer(window: Hwnd, id: usize, elapse: Uint, callback: usize) -> usize;
+    fn KillTimer(window: Hwnd, id: usize) -> Bool;
+    fn TrackMouseEvent(track: *mut TrackMouseEventStruct) -> Bool;
+    fn AdjustWindowRect(rectangle: *mut Rect, style: Dword, menu: Bool) -> Bool;
+    fn SetWindowPos(
+        window: Hwnd,
+        insert_after: Hwnd,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        flags: Uint,
+    ) -> Bool;
 }
 
 static ACTIVATION_MESSAGE: OnceLock<Uint> = OnceLock::new();
 static WINDOW_CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
+static ICONS: OnceLock<(Option<isize>, Option<isize>)> = OnceLock::new();
 
-/// Opens the simple host-owned text surface.
+/// Opens the simple host-owned document surface.
 pub fn run(title: &str, text: &str) -> io::Result<()> {
-    run_windows(vec![WindowDefinition::text(title, text, 880, 520)], None)
+    run_windows(
+        vec![WindowDefinition::document(
+            title,
+            "Host-owned surface",
+            text,
+            920,
+            580,
+        )],
+        None,
+    )
 }
 
 /// Opens the validated application text surface as the primary host instance.
-pub fn run_application(title: &str, text: &str, instance: &PrimaryInstance) -> io::Result<()> {
+pub fn run_application(
+    title: &str,
+    subtitle: &str,
+    text: &str,
+    instance: &PrimaryInstance,
+) -> io::Result<()> {
     run_windows(
-        vec![WindowDefinition::text(title, text, 880, 520)],
+        vec![WindowDefinition::document(title, subtitle, text, 920, 580)],
         Some(instance),
     )
 }
 
 /// Opens the branded Startup Lab after the caller has completed its checks.
+///
+/// `startup` is the time from process start to this call, which the surface
+/// reports as its startup reading.
 pub fn run_startup_lab(
-    display_name: &str,
-    application_id: &str,
+    package: PackageFacts,
     instance: &PrimaryInstance,
+    startup: std::time::Duration,
 ) -> io::Result<()> {
+    let scale = primary_scale();
     run_windows(
         vec![WindowDefinition {
             title: "Anodrel Startup Lab".to_owned(),
-            width: 1_160,
-            height: 760,
+            width: (startup_lab::BASE_WIDTH * scale) as i32,
+            height: (startup_lab::BASE_HEIGHT * scale) as i32,
             view: View::StartupLab(StartupLab {
-                display_name: display_name.to_owned(),
-                application_id: application_id.to_owned(),
+                package,
+                startup_millis: startup.as_millis() as u64,
+                working_set_bytes: stats::working_set_bytes(),
+                last_frame_micros: 0,
+                revealed_at: Instant::now(),
+                hovered: None,
+                ambient: false,
             }),
         }],
         Some(instance),
@@ -218,17 +358,19 @@ pub fn run_startup_lab(
 pub fn run_window_lab() -> io::Result<()> {
     run_windows(
         vec![
-            WindowDefinition::text(
+            WindowDefinition::document(
                 "Anodrel Window Lab - Primary",
-                "Anodrel Window Lab\n\nThis primary window proves that the direct host can keep multiple host-owned windows alive on one User32 message loop.\n\nClose this window first: the companion window remains available. Close the final window to end the host process.",
+                "Multi-window lifecycle",
+                "This primary window proves that the direct host can keep multiple host-owned windows alive on one User32 message loop.\n\nClose this window first: the companion window remains available. Close the final window to end the host process.",
                 760,
-                420,
+                460,
             ),
-            WindowDefinition::text(
+            WindowDefinition::document(
                 "Anodrel Window Lab - Companion",
-                "Anodrel Window Lab\n\nThis companion has its own immutable host view. Its paint messages are routed by the real Win32 window handle, not a process-global surface.\n\nClose either window in any order. The host exits only after the last one closes.",
+                "Multi-window lifecycle",
+                "This companion has its own immutable host view. Its paint messages are routed by the real Win32 window handle, not a process-global surface.\n\nClose either window in any order. The host exits only after the last one closes.",
                 760,
-                420,
+                460,
             ),
         ],
         None,
@@ -255,14 +397,8 @@ fn run_windows(
     ensure_window_class(instance, &class_name)?;
     let mut windows = Vec::with_capacity(definitions.len());
     for definition in definitions {
-        let title = to_wide_null(&definition.title);
-        let window = match create_window(
-            instance,
-            &class_name,
-            &title,
-            definition.width,
-            definition.height,
-        ) {
+        let animated = matches!(definition.view, View::StartupLab(_));
+        let window = match create_window(instance, &class_name, &definition) {
             Ok(window) => window,
             Err(error) => {
                 destroy_windows(&windows);
@@ -273,6 +409,14 @@ fn run_windows(
             destroy_window(window);
             destroy_windows(&windows);
             return Err(error);
+        }
+        apply_icons(window);
+        if animated {
+            // SAFETY: the window was just created and belongs to this thread's
+            // message queue. The timer is stopped when the reveal completes.
+            unsafe {
+                SetTimer(window, REVEAL_TIMER, REVEAL_INTERVAL_MILLIS, 0);
+            }
         }
         windows.push(window);
     }
@@ -303,6 +447,58 @@ fn module_handle() -> io::Result<Hinstance> {
     }
 }
 
+/// Resolves an optional User32 entry point by name.
+///
+/// The DPI functions used below arrived in later Windows releases. Binding them
+/// dynamically keeps the executable loadable where they are absent, at the cost
+/// of one lookup.
+fn user32_export(name: &[u8]) -> Option<*const core::ffi::c_void> {
+    let module_name = to_wide_null("user32.dll");
+    // SAFETY: user32 is already loaded in any process with a window; the name
+    // is a null-terminated ASCII literal supplied by this module.
+    let module = unsafe { GetModuleHandleW(module_name.as_ptr()) };
+    if module == 0 {
+        return None;
+    }
+    // SAFETY: `module` is a live module handle and `name` is null-terminated.
+    let address = unsafe { GetProcAddress(module, name.as_ptr()) };
+    (!address.is_null()).then_some(address)
+}
+
+/// Opts the process into per-monitor DPI awareness.
+///
+/// Without this the system scales the window's pixels, and a renderer that
+/// draws its own antialiasing would be blurred by that scaling.
+pub fn enable_dpi_awareness() {
+    let Some(address) = user32_export(b"SetProcessDpiAwarenessContext\0") else {
+        return;
+    };
+    // SAFETY: the resolved symbol has this documented signature. A failure
+    // return is ignored because awareness may already be set by a manifest.
+    unsafe {
+        let set_context: unsafe extern "system" fn(isize) -> Bool = mem::transmute(address);
+        set_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+}
+
+/// Returns the scale factor to size a new window by, defaulting to 1.0.
+fn primary_scale() -> f32 {
+    let Some(address) = user32_export(b"GetDpiForSystem\0") else {
+        return 1.0;
+    };
+    // SAFETY: the resolved symbol has this documented signature and takes no
+    // arguments.
+    let dpi = unsafe {
+        let get_dpi: unsafe extern "system" fn() -> u32 = mem::transmute(address);
+        get_dpi()
+    };
+    if dpi == 0 {
+        1.0
+    } else {
+        dpi as f32 / USER_DEFAULT_SCREEN_DPI as f32
+    }
+}
+
 fn ensure_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<()> {
     if WINDOW_CLASS_REGISTERED.get().is_some() {
         return Ok(());
@@ -318,6 +514,8 @@ fn ensure_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<()
         hInstance: instance,
         hIcon: 0,
         hCursor: cursor,
+        // No background brush: the canvas covers the whole client area, so
+        // letting the system erase first would only introduce a flash.
         hbrBackground: 0,
         lpszMenuName: ptr::null(),
         lpszClassName: class_name.as_ptr(),
@@ -332,13 +530,26 @@ fn ensure_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<()
     }
 }
 
+/// Grows a requested client size into the window size that contains it.
+fn window_size_for_client(width: i32, height: i32) -> (i32, i32) {
+    let mut rect = Rect::new(0, 0, width, height);
+    // SAFETY: `rect` is writable stack storage and the style matches the one
+    // the window is created with.
+    let adjusted = unsafe { AdjustWindowRect(&mut rect, WS_OVERLAPPEDWINDOW, 0) };
+    if adjusted == 0 {
+        (width, height)
+    } else {
+        (rect.width(), rect.height())
+    }
+}
+
 fn create_window(
     instance: Hinstance,
     class_name: &[u16],
-    title: &[u16],
-    width: i32,
-    height: i32,
+    definition: &WindowDefinition,
 ) -> io::Result<Hwnd> {
+    let title = to_wide_null(&definition.title);
+    let (width, height) = window_size_for_client(definition.width, definition.height);
     // SAFETY: class_name and title are null-terminated UTF-16 strings that stay
     // live through the call. All other handles are null because this is a top-
     // level window with no menu or creation data.
@@ -362,6 +573,21 @@ fn create_window(
         Err(io::Error::last_os_error())
     } else {
         Ok(window)
+    }
+}
+
+/// Attaches the generated brand icon to a window.
+fn apply_icons(window: Hwnd) {
+    let (small, large) = ICONS.get_or_init(appicon::create);
+    // SAFETY: the window belongs to this process and the icon handles, when
+    // present, were created by CreateIconIndirect and outlive the process.
+    unsafe {
+        if let Some(small) = small {
+            SendMessageW(window, WM_SETICON, ICON_SMALL, *small);
+        }
+        if let Some(large) = large {
+            SendMessageW(window, WM_SETICON, ICON_BIG, *large);
+        }
     }
 }
 
@@ -409,6 +635,296 @@ fn message_loop() -> io::Result<()> {
     }
 }
 
+fn client_rect(window: Hwnd) -> Rect {
+    let mut rect = Rect::default();
+    // SAFETY: rect is writable stack storage for a synchronous query about a
+    // window owned by this process.
+    unsafe {
+        GetClientRect(window, &mut rect);
+    }
+    rect
+}
+
+fn invalidate(window: Hwnd) {
+    // SAFETY: a null rectangle invalidates the whole client area; erase is
+    // false because the canvas covers every pixel.
+    unsafe {
+        InvalidateRect(window, ptr::null(), 0);
+    }
+}
+
+/// Invalidates one rectangle, so only that part is repainted and sent.
+fn invalidate_region(window: Hwnd, region: CanvasRect) {
+    let rect = Rect::new(
+        region.left.floor() as i32,
+        region.top.floor() as i32,
+        region.right.ceil() as i32,
+        region.bottom.ceil() as i32,
+    );
+    // SAFETY: rect is stack storage read synchronously; erase is false because
+    // the canvas covers every pixel it will repaint.
+    unsafe {
+        InvalidateRect(window, &rect, 0);
+    }
+}
+
+/// Extracts the signed client coordinates packed into an `LPARAM`.
+fn mouse_position(lparam: Lparam) -> (i32, i32) {
+    let raw = lparam as u32;
+    ((raw & 0xFFFF) as i16 as i32, (raw >> 16) as i16 as i32)
+}
+
+/// Opens an additional host-owned window while the message loop is running.
+fn open_document_window(title: &str, document: Document) -> io::Result<()> {
+    let instance = module_handle()?;
+    let class_name = to_wide_null("Anodrel.DirectWindowsHost");
+    ensure_window_class(instance, &class_name)?;
+    let definition = WindowDefinition {
+        title: title.to_owned(),
+        width: 760,
+        height: 560,
+        view: View::Document(document),
+    };
+    let window = create_window(instance, &class_name, &definition)?;
+    if let Err(error) = registry::insert(window, definition.view) {
+        destroy_window(window);
+        return Err(error);
+    }
+    apply_icons(window);
+    show_and_update(window);
+    Ok(())
+}
+
+/// Builds the document behind a linked action tile.
+fn action_document(
+    action: startup_lab::ActionKind,
+    lab: &StartupLab,
+) -> Option<(String, Document)> {
+    match action {
+        startup_lab::ActionKind::InspectPackage => Some((
+            "Anodrel - Inspect Package".to_owned(),
+            Document {
+                title: "Inspect Package".to_owned(),
+                subtitle: "Facts verified before this surface opened".to_owned(),
+                body: Body::Sections(vec![
+                    Section {
+                        heading: "IDENTITY".to_owned(),
+                        rows: vec![
+                            ("Display name".to_owned(), lab.package.display_name.clone()),
+                            (
+                                "Application ID".to_owned(),
+                                lab.package.application_id.clone(),
+                            ),
+                        ],
+                    },
+                    Section {
+                        heading: "CONTENT".to_owned(),
+                        rows: vec![
+                            ("Format".to_owned(), lab.package.content_format.clone()),
+                            ("Path".to_owned(), lab.package.content_path.clone()),
+                            ("Bytes".to_owned(), lab.package.content_bytes.to_string()),
+                            ("SHA-256".to_owned(), lab.package.content_digest.clone()),
+                        ],
+                    },
+                    Section {
+                        heading: "LIMITS".to_owned(),
+                        rows: vec![
+                            (
+                                "Max manifest".to_owned(),
+                                format!("{} bytes", anodrel_application::MAX_MANIFEST_BYTES),
+                            ),
+                            (
+                                "Max content".to_owned(),
+                                format!("{} bytes", anodrel_application::MAX_CONTENT_BYTES),
+                            ),
+                            (
+                                "Publisher trust".to_owned(),
+                                "not verified - see ROADMAP".to_owned(),
+                            ),
+                        ],
+                    },
+                ]),
+            },
+        )),
+        startup_lab::ActionKind::RuntimeDiagnostics => Some((
+            "Anodrel - Runtime Diagnostics".to_owned(),
+            Document {
+                title: "Runtime Diagnostics".to_owned(),
+                subtitle: "Owned protocol, transport, and renderer state".to_owned(),
+                body: Body::Sections(vec![
+                    Section {
+                        heading: "PROTOCOL".to_owned(),
+                        rows: vec![
+                            (
+                                "Version".to_owned(),
+                                format!(
+                                    "{}.{}",
+                                    anodrel_protocol::PROTOCOL_MAJOR,
+                                    anodrel_protocol::PROTOCOL_MINOR
+                                ),
+                            ),
+                            (
+                                "Max request".to_owned(),
+                                format!("{} bytes", anodrel_core::MAX_REQUEST_BYTES),
+                            ),
+                            (
+                                "JSON depth".to_owned(),
+                                anodrel_json::DEFAULT_MAX_DEPTH.to_string(),
+                            ),
+                        ],
+                    },
+                    Section {
+                        heading: "TRANSPORT".to_owned(),
+                        rows: vec![
+                            (
+                                "Frame magic".to_owned(),
+                                String::from_utf8_lossy(&anodrel_wire::MAGIC).into_owned(),
+                            ),
+                            (
+                                "Max payload".to_owned(),
+                                format!("{} bytes", anodrel_wire::MAX_PAYLOAD_BYTES),
+                            ),
+                            (
+                                "Frames per read".to_owned(),
+                                anodrel_wire::MAX_FRAMES_PER_RECEIVE.to_string(),
+                            ),
+                            ("Pipe scope".to_owned(), "current logon session".to_owned()),
+                        ],
+                    },
+                    Section {
+                        heading: "PROCESS".to_owned(),
+                        rows: vec![
+                            (
+                                "Working set".to_owned(),
+                                format!(
+                                    "{:.1} MB",
+                                    stats::working_set_bytes() as f32 / (1024.0 * 1024.0)
+                                ),
+                            ),
+                            ("Startup".to_owned(), format!("{} ms", lab.startup_millis)),
+                            (
+                                "Last frame".to_owned(),
+                                format!("{:.2} ms", lab.last_frame_micros as f32 / 1000.0),
+                            ),
+                            (
+                                "Runtime dependencies".to_owned(),
+                                "0 third-party crates".to_owned(),
+                            ),
+                        ],
+                    },
+                ]),
+            },
+        )),
+        startup_lab::ActionKind::LaunchSample | startup_lab::ActionKind::OpenLogs => None,
+    }
+}
+
+thread_local! {
+    /// The animated surface, retained between paints.
+    ///
+    /// Repainting only a region requires the rest of the previous frame to
+    /// still be there, so the animated window keeps its canvas rather than
+    /// composing a fresh one each time. Document windows always redraw whole
+    /// and need no such state.
+    static SURFACE: std::cell::RefCell<Option<(Hwnd, Canvas)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Returns `true` when `inner` lies entirely within `outer`.
+fn region_covers(outer: CanvasRect, inner: Rect) -> bool {
+    (inner.left as f32) >= outer.left.floor()
+        && (inner.top as f32) >= outer.top.floor()
+        && (inner.right as f32) <= outer.right.ceil()
+        && (inner.bottom as f32) <= outer.bottom.ceil()
+}
+
+/// Paints a window's view and presents it.
+///
+/// `update` is the rectangle Windows asked to be repainted. When it falls
+/// inside the animated region and the surface has settled, only that region is
+/// recomposed and sent; anything else redraws the whole surface.
+///
+/// Returns the time the frame took, which the Startup Lab reports on the next
+/// frame.
+fn paint(window: Hwnd, device_context: Hdc, view: &View, update: Rect) -> u64 {
+    let started = Instant::now();
+    let rect = client_rect(window);
+    let width = rect.width().max(1) as u32;
+    let height = rect.height().max(1) as u32;
+
+    match view {
+        View::Document(document) => {
+            let mut canvas = Canvas::new(width, height);
+            document::draw(&mut canvas, document);
+            present::present(device_context, &canvas);
+        }
+        View::StartupLab(lab) => {
+            let elapsed = lab.revealed_at.elapsed().as_millis() as u64;
+            SURFACE.with(|cell| {
+                let mut slot = cell.borrow_mut();
+                let reusable = slot.as_ref().is_some_and(|(owner, canvas)| {
+                    *owner == window && canvas.width() == width && canvas.height() == height
+                });
+                if !reusable {
+                    // A new size invalidates every cached layer, including the
+                    // backdrop and the pre-composed hero.
+                    startup_lab::invalidate_caches();
+                    *slot = Some((window, Canvas::new(width, height)));
+                }
+                let Some((_, canvas)) = slot.as_mut() else {
+                    return;
+                };
+
+                let region = (elapsed >= startup_lab::REVEAL_MILLIS)
+                    .then(|| startup_lab::ambient_region(width as f32, height as f32))
+                    .flatten()
+                    .filter(|region| reusable && region_covers(*region, update));
+
+                match region {
+                    Some(region) if startup_lab::draw_ambient(canvas, lab, elapsed) => {
+                        present::present_region(
+                            device_context,
+                            canvas,
+                            region.left.floor().max(0.0) as u32,
+                            region.top.floor().max(0.0) as u32,
+                            region.width().ceil() as u32,
+                            region.height().ceil() as u32,
+                        );
+                    }
+                    _ => {
+                        startup_lab::draw(canvas, lab, elapsed);
+                        present::present(device_context, canvas);
+                    }
+                }
+            });
+        }
+    }
+    started.elapsed().as_micros() as u64
+}
+
+/// Starts or stops ambient motion for a settled surface.
+///
+/// Motion is suspended whenever the window cannot be seen or is not being
+/// looked at. A background window must cost nothing.
+fn set_ambient_running(window: Hwnd, running: bool) {
+    let settled = registry::with_startup_lab(window, |lab| lab.ambient)
+        .ok()
+        .flatten()
+        .unwrap_or(false);
+    if !settled {
+        return;
+    }
+    // SAFETY: the window belongs to this process; setting a timer that already
+    // exists resets it, and killing one that does not is a no-op.
+    unsafe {
+        if running {
+            SetTimer(window, REVEAL_TIMER, AMBIENT_INTERVAL_MILLIS, 0);
+        } else {
+            KillTimer(window, REVEAL_TIMER);
+        }
+    }
+}
+
 unsafe extern "system" fn window_proc(
     window: Hwnd,
     message: Uint,
@@ -430,29 +946,190 @@ unsafe extern "system" fn window_proc(
             }
             0
         }
+        // The canvas covers every pixel, so erasing first would only flash.
+        WM_ERASEBKGND => 1,
+        WM_GETMINMAXINFO => {
+            let (width, height) = window_size_for_client(MIN_CLIENT_WIDTH, MIN_CLIENT_HEIGHT);
+            // SAFETY: for this message lparam points to a writable MINMAXINFO
+            // supplied by the system.
+            unsafe {
+                let info = &mut *(lparam as *mut MinMaxInfo);
+                info.minTrackSize = Point {
+                    x: width,
+                    y: height,
+                };
+            }
+            0
+        }
         WM_PAINT => {
-            let mut paint = PaintStruct::default();
+            let mut paint_struct = PaintStruct::default();
             // SAFETY: Windows calls this procedure for a valid window, and
-            // paint is writable stack storage for the matching EndPaint call.
-            let device_context = unsafe { BeginPaint(window, &mut paint) };
+            // paint_struct is writable stack storage for the matching EndPaint.
+            let device_context = unsafe { BeginPaint(window, &mut paint_struct) };
             if device_context != 0 {
-                let mut rect = Rect::default();
-                // SAFETY: rect is writable stack storage for the synchronous
-                // client-area query, and the selected view remains immutable.
-                unsafe {
-                    GetClientRect(window, &mut rect);
-                }
                 if let Ok(Some(view)) = registry::view_for(window) {
-                    match view {
-                        View::Text(text) => paint::draw_text_surface(device_context, rect, &text),
-                        View::StartupLab(lab) => startup_lab::draw(device_context, rect, &lab),
-                    }
+                    let micros = paint(window, device_context, &view, paint_struct.rcPaint);
+                    let _ = registry::with_startup_lab(window, |lab| {
+                        lab.last_frame_micros = micros;
+                    });
                 }
-                // SAFETY: BeginPaint initialized paint for this exact window.
+                // SAFETY: BeginPaint initialized paint_struct for this window.
                 unsafe {
-                    EndPaint(window, &paint);
+                    EndPaint(window, &paint_struct);
                 }
             }
+            0
+        }
+        WM_TIMER if wparam == REVEAL_TIMER => {
+            let state = registry::with_startup_lab(window, |lab| {
+                let elapsed = lab.revealed_at.elapsed().as_millis() as u64;
+                let settling = !lab.ambient && elapsed >= startup_lab::REVEAL_MILLIS;
+                if settling {
+                    lab.ambient = true;
+                }
+                (elapsed, lab.ambient, settling)
+            })
+            .ok()
+            .flatten();
+            let Some((_, ambient, settling)) = state else {
+                // Not an animated surface any more; stop waking for it.
+                // SAFETY: killing a timer that does not exist is a no-op.
+                unsafe { KillTimer(window, REVEAL_TIMER) };
+                return 0;
+            };
+
+            if settling {
+                // The reveal is done. Drop from the reveal's frame rate to the
+                // ambient one rather than stopping: the mark keeps breathing,
+                // but at a cadence a settled screen can afford.
+                // SAFETY: re-setting an existing timer changes its interval.
+                unsafe {
+                    SetTimer(window, REVEAL_TIMER, AMBIENT_INTERVAL_MILLIS, 0);
+                }
+            }
+
+            let rect = client_rect(window);
+            match ambient
+                .then(|| startup_lab::ambient_region(rect.width() as f32, rect.height() as f32))
+                .flatten()
+            {
+                // The mark moves, and its translucent foreground detail band
+                // is redrawn above it. Both fit inside this bounded region.
+                Some(region) => invalidate_region(window, region),
+                None => invalidate(window),
+            }
+            0
+        }
+        WM_ACTIVATE => {
+            set_ambient_running(window, (wparam & 0xFFFF) != WA_INACTIVE);
+            0
+        }
+        WM_SIZE => {
+            set_ambient_running(window, wparam != SIZE_MINIMIZED);
+            0
+        }
+        WM_MOUSEMOVE => {
+            let (x, y) = mouse_position(lparam);
+            let rect = client_rect(window);
+            let hovered = startup_lab::action_at(
+                rect.width() as f32,
+                rect.height() as f32,
+                point(x as f32, y as f32),
+            )
+            .filter(|index| startup_lab::ACTIONS[*index].linked);
+            let changed = registry::with_startup_lab(window, |lab| {
+                let changed = lab.hovered != hovered;
+                lab.hovered = hovered;
+                changed
+            })
+            .ok()
+            .flatten()
+            .unwrap_or(false);
+            if changed {
+                invalidate(window);
+            }
+            let mut track = TrackMouseEventStruct {
+                cbSize: mem::size_of::<TrackMouseEventStruct>() as Dword,
+                dwFlags: TME_LEAVE,
+                hwndTrack: window,
+                dwHoverTime: 0,
+            };
+            // SAFETY: `track` is writable stack storage whose declared size
+            // matches the struct, and the window belongs to this process.
+            unsafe {
+                TrackMouseEvent(&mut track);
+            }
+            0
+        }
+        WM_MOUSELEAVE => {
+            let changed = registry::with_startup_lab(window, |lab| {
+                let changed = lab.hovered.is_some();
+                lab.hovered = None;
+                changed
+            })
+            .ok()
+            .flatten()
+            .unwrap_or(false);
+            if changed {
+                invalidate(window);
+            }
+            0
+        }
+        WM_SETCURSOR if (lparam as u32 & 0xFFFF) as isize == HTCLIENT => {
+            let hovered = registry::with_startup_lab(window, |lab| lab.hovered)
+                .ok()
+                .flatten()
+                .flatten();
+            let cursor_id = if hovered.is_some() {
+                IDC_HAND
+            } else {
+                IDC_ARROW
+            };
+            // SAFETY: both identifiers are documented integer resources, and
+            // LoadCursorW returns a shared cursor that must not be destroyed.
+            unsafe {
+                SetCursor(LoadCursorW(0, cursor_id as *const u16));
+            }
+            1
+        }
+        WM_LBUTTONUP => {
+            let (x, y) = mouse_position(lparam);
+            let rect = client_rect(window);
+            let clicked = startup_lab::action_at(
+                rect.width() as f32,
+                rect.height() as f32,
+                point(x as f32, y as f32),
+            )
+            .map(|index| &startup_lab::ACTIONS[index])
+            .filter(|action| action.linked);
+            if let Some(action) = clicked
+                && let Ok(Some(View::StartupLab(lab))) = registry::view_for(window)
+                && let Some((title, document)) = action_document(action.kind, &lab)
+            {
+                // A failure to open a diagnostic window is not fatal to the
+                // surface that launched it.
+                let _ = open_document_window(&title, document);
+            }
+            0
+        }
+        WM_DPICHANGED => {
+            // SAFETY: for this message lparam points to a RECT the system has
+            // sized for the new DPI.
+            let suggested = unsafe { *(lparam as *const Rect) };
+            // SAFETY: the window belongs to this process; z-order and
+            // activation are left untouched.
+            unsafe {
+                SetWindowPos(
+                    window,
+                    0,
+                    suggested.left,
+                    suggested.top,
+                    suggested.width(),
+                    suggested.height(),
+                    SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+            }
+            invalidate(window);
             0
         }
         WM_DESTROY => {
@@ -468,5 +1145,235 @@ unsafe extern "system" fn window_proc(
             // documented default Win32 procedure.
             unsafe { DefWindowProcW(window, message, wparam, lparam) }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, StartupLab,
+        action_document, document, mouse_position, startup_lab, window_size_for_client,
+    };
+    /// Representative surface state, matching the shipped sample package.
+    pub(super) fn sample_lab() -> StartupLab {
+        StartupLab {
+            package: PackageFacts {
+                display_name: "Anodrel Sample".to_owned(),
+                application_id: "org.anodrel.sample".to_owned(),
+                content_format: "anodrel.text.v1".to_owned(),
+                content_path: "content/main.txt".to_owned(),
+                content_digest: "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585"
+                    .to_owned(),
+                content_bytes: 214,
+            },
+            startup_millis: 1_240,
+            working_set_bytes: 56 * 1024 * 1024,
+            last_frame_micros: 3_180,
+            revealed_at: Instant::now(),
+            hovered: Some(2),
+            ambient: false,
+        }
+    }
+
+    /// Counts pixels brighter than `threshold` in summed channels.
+    ///
+    /// A plain "differs from the backdrop" count is useless here: the hero's
+    /// radial bloom tints nearly every pixel from the first frame. Content —
+    /// the mark, type, cards — is far brighter than that wash, so a luminance
+    /// threshold is what actually distinguishes drawn content from background.
+    fn lit_pixels(canvas: &Canvas, threshold: u16) -> usize {
+        (0..canvas.height())
+            .flat_map(|y| (0..canvas.width()).map(move |x| (x as i32, y as i32)))
+            .filter(|(x, y)| {
+                let color = canvas.pixel(*x, *y);
+                u16::from(color.red) + u16::from(color.green) + u16::from(color.blue) > threshold
+            })
+            .count()
+    }
+
+    #[test]
+    fn a_client_size_grows_into_a_larger_window_size() {
+        let (width, height) = window_size_for_client(MIN_CLIENT_WIDTH, MIN_CLIENT_HEIGHT);
+        assert!(width >= MIN_CLIENT_WIDTH);
+        assert!(height > MIN_CLIENT_HEIGHT, "a title bar should add height");
+    }
+
+    #[test]
+    fn mouse_coordinates_decode_as_signed_values() {
+        assert_eq!(mouse_position(0x0010_0020), (32, 16));
+        // A pointer dragged above or left of the client area reports negatives.
+        let packed = (((-3_i16) as u16 as u32) << 16 | ((-7_i16) as u16 as u32)) as isize;
+        assert_eq!(mouse_position(packed), (-7, -3));
+    }
+
+    #[test]
+    fn the_startup_lab_composes_at_every_supported_client_size() {
+        let lab = sample_lab();
+        for (width, height) in [
+            (MIN_CLIENT_WIDTH as u32, MIN_CLIENT_HEIGHT as u32),
+            (1_240, 900),
+            (2_480, 1_800),
+        ] {
+            let mut canvas = Canvas::new(width, height);
+            startup_lab::draw(&mut canvas, &lab, 99_999);
+            let painted = lit_pixels(&canvas, 150);
+            assert!(
+                painted > (width as usize * height as usize) / 200,
+                "{width}x{height} composed only {painted} lit pixels"
+            );
+        }
+    }
+
+    fn frame_at(elapsed: u64) -> Canvas {
+        let mut canvas = Canvas::new(1_240, 900);
+        startup_lab::draw(&mut canvas, &sample_lab(), elapsed);
+        canvas
+    }
+
+    fn differing_pixels(left: &Canvas, right: &Canvas) -> usize {
+        (0..left.height())
+            .flat_map(|y| (0..left.width()).map(move |x| (x as i32, y as i32)))
+            .filter(|(x, y)| left.pixel(*x, *y) != right.pixel(*x, *y))
+            .count()
+    }
+
+    #[test]
+    fn the_reveal_adds_content_over_time() {
+        let opening = lit_pixels(&frame_at(0), 150);
+        let midway = lit_pixels(&frame_at(startup_lab::REVEAL_MILLIS / 2), 150);
+        let settled = lit_pixels(&frame_at(startup_lab::REVEAL_MILLIS), 150);
+        assert!(opening < midway, "the reveal should add content over time");
+        assert!(
+            midway < settled,
+            "the reveal should finish fuller than midway"
+        );
+    }
+
+    #[test]
+    fn everything_but_the_ambient_loop_is_static_once_revealed() {
+        // Sampling a whole ambient cycle apart puts the animation at the same
+        // phase, so any difference would be a reveal stage still running.
+        let settled = frame_at(startup_lab::REVEAL_MILLIS);
+        let later = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS);
+        assert_eq!(
+            differing_pixels(&settled, &later),
+            0,
+            "the surface must be identical at equal ambient phase"
+        );
+    }
+
+    #[test]
+    fn ambient_motion_actually_moves() {
+        // Mid-sweep against a point in the cycle with no sweep at all.
+        let swept = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 10);
+        let quiet = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 2);
+        assert!(
+            differing_pixels(&swept, &quiet) > 5_000,
+            "the mark should visibly change across the ambient cycle"
+        );
+    }
+
+    #[test]
+    fn a_partial_ambient_frame_reproduces_a_full_one() {
+        // The partial path restores the backdrop and recomposites cached
+        // layers. If it ever diverged from a full compose, the mark's region
+        // would drift out of step with the rest of the surface.
+        let elapsed = startup_lab::REVEAL_MILLIS + 900;
+        let full = frame_at(elapsed);
+        let mut partial = frame_at(elapsed);
+        assert!(
+            startup_lab::draw_ambient(&mut partial, &sample_lab(), elapsed),
+            "the ambient path should be available once settled"
+        );
+        assert_eq!(
+            differing_pixels(&full, &partial),
+            0,
+            "a partial update must match a full compose exactly"
+        );
+    }
+
+    #[test]
+    fn ambient_motion_stays_inside_its_declared_region() {
+        // Whatever moves must be inside the region the host invalidates, or
+        // the screen would tear where an update was never sent.
+        let region = startup_lab::ambient_region(1_240.0, 900.0).expect("region available");
+        let swept = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 10);
+        let quiet = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 2);
+        for y in 0..900_i32 {
+            for x in 0..1_240_i32 {
+                if swept.pixel(x, y) == quiet.pixel(x, y) {
+                    continue;
+                }
+                assert!(
+                    (x as f32) >= region.left.floor()
+                        && (x as f32) < region.right.ceil()
+                        && (y as f32) >= region.top.floor()
+                        && (y as f32) < region.bottom.ceil(),
+                    "pixel ({x}, {y}) changes outside the ambient region {region:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn linked_actions_produce_a_document_and_planned_actions_do_not() {
+        let lab = sample_lab();
+        for action in &startup_lab::ACTIONS {
+            let produced = action_document(action.kind, &lab);
+            assert_eq!(
+                produced.is_some(),
+                action.linked,
+                "{:?} disagrees with its linked state",
+                action.kind
+            );
+        }
+    }
+
+    #[test]
+    fn an_action_document_never_carries_a_filesystem_path() {
+        let lab = sample_lab();
+        for action in &startup_lab::ACTIONS {
+            let Some((_, document)) = action_document(action.kind, &lab) else {
+                continue;
+            };
+            let mut canvas = Canvas::new(760, 560);
+            document::draw(&mut canvas, &document);
+            assert!(lit_pixels(&canvas, 150) > 1_000, "document drew nothing");
+        }
+        // The window layer only ever holds the manifest-relative path.
+        assert!(!lab.package.content_path.contains(':'));
+        assert!(!lab.package.content_path.contains('\\'));
+    }
+}
+
+/// Frame-cost guard for the animated surface.
+///
+/// The reveal is driven by a timer at [`REVEAL_INTERVAL_MILLIS`]. If a frame
+/// costs more than that interval the animation drops frames, so the budget is
+/// asserted rather than left to be noticed by eye. Only an optimised build is
+/// measured: an unoptimised one is an order of magnitude slower, which is why
+/// `start.bat` builds in release.
+#[cfg(all(test, not(debug_assertions)))]
+mod frame_budget {
+    use super::{Canvas, REVEAL_INTERVAL_MILLIS, startup_lab, tests::sample_lab};
+
+    #[test]
+    fn an_animated_frame_fits_inside_the_timer_interval() {
+        let lab = sample_lab();
+        let mut canvas = Canvas::new(1_240, 900);
+        // Warm the glyph and backdrop caches, as the first real frame does.
+        startup_lab::draw(&mut canvas, &lab, 600);
+
+        let frames = 30_u32;
+        let started = std::time::Instant::now();
+        for index in 0..frames {
+            startup_lab::draw(&mut canvas, &lab, 600 + u64::from(index) * 10);
+        }
+        let per_frame_micros = started.elapsed().as_micros() as f64 / f64::from(frames);
+        let budget_micros = f64::from(REVEAL_INTERVAL_MILLIS) * 1_000.0;
+        assert!(
+            per_frame_micros < budget_micros,
+            "a frame costs {per_frame_micros:.0} us, over the {budget_micros:.0} us budget"
+        );
     }
 }

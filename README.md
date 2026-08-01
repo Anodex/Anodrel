@@ -26,6 +26,14 @@ operating-system capability. The first branded Startup Lab turns those
 foundation checks, including a temporary private IPC health loopback, into a
 direct native visual smoke test.
 
+First-party surfaces are drawn by an owned software renderer rather than by
+platform drawing primitives: a portable rasterizer with antialiasing, gradients,
+blur, bevels, and filtered image scaling. The Anodrel mark ships as the authored
+artwork, committed pre-decoded so the platform displays its real logo while
+still shipping no image decoder. Neither crate has an operating-system or
+third-party dependency, and both forbid unsafe code, so rendering is tested by
+asserting on pixels without opening a window.
+
 ## Goals
 
 - Create a reusable native desktop runtime.
@@ -63,8 +71,8 @@ Native Host
     └── Linux
 ~~~
 
-The current Windows host uses Anodrel-owned modules over direct User32 and
-Kernel32 APIs. The direct pipe adapter is restricted to the current Windows
+The current Windows host uses Anodrel-owned modules over direct User32,
+Kernel32, and GDI APIs. The direct pipe adapter is restricted to the current Windows
 logon session and requires host-created credentials; a separate direct launcher
 delivers those credentials once through a child-only anonymous standard-input
 handle. Existing TypeScript and React applications remain UI clients through
@@ -97,6 +105,7 @@ Anodrel/
 
 `docs/TRANSPORT.md` defines the native frame and session contract.
 `docs/APPLICATIONS.md` defines the validated application-package contract.
+`docs/RENDERER.md` documents the owned renderer and brand API.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
@@ -127,7 +136,8 @@ See docs/DEVELOPMENT.md for prerequisites and the expected verification order.
 On Windows, double-click `start.bat` from the repository root to build and open
 the Anodrel Startup Lab. It validates the sample package and host core, then
 completes a temporary private IPC health loopback before the native visual test
-surface appears.
+surface appears. It builds in release: the surface composes every frame in
+software, and an unoptimised build cannot hold its frame rate.
 
 The public interface and security baseline are documented in docs/PROTOCOL.md
 and docs/THREAT_MODEL.md.

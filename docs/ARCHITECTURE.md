@@ -74,21 +74,39 @@ The native host owns operating-system integration:
 The first host is expected to target Windows. Other operating systems should be
 added as adapters behind the same service contracts.
 
-The current Windows host uses Anodrel-owned modules over direct User32 and
-Kernel32 APIs. Its raw FFI is isolated from the portable protocol and policy
-layers. It paints an internal diagnostics view and a bounded, digest-verified
-`anodrel.text.v1` application package surface; it has no webview, script
-runtime, navigation, or application bridge. macOS and Linux hosts will follow
-the same ownership rule through their respective operating-system APIs.
+The current Windows host uses Anodrel-owned modules over direct User32,
+Kernel32, and GDI APIs. Its raw FFI is isolated from the portable protocol and
+policy layers. It paints an internal diagnostics view and a bounded,
+digest-verified `anodrel.text.v1` application package surface; it has no
+webview, script runtime, navigation, or application bridge. macOS and Linux
+hosts will follow the same ownership rule through their respective
+operating-system APIs.
+
+Drawing is not a host responsibility. Every first-party surface is composed by
+two portable crates — `anodrel-canvas`, a software rasterizer, and
+`anodrel-brand`, which carries the authored mark as a pre-decoded asset along
+with colour tokens and small-size geometry — and reaches the screen through one
+bitmap blit. Both crates are free of operating-system and
+third-party dependencies and forbid unsafe code, so a future host reuses them
+and supplies only three things: a blit, a source of glyph coverage, and a
+display-density signal. The host's remaining drawing code is the seam for those
+three. See `docs/RENDERER.md` and Decision 0013.
 
 The Windows host also has an Anodrel-owned Startup Lab. It validates a supplied
 application package and performs its internal protocol health check before
-drawing a branded GDI visual test surface. The lab is host-controlled
-diagnostics: it displays only safe validated identity and foundation status,
-does not render package text or open a public pipe client or privileged
-service. Before the window is created, it performs a temporary owned loopback
-through the named-pipe authentication and `platform.health` path; this is a
-transport check, not an application session.
+composing a branded visual test surface. The lab is host-controlled
+diagnostics: it displays only safe validated identity, foundation status, and
+this process's own readings; it does not render package text or open a public
+pipe client or privileged service. Before the window is created, it performs a
+temporary owned loopback through the named-pipe authentication and
+`platform.health` path; this is a transport check, not an application session.
+
+The lab also shows every action the platform intends to offer, each carrying a
+declared linked or planned state. A planned tile is drawn dimmed, states the
+gate it waits on, and is inert; hit-testing and drawing read the same value, so
+a tile cannot be enabled by changing its appearance. The two linked tiles open
+host-owned windows that display values the host already held, introducing no
+capability. See `docs/STARTUP_LAB.md` and Decision 0014.
 
 The owned Windows instance adapter gives the package text surface one bounded,
 current-session primary instance per validated application identity. A second
