@@ -65,6 +65,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-core",
  "anodrel-transport",
+ "anodrel-windows-pipe",
  "anodrel-wire",
 ]
 

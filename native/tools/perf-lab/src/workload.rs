@@ -4,8 +4,10 @@ use std::{hint::black_box, time::Instant};
 
 use anodrel_core::HostPolicy;
 use anodrel_transport::{SessionCredentials, TransportSession, authentication_message};
+use anodrel_windows_pipe::measure_loopback_request;
 use anodrel_wire::encode_json;
 
+use crate::arguments::Workload;
 use crate::report::{LatencyMeasurement, Report};
 
 const WARMUP_ITERATIONS: usize = 200;
@@ -19,23 +21,36 @@ const REQUEST_PREFIX: &str = concat!(
 );
 const REQUEST_SUFFIX: &str = "\"}}";
 
-pub fn measure(iterations: usize) -> Result<Report, String> {
+pub fn measure(workload: Workload, iterations: usize) -> Result<Report, String> {
     if iterations == 0 {
         return Err("performance measurements require at least one iteration".to_owned());
     }
     let measurements = PAYLOAD_SIZES
         .into_iter()
-        .map(|payload_bytes| measure_payload(payload_bytes, iterations))
+        .map(|payload_bytes| measure_payload(workload, payload_bytes, iterations))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Report {
+        workload,
         iterations,
         measurements,
     })
 }
 
-fn measure_payload(payload_bytes: usize, iterations: usize) -> Result<LatencyMeasurement, String> {
+fn measure_payload(
+    workload: Workload,
+    payload_bytes: usize,
+    iterations: usize,
+) -> Result<LatencyMeasurement, String> {
     let request = request_json(payload_bytes);
-    let frame = encode_json(&request).map_err(|error| error.to_string())?;
+    let samples = match workload {
+        Workload::InProcess => in_process_samples(&request, iterations)?,
+        Workload::WindowsPipe => windows_pipe_samples(&request, iterations)?,
+    };
+    latency_measurement(payload_bytes, samples)
+}
+
+fn in_process_samples(request: &str, iterations: usize) -> Result<Vec<u128>, String> {
+    let frame = encode_json(request).map_err(|error| error.to_string())?;
     let mut session = authenticated_session()?;
 
     for _ in 0..WARMUP_ITERATIONS {
@@ -48,8 +63,30 @@ fn measure_payload(payload_bytes: usize, iterations: usize) -> Result<LatencyMea
         receive(&mut session, &frame)?;
         samples.push(started.elapsed().as_nanos());
     }
-    samples.sort_unstable();
+    Ok(samples)
+}
 
+fn windows_pipe_samples(request: &str, iterations: usize) -> Result<Vec<u128>, String> {
+    let policy = HostPolicy::new("org.anodrel.performance", Vec::new(), "anodrel-perf-lab")
+        .map_err(str::to_owned)?;
+    measure_loopback_request(policy, request, WARMUP_ITERATIONS, iterations)
+        .map(|measurements| {
+            measurements
+                .into_iter()
+                .map(|sample| sample.as_nanos())
+                .collect()
+        })
+        .map_err(|_| "Windows named-pipe loopback measurement did not complete".to_owned())
+}
+
+fn latency_measurement(
+    payload_bytes: usize,
+    mut samples: Vec<u128>,
+) -> Result<LatencyMeasurement, String> {
+    if samples.is_empty() {
+        return Err("performance measurement did not produce samples".to_owned());
+    }
+    samples.sort_unstable();
     let mean_nanoseconds = samples.iter().sum::<u128>() / samples.len() as u128;
     Ok(LatencyMeasurement {
         payload_bytes,
@@ -106,6 +143,8 @@ fn percentile(samples: &[u128], percentage: usize) -> u128 {
 mod tests {
     use anodrel_wire::MAX_PAYLOAD_BYTES;
 
+    use crate::arguments::Workload;
+
     use super::{measure, percentile, request_json};
 
     #[test]
@@ -124,7 +163,20 @@ mod tests {
 
     #[test]
     fn runs_the_owned_transport_workload() {
-        let report = measure(10).expect("transport workload succeeds");
+        let report = measure(Workload::InProcess, 10).expect("transport workload succeeds");
+        assert_eq!(report.measurements.len(), 2);
+        assert!(
+            report
+                .measurements
+                .iter()
+                .all(|measurement| measurement.samples == 10)
+        );
+    }
+
+    #[test]
+    fn runs_the_windows_pipe_workload() {
+        let report = measure(Workload::WindowsPipe, 10).expect("pipe workload succeeds");
+        assert_eq!(report.workload, Workload::WindowsPipe);
         assert_eq!(report.measurements.len(), 2);
         assert!(
             report
@@ -136,6 +188,6 @@ mod tests {
 
     #[test]
     fn rejects_an_empty_measurement() {
-        assert!(measure(0).is_err());
+        assert!(measure(Workload::InProcess, 0).is_err());
     }
 }

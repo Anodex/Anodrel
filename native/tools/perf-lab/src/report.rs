@@ -1,5 +1,7 @@
 //! Stable JSON report formatting for local benchmark results.
 
+use crate::arguments::Workload;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LatencyMeasurement {
     pub payload_bytes: usize,
@@ -12,6 +14,7 @@ pub struct LatencyMeasurement {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Report {
+    pub workload: Workload,
     pub iterations: usize,
     pub measurements: Vec<LatencyMeasurement>,
 }
@@ -26,13 +29,32 @@ impl Report {
             .join(",");
         format!(
             concat!(
-                "{{\"benchmark\":\"anodrel.transport.in-process.v1\",",
+                "{{\"benchmark\":\"{}\",",
                 "\"iterations\":{},\"measurements\":[{}],",
                 "\"unit\":\"nanoseconds\",",
-                "\"scope\":\"owned wire, authenticated transport, and core only\"}}\n"
+                "\"scope\":\"{}\"}}\n"
             ),
-            self.iterations, measurements
+            benchmark_name(self.workload),
+            self.iterations,
+            measurements,
+            scope(self.workload)
         )
+    }
+}
+
+fn benchmark_name(workload: Workload) -> &'static str {
+    match workload {
+        Workload::InProcess => "anodrel.transport.in-process.v1",
+        Workload::WindowsPipe => "anodrel.transport.windows-pipe-loopback.v1",
+    }
+}
+
+fn scope(workload: Workload) -> &'static str {
+    match workload {
+        Workload::InProcess => "owned wire, authenticated transport, and core only",
+        Workload::WindowsPipe => {
+            "owned Windows named pipe, wire, authenticated transport, and core"
+        }
     }
 }
 
@@ -56,11 +78,14 @@ impl LatencyMeasurement {
 
 #[cfg(test)]
 mod tests {
+    use crate::arguments::Workload;
+
     use super::{LatencyMeasurement, Report};
 
     #[test]
     fn formats_a_machine_readable_report_without_dynamic_strings() {
         let report = Report {
+            workload: Workload::InProcess,
             iterations: 10,
             measurements: vec![LatencyMeasurement {
                 payload_bytes: 1_024,
@@ -75,6 +100,21 @@ mod tests {
         assert_eq!(
             report.to_json(),
             "{\"benchmark\":\"anodrel.transport.in-process.v1\",\"iterations\":10,\"measurements\":[{\"payloadBytes\":1024,\"samples\":10,\"p50Nanoseconds\":10,\"p95Nanoseconds\":20,\"p99Nanoseconds\":30,\"meanNanoseconds\":15}],\"unit\":\"nanoseconds\",\"scope\":\"owned wire, authenticated transport, and core only\"}\n"
+        );
+    }
+
+    #[test]
+    fn identifies_the_windows_pipe_workload_separately() {
+        let report = Report {
+            workload: Workload::WindowsPipe,
+            iterations: 10,
+            measurements: Vec::new(),
+        };
+
+        assert!(
+            report
+                .to_json()
+                .contains("anodrel.transport.windows-pipe-loopback.v1")
         );
     }
 }

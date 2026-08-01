@@ -190,11 +190,12 @@ invitation, or perform pipe I/O. Those remain explicit caller-owned lifecycle
 steps.
 
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It
-measures the owned in-process wire, authenticated transport, and core path at
-fixed 1 KiB and 64 KiB payload sizes. Its bounded iteration count, fixed warmup,
-and nearest-rank percentiles make results repeatable; it does not measure pipe
-I/O, application startup, memory, rendering, or another runtime. See
-`docs/PERFORMANCE.md` and Decision 0024.
+measures either the owned in-process wire, authenticated transport, and core
+path or the same path through a temporary authenticated Windows named-pipe
+loopback, always at fixed 1 KiB and 64 KiB payload sizes. Its bounded iteration
+count, fixed warmup, and nearest-rank percentiles make results repeatable; it
+does not measure application startup, memory, rendering, or another runtime.
+See `docs/PERFORMANCE.md` and Decision 0024.
 
 ## Communication model
 

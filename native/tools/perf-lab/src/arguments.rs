@@ -5,14 +5,23 @@ const MIN_ITERATIONS: usize = 10;
 const MAX_ITERATIONS: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Workload {
+    InProcess,
+    WindowsPipe,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Options {
     pub iterations: usize,
+    pub workload: Workload,
 }
 
 impl Options {
     pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Self, String> {
         let mut iterations = DEFAULT_ITERATIONS;
         let mut iterations_seen = false;
+        let mut workload = Workload::InProcess;
+        let mut windows_pipe_seen = false;
         let mut arguments = arguments.into_iter();
         while let Some(argument) = arguments.next() {
             match argument.as_str() {
@@ -28,6 +37,13 @@ impl Options {
                         .map_err(|_| "--iterations requires a whole number".to_owned())?;
                     iterations_seen = true;
                 }
+                "--windows-pipe" => {
+                    if windows_pipe_seen {
+                        return Err("--windows-pipe may be supplied only once".to_owned());
+                    }
+                    workload = Workload::WindowsPipe;
+                    windows_pipe_seen = true;
+                }
                 "--help" | "-h" => return Err(help_text()),
                 _ => return Err(format!("unrecognized argument: {argument}")),
             }
@@ -38,27 +54,33 @@ impl Options {
                 "--iterations must be between {MIN_ITERATIONS} and {MAX_ITERATIONS}"
             ));
         }
-        Ok(Self { iterations })
+        Ok(Self {
+            iterations,
+            workload,
+        })
     }
 }
 
 fn help_text() -> String {
     format!(
-        "usage: anodrel-perf-lab [--iterations <{MIN_ITERATIONS}..{MAX_ITERATIONS}>]\n\
-         Measures the owned in-process transport path for 1 KiB and 64 KiB requests.\n\
+        "usage: anodrel-perf-lab [--iterations <{MIN_ITERATIONS}..{MAX_ITERATIONS}>] [--windows-pipe]\n\
+         Measures the owned in-process transport path, or a Windows named-pipe loopback, for 1 KiB and 64 KiB requests.\n\
          Default iterations: {DEFAULT_ITERATIONS}."
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{DEFAULT_ITERATIONS, Options};
+    use super::{DEFAULT_ITERATIONS, Options, Workload};
 
     #[test]
     fn accepts_the_bounded_iteration_option() {
         assert_eq!(
             Options::parse(["--iterations".to_owned(), "10".to_owned()]),
-            Ok(Options { iterations: 10 })
+            Ok(Options {
+                iterations: 10,
+                workload: Workload::InProcess
+            })
         );
     }
 
@@ -67,7 +89,19 @@ mod tests {
         assert_eq!(
             Options::parse(Vec::new()),
             Ok(Options {
-                iterations: DEFAULT_ITERATIONS
+                iterations: DEFAULT_ITERATIONS,
+                workload: Workload::InProcess
+            })
+        );
+        assert_eq!(
+            Options::parse([
+                "--windows-pipe".to_owned(),
+                "--iterations".to_owned(),
+                "10".to_owned()
+            ]),
+            Ok(Options {
+                iterations: 10,
+                workload: Workload::WindowsPipe
             })
         );
         assert!(Options::parse(["--iterations".to_owned(), "0".to_owned()]).is_err());

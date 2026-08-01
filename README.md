@@ -35,9 +35,9 @@ third-party dependency, and both forbid unsafe code, so rendering is tested by
 asserting on pixels without opening a window.
 
 The native workspace also includes a first-party performance lab for the owned
-wire, authenticated transport, and core path. It reports repeatable release
-measurements without making a comparison claim or bringing in a benchmark
-framework. See `docs/PERFORMANCE.md`.
+wire, authenticated transport, core, and optional local Windows pipe path. It
+reports repeatable release measurements without making a comparison claim or
+bringing in a benchmark framework. See `docs/PERFORMANCE.md`.
 
 ## Goals
 

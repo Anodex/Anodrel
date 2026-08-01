@@ -5,7 +5,10 @@
 //! authentication, frame decoder, and policy-bound health path without
 //! creating an application-facing client API.
 
-use std::io;
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
 use anodrel_protocol::JsonValue;
 use anodrel_wire::{FrameDecoder, encode_json};
@@ -18,13 +21,7 @@ pub(super) fn authenticated_health(
     client: &raw::OwnedHandle,
     invitation: &SessionInvitation,
 ) -> io::Result<()> {
-    write_json(
-        client,
-        &invitation.authentication_payload().map_err(|_| failed())?,
-    )?;
-    let authentication = read_json(client)?;
-    require_field(&authentication, "kind", "session.authenticated")?;
-
+    authenticate(client, invitation)?;
     write_json(client, HEALTH_REQUEST)?;
     let health = read_json(client)?;
     require_field(&health, "status", "success")?;
@@ -33,6 +30,42 @@ pub(super) fn authenticated_health(
         .and_then(|fields| fields.get("result"))
         .ok_or_else(failed)?;
     require_field(result, "status", "ready")
+}
+
+pub(super) fn measure_authenticated_request(
+    client: &raw::OwnedHandle,
+    invitation: &SessionInvitation,
+    request_frame: &[u8],
+    warmup_iterations: usize,
+    measured_iterations: usize,
+) -> io::Result<Vec<Duration>> {
+    authenticate(client, invitation)?;
+    for _ in 0..warmup_iterations {
+        request_response(client, request_frame)?;
+    }
+
+    let mut measurements = Vec::with_capacity(measured_iterations);
+    for _ in 0..measured_iterations {
+        let started = Instant::now();
+        request_response(client, request_frame)?;
+        measurements.push(started.elapsed());
+    }
+    Ok(measurements)
+}
+
+fn authenticate(client: &raw::OwnedHandle, invitation: &SessionInvitation) -> io::Result<()> {
+    write_json(
+        client,
+        &invitation.authentication_payload().map_err(|_| failed())?,
+    )?;
+    let authentication = read_json(client)?;
+    require_field(&authentication, "kind", "session.authenticated")
+}
+
+fn request_response(client: &raw::OwnedHandle, request_frame: &[u8]) -> io::Result<()> {
+    raw::write_all(client, request_frame).map_err(|_| failed())?;
+    let response = read_json(client)?;
+    require_field(&response, "status", "success")
 }
 
 fn write_json(client: &raw::OwnedHandle, message: &str) -> io::Result<()> {

@@ -53,38 +53,46 @@ pipe from connection through authenticated health response.
 documented `platform.ping` request through Anodrel's frame codec,
 already-authenticated `TransportSession`, and `CoreHost`. It measures the two
 fixed wire payload sizes required above: **1,024 bytes** and **65,536 bytes**.
-It makes no OS call and does not listen on a pipe, so it isolates the work
-Anodrel owns in those three layers.
+
+By default it isolates the work Anodrel owns in those three in-process layers.
+`--windows-pipe` instead creates a temporary owner-restricted Windows named
+pipe and measures the same authenticated request/response workload across that
+pipe. Pipe creation, local connection, authentication, warmup, and close are
+outside the timed samples. The two modes have distinct report identifiers and
+must never be treated as interchangeable results.
 
 Run it from the repository root in a release build:
 
 ~~~text
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --iterations 5000
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --windows-pipe --iterations 5000
 ~~~
 
 `--iterations` accepts a whole number from 10 through 100,000 and defaults to
-5,000. The tool runs 200 unreported warmup requests for each size. It writes one
-JSON object to standard output and performs no file I/O. To retain a result,
-redirect standard output to an ignored local `.anodrel/` directory along with
-the machine, OS build, power mode, compiler version, and workload notes.
+5,000. `--windows-pipe` selects the real Windows pipe loopback; omitting it
+selects the in-process workload. The tool runs 200 unreported warmup requests
+for each size. It writes one JSON object to standard output and performs no
+file I/O. To retain a result, redirect standard output to an ignored local
+`.anodrel/` directory along with the machine, OS build, power mode, compiler
+version, and workload notes.
 
 The report is a local tooling format, not a public protocol. Its v1 fields are:
 
 | Field | Meaning |
 | --- | --- |
-| `benchmark` | Exact workload identifier: `anodrel.transport.in-process.v1`. |
+| `benchmark` | Exact workload identifier: `anodrel.transport.in-process.v1` or `anodrel.transport.windows-pipe-loopback.v1`. |
 | `iterations` | Measured requests per payload size, excluding warmup. |
 | `measurements[].payloadBytes` | Exact encoded JSON payload size. |
 | `measurements[].samples` | Number of reported latency samples. |
 | `p50Nanoseconds`, `p95Nanoseconds`, `p99Nanoseconds` | Nearest-rank latency percentiles; rank is `ceil(percentile × samples / 100)`. |
 | `meanNanoseconds` | Integer mean latency across reported samples. |
 | `unit` | Always `nanoseconds`. |
-| `scope` | Fixed statement of the layers being measured. |
+| `scope` | Fixed statement of the layers being measured for the selected workload. |
 
-This result must not be presented as startup time, named-pipe latency, process
-memory, rendering performance, or an Electron comparison. Those need their own
-equivalent benchmark contracts and recorded environment before a comparison is
-published.
+This result must not be presented as startup time, process memory, rendering
+performance, or an Electron comparison. The in-process workload must not be
+presented as pipe latency. Both modes need an equivalent workload and recorded
+environment before a cross-runtime comparison is published.
 
 ## Reference material
 

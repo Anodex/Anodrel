@@ -126,6 +126,22 @@ executable identity. It exists to exercise the same DACL, authentication,
 frame, decode, and policy path that a future controlled application connection
 will use.
 
+### Development performance loopback
+
+`anodrel-perf-lab --windows-pipe` creates a separate temporary endpoint for a
+local performance diagnostic. It authenticates its private in-process client,
+runs fixed unreported warmup requests, then reports only timed request/response
+cycles. The creation, connection, authentication, and close are deliberately
+outside the reported samples. Each client/server pair is one current-session,
+owner-restricted pipe and its invitation is dropped before the measurement
+returns.
+
+This is developer tooling, not a public pipe client or runtime feature. It may
+measure the pipe, wire, transport, and core together, but it does not measure
+process creation, bootstrap delivery, application startup, memory, rendering,
+or another application runtime. See `docs/PERFORMANCE.md` for the output
+fields and comparison rules.
+
 ## Private child bootstrap
 
 `anodrel-windows-bootstrap` delivers one pipe invitation to a child process

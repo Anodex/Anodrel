@@ -15,24 +15,26 @@ an undocumented ad-hoc benchmark would not produce comparable results.
 ## Decision
 
 The native workspace provides `anodrel-perf-lab`, a first-party release tool.
-It measures fixed 1,024-byte and 65,536-byte `platform.ping` payloads through
-the owned frame codec, already-authenticated transport session, and core host.
-It uses a fixed 200-request warmup, a bounded explicit iteration count, and
-nearest-rank p50/p95/p99 results in nanoseconds. Its stable local JSON report
-is documented in `docs/PERFORMANCE.md`.
+Its default workload measures fixed 1,024-byte and 65,536-byte
+`platform.ping` payloads through the owned frame codec, already-authenticated
+transport session, and core host. Its optional `--windows-pipe` workload uses a
+temporary current-session named-pipe loopback through those same layers. Both
+use a fixed 200-request warmup, a bounded explicit iteration count, and
+nearest-rank p50/p95/p99 results in nanoseconds. Their separate stable local
+JSON report identifiers are documented in `docs/PERFORMANCE.md`.
 
-The tool has no OS I/O or third-party runtime dependency. It deliberately does
-not claim to measure named-pipe latency, cold start, application memory, frame
-performance, or Electron. Each comparison requires its own equivalent
-workload, environment record, and raw result.
+The tool has no third-party runtime dependency. It deliberately does not claim
+to measure cold start, application memory, frame performance, or Electron.
+Each comparison requires its own equivalent workload, environment record, and
+raw result.
 
 ## Consequences
 
 - owned transport work has a repeatable release measurement command;
 - timing does not become a brittle pass/fail unit-test condition;
 - performance claims remain scoped to measured workloads; and
-- pipe, startup, memory, rendering, and cross-runtime comparisons remain
-  separately defined work.
+- startup, memory, rendering, and cross-runtime comparisons remain separately
+  defined work.
 
 ## Revisit conditions
 

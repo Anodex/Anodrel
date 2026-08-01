@@ -8,3 +8,4 @@ license.workspace = true
 anodrel-core = { path = "../../crates/core" }
 anodrel-transport = { path = "../../crates/transport" }
 anodrel-wire = { path = "../../crates/wire" }
+anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }
