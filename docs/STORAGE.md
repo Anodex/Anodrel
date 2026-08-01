@@ -1,7 +1,7 @@
 # Application state storage v1
 
-**Status:** Portable value and host-service foundation. No native adapter or
-public protocol operation is available yet.
+**Status:** Portable value and direct Windows host-service foundation. No public
+protocol operation is available yet.
 
 ## Purpose and boundary
 
@@ -37,13 +37,14 @@ explicit so the recovery contract remains small and testable.
 
 The host derives the storage location exclusively from the already validated
 application identity and the host-owned `data` location from `docs/PATHS.md`.
-The application never supplies a location. A Windows adapter will retain a
-validated current-user file object while reading or replacing the state and
-will keep a bounded prior committed snapshot as a recovery candidate. It will
-write a complete new snapshot to a host-chosen temporary object, flush it, then
-perform one direct Windows replacement operation. A failed or interrupted
-write must leave either the prior complete snapshot or a complete new snapshot
-available; it must never return a partial value.
+The application never supplies a location. The direct Windows adapter creates
+only the derived directory tree, rejects reparse points for each derived
+directory and state file, and keeps a bounded prior committed snapshot as a
+recovery candidate. It writes a complete new snapshot to a fixed host-chosen
+staging file and flushes it before moving the prior state to the backup and the
+staged state into place through direct Windows rename operations. A failed or
+interrupted write leaves either the prior complete snapshot or a complete new
+snapshot available; it never returns a partial value.
 
 Snapshot contents, absolute paths, temporary names, native status values, and
 recovery details must not appear in protocol diagnostics or the typed host log.
@@ -65,10 +66,9 @@ concurrent multi-process writer policy require separate decisions.
 ## Verification plan
 
 The portable foundation tests absent versus empty state, the fixed size limit,
-value redaction, and error categories. The Windows adapter will test
-current-user identity isolation, atomic replacement, recovery from an
-interrupted staging file, malformed-record rejection, link rejection, and that
-no storage path or content appears in safe error output. Authenticated protocol
-coverage will be added only with the later capability contract.
+value redaction, and error categories. The Windows adapter tests whole-value
+replacement, recovery from an interrupted staging file, and path redaction.
+Its direct file boundary rejects directories and reparse points. Authenticated
+protocol coverage will be added only with the later capability contract.
 
 Decision 0051 records this boundary.

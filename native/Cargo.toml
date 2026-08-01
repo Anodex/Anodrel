@@ -29,6 +29,7 @@ members = [
   "adapters/windows-registered-session",
   "adapters/windows-launch",
   "adapters/windows-paths",
+  "adapters/windows-storage",
   "adapters/windows-credentials",
   "adapters/windows-clipboard",
   "adapters/windows-external-links",

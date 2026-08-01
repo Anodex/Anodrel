@@ -138,10 +138,11 @@ and passes it to a portable layout builder. That builder derives fixed
 per-application `data`, `cache`, and `logs` locations solely from the validated
 application identity; it never creates, enumerates, or exposes those paths to
 the protocol. The portable state-store foundation reserves one bounded opaque
-snapshot below `data`, while its native adapter and protocol grants remain
-separate work. Logging and future storage services define their own permission,
-creation, and recovery rules on top of this layout. See `docs/PATHS.md`,
-`docs/STORAGE.md`, Decisions 0021 and 0051.
+snapshot below `data`; its direct Windows adapter stages and flushes complete
+values before retaining the prior committed state as a recovery candidate.
+Protocol grants remain separate work. Logging and future storage services
+define their own permission, creation, and recovery rules on top of this
+layout. See `docs/PATHS.md`, `docs/STORAGE.md`, Decisions 0021 and 0051.
 
 The Windows credential adapter stores a bounded secret only under the exact
 target derived from a validated application identity and credential name. It

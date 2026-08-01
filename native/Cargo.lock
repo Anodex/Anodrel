@@ -284,5 +284,14 @@ name = "anodrel-windows-signature"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-windows-storage"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-paths",
+ "anodrel-storage",
+]
+
+[[package]]
 name = "anodrel-wire"
 version = "0.1.0"

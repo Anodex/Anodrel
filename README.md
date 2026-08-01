@@ -29,6 +29,10 @@ separate grant, alongside UI-session test grants. The first branded Startup Lab 
 foundation checks, including a temporary private IPC health loopback, into a
 direct native visual smoke test.
 
+The storage foundation now has a portable whole-snapshot contract and a direct
+Windows adapter that keeps one recovered prior snapshot; it remains unavailable
+to protocol clients until its own capability contract is defined.
+
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
 blur, bevels, and filtered image scaling. The Anodrel mark ships as the authored

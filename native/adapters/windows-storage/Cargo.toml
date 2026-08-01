@@ -1,0 +1,12 @@
+[package]
+name = "anodrel-windows-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-paths = { path = "../../crates/paths" }
+anodrel-storage = { path = "../../crates/storage" }
+
+[dev-dependencies]
+anodrel-application = { path = "../../crates/application" }

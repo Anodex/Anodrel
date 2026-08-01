@@ -62,6 +62,8 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-session-policy
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-registered-session
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
+cargo test --manifest-path native/Cargo.toml -p anodrel-storage
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-storage
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui-document
