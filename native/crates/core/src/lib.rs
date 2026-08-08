@@ -119,6 +119,25 @@ pub struct CoreHost {
     credentials: Box<dyn CredentialService>,
 }
 
+/// Explicit native services owned by one authenticated host session.
+///
+/// A native composition boundary builds this value from host-validated
+/// identity, policy, and native resources before a transport session begins.
+/// Protocol messages cannot replace, inspect, or add services after this value
+/// has been consumed by [`CoreHost`]. Services are unavailable by default so a
+/// newly declared capability never gains ambient operating-system authority.
+#[derive(Debug)]
+pub struct HostServices {
+    clipboard: Box<dyn ClipboardService>,
+    external_links: Box<dyn ExternalLinkService>,
+    file_dialogs: Box<dyn FileDialogService>,
+    file_selections: Box<dyn FileSelectionService>,
+    file_text: Box<dyn FileTextService>,
+    storage: Box<dyn StorageService>,
+    diagnostics: Box<dyn DiagnosticsService>,
+    credentials: Box<dyn CredentialService>,
+}
+
 #[derive(Debug)]
 struct UnavailableClipboard;
 
@@ -200,9 +219,120 @@ impl CredentialService for UnavailableCredentials {
     }
 }
 
+impl HostServices {
+    /// Creates a service bundle with every platform service explicitly
+    /// unavailable.
+    #[must_use]
+    pub fn unavailable() -> Self {
+        Self {
+            clipboard: Box::new(UnavailableClipboard),
+            external_links: Box::new(UnavailableExternalLinks),
+            file_dialogs: Box::new(UnavailableFileDialogs),
+            file_selections: Box::new(UnavailableFileSelectionService),
+            file_text: Box::new(UnavailableFileTextService),
+            storage: Box::new(UnavailableStorage),
+            diagnostics: Box::new(UnavailableDiagnostics),
+            credentials: Box::new(UnavailableCredentials),
+        }
+    }
+
+    /// Replaces the session's bounded text clipboard service.
+    #[must_use]
+    pub fn with_clipboard(mut self, service: impl ClipboardService + 'static) -> Self {
+        self.clipboard = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's validated external-link service.
+    #[must_use]
+    pub fn with_external_links(mut self, service: impl ExternalLinkService + 'static) -> Self {
+        self.external_links = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed file-dialog service.
+    #[must_use]
+    pub fn with_file_dialogs(mut self, service: impl FileDialogService + 'static) -> Self {
+        self.file_dialogs = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's retained file-selection service.
+    #[must_use]
+    pub fn with_file_selections(mut self, service: impl FileSelectionService + 'static) -> Self {
+        self.file_selections = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's selected-file text service.
+    #[must_use]
+    pub fn with_file_text(mut self, service: impl FileTextService + 'static) -> Self {
+        self.file_text = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-owned application-state service.
+    #[must_use]
+    pub fn with_storage(mut self, service: impl StorageService + 'static) -> Self {
+        self.storage = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's closed host diagnostics source.
+    #[must_use]
+    pub fn with_diagnostics(mut self, service: impl DiagnosticsService + 'static) -> Self {
+        self.diagnostics = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's identity-bound credential service.
+    #[must_use]
+    pub fn with_credentials(mut self, service: impl CredentialService + 'static) -> Self {
+        self.credentials = Box::new(service);
+        self
+    }
+}
+
 impl CoreHost {
     pub fn new(policy: HostPolicy) -> Self {
         Self::with_session_components(policy, UiInputMailbox::new(), SessionCloseSignal::default())
+    }
+
+    /// Creates a core from one complete host-owned service bundle.
+    #[must_use]
+    pub fn with_services(policy: HostPolicy, services: HostServices) -> Self {
+        Self::with_session_components_and_service_bundle(
+            policy,
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            services,
+        )
+    }
+
+    /// Creates a core from explicit native session components and one complete
+    /// host-owned service bundle.
+    #[must_use]
+    pub fn with_session_components_and_service_bundle(
+        policy: HostPolicy,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        services: HostServices,
+    ) -> Self {
+        Self {
+            policy,
+            ui_document_session: RefCell::new(UiDocumentSession::new()),
+            ui_input_mailbox,
+            session_close_signal,
+            pending_ui_document_update: RefCell::new(None),
+            clipboard: services.clipboard,
+            external_links: services.external_links,
+            file_dialogs: services.file_dialogs,
+            file_selections: services.file_selections,
+            file_text: services.file_text,
+            storage: services.storage,
+            diagnostics: services.diagnostics,
+            credentials: services.credentials,
+        }
     }
 
     /// Creates a core with only an identity-bound credential service enabled.
@@ -2667,6 +2797,47 @@ mod tests {
         assert_eq!(
             field(field(&unsupported, "error"), "code").as_string(),
             Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn service_bundle_exposes_only_the_explicitly_attached_services() {
+        let host = CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::CredentialWrite, Capability::StorageStateRead],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable()
+                .with_credentials(MemoryCredentials::default())
+                .with_storage(MemoryStorage::with_state(StorageRead::Absent)),
+        );
+
+        let credential = JsonValue::parse(&host.handle_json(&request_v1_12(
+            "credential.write",
+            r#"{"name":"refresh-token","secret":"00aaff"}"#,
+        )))
+        .expect("credential response is JSON");
+        assert_eq!(
+            field(field(&credential, "result"), "status").as_string(),
+            Some("written")
+        );
+
+        let storage =
+            JsonValue::parse(&host.handle_json(&request_v1_10("storage.state.read", "{}")))
+                .expect("storage response is JSON");
+        assert_eq!(
+            field(field(&storage, "result"), "status").as_string(),
+            Some("absent")
+        );
+
+        let unavailable =
+            JsonValue::parse(&host.handle_json(&request_v1_5("clipboard.read", "{}")))
+                .expect("clipboard response is JSON");
+        assert_eq!(
+            field(field(&unavailable, "error"), "code").as_string(),
+            Some("capability.denied")
         );
     }
 

@@ -1,8 +1,8 @@
 # Application state storage v1
 
-**Status:** Implemented portable value, direct Windows host service, and
-Protocol 1.10 development-session path. Installed-application policy
-integration remains separate work.
+**Status:** Implemented portable value, direct Windows host service, Protocol
+1.10 development-session path, and identity-bound registered Windows session
+composition.
 
 ## Purpose and boundary
 
@@ -68,6 +68,12 @@ its injected storage service. A host that has not explicitly supplied one
 returns only `storage.unavailable`. Stored invalid and oversized values map to
 their stable safe error categories without state contents, paths, recovery
 source, or native details.
+
+Registered Windows sessions attach this service only after their installed
+record validates and derive its location from that record's identity. Version
+1.2 records may select the three exact storage grants; version 1.1 records
+cannot select them. A signed provisioned product launch remains separate from
+this composition boundary.
 
 The v1 snapshot limit, whole-value semantics, and one-snapshot namespace are
 part of the compatibility contract. A key-value API, binary-transfer surface,

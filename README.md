@@ -47,6 +47,13 @@ the current-user Credential Manager path while writing, reading, and removing
 one fixed test value; it is not an installed product session and never renders
 or logs the credential.
 
+The registered Windows-session boundary now turns one machine-validated
+application record into a fixed service bundle before pipe authentication. Its
+identity binds state storage and Credential Manager, while its host-owned
+clipboard and HTTPS handoff services remain independent narrow seams. Record
+version 1.2 adds the existing storage, credential, and file-operation grants;
+UI-bound file services remain unavailable until public window lifecycle exists.
+
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
 blur, bevels, and filtered image scaling. The Anodrel mark ships as the authored

@@ -1,7 +1,8 @@
 # Secure credentials v1
 
-**Status:** Windows credential-store service, Protocol 1.12 operations, and a
-development-only authenticated native diagnostic.
+**Status:** Windows credential-store service, Protocol 1.12 operations, a
+development-only authenticated native diagnostic, and identity-bound registered
+Windows session composition.
 
 ## Purpose and boundary
 
@@ -95,6 +96,12 @@ exact name before waiting for its regular semantic action. It emits neither
 that name nor the secret to logs, diagnostics, events, window content,
 command lines, or errors. It is not a product session: installed application
 policy, user consent, and non-Windows adapters remain separate work.
+
+Registered Windows sessions create the same credential service only after a
+machine-selected installed record has validated. Its identity comes from that
+record, never a pipe peer or protocol request. A record must use version 1.2
+and include the exact relevant credential grants before protocol traffic can
+invoke this service. See `docs/LAUNCH.md` and Decision 0057.
 
 ## Verification
 

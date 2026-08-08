@@ -283,6 +283,7 @@ struct ParsedRecord {
 enum RecordVersion {
     V1_0,
     V1_1,
+    V1_2,
 }
 
 fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> {
@@ -346,16 +347,8 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
         };
         let mut grants = Vec::with_capacity(values.len());
         for value in values {
-            let capability = match value.as_string() {
-                Some("diagnostics.read") => Capability::DiagnosticsRead,
-                Some("ui.document.write") => Capability::UiDocumentWrite,
-                Some("ui.events.read") => Capability::UiEventsRead,
-                Some("session.close") => Capability::SessionClose,
-                Some("clipboard.read") => Capability::ClipboardRead,
-                Some("clipboard.write") => Capability::ClipboardWrite,
-                Some("external.open") => Capability::ExternalOpen,
-                _ => return Err(InstalledApplicationError::InvalidRecord),
-            };
+            let capability = capability_for_record_version(version, value.as_string())
+                .ok_or(InstalledApplicationError::InvalidRecord)?;
             if grants.contains(&capability) {
                 return Err(InstalledApplicationError::InvalidRecord);
             }
@@ -372,6 +365,37 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
         publisher_fingerprint,
         capabilities,
     })
+}
+
+fn capability_for_record_version(
+    version: RecordVersion,
+    value: Option<&str>,
+) -> Option<Capability> {
+    match value? {
+        "diagnostics.read" => Some(Capability::DiagnosticsRead),
+        "ui.document.write" => Some(Capability::UiDocumentWrite),
+        "ui.events.read" => Some(Capability::UiEventsRead),
+        "session.close" => Some(Capability::SessionClose),
+        "clipboard.read" => Some(Capability::ClipboardRead),
+        "clipboard.write" => Some(Capability::ClipboardWrite),
+        "external.open" => Some(Capability::ExternalOpen),
+        "dialog.open_file" if version == RecordVersion::V1_2 => Some(Capability::DialogOpenFile),
+        "dialog.save_file" if version == RecordVersion::V1_2 => Some(Capability::DialogSaveFile),
+        "file.read_text" if version == RecordVersion::V1_2 => Some(Capability::FileReadText),
+        "storage.state.read" if version == RecordVersion::V1_2 => {
+            Some(Capability::StorageStateRead)
+        }
+        "storage.state.replace" if version == RecordVersion::V1_2 => {
+            Some(Capability::StorageStateReplace)
+        }
+        "storage.state.clear" if version == RecordVersion::V1_2 => {
+            Some(Capability::StorageStateClear)
+        }
+        "credential.read" if version == RecordVersion::V1_2 => Some(Capability::CredentialRead),
+        "credential.write" if version == RecordVersion::V1_2 => Some(Capability::CredentialWrite),
+        "credential.delete" if version == RecordVersion::V1_2 => Some(Capability::CredentialDelete),
+        _ => None,
+    }
 }
 
 fn canonical_directory(path: &Path) -> std::io::Result<PathBuf> {
@@ -471,6 +495,7 @@ fn validate_version(
     match (major, minor) {
         (1, 0) => Ok(RecordVersion::V1_0),
         (1, 1) => Ok(RecordVersion::V1_1),
+        (1, 2) => Ok(RecordVersion::V1_2),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -743,12 +768,40 @@ mod tests {
 
         let unsupported = fs::read_to_string(&fixture.record_path)
             .expect("validated record is read")
-            .replace("external.open", "credentials.read");
+            .replace("external.open", "credential.read");
         fs::write(&fixture.record_path, unsupported).expect("record is updated");
         assert!(matches!(
             InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
             Err(InstalledApplicationError::InvalidRecord)
         ));
+        fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_2_accepts_the_newly_composable_storage_and_credential_grants() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 2")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"storage.state.read\", \"storage.state.replace\", \"storage.state.clear\", \"credential.read\", \"credential.write\", \"credential.delete\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.2 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::StorageStateRead,
+                anodrel_protocol::Capability::StorageStateReplace,
+                anodrel_protocol::Capability::StorageStateClear,
+                anodrel_protocol::Capability::CredentialRead,
+                anodrel_protocol::Capability::CredentialWrite,
+                anodrel_protocol::Capability::CredentialDelete,
+            ]
+        );
         fixture.remove();
     }
 

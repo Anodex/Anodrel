@@ -188,14 +188,18 @@ and content digest before the host draws a plain-text application surface.
 record into the identity and machine-selected grants for one `anodrel-core`
 host session. It has no operating-system store, launch, pipe, bootstrap, or UI
 authority; platform adapters select the record before calling it. A version
-1.0 record produces no grants, while version 1.1 uses only its strict validated
-capability array. See Decision 0023.
+1.0 record produces no grants, version 1.1 uses its original strict capability
+array, and version 1.2 adds the existing storage, credential, and file grant
+names. See Decisions 0023 and 0057.
 
 `anodrel-windows-registered-session` is the Windows composition boundary for
-that policy and the owner-restricted named-pipe adapter. It returns an endpoint
-and a separate sensitive invitation, but does not start a process, deliver the
-invitation, or perform pipe I/O. Those remain explicit caller-owned lifecycle
-steps.
+that policy and the owner-restricted named-pipe adapter. Before creating the
+endpoint it composes a fixed `HostServices` bundle: identity-derived Windows
+state storage and Credential Manager, plus bounded clipboard and HTTPS-link
+services. UI-bound file and document services remain unavailable. It returns
+an endpoint and a separate sensitive invitation, but does not start a process,
+deliver the invitation, or perform pipe I/O. Those remain explicit caller-owned
+lifecycle steps.
 
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It
 measures either the owned in-process wire, authenticated transport, and core

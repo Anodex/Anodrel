@@ -108,9 +108,10 @@ Status: **Direct Windows host in progress**
   recovers one host-derived state file (Decision 0051). Protocol 1.10 now
   defines separate state read, replace, and clear grants (Decision 0052).
   Core, SDK, authenticated transport, and the development UI-session diagnostic
-  now exercise the complete path; installed-application policy integration,
-  durable product-session lifecycle, and non-Windows adapters remain separate
-  work.
+  now exercise the complete path. Registered Windows sessions now compose this
+  service from the machine-validated application identity before pipe
+  authentication; signed-launch activation, durable product-session lifecycle,
+  and non-Windows adapters remain separate work.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and
@@ -134,8 +135,10 @@ Status: **Direct Windows host in progress**
   opaque secrets, and current-user local persistence (Decision 0022). Protocol
   1.12 now supplies separately granted exact read, write, and delete operations
   over the authenticated transport, and a development Windows UI-session
-  diagnostic proves the direct Credential Manager path. Installed-policy
-  integration, consent, and non-Windows adapters remain deferred.
+  diagnostic proves the direct Credential Manager path. Registered-session
+  composition now supplies the same identity-bound service from installed
+  policy; consent, signed-launch activation, and non-Windows adapters remain
+  deferred.
 - Add logging, crash reporting boundaries, and shutdown behavior. **Completed
   for the first in-memory diagnostic log and its bounded authenticated read:**
   a closed event catalogue has no application input, persistence, export, or

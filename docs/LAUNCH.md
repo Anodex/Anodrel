@@ -31,8 +31,9 @@ process, create a pipe, or expose a record to an application or renderer.
 
 A record is strict UTF-8 JSON no larger than **16 KiB**. Version 1.0 accepts
 the existing five fields and grants no capabilities. Version 1.1 adds the
-required `capabilities` array; unknown, missing, duplicate, and wrongly typed
-fields are rejected.
+required `capabilities` array. Version 1.2 adds the later storage, credential,
+and file-operation grants without changing the version 1.1 interpretation.
+Unknown, missing, duplicate, and wrongly typed fields are rejected.
 
 ~~~json
 {
@@ -52,13 +53,13 @@ fields are rejected.
 
 | Field | Rule |
 | --- | --- |
-| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing, minor `1` requires `capabilities`. |
+| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing; minors `1` and `2` require `capabilities`. |
 | `applicationId` | Uses the same 3â€“128 character identity grammar as the validated package manifest and exactly equals its `applicationId`. |
 | `packageRoot` | Absolute local directory path. Its canonical value is private host data and is never rendered. |
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
-| `capabilities` | Required only in 1.1. Exact non-duplicate supported grants selected by machine policy; 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`. |
+| `capabilities` | Required in 1.1 and 1.2. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`. |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's
@@ -103,19 +104,24 @@ only the record's application ID and its strict machine-selected capability
 array. The adapter does not create the pipe, bootstrap a child, launch a
 process, or make a record visible to an application.
 
-`anodrel-windows-registered-session` composes this derived policy with the
-owner-restricted Windows pipe listener. It returns the listener and its
-separate sensitive invitation, but does not begin I/O, launch the executable,
-or deliver the invitation. The native host must still perform locked executable
-and signer verification before using the private bootstrap adapter.
+`anodrel-windows-registered-session` composes this derived policy with an
+identity-bound service bundle and the owner-restricted Windows pipe listener.
+The bundle supplies state storage, Credential Manager, bounded text clipboard,
+and validated HTTPS handoff. It leaves UI-bound file and document services
+unavailable until public window lifecycle is defined. It returns the listener
+and its separate sensitive invitation, but does not begin I/O, launch the
+executable, or deliver the invitation. The native host must still perform
+locked executable and signer verification before using the private bootstrap
+adapter.
 
 ## Compatibility and failures
 
 Records are exact at their declared version because they influence process
 authority. A compatible extension requires a new minor version, documentation,
 and tests before acceptance. A breaking change requires a new major version.
-Version 1.0 remains a no-grants migration format; version 1.1 accepts only the
-supported machine-policy grants.
+Version 1.0 remains a no-grants migration format; version 1.1 accepts only its
+original machine-policy grants, while version 1.2 accepts the documented later
+grant set. Each version fails closed for unknown values.
 
 The parser fails closed if the record is outside the selected policy root,
 inside the package root, malformed, oversized, mismatched with the package, or

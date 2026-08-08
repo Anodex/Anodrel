@@ -9,7 +9,7 @@
 use std::{collections::BTreeSet, fmt};
 
 use anodrel_clipboard::{ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText};
-use anodrel_core::{CoreHost, HostPolicy, SessionCloseSignal};
+use anodrel_core::{CoreHost, HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
 use anodrel_diagnostics::DiagnosticsService;
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
@@ -256,6 +256,24 @@ impl TransportSession {
     /// credentials. Stream input cannot modify either after construction.
     pub fn new(policy: HostPolicy, credentials: SessionCredentials) -> Self {
         Self::with_ui_document_mailbox(policy, credentials, UiDocumentMailbox::new())
+    }
+
+    /// Creates a session from one complete native service bundle. The caller
+    /// supplies every operating-system service before authentication begins;
+    /// protocol traffic cannot mutate this composition.
+    #[must_use]
+    pub fn with_services(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        services: HostServices,
+    ) -> Self {
+        Self {
+            decoder: FrameDecoder::new(),
+            host: CoreHost::with_services(policy, services),
+            ui_document_mailbox: UiDocumentMailbox::new(),
+            pending_cancellations: BTreeSet::new(),
+            state: SessionState::Pending(credentials),
+        }
     }
 
     /// Creates an authenticated session with only an identity-bound credential

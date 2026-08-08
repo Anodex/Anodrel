@@ -13,7 +13,7 @@ use std::{fmt, io, thread, time::Duration};
 
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
-use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
 use anodrel_diagnostics::DiagnosticsService;
 use anodrel_external_links::ExternalLinkService;
@@ -268,6 +268,19 @@ impl WindowsPipeServer {
         session_id: impl Into<String>,
     ) -> io::Result<(Self, SessionInvitation)> {
         Self::create_with_ui_document_mailbox(policy, session_id, UiDocumentMailbox::new())
+    }
+
+    /// Creates an authenticated endpoint from a complete host-owned service
+    /// bundle. The bundle is fixed before the peer can authenticate and is
+    /// consumed by this server, so it cannot be altered by protocol traffic.
+    pub fn create_with_services(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        services: HostServices,
+    ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_services(policy, credentials, services)
+        })
     }
 
     /// Creates an authenticated worker-thread endpoint with only an
