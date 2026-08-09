@@ -64,6 +64,16 @@ that window's view owns the session. Destroying the window drops the session,
 which ends it exactly as `finish` would. Exactly one product session may exist
 at a time, and a failed start reports only the tile's existing planned state.
 
+Between those two steps the session waits in a host-owned slot, and a start
+takes long enough — machine policy, a locked hash, an Authenticode chain, and
+process creation — that the surface can close first. That gap is closed twice:
+the worker ends the session itself if its message cannot be posted, and the
+host ends any session still waiting once its message loop returns. Both are
+required, because a posted message is only delivered while the loop runs, and
+because a session left in that slot would never be dropped at all — its
+verified child would then outlive the host, which is exactly what this
+lifecycle exists to prevent.
+
 ## What it still does not do
 
 The current coordinator has no restart, background mode, application-driven

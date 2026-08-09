@@ -292,6 +292,13 @@ instead of activating the action: the window must close, the host must exit, and
 the child must still disappear. Separately, end `anodrel-product-fixture.exe`
 from Task Manager while the window is open: the window must close on its own.
 
+There is a third path worth checking from the Startup Lab, because a launch
+takes a noticeable moment. Click **Launch Sample** and immediately close the
+Startup Lab window, before the product window appears. The host must exit and
+`anodrel-product-fixture.exe` must not be left running: a session that finishes
+starting after its surface has gone is ended by the host rather than handed to a
+window that no longer exists.
+
 The Startup Lab reads the same provisioning state:
 
 ~~~powershell

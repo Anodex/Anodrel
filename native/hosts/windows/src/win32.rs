@@ -597,7 +597,13 @@ fn run_windows(
     for window in windows {
         show_and_update(window);
     }
-    message_loop()
+    let result = message_loop();
+    // The loop has ended, so no window can collect a session that finished
+    // starting during shutdown — a posted message is only delivered while the
+    // loop runs. This is the last point at which such a session can be ended,
+    // because statics are never dropped at process exit.
+    product_tile::discard();
+    result
 }
 
 fn to_wide_null(value: &str) -> Vec<u16> {
@@ -909,8 +915,12 @@ fn begin_product_session(window: Hwnd) {
     product_tile::request_start(move || {
         // SAFETY: posting to a window this process created is safe from any
         // thread, and the message carries no pointer or payload.
-        unsafe {
-            PostMessageW(window, WM_ANODREL_PRODUCT_SESSION, 0, 0);
+        let posted = unsafe { PostMessageW(window, WM_ANODREL_PRODUCT_SESSION, 0, 0) };
+        if posted == 0 {
+            // The surface closed while this session was starting, so nothing
+            // will ever collect it. Ending it here is what stops a verified
+            // child from outliving the host.
+            product_tile::discard();
         }
     });
 }

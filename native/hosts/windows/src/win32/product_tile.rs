@@ -108,6 +108,22 @@ pub(super) fn release() {
     ACTIVE.store(false, Ordering::SeqCst);
 }
 
+/// Ends a started session that no window will ever collect.
+///
+/// A start takes long enough — machine policy, a locked hash, an Authenticode
+/// chain, and process creation — that the surface can be gone by the time it
+/// finishes. The session would then sit in the host-owned slot below with
+/// nothing to hand it to.
+///
+/// That has to be cleaned up explicitly. Rust does not run destructors for
+/// statics at process exit, so a session left in that slot would never shut
+/// down, and its verified child would outlive the host. Dropping it here ends
+/// the child, the pipe worker, and the exit watcher.
+pub(super) fn discard() {
+    drop(take_started());
+    release();
+}
+
 fn started_slot() -> &'static Mutex<Option<RunningProductSession>> {
     STARTED.get_or_init(|| Mutex::new(None))
 }
@@ -116,7 +132,9 @@ fn started_slot() -> &'static Mutex<Option<RunningProductSession>> {
 mod tests {
     use std::sync::atomic::Ordering;
 
-    use super::{ACTIVE, FIXTURE_APPLICATION_ID, WINDOW, note_destroyed, release, take_started};
+    use super::{
+        ACTIVE, FIXTURE_APPLICATION_ID, WINDOW, discard, note_destroyed, release, take_started,
+    };
 
     /// These tests share process-global lifecycle state.
     static EXCLUSIVE: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -183,5 +201,25 @@ mod tests {
         assert!(take_started().is_none());
         release();
         assert!(!ACTIVE.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn discarding_leaves_no_session_waiting_for_a_window_that_will_never_come() {
+        // The host calls this after its message loop ends. Anything still in
+        // the slot then would never be dropped, because statics outlive the
+        // process, and its verified child would outlive the host with it.
+        let _exclusive = EXCLUSIVE.lock().expect("product tile tests are serialized");
+        ACTIVE.store(true, Ordering::SeqCst);
+        WINDOW.store(-521, Ordering::SeqCst);
+
+        discard();
+
+        assert!(take_started().is_none());
+        assert!(!ACTIVE.load(Ordering::SeqCst));
+        // Discarding twice is ordinary: the failed-post path and the
+        // end-of-loop backstop can both run for the same attempt.
+        discard();
+        assert!(!ACTIVE.load(Ordering::SeqCst));
+        WINDOW.store(0, Ordering::SeqCst);
     }
 }
