@@ -32,6 +32,13 @@ use stages::Stage;
 const ACTION_ATTEMPTS: u32 = 1_200;
 const ACTION_INTERVAL: Duration = Duration::from_millis(100);
 
+/// The exact grants the fixture's machine record declares, in sorted order.
+///
+/// A session carrying anything else is not this fixture's session, and the
+/// fixture refuses to continue rather than exercising authority it was not
+/// provisioned with.
+const EXPECTED_GRANTS: [&str; 3] = ["session.close", "ui.document.write", "ui.events.read"];
+
 fn main() -> ExitCode {
     ExitCode::from(run().code())
 }
@@ -50,8 +57,8 @@ fn run() -> Stage {
     // token well before this process waits on a person.
     drop(invitation);
 
-    if !is_ready(&mut session) {
-        return Stage::HostNotReady;
+    if !has_exactly_its_machine_grants(&mut session) {
+        return Stage::GrantsUnexpected;
     }
     if !delivers_first_document(&mut session) {
         return Stage::DocumentRejected;
@@ -66,16 +73,25 @@ fn run() -> Stage {
     Stage::Completed
 }
 
-fn is_ready(session: &mut FixtureSession) -> bool {
-    session
-        .request("fixture-health", "platform.health", "{}")
-        .and_then(|result| {
-            field(&result, "status")
-                .and_then(JsonValue::as_string)
-                .map(str::to_owned)
-        })
-        .as_deref()
-        == Some("ready")
+/// Confirms the session carries exactly the grants the machine record declares.
+///
+/// This is the fixture's liveness check and its capability check in one. It uses
+/// `platform.capabilities`, which needs no grant of its own, so the fixture can
+/// verify the record's capability array reached the authenticated session
+/// without requesting a diagnostics grant it has no use for.
+fn has_exactly_its_machine_grants(session: &mut FixtureSession) -> bool {
+    let Some(result) = session.request("fixture-grants", "platform.capabilities", "{}") else {
+        return false;
+    };
+    let Some(JsonValue::Array(granted)) = field(&result, "grantedCapabilities") else {
+        return false;
+    };
+    let mut granted = granted
+        .iter()
+        .filter_map(JsonValue::as_string)
+        .collect::<Vec<_>>();
+    granted.sort_unstable();
+    granted == EXPECTED_GRANTS
 }
 
 /// Replaces the host's waiting screen with the fixture's one fixed document.

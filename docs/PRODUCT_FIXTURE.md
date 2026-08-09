@@ -72,7 +72,10 @@ authenticated path and then exit. In order it
    and closes that channel;
 2. connects to the named pipe named by that record;
 3. sends the authentication control message built from the invitation;
-4. calls `platform.health` and requires `ready`;
+4. calls `platform.capabilities` and requires exactly the three grants its
+   machine record declares — this is both its liveness check and its proof that
+   the record's capability array reached the authenticated session, and it needs
+   no grant of its own;
 5. calls `ui.document.replace` with one compiled-in
    `anodrel.ui.document.v1` document and requires revision `1`;
 6. polls `ui.events.read` until the host-rendered semantic action
@@ -95,7 +98,7 @@ only signal. Codes name a boundary, never a cause:
 | `11` | the bootstrap record could not be read or decoded |
 | `12` | the named pipe could not be opened |
 | `13` | authentication did not complete |
-| `14` | `platform.health` did not report ready |
+| `14` | the session did not carry exactly the record's declared grants |
 | `15` | `ui.document.replace` was rejected or returned another revision |
 | `16` | `ui.events.read` failed, dropped, or discarded a candidate |
 | `17` | the expected semantic action did not arrive before the wait bound |

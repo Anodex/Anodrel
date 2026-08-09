@@ -102,8 +102,14 @@ name = "anodrel-product-fixture"
 version = "0.1.0"
 dependencies = [
  "anodrel-bootstrap",
+ "anodrel-core",
  "anodrel-json",
+ "anodrel-protocol",
+ "anodrel-ui",
  "anodrel-ui-document",
+ "anodrel-ui-session",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-pipe",
  "anodrel-wire",
 ]
 

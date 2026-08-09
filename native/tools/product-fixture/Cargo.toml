@@ -17,3 +17,11 @@ anodrel-wire = { path = "../../crates/wire" }
 # Test-only: proves the compiled-in document decodes through the exact codec the
 # host uses, so a fixture run cannot fail at the UI boundary.
 anodrel-ui-document = { path = "../../crates/ui-document" }
+# Test-only: the end-to-end test stands in for a host window, creating the same
+# authenticated endpoint and bootstrap channel a registered session creates.
+anodrel-core = { path = "../../crates/core" }
+anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-ui = { path = "../../crates/ui" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
+anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
+anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }
