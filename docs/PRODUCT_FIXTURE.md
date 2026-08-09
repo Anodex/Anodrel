@@ -242,8 +242,11 @@ Automated coverage lives with each component:
 
 - the fixture's document, action name, and stage codes are unit tested without
   Windows;
-- the provisioning helper's record composition and its refusal to write an
-  invalid record are unit tested;
+- the provisioning helper's record composition is unit tested, along with its
+  refusals: an unsigned executable, an absent executable, a record whose digest
+  no longer matches its package, and a record offered under another
+  application's identity. `provision` reaches the registry only through a
+  successful composition, so each refusal means nothing was written;
 - `anodrel-windows-launch` has a verification-only entry point with tests that
   it fails closed on an unprovisioned machine; and
 - the Startup Lab has a test that the launch tile is linked only when a
