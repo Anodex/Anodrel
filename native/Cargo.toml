@@ -27,6 +27,7 @@ members = [
   "adapters/windows-signature",
   "adapters/windows-policy",
   "adapters/windows-registered-session",
+  "adapters/windows-product-session",
   "adapters/windows-launch",
   "adapters/windows-paths",
   "adapters/windows-storage",

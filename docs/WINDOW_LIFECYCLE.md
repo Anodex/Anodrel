@@ -45,8 +45,9 @@ The host now also has an internal authenticated-session window entry point. It
 accepts only one grouped set of mailboxes and native file resources created by
 the registered-session adapter; titles and dimensions remain host-selected.
 It does not expose application window creation, targets, enumeration, or
-handles. A provisioned signed application and tracked-child shutdown policy are
-still required before this becomes a product launch path.
+handles. `anodrel-windows-product-session` now provides the required
+tracked-child and pipe shutdown owner. A provisioned signed application remains
+required before this becomes an executable host path.
 
 ## Manual verification
 

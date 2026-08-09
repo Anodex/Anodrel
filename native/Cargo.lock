@@ -290,6 +290,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-product-session"
+version = "0.1.0"
+dependencies = [
+ "anodrel-core",
+ "anodrel-windows-launch",
+ "anodrel-windows-pipe",
+ "anodrel-windows-policy",
+ "anodrel-windows-registered-session",
+]
+
+[[package]]
 name = "anodrel-windows-registered-session"
 version = "0.1.0"
 dependencies = [

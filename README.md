@@ -61,6 +61,9 @@ a public window API or a substitute for signed application provisioning.
 
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.
+The verified Windows product-session adapter now joins that pipe, one locked
+signed child launch, and one grouped native UI session under the host's single
+lifetime owner; it awaits a provisioned signed fixture before host activation.
 
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
@@ -156,6 +159,8 @@ Anodrel/
 `docs/LAUNCH.md` defines the installed application-record contract and the
 host-only Windows launch sequence that binds executable and publisher policy
 before process launch.
+`docs/PRODUCT_SESSIONS.md` defines the host-only verified Windows product
+session and its shutdown rules.
 `docs/PATHS.md` defines the host-owned per-application directory layout.
 `docs/CREDENTIALS.md` defines the host-only Windows credential-store boundary.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.

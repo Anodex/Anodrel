@@ -110,8 +110,10 @@ Status: **Direct Windows host in progress**
   Core, SDK, authenticated transport, and the development UI-session diagnostic
   now exercise the complete path. Registered Windows sessions now compose this
   service from the machine-validated application identity before pipe
-  authentication; signed-launch activation, durable product-session lifecycle,
-  and non-Windows adapters remain separate work.
+  authentication; the host-only Windows product-session coordinator now joins
+  verified launch, pipe, child exit, and native window shutdown (Decision
+  0060). A provisioned signed product fixture and non-Windows adapters remain
+  separate work.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

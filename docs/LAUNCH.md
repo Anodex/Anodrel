@@ -123,6 +123,12 @@ title, handle, or application-request API. A future launch coordinator must
 still create it before bootstrap delivery, run locked executable verification,
 track the child, and end both child and window on shutdown.
 
+`anodrel-windows-product-session` now supplies that host-only coordinator.
+It joins the registered interactive session, locked launch, pipe worker, and
+child-exit watcher without making any of them application-facing. The current
+native host has no provisioned signed product fixture to invoke it; see
+`docs/PRODUCT_SESSIONS.md` for the exact ownership and shutdown contract.
+
 ## Compatibility and failures
 
 Records are exact at their declared version because they influence process

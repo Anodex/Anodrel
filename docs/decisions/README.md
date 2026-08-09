@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0060: Verified Windows product components share one host-owned lifetime.
+
 - 0059: Windows pipe workers use a host-only stop signal.
 
 - 0058: Registered interactive-session resources stay host-owned.

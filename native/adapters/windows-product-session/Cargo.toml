@@ -1,0 +1,14 @@
+[package]
+name = "anodrel-windows-product-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-windows-launch = { path = "../windows-launch" }
+anodrel-windows-pipe = { path = "../windows-pipe" }
+anodrel-windows-registered-session = { path = "../windows-registered-session" }
+
+[dev-dependencies]
+anodrel-windows-policy = { path = "../windows-policy" }

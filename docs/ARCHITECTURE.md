@@ -129,9 +129,11 @@ fixed, machine-wide 64-bit Windows registry location using query access. The
 host-only launch service locks the executable, rechecks containment and digest,
 checks Authenticode and the publisher fingerprint, creates only the exact
 argument-free `.exe`, and returns a child handle that terminates on host
-shutdown. Record provisioning and host UI integration remain required before a
-product process can be launched. See `docs/SIGNING.md`, `docs/LAUNCH.md`, and
-Decisions 0017 through 0020.
+shutdown. `anodrel-windows-product-session` now joins that child, one
+registered interactive pipe, and one grouped native UI session under one
+host-owned lifetime. Record provisioning and host UI activation remain required
+before a product process can be launched. See `docs/SIGNING.md`,
+`docs/LAUNCH.md`, and Decisions 0017 through 0020.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. That builder derives fixed
@@ -207,6 +209,12 @@ them to the authenticated transport before the client connects. The Windows
 host may consume that group through its internal authenticated-session window
 entry point; it cannot be selected or assembled by an application. The group
 has no process-launch or native-handle authority. See Decision 0058.
+
+The product-session adapter creates the group before bootstrap delivery, starts
+the pipe only on a worker, and observes the tracked child on a separate worker.
+Child exit ends pending pipe I/O and closes the native window; pipe exit closes
+the window and ends the child. This control path is host-only and has no
+protocol message. See Decision 0060.
 
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It
 measures either the owned in-process wire, authenticated transport, and core
