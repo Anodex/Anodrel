@@ -5,9 +5,11 @@ use std::sync::Arc;
 use anodrel_canvas::Point;
 use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
+use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{UiDocumentMailbox, UiDocumentRevision, UiInputCandidate, UiInputMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
 
 use super::ui_lab::UiLab;
@@ -21,6 +23,14 @@ pub(super) struct UiSessionView {
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    notifications: NotificationMailbox,
+    /// This session's notification-area entry, created the first time it
+    /// actually shows something.
+    ///
+    /// Creating it eagerly would put an icon in the notification area for every
+    /// session window, including diagnostics that never notify. The entry lives
+    /// as long as the view, so it is shared rather than recreated.
+    notification_entry: Option<Arc<WindowsNotifications>>,
     revision: UiDocumentRevision,
     /// The product session whose resources this view consumes, when the window
     /// owns one.
@@ -41,6 +51,7 @@ impl UiSessionView {
         close_signal: SessionCloseSignal,
         file_dialog_mailbox: FileDialogMailbox,
         file_text: WindowsFileTextService,
+        notifications: NotificationMailbox,
     ) -> Self {
         Self {
             lab: UiLab::waiting_for_session(),
@@ -49,8 +60,35 @@ impl UiSessionView {
             close_signal,
             file_dialog_mailbox,
             file_text,
+            notifications,
+            notification_entry: None,
             revision: UiDocumentRevision::INITIAL,
             product_session: None,
+        }
+    }
+
+    /// Takes a pending notification for the host UI thread.
+    ///
+    /// The entry is returned alongside so the Shell32 call happens outside the
+    /// window registry's lock.
+    pub(super) fn take_notification_request(
+        &self,
+    ) -> Option<(NotificationRequest, Option<Arc<WindowsNotifications>>)> {
+        let request = self.notifications.take()?;
+        Some((request, self.notification_entry.clone()))
+    }
+
+    /// Records the entry this session created on its first notification.
+    pub(super) fn set_notification_entry(&mut self, entry: Arc<WindowsNotifications>) {
+        self.notification_entry = Some(entry);
+    }
+
+    /// Completes a notification after the host UI thread returns from Shell32.
+    pub(super) fn complete_notification_request(&self, request_id: u64, shown: bool) -> bool {
+        if shown {
+            self.notifications.complete(request_id)
+        } else {
+            self.notifications.fail(request_id)
         }
     }
 
@@ -67,6 +105,7 @@ impl UiSessionView {
             ui.close_signal(),
             ui.file_dialog_mailbox(),
             ui.file_text_service(),
+            ui.notification_mailbox(),
         );
         view.product_session = Some(Arc::new(session));
         view
@@ -184,6 +223,7 @@ impl UiSessionView {
 mod tests {
     use anodrel_core::SessionCloseSignal;
     use anodrel_file_dialog::FileDialogMailbox;
+    use anodrel_notifications::NotificationMailbox;
     use anodrel_ui::UiEvent;
     use anodrel_ui_session::{UiDocumentMailbox, UiDocumentSession, UiInputMailbox};
     use anodrel_windows_file_access::WindowsFileTextService;
@@ -203,6 +243,7 @@ mod tests {
             SessionCloseSignal::default(),
             FileDialogMailbox::new(),
             WindowsFileTextService::new(),
+            NotificationMailbox::new(),
         );
         let mut session = UiDocumentSession::new();
         session
@@ -223,6 +264,7 @@ mod tests {
             signal.clone(),
             FileDialogMailbox::new(),
             WindowsFileTextService::new(),
+            NotificationMailbox::new(),
         );
 
         assert_eq!(view.poll(), (false, false));
@@ -241,6 +283,7 @@ mod tests {
             SessionCloseSignal::default(),
             FileDialogMailbox::new(),
             WindowsFileTextService::new(),
+            NotificationMailbox::new(),
         );
         let mut session = UiDocumentSession::new();
         session
@@ -273,6 +316,7 @@ mod tests {
             SessionCloseSignal::default(),
             FileDialogMailbox::new(),
             WindowsFileTextService::new(),
+            NotificationMailbox::new(),
         );
         let mut session = UiDocumentSession::new();
         session

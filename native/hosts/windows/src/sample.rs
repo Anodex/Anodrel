@@ -216,6 +216,10 @@ fn run_with_optional_session_view(
             close_signal,
             file_dialog_mailbox,
             file_text,
+            // This diagnostic's session is built without a notification
+            // service, so nothing can ever place a request in this mailbox. It
+            // exists only to satisfy the window's one shape.
+            anodrel_notifications::NotificationMailbox::new(),
         )?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;

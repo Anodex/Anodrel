@@ -1,11 +1,14 @@
 # Anodrel notification foundation
 
-**Status:** The portable values and UI-thread bridge in `anodrel-notifications`,
-the direct Windows adapter in `anodrel-windows-notifications`, the Protocol 1.13
-operation, and installed record version 1.3 are implemented. Host wiring —
-supplying the adapter to a real session and servicing the mailbox on the UI
-thread — and manual verification of the real notification-area behaviour are
-not, so no application can reach a notification yet.
+**Status:** Implemented end to end for registered Windows sessions: the portable
+values and UI-thread bridge in `anodrel-notifications`, the direct Windows
+adapter in `anodrel-windows-notifications`, the Protocol 1.13 operation,
+installed record version 1.3, and host wiring that services the mailbox from the
+owning UI thread.
+
+Two things remain: a development client that actually calls the operation, and
+manual verification that a notification appears on a real desktop. Until a
+machine record grants `notification.show`, no application reaches it.
 
 ## Boundary
 
@@ -124,6 +127,13 @@ A completion is ignored unless it names the active request **and** that request
 has already been taken by the UI thread, so a response can never race ahead of
 the call it claims to describe.
 
+`anodrel-windows-registered-session` composes the mailbox into every registered
+interactive session and hands the session the mailbox rather than the adapter,
+so a worker never holds anything that can reach Shell32. The host services the
+mailbox from the same timer that already drives document polling and file
+dialogs. The Shell32 call runs outside the window registry's lock, so a slow
+shell cannot block every other window's message handling.
+
 ## Windows mapping
 
 The first Windows adapter uses `Shell_NotifyIconW` from Shell32. It uses only
@@ -237,7 +247,10 @@ rejected notification never echoes its text back. Record tests cover version 1.3
 accepting the new grant while keeping every earlier one, and earlier versions
 refusing to name it.
 
-Host wiring still needs its own verification once it exists.
+Host wiring is covered indirectly: every session view carries the mailbox, and
+the existing view tests exercise that shape. What no automated test can cover is
+a notification actually appearing, because Shell32 needs a real desktop session.
+That manual check waits for a development client that calls the operation.
 
 ## Deferred
 

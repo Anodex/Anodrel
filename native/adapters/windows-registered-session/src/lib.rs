@@ -15,6 +15,7 @@ use anodrel_application::InstalledApplication;
 use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_file_access::SelectionFileDialogMailbox;
 use anodrel_file_dialog::FileDialogMailbox;
+use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_clipboard::WindowsClipboard;
@@ -38,6 +39,7 @@ pub struct RegisteredSessionUi {
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    notification_mailbox: NotificationMailbox,
 }
 
 impl RegisteredSessionUi {
@@ -48,6 +50,7 @@ impl RegisteredSessionUi {
             close_signal: SessionCloseSignal::default(),
             file_dialog_mailbox: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
+            notification_mailbox: NotificationMailbox::new(),
         }
     }
 
@@ -79,6 +82,12 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn file_text_service(&self) -> WindowsFileTextService {
         self.file_text.clone()
+    }
+
+    /// Returns this session's one-request UI-thread notification mailbox.
+    #[must_use]
+    pub fn notification_mailbox(&self) -> NotificationMailbox {
+        self.notification_mailbox.clone()
     }
 }
 
@@ -199,7 +208,10 @@ fn registered_interactive_services(
     Ok(registered_services(application)?
         .with_file_dialogs(ui.file_dialog_mailbox())
         .with_file_selections(SelectionFileDialogMailbox::new(ui.file_dialog_mailbox()))
-        .with_file_text(ui.file_text_service()))
+        .with_file_text(ui.file_text_service())
+        // Notifications reach Shell32 through the owning UI thread, so the
+        // session gets the mailbox rather than the adapter.
+        .with_notifications(ui.notification_mailbox()))
 }
 
 /// A safe failure category while creating a registered application session.

@@ -102,6 +102,47 @@ pub(super) fn complete_file_dialog_request(
     }
 }
 
+/// Takes one pending notification only from its associated UI session.
+///
+/// The session's existing entry comes back with it so the Shell32 call can run
+/// outside this lock.
+pub(super) fn take_notification_request(
+    window: Hwnd,
+) -> io::Result<
+    Option<(
+        anodrel_notifications::NotificationRequest,
+        Option<std::sync::Arc<anodrel_windows_notifications::WindowsNotifications>>,
+    )>,
+> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_notification_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one notification from its owning native UI session, recording the
+/// entry when this was the session's first.
+pub(super) fn complete_notification_request(
+    window: Hwnd,
+    request_id: u64,
+    shown: bool,
+    entry: Option<std::sync::Arc<anodrel_windows_notifications::WindowsNotifications>>,
+) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => {
+            if let Some(entry) = entry {
+                session.set_notification_entry(entry);
+            }
+            Ok(Some(
+                session.complete_notification_request(request_id, shown),
+            ))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Returns the session-local file registry for the UI thread's capture flow.
 pub(super) fn file_text_service(window: Hwnd) -> io::Result<Option<WindowsFileTextService>> {
     let views = lock_views()?;

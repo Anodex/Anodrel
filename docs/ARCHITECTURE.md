@@ -213,8 +213,12 @@ deliver the invitation, or perform pipe I/O. Those remain explicit caller-owned
 lifecycle steps.
 
 For an interactive registered session, the same boundary creates one grouped
-set of document, input, close, dialog, and retained-file resources and attaches
-them to the authenticated transport before the client connects. The Windows
+set of document, input, close, dialog, retained-file, and notification resources
+and attaches them to the authenticated transport before the client connects. The
+session receives the notification mailbox rather than the Shell32 adapter, so a
+worker never holds anything that can reach the notification area; the owning UI
+thread performs that call and the adapter's entry lives as long as its view. See
+`docs/NOTIFICATIONS.md` and Decision 0062. The Windows
 host may consume that group through its internal authenticated-session window
 entry point; it cannot be selected or assembled by an application. The group
 has no process-launch or native-handle authority. See Decision 0058.

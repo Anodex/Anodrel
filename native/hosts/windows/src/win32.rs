@@ -28,6 +28,7 @@ use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_core::SessionCloseSignal;
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSelection};
+use anodrel_notifications::NotificationMailbox;
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
@@ -494,6 +495,7 @@ pub fn run_ui_session(
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    notifications: NotificationMailbox,
 ) -> io::Result<()> {
     run_authenticated_ui_session(
         "Anodrel UI Session Lab",
@@ -502,6 +504,7 @@ pub fn run_ui_session(
         close_signal,
         file_dialog_mailbox,
         file_text,
+        notifications,
     )
 }
 
@@ -518,6 +521,7 @@ pub fn run_authenticated_ui_session(
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    notifications: NotificationMailbox,
 ) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
@@ -531,6 +535,7 @@ pub fn run_authenticated_ui_session(
                 close_signal,
                 file_dialog_mailbox,
                 file_text,
+                notifications,
             )),
         }],
         None,
@@ -905,6 +910,40 @@ fn open_product_session_window(
     }
     show_and_update(window);
     Ok(())
+}
+
+/// Shows one pending notification for a session window, if it has one.
+///
+/// The Shell32 call runs outside the window registry's lock, so a slow shell
+/// cannot block every other window's message handling. The notification-area
+/// entry is created on first use and then reused, because creating one eagerly
+/// would put an icon on screen for sessions that never notify.
+fn service_notification(window: Hwnd) {
+    let Ok(Some((request, entry))) = registry::take_notification_request(window) else {
+        return;
+    };
+
+    let (entry, created) = match entry {
+        Some(entry) => (Some(entry), None),
+        // Host-owned brand artwork, the same icon the window already carries.
+        // An application cannot supply, select, or replace it.
+        None => match anodrel_windows_notifications::WindowsNotifications::create(
+            window,
+            ICONS.get_or_init(appicon::create).0.unwrap_or(0),
+        ) {
+            Ok(entry) => {
+                let entry = std::sync::Arc::new(entry);
+                (Some(std::sync::Arc::clone(&entry)), Some(entry))
+            }
+            Err(_) => (None, None),
+        },
+    };
+
+    let shown = entry.is_some_and(|entry| {
+        anodrel_notifications::NotificationService::show(entry.as_ref(), request.notification())
+            .is_ok()
+    });
+    let _ = registry::complete_notification_request(window, request.id(), shown, created);
 }
 
 /// Starts one product session for the Startup Lab's launch tile.
@@ -1315,6 +1354,7 @@ unsafe extern "system" fn window_proc(
                     invalidate(window);
                 }
             }
+            service_notification(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {
                     FileDialogRequestKind::Open => {
