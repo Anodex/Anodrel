@@ -1,4 +1,9 @@
 //! Small, allocation-free SHA-256 implementation built into Anodrel.
+//!
+//! This module is public so a host-side provisioning tool can compute the exact
+//! digest the record parser will later compare against, using the same code
+//! rather than a second implementation. It is a pure hash: it selects no policy,
+//! reads no path of its own, and grants no authority.
 
 use std::io::{self, Read};
 
@@ -111,7 +116,7 @@ pub fn parse_lower_hex(input: &str) -> Option<[u8; 32]> {
 
 /// Hashes a reader while stopping as soon as the configured byte limit is
 /// exceeded. The `None` result means the caller's limit was exceeded.
-pub(crate) fn digest_reader_limited<R: Read>(
+pub fn digest_reader_limited<R: Read>(
     reader: &mut R,
     maximum: usize,
 ) -> io::Result<Option<([u8; 32], usize)>> {

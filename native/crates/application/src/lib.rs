@@ -10,7 +10,7 @@
 mod installed;
 mod manifest;
 mod package;
-mod sha256;
+pub mod sha256;
 
 use std::{fmt, io};
 

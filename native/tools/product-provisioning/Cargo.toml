@@ -1,0 +1,15 @@
+[package]
+name = "anodrel-product-provisioning"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-product-provisioning"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-windows-policy = { path = "../../adapters/windows-policy" }
+anodrel-windows-signature = { path = "../../adapters/windows-signature" }

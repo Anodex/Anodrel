@@ -108,6 +108,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-product-provisioning"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-json",
+ "anodrel-windows-policy",
+ "anodrel-windows-signature",
+]
+
+[[package]]
 name = "anodrel-protocol"
 version = "0.1.0"
 dependencies = [
