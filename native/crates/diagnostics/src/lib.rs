@@ -43,6 +43,17 @@ pub enum Event {
     CoreHealthChecked,
     /// The private pipe loopback check completed.
     PipeLoopbackChecked,
+    /// The verification-only launch preflight ran to a conclusion.
+    ///
+    /// This states only that the host completed the check. It deliberately does
+    /// not carry the answer, so the catalogue never reports whether some other
+    /// application is provisioned on this machine.
+    LaunchPreflightCompleted,
+    /// The verification-only launch preflight could not run at all.
+    ///
+    /// This separates "checked and declined" from "never checked", which is the
+    /// difference an operator needs when a launch action is absent.
+    LaunchPreflightUnavailable,
     /// The Startup Lab was allowed to open after preflight.
     StartupLabAuthorized,
 }
@@ -55,6 +66,7 @@ impl Event {
             Self::PackageVerified => "package",
             Self::CoreHealthChecked => "core",
             Self::PipeLoopbackChecked => "transport",
+            Self::LaunchPreflightCompleted | Self::LaunchPreflightUnavailable => "launch",
             Self::StartupLabAuthorized => "host",
         }
     }
@@ -66,6 +78,8 @@ impl Event {
             Self::PackageVerified => "Package verification completed.",
             Self::CoreHealthChecked => "Internal platform.health check completed.",
             Self::PipeLoopbackChecked => "Private pipe loopback check completed.",
+            Self::LaunchPreflightCompleted => "Verified launch preflight completed.",
+            Self::LaunchPreflightUnavailable => "Verified launch preflight could not run.",
             Self::StartupLabAuthorized => "Startup Lab opened after preflight.",
         }
     }
@@ -201,41 +215,65 @@ impl Default for LogBook {
 mod tests {
     use super::{DiagnosticsService, Event, Level, LogBook, MAX_ENTRIES};
 
+    /// Every variant of the closed catalogue.
+    ///
+    /// Adding an event without adding it here would leave it outside the
+    /// display-safety checks below, so the compiler-checked count keeps this
+    /// list honest.
+    const CATALOGUE: [Event; 6] = [
+        Event::PackageVerified,
+        Event::CoreHealthChecked,
+        Event::PipeLoopbackChecked,
+        Event::LaunchPreflightCompleted,
+        Event::LaunchPreflightUnavailable,
+        Event::StartupLabAuthorized,
+    ];
+
     #[test]
     fn fixed_events_produce_the_documented_record_fields() {
-        let events = [
-            Event::PackageVerified,
-            Event::CoreHealthChecked,
-            Event::PipeLoopbackChecked,
-            Event::StartupLabAuthorized,
-        ];
         let mut log = LogBook::new();
-        for event in events {
+        for event in CATALOGUE {
             log.record(event).expect("test sequence capacity");
         }
 
         let entries: Vec<_> = log.entries().copied().collect();
-        assert_eq!(entries.len(), 4);
+        assert_eq!(entries.len(), CATALOGUE.len());
         assert_eq!(entries[0].sequence(), 1);
-        assert_eq!(entries[3].sequence(), 4);
+        assert_eq!(entries[5].sequence(), 6);
         assert_eq!(entries[1].level(), Level::Info);
         assert_eq!(entries[2].component(), "transport");
-        assert_eq!(entries[3].message(), "Startup Lab opened after preflight.");
+        assert_eq!(entries[3].component(), "launch");
+        assert_eq!(entries[5].message(), "Startup Lab opened after preflight.");
     }
 
     #[test]
     fn fixed_catalogue_cannot_introduce_path_or_control_characters() {
-        for event in [
-            Event::PackageVerified,
-            Event::CoreHealthChecked,
-            Event::PipeLoopbackChecked,
-            Event::StartupLabAuthorized,
-        ] {
+        for event in CATALOGUE {
             for field in [event.component(), event.message()] {
                 assert!(!field.contains(char::from(92)));
                 assert!(!field.contains('/'));
                 assert!(!field.contains(':'));
                 assert!(!field.chars().any(char::is_control));
+            }
+        }
+    }
+
+    #[test]
+    fn the_launch_events_report_host_execution_rather_than_machine_state() {
+        // The catalogue must not answer "is another application provisioned on
+        // this machine": that is machine state an authenticated reader of this
+        // ledger has no business learning. Both launch events describe only
+        // whether this host completed its own check.
+        for event in [
+            Event::LaunchPreflightCompleted,
+            Event::LaunchPreflightUnavailable,
+        ] {
+            let message = event.message().to_ascii_lowercase();
+            for leaked in ["available", "verified signed", "provisioned", "signature"] {
+                assert!(
+                    !message.contains(leaked),
+                    "{event:?} states an outcome rather than an execution"
+                );
             }
         }
     }

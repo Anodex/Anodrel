@@ -182,12 +182,13 @@ fn run_startup_lab(manifest_path: &str, started: Instant) -> Result<(), Box<dyn 
     )?)?;
     // Joined before the window exists: the tile's state must be resolved before
     // the surface opens, so drawing and hit-testing share one settled value.
-    let launch_available = preflight.finish();
+    // The same outcome also selects the surface's launch diagnostic entry.
+    let launch = preflight.finish();
     win32::run_startup_lab(
         package_facts(&package),
         &instance,
         started.elapsed(),
-        launch_available,
+        launch,
     )?;
     Ok(())
 }

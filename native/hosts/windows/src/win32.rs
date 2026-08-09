@@ -33,6 +33,7 @@ use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
 
+use crate::product::PreflightOutcome;
 use document::{Body, Document, Section};
 
 pub use product_tile::FIXTURE_APPLICATION_ID;
@@ -254,19 +255,23 @@ pub(super) struct StartupLab {
 
 /// Builds the diagnostic history displayed by the Startup Lab.
 ///
-/// This function deliberately has no input: the displayed catalogue reflects
-/// fixed host milestones rather than application text, operating-system errors,
-/// paths, or arbitrary caller data.
-fn startup_log_book() -> LogBook {
+/// Its only input is one member of the closed event catalogue, chosen by the
+/// caller's preflight. The displayed history therefore still reflects fixed host
+/// milestones rather than application text, operating-system errors, paths, or
+/// arbitrary caller data.
+fn startup_log_book(launch_event: Event) -> LogBook {
     let mut log = LogBook::new();
+    // Chronological: the preflight runs alongside the two checks above it and is
+    // settled before this surface is authorized to open.
     for event in [
         Event::PackageVerified,
         Event::CoreHealthChecked,
         Event::PipeLoopbackChecked,
+        launch_event,
         Event::StartupLabAuthorized,
     ] {
         log.record(event)
-            .expect("four fixed startup events fit in the diagnostic log");
+            .expect("five fixed startup events fit in the diagnostic log");
     }
     log
 }
@@ -388,16 +393,18 @@ pub fn run_application(
 ///
 /// `startup` is the time from process start to this call, which the surface
 /// reports as its startup reading.
-/// `launch_available` must come from the caller's verification-only preflight.
-/// The surface never runs that check itself, so drawing code cannot decide that
-/// a launch is possible.
+/// `launch` must come from the caller's verification-only preflight. The surface
+/// never runs that check itself, so drawing code cannot decide that a launch is
+/// possible. One outcome drives both the tile's availability and its diagnostic
+/// entry, so the two can never disagree.
 pub fn run_startup_lab(
     package: PackageFacts,
     instance: &PrimaryInstance,
     startup: std::time::Duration,
-    launch_available: bool,
+    launch: PreflightOutcome,
 ) -> io::Result<()> {
     let scale = primary_scale();
+    let launch_available = launch.allows_launch();
     run_windows(
         vec![WindowDefinition {
             title: "Anodrel Startup Lab".to_owned(),
@@ -405,7 +412,7 @@ pub fn run_startup_lab(
             height: (startup_lab::BASE_HEIGHT * scale) as i32,
             view: View::StartupLab(StartupLab {
                 package,
-                log: startup_log_book(),
+                log: startup_log_book(launch.event()),
                 startup_millis: startup.as_millis() as u64,
                 working_set_bytes: stats::working_set_bytes(),
                 last_frame_micros: 0,
@@ -1702,9 +1709,9 @@ unsafe extern "system" fn window_proc(
 #[cfg(test)]
 mod tests {
     use super::{
-        Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, StartupLab,
-        action_document, document, mouse_position, startup_lab, startup_log_book, wheel_delta,
-        window_size_for_client,
+        Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, PreflightOutcome,
+        StartupLab, action_document, document, mouse_position, startup_lab, startup_log_book,
+        wheel_delta, window_size_for_client,
     };
     /// Representative surface state, matching the shipped sample package.
     pub(super) fn sample_lab() -> StartupLab {
@@ -1718,7 +1725,7 @@ mod tests {
                     .to_owned(),
                 content_bytes: 214,
             },
-            log: startup_log_book(),
+            log: startup_log_book(PreflightOutcome::NotLaunchable.event()),
             startup_millis: 1_240,
             working_set_bytes: 56 * 1024 * 1024,
             last_frame_micros: 3_180,
@@ -1909,9 +1916,13 @@ mod tests {
             panic!("the log document must be structured");
         };
         let events = &sections[0].rows;
-        assert_eq!(events.len(), 4);
+        assert_eq!(events.len(), 5);
         assert_eq!(events[0].0, "#0001");
-        assert_eq!(events[3].0, "#0004");
+        assert_eq!(events[4].0, "#0005");
+        // The launch preflight sits between the transport check and the
+        // surface being authorized, and reports only that the host ran it.
+        assert!(events[3].1.contains("launch"));
+        assert!(events[3].1.contains("Verified launch preflight completed."));
         for (_, reading) in events {
             assert!(!reading.contains(char::from(92)));
             assert!(!reading.contains('/'));

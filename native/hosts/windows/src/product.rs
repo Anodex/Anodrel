@@ -13,6 +13,7 @@
 use std::{error::Error, io, thread};
 
 use anodrel_application::is_valid_application_id;
+use anodrel_diagnostics::Event;
 use anodrel_windows_launch::verify_registered_application;
 use anodrel_windows_product_session::{
     ProductSessionError, RunningProductSession, start_registered_product_session,
@@ -83,15 +84,54 @@ impl FixturePreflight {
         )
     }
 
-    /// Waits for the preflight and reports whether a launch action may exist.
+    /// Waits for the preflight and reports what the surface may offer.
     ///
-    /// A worker that could not be started, or that stopped unexpectedly, answers
-    /// `false`: an unavailable preflight can never widen what the surface offers.
+    /// A worker that could not be started, or that stopped unexpectedly, reports
+    /// [`PreflightOutcome::Unavailable`]: an unavailable check never widens what
+    /// the surface offers.
     #[must_use]
-    pub fn finish(self) -> bool {
-        self.0
-            .and_then(|worker| worker.join().ok())
-            .unwrap_or(false)
+    pub fn finish(self) -> PreflightOutcome {
+        match self.0.map(thread::JoinHandle::join) {
+            Some(Ok(true)) => PreflightOutcome::Launchable,
+            Some(Ok(false)) => PreflightOutcome::NotLaunchable,
+            None | Some(Err(_)) => PreflightOutcome::Unavailable,
+        }
+    }
+}
+
+/// What one completed or abandoned launch preflight tells the host.
+///
+/// The distinction between "ran and declined" and "never ran" is not visible on
+/// the surface — both leave the tile planned — so it is the one thing worth
+/// recording in the diagnostic log.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PreflightOutcome {
+    /// The record and signature validate right now.
+    Launchable,
+    /// The check ran and this machine cannot launch the fixture.
+    NotLaunchable,
+    /// The check could not run, so nothing may be offered.
+    Unavailable,
+}
+
+impl PreflightOutcome {
+    /// Whether a launch action may exist on the surface at all.
+    #[must_use]
+    pub const fn allows_launch(self) -> bool {
+        matches!(self, Self::Launchable)
+    }
+
+    /// The closed diagnostic event describing the host's own execution.
+    ///
+    /// The event states whether this host completed its check, never what the
+    /// check concluded, so the ledger cannot report whether another application
+    /// is provisioned on this machine.
+    #[must_use]
+    pub const fn event(self) -> Event {
+        match self {
+            Self::Launchable | Self::NotLaunchable => Event::LaunchPreflightCompleted,
+            Self::Unavailable => Event::LaunchPreflightUnavailable,
+        }
     }
 }
 
@@ -136,7 +176,7 @@ fn start_off_the_ui_thread(
 
 #[cfg(test)]
 mod tests {
-    use super::{FixturePreflight, is_launchable, run};
+    use super::{FixturePreflight, PreflightOutcome, is_launchable, run};
 
     #[test]
     fn an_invalid_identity_never_reaches_machine_policy_or_a_window() {
@@ -159,14 +199,37 @@ mod tests {
         // Moving the preflight off the startup path must not change what the
         // surface is allowed to offer.
         assert_eq!(
-            FixturePreflight::begin().finish(),
+            FixturePreflight::begin().finish().allows_launch(),
             is_launchable(crate::win32::FIXTURE_APPLICATION_ID)
         );
     }
 
     #[test]
     fn a_preflight_that_never_ran_reports_no_launch_action() {
-        assert!(!FixturePreflight(None).finish());
+        let outcome = FixturePreflight(None).finish();
+        assert_eq!(outcome, PreflightOutcome::Unavailable);
+        assert!(!outcome.allows_launch());
+    }
+
+    #[test]
+    fn only_a_launchable_outcome_permits_a_launch_action() {
+        assert!(PreflightOutcome::Launchable.allows_launch());
+        assert!(!PreflightOutcome::NotLaunchable.allows_launch());
+        assert!(!PreflightOutcome::Unavailable.allows_launch());
+    }
+
+    #[test]
+    fn the_diagnostic_event_separates_a_declined_check_from_an_absent_one() {
+        // Both leave the tile planned, so the log is the only place an operator
+        // can tell them apart. Neither event reports the answer itself.
+        assert_eq!(
+            PreflightOutcome::Launchable.event(),
+            PreflightOutcome::NotLaunchable.event()
+        );
+        assert_ne!(
+            PreflightOutcome::NotLaunchable.event(),
+            PreflightOutcome::Unavailable.event()
+        );
     }
 
     #[test]

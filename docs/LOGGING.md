@@ -31,6 +31,8 @@ Entries are a closed enum, not caller-provided strings. The current events are:
 | `package` | Application package verification completed. |
 | `core` | Internal `platform.health` check completed. |
 | `transport` | Private named-pipe loopback completed. |
+| `launch` | Verified launch preflight completed. |
+| `launch` | Verified launch preflight could not run. |
 | `host` | Startup Lab launch authorized. |
 
 When the capacity is reached, the oldest entry is discarded. The log reads no
@@ -38,11 +40,28 @@ clock and records no duration, absolute path, request payload, manifest text,
 pipe name, invitation, capability context, token, credential, raw native error,
 or application content.
 
+### Why the launch events state execution, not outcome
+
+The two `launch` events say whether this host completed its verification-only
+preflight. Neither says what the preflight concluded. That distinction is
+deliberate: the answer is machine state about a *different* application's
+provisioning, and this ledger is readable by an authenticated session that holds
+`diagnostics.read`. A reader learning "the host checked" is harmless; a reader
+learning "another application is provisioned on this machine" would be a small
+but real cross-application disclosure.
+
+The pair still carries the one thing an operator cannot see on the surface. A
+declined preflight and an absent preflight both leave the launch tile planned,
+so the log is the only place to tell "checked and declined" from "never
+checked".
+
 ## Display and lifecycle
 
 The Windows host creates this log only after all Startup Lab preflight checks
-have passed. The linked **Open Logs** tile opens a native document window
-from the log snapshot. The document can show only the four fields above and
+have passed. Exactly one of the two `launch` events is recorded per surface, and
+the same resolved preflight outcome selects both that event and the launch
+tile's availability, so the log and the surface cannot disagree. The linked
+**Open Logs** tile opens a native document window from the log snapshot. The document can show only the four fields above and
 cannot navigate, export, write a file, or contact another process.
 
 The log is dropped with the host process. It is not written to disk, included in
@@ -66,8 +85,9 @@ decision, threat-model update, and compatibility tests.
 ## Verification
 
 Unit tests prove that the ledger bounds itself, preserves the order of retained
-events, assigns process-local sequence numbers, and only exposes the closed
-event catalogue. Protocol contract tests verify its exact payload, fixed record
+events, assigns process-local sequence numbers, only exposes the closed event
+catalogue, and that the two `launch` events describe host execution rather than
+machine state. Protocol contract tests verify its exact payload, fixed record
 shape, independent grant check, and unavailable service behavior. Host tests
 prove that the linked log action produces a document and that no document action
 carries a filesystem path.

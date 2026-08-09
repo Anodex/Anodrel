@@ -80,8 +80,13 @@ machine where the record or signature does not validate, and it cannot be made
 live by changing how it looks. A live tile starts exactly one product session on
 a worker thread and hands it to a window that owns its lifetime. The surface
 reports no reason for an unavailable or failed launch: no path, certificate,
-fingerprint, or Windows error reaches it. See `docs/PRODUCT_FIXTURE.md` and
-Decision 0061.
+fingerprint, or Windows error reaches it.
+
+The log records one `launch` event for the same resolved outcome, so **Open
+Logs** distinguishes a preflight that ran and declined from one that could not
+run at all — a difference the tile cannot show, since both leave it planned.
+Neither event states what the preflight concluded; see `docs/LOGGING.md`,
+`docs/PRODUCT_FIXTURE.md`, and Decision 0061.
 
 The three linked tiles introduce no capability. They display values the host
 already held after startup: the package's identity, declared relative content
