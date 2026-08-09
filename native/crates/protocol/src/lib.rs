@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 12;
+pub const PROTOCOL_MINOR: u16 = 13;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -58,6 +58,9 @@ pub enum Capability {
     CredentialRead,
     CredentialWrite,
     CredentialDelete,
+    /// Show one bounded notification. There is no read counterpart to grant,
+    /// because a notification has no read surface at all.
+    NotificationShow,
 }
 
 impl Capability {
@@ -79,6 +82,7 @@ impl Capability {
             Self::CredentialRead => "credential.read",
             Self::CredentialWrite => "credential.write",
             Self::CredentialDelete => "credential.delete",
+            Self::NotificationShow => "notification.show",
         }
     }
 }
@@ -106,6 +110,14 @@ pub enum ProtocolErrorCode {
     CredentialUnavailable,
     CredentialAccessDenied,
     CredentialStoredSecretInvalid,
+    /// The host cannot show notifications, or the system refused. This never
+    /// distinguishes a muted application from a busy shell.
+    NotificationUnavailable,
+    /// Another notification for this session is still pending.
+    NotificationBusy,
+    /// The supplied title or body failed the documented bounds or character
+    /// rules. The failure never echoes the offending text back.
+    NotificationTextInvalid,
 }
 
 impl ProtocolErrorCode {
@@ -132,6 +144,9 @@ impl ProtocolErrorCode {
             Self::CredentialUnavailable => "credential.unavailable",
             Self::CredentialAccessDenied => "credential.access_denied",
             Self::CredentialStoredSecretInvalid => "credential.stored_secret_invalid",
+            Self::NotificationUnavailable => "notification.unavailable",
+            Self::NotificationBusy => "notification.busy",
+            Self::NotificationTextInvalid => "notification.text_invalid",
         }
     }
 }

@@ -59,7 +59,7 @@ Unknown, missing, duplicate, and wrongly typed fields are rejected.
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
-| `capabilities` | Required in 1.1 and 1.2. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`. |
+| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 additionally supports `notification.show`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's
@@ -136,8 +136,9 @@ Records are exact at their declared version because they influence process
 authority. A compatible extension requires a new minor version, documentation,
 and tests before acceptance. A breaking change requires a new major version.
 Version 1.0 remains a no-grants migration format; version 1.1 accepts only its
-original machine-policy grants, while version 1.2 accepts the documented later
-grant set. Each version fails closed for unknown values.
+original machine-policy grants, version 1.2 accepts the documented later grant
+set, and version 1.3 adds `notification.show` on top of it. Each version fails
+closed for unknown values, and for any grant a later version introduced.
 
 The parser fails closed if the record is outside the selected policy root,
 inside the package root, malformed, oversized, mismatched with the package, or

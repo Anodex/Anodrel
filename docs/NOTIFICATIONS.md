@@ -1,10 +1,11 @@
 # Anodrel notification foundation
 
-**Status:** The portable values and UI-thread bridge in `anodrel-notifications`
-and the direct Windows adapter in `anodrel-windows-notifications` are
-implemented. A protocol capability, host wiring, and manual verification of the
-real notification-area behaviour are not. No application can reach a
-notification yet.
+**Status:** The portable values and UI-thread bridge in `anodrel-notifications`,
+the direct Windows adapter in `anodrel-windows-notifications`, the Protocol 1.13
+operation, and installed record version 1.3 are implemented. Host wiring —
+supplying the adapter to a real session and servicing the mailbox on the UI
+thread — and manual verification of the real notification-area behaviour are
+not, so no application can reach a notification yet.
 
 ## Boundary
 
@@ -60,8 +61,41 @@ There is no read counterpart to grant, because nothing can be read.
 
 The grant is machine-selected like every other: it comes from the installed
 application record's capability array, and the capability is checked immediately
-before the service is used. `docs/LAUNCH.md` records the record version that
-adds it.
+before the service is used. Installed record version **1.3** adds it, and an
+earlier record naming it stays invalid, so provisioning cannot widen a record by
+accident.
+
+## Protocol
+
+Protocol **1.13** maps the capability to one operation:
+
+~~~json
+{
+  "protocolVersion": { "major": 1, "minor": 13 },
+  "kind": "request",
+  "requestId": "…",
+  "operation": "notification.show",
+  "payload": { "title": "Build finished", "body": "Two targets\nzero warnings" }
+}
+~~~
+
+The payload accepts exactly `title` and `body`, both strings. A missing, extra,
+or wrongly typed field is rejected, so a future urgency, icon, or action field
+cannot be smuggled past this version. A client asking at a protocol minor below
+1.13 gets `operation.unsupported`.
+
+Success returns only `{ "status": "shown" }` — handed over, not seen.
+
+| Error code | Meaning |
+| --- | --- |
+| `capability.denied` | The session has no `notification.show` grant. |
+| `request.payload_invalid` | The payload is not exactly one title and one body. |
+| `notification.text_invalid` | The title or body failed the bounds or character rules. |
+| `notification.unavailable` | No surface, or the system refused. |
+| `notification.busy` | Another notification for this session is still pending. |
+
+A rejected notification never echoes the offending text back, so a refusal
+cannot become a way to have the host repeat content.
 
 ## Threading
 
@@ -196,7 +230,14 @@ What those tests cannot cover is the notification actually appearing. Shell32
 behaviour needs a real desktop session, so a manual check belongs in
 `docs/DEVELOPMENT.md` once host wiring exists.
 
-The protocol capability still needs its own contract tests for the grant check.
+Core tests cover the operation: the independent grant check, the refusal of a
+client asking below Protocol 1.13, the exact two-field payload including a
+rejected extra field, each service failure mapping to its own code, and that a
+rejected notification never echoes its text back. Record tests cover version 1.3
+accepting the new grant while keeping every earlier one, and earlier versions
+refusing to name it.
+
+Host wiring still needs its own verification once it exists.
 
 ## Deferred
 

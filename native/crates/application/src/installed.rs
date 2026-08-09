@@ -284,6 +284,17 @@ enum RecordVersion {
     V1_0,
     V1_1,
     V1_2,
+    V1_3,
+}
+
+impl RecordVersion {
+    /// Whether this version accepts the grants version 1.2 introduced.
+    ///
+    /// Each later version is a superset, so a record written for 1.2 keeps its
+    /// exact meaning when read as 1.3.
+    const fn accepts_v1_2_grants(self) -> bool {
+        matches!(self, Self::V1_2 | Self::V1_3)
+    }
 }
 
 fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> {
@@ -379,21 +390,22 @@ fn capability_for_record_version(
         "clipboard.read" => Some(Capability::ClipboardRead),
         "clipboard.write" => Some(Capability::ClipboardWrite),
         "external.open" => Some(Capability::ExternalOpen),
-        "dialog.open_file" if version == RecordVersion::V1_2 => Some(Capability::DialogOpenFile),
-        "dialog.save_file" if version == RecordVersion::V1_2 => Some(Capability::DialogSaveFile),
-        "file.read_text" if version == RecordVersion::V1_2 => Some(Capability::FileReadText),
-        "storage.state.read" if version == RecordVersion::V1_2 => {
-            Some(Capability::StorageStateRead)
-        }
-        "storage.state.replace" if version == RecordVersion::V1_2 => {
+        "dialog.open_file" if version.accepts_v1_2_grants() => Some(Capability::DialogOpenFile),
+        "dialog.save_file" if version.accepts_v1_2_grants() => Some(Capability::DialogSaveFile),
+        "file.read_text" if version.accepts_v1_2_grants() => Some(Capability::FileReadText),
+        "storage.state.read" if version.accepts_v1_2_grants() => Some(Capability::StorageStateRead),
+        "storage.state.replace" if version.accepts_v1_2_grants() => {
             Some(Capability::StorageStateReplace)
         }
-        "storage.state.clear" if version == RecordVersion::V1_2 => {
+        "storage.state.clear" if version.accepts_v1_2_grants() => {
             Some(Capability::StorageStateClear)
         }
-        "credential.read" if version == RecordVersion::V1_2 => Some(Capability::CredentialRead),
-        "credential.write" if version == RecordVersion::V1_2 => Some(Capability::CredentialWrite),
-        "credential.delete" if version == RecordVersion::V1_2 => Some(Capability::CredentialDelete),
+        "credential.read" if version.accepts_v1_2_grants() => Some(Capability::CredentialRead),
+        "credential.write" if version.accepts_v1_2_grants() => Some(Capability::CredentialWrite),
+        "credential.delete" if version.accepts_v1_2_grants() => Some(Capability::CredentialDelete),
+        // Version 1.3 adds exactly one grant. An earlier record naming it stays
+        // invalid, so provisioning cannot widen a record by accident.
+        "notification.show" if version == RecordVersion::V1_3 => Some(Capability::NotificationShow),
         _ => None,
     }
 }
@@ -496,6 +508,7 @@ fn validate_version(
         (1, 0) => Ok(RecordVersion::V1_0),
         (1, 1) => Ok(RecordVersion::V1_1),
         (1, 2) => Ok(RecordVersion::V1_2),
+        (1, 3) => Ok(RecordVersion::V1_3),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -803,6 +816,56 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_3_adds_notifications_and_keeps_every_earlier_grant() {
+        // Each version is a superset, so a record written for 1.2 must keep its
+        // exact meaning when its version is raised.
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 3")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"clipboard.read\", \"credential.read\", \"notification.show\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.3 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::ClipboardRead,
+                anodrel_protocol::Capability::CredentialRead,
+                anodrel_protocol::Capability::NotificationShow,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_notification_grant() {
+        // Provisioning must not be able to widen a record by naming a grant its
+        // declared version does not carry.
+        for minor in ["1", "2"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"notification.show\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(matches!(
+                InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                Err(InstalledApplicationError::InvalidRecord)
+            ));
+            fixture.remove();
+        }
     }
 
     #[test]

@@ -185,8 +185,8 @@ provisioning contract, and host activation routes that exercise it.
 `docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
 boundary.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary; its
-portable values, host UI-thread bridge, and direct Shell32 adapter exist, and
-its protocol capability and host wiring do not.
+portable values, host UI-thread bridge, direct Shell32 adapter, Protocol 1.13
+operation, and record version 1.3 grant exist, and its host wiring does not.
 `docs/STORAGE.md` defines the bounded application-state storage boundary and
 its recovery and capability contract.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.

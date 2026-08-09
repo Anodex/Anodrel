@@ -124,9 +124,10 @@ Status: **Direct Windows host in progress**
   timeout. `anodrel-windows-notifications` adds the direct Shell32 adapter,
   which keeps one host-owned notification-area entry per process because
   removing an entry also dismisses the balloon it was asked to show. The
-  `notification.show` capability, host wiring, and manual desktop verification
-  remain; no application can reach a notification yet. See
-  `docs/NOTIFICATIONS.md`.
+  Protocol 1.13 maps the single `notification.show` grant to one operation, and
+  installed record version 1.3 adds that grant as a strict superset of 1.2.
+  Host wiring and manual desktop verification remain; no application can reach
+  a notification yet. See `docs/NOTIFICATIONS.md`.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

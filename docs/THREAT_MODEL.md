@@ -14,8 +14,8 @@ The current operations are `platform.ping`, `platform.capabilities`,
 `clipboard.read`, `clipboard.write`, `external.open`, `dialog.open_file`,
 `dialog.open_file.v2`, `dialog.save_file`, `file.read_text`,
 `storage.state.read`, `storage.state.replace`, `storage.state.clear`, and
-`diagnostics.entries.read`, `credential.read`, `credential.write`, and
-`credential.delete`.
+`diagnostics.entries.read`, `credential.read`, `credential.write`,
+`credential.delete`, and `notification.show`.
 Clipboard, external-link, file-dialog, selection-scoped file-text, and
 application-state operations each have their own bounded values and separate
 host-issued grants. The development UI-session sample exercises these only with

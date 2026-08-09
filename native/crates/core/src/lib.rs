@@ -28,6 +28,10 @@ use anodrel_file_access::{
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
+use anodrel_notifications::{
+    Notification, NotificationBody, NotificationService, NotificationServiceError,
+    NotificationTitle,
+};
 use anodrel_protocol::{
     Capability, JsonValue, ProtocolErrorCode, ProtocolVersion, RequestEnvelope, ResponseEnvelope,
     is_empty_object, object, sent_at,
@@ -111,6 +115,7 @@ pub struct CoreHost {
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
+    notifications: Box<dyn NotificationService>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
@@ -130,6 +135,7 @@ pub struct CoreHost {
 pub struct HostServices {
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
+    notifications: Box<dyn NotificationService>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
@@ -157,6 +163,15 @@ struct UnavailableExternalLinks;
 impl ExternalLinkService for UnavailableExternalLinks {
     fn open(&self, _link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
         Err(ExternalLinkOpenError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableNotifications;
+
+impl NotificationService for UnavailableNotifications {
+    fn show(&self, _notification: &Notification) -> Result<(), NotificationServiceError> {
+        Err(NotificationServiceError::Unavailable)
     }
 }
 
@@ -227,6 +242,7 @@ impl HostServices {
         Self {
             clipboard: Box::new(UnavailableClipboard),
             external_links: Box::new(UnavailableExternalLinks),
+            notifications: Box::new(UnavailableNotifications),
             file_dialogs: Box::new(UnavailableFileDialogs),
             file_selections: Box::new(UnavailableFileSelectionService),
             file_text: Box::new(UnavailableFileTextService),
@@ -247,6 +263,16 @@ impl HostServices {
     #[must_use]
     pub fn with_external_links(mut self, service: impl ExternalLinkService + 'static) -> Self {
         self.external_links = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed notification service.
+    ///
+    /// The supplied service must reach the operating system through the host UI
+    /// thread. A session worker never calls Shell32 itself.
+    #[must_use]
+    pub fn with_notifications(mut self, service: impl NotificationService + 'static) -> Self {
+        self.notifications = Box::new(service);
         self
     }
 
@@ -326,6 +352,7 @@ impl CoreHost {
             pending_ui_document_update: RefCell::new(None),
             clipboard: services.clipboard,
             external_links: services.external_links,
+            notifications: services.notifications,
             file_dialogs: services.file_dialogs,
             file_selections: services.file_selections,
             file_text: services.file_text,
@@ -551,6 +578,10 @@ impl CoreHost {
             pending_ui_document_update: RefCell::new(None),
             clipboard: Box::new(clipboard),
             external_links: Box::new(external_links),
+            // This constructor names each service explicitly and predates
+            // notifications. Leaving it unavailable keeps every existing caller
+            // exactly as capable as it was, rather than silently widening it.
+            notifications: Box::new(UnavailableNotifications),
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
             file_text: Box::new(file_text),
@@ -640,6 +671,9 @@ impl CoreHost {
             }
             "credential.delete" if request.protocol_version.minor >= 12 => {
                 self.handle_credential_delete(request)
+            }
+            "notification.show" if request.protocol_version.minor >= 13 => {
+                self.handle_notification_show(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
@@ -1065,6 +1099,56 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::ExternalUnavailable,
                 "external link handler is unavailable.",
+                None,
+            ),
+        }
+    }
+
+    /// Shows one bounded notification for an authenticated session.
+    ///
+    /// The result reports only that the host handed the values over. It must
+    /// never describe what the user experienced.
+    fn handle_notification_show(&self, request: RequestEnvelope) -> JsonValue {
+        let Some((title, body)) = notification_show_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "notification.show requires one title and one body string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::NotificationShow) {
+            return self.capability_denied(request.request_id, "notification.show");
+        }
+
+        // Validation failures never echo the offending text back: a rejected
+        // notification must not become a way to have the host repeat content.
+        let (Ok(title), Ok(body)) = (NotificationTitle::new(title), NotificationBody::new(body))
+        else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::NotificationTextInvalid,
+                "notification.show text is invalid.",
+                None,
+            );
+        };
+
+        match self.notifications.show(&Notification::new(title, body)) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("shown".to_owned()))]),
+            ),
+            Err(NotificationServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::NotificationUnavailable,
+                "notifications are unavailable.",
+                None,
+            ),
+            Err(NotificationServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::NotificationBusy,
+                "a notification is already pending.",
                 None,
             ),
         }
@@ -1574,6 +1658,20 @@ fn clipboard_write_payload(value: &JsonValue) -> Option<&str> {
         .and_then(JsonValue::as_string)
 }
 
+/// Reads the exact two-field payload `notification.show` accepts.
+///
+/// Any extra field is a mismatch rather than something to ignore, so a future
+/// urgency, icon, or action field cannot be smuggled past this version.
+fn notification_show_payload(value: &JsonValue) -> Option<(&str, &str)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    let title = fields.get("title").and_then(JsonValue::as_string)?;
+    let body = fields.get("body").and_then(JsonValue::as_string)?;
+    Some((title, body))
+}
+
 fn external_open_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -1697,6 +1795,7 @@ mod tests {
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
     use anodrel_file_access::{FileSelection, FileSelectionService, FileTextService};
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
+    use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
@@ -2050,6 +2149,64 @@ mod tests {
         )
     }
 
+    fn host_with_notifications(service: impl NotificationService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::NotificationShow],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_notifications(service),
+        )
+    }
+
+    fn request_v1_13(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":13}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    /// A notification service that records what it was asked to show.
+    #[derive(Debug, Default)]
+    struct RecordingNotifications {
+        shown: std::sync::Mutex<Vec<(String, String)>>,
+        result: Option<NotificationServiceError>,
+    }
+
+    impl RecordingNotifications {
+        fn failing(error: NotificationServiceError) -> Self {
+            Self {
+                shown: std::sync::Mutex::new(Vec::new()),
+                result: Some(error),
+            }
+        }
+    }
+
+    impl NotificationService for RecordingNotifications {
+        fn show(&self, notification: &Notification) -> Result<(), NotificationServiceError> {
+            if let Some(error) = self.result {
+                return Err(error);
+            }
+            self.shown
+                .lock()
+                .expect("the fixture lock is usable")
+                .push((
+                    notification.title().as_str().to_owned(),
+                    notification.body().as_str().to_owned(),
+                ));
+            Ok(())
+        }
+    }
+
+    fn notification_payload(title: &str, body: &str) -> String {
+        object([
+            ("body", JsonValue::String(body.to_owned())),
+            ("title", JsonValue::String(title.to_owned())),
+        ])
+        .to_json()
+    }
+
     fn ui_document_payload(document: &str) -> String {
         object([("document", JsonValue::String(document.to_owned()))]).to_json()
     }
@@ -2066,6 +2223,123 @@ mod tests {
 
     fn field<'a>(value: &'a JsonValue, field: &str) -> &'a JsonValue {
         &value.as_object().expect("response is an object")[field]
+    }
+
+    #[test]
+    fn notifications_need_their_own_grant_and_protocol_minor() {
+        let payload = notification_payload("Build finished", "Two targets");
+
+        // No grant.
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new("test.application", vec![], "test-host").expect("policy is valid"),
+                HostServices::unavailable().with_notifications(RecordingNotifications::default()),
+            )
+            .handle_json(&request_v1_13("notification.show", &payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        // Granted, but asked for at a protocol minor that predates the
+        // operation: an older client must not reach a newer capability.
+        let unsupported = JsonValue::parse(
+            &host_with_notifications(RecordingNotifications::default())
+                .handle_json(&request_v1_12("notification.show", &payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn a_granted_notification_reaches_the_service_unchanged() {
+        let service = RecordingNotifications::default();
+        let response = JsonValue::parse(&host_with_notifications(service).handle_json(
+            &request_v1_13(
+                "notification.show",
+                &notification_payload("Done", "All green"),
+            ),
+        ))
+        .expect("response JSON is valid");
+
+        assert_eq!(field(&response, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&response, "result"), "status").as_string(),
+            Some("shown")
+        );
+    }
+
+    #[test]
+    fn a_rejected_notification_never_echoes_its_own_text_back() {
+        // A refusal must not become a way to have the host repeat content.
+        let response = JsonValue::parse(
+            &host_with_notifications(RecordingNotifications::default()).handle_json(
+                &request_v1_13(
+                    "notification.show",
+                    &notification_payload("Spoofed\rsecond line", "body"),
+                ),
+            ),
+        )
+        .expect("response JSON is valid");
+
+        let error = field(&response, "error");
+        assert_eq!(
+            field(error, "code").as_string(),
+            Some("notification.text_invalid")
+        );
+        assert!(!response.to_json().contains("Spoofed"));
+    }
+
+    #[test]
+    fn notification_payloads_accept_exactly_a_title_and_a_body() {
+        let host = host_with_notifications(RecordingNotifications::default());
+        for payload in [
+            r#"{"title":"only"}"#,
+            r#"{"body":"only"}"#,
+            // An extra field is a mismatch, not something to ignore, so a
+            // future urgency or action field cannot be smuggled past 1.13.
+            r#"{"title":"a","body":"b","urgency":"high"}"#,
+            r#"{"title":"a","body":2}"#,
+        ] {
+            let response =
+                JsonValue::parse(&host.handle_json(&request_v1_13("notification.show", payload)))
+                    .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn service_failures_stay_distinguishable_without_describing_the_user() {
+        for (error, expected) in [
+            (
+                NotificationServiceError::Unavailable,
+                "notification.unavailable",
+            ),
+            (NotificationServiceError::Busy, "notification.busy"),
+        ] {
+            let response = JsonValue::parse(
+                &host_with_notifications(RecordingNotifications::failing(error)).handle_json(
+                    &request_v1_13(
+                        "notification.show",
+                        &notification_payload("Done", "All green"),
+                    ),
+                ),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(expected)
+            );
+        }
     }
 
     #[test]

@@ -11,6 +11,7 @@ anodrel-diagnostics = { path = "../diagnostics" }
 anodrel-external-links = { path = "../external-links" }
 anodrel-file-access = { path = "../file-access" }
 anodrel-file-dialog = { path = "../file-dialog" }
+anodrel-notifications = { path = "../notifications" }
 anodrel-storage = { path = "../storage" }
 anodrel-protocol = { path = "../protocol" }
 anodrel-ui-session = { path = "../ui-session" }
