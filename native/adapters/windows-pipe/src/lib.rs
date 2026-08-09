@@ -9,7 +9,15 @@ mod loopback;
 mod raw;
 mod security;
 
-use std::{fmt, io, thread, time::Duration};
+use std::{
+    fmt, io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::Duration,
+};
 
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_clipboard::ClipboardService;
@@ -157,8 +165,37 @@ impl fmt::Display for InvitationError {
 impl std::error::Error for InvitationError {}
 
 pub struct WindowsPipeServer {
-    handle: raw::OwnedHandle,
+    handle: Arc<raw::OwnedHandle>,
+    pipe_name: String,
+    stop_requested: Arc<AtomicBool>,
     session: TransportSession,
+}
+
+/// Host-only signal that stops one pending or connected pipe worker.
+#[derive(Clone)]
+pub struct PipeStopSignal {
+    handle: Arc<raw::OwnedHandle>,
+    pipe_name: String,
+    requested: Arc<AtomicBool>,
+}
+
+impl fmt::Debug for PipeStopSignal {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("PipeStopSignal(..)")
+    }
+}
+
+impl PipeStopSignal {
+    /// Requests a best-effort stop for this one host-owned pipe worker.
+    pub fn request_stop(&self) {
+        self.requested.store(true, Ordering::Release);
+        // A private local connection wakes a server that has not entered its
+        // blocking accept yet; cancellation wakes an already pending accept or
+        // read. Neither result is application-visible.
+        let name = wide_null(&self.pipe_name);
+        let _ = raw::connect_client_once(&name);
+        raw::cancel_pending_io(&self.handle);
+    }
 }
 
 /// Runs one internal local authentication and `platform.health` round trip.
@@ -260,6 +297,16 @@ pub fn measure_loopback_request(
 }
 
 impl WindowsPipeServer {
+    /// Returns the host-only stop signal for this endpoint.
+    #[must_use]
+    pub fn stop_signal(&self) -> PipeStopSignal {
+        PipeStopSignal {
+            handle: Arc::clone(&self.handle),
+            pipe_name: self.pipe_name.clone(),
+            requested: Arc::clone(&self.stop_requested),
+        }
+    }
+
     /// Creates a random owner-restricted endpoint and its separate sensitive
     /// invitation. The caller owns secure delivery of that invitation to the
     /// application it launches.
@@ -590,11 +637,16 @@ impl WindowsPipeServer {
         })?;
         let security = CurrentSessionSecurity::new()?;
         let pipe_name_wide = wide_null(&pipe_name);
-        let handle = raw::create_server_pipe(&pipe_name_wide, security.attributes())?;
+        let handle = Arc::new(raw::create_server_pipe(
+            &pipe_name_wide,
+            security.attributes(),
+        )?);
 
         Ok((
             Self {
                 handle,
+                pipe_name: pipe_name.clone(),
+                stop_requested: Arc::new(AtomicBool::new(false)),
                 session: create_session(credentials),
             },
             SessionInvitation {
@@ -609,7 +661,23 @@ impl WindowsPipeServer {
     /// only from a dedicated worker thread. Any transport failure closes the
     /// stream without exposing parser or authentication details to the client.
     pub fn serve_one(mut self) -> io::Result<()> {
-        raw::connect_server(&self.handle)?;
+        if self.stop_requested.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        match raw::connect_server(&self.handle) {
+            Ok(()) => {}
+            Err(error)
+                if self.stop_requested.load(Ordering::Acquire)
+                    && raw::is_operation_aborted(&error) =>
+            {
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        }
+        if self.stop_requested.load(Ordering::Acquire) {
+            raw::disconnect_server(&self.handle);
+            return Ok(());
+        }
         let result = self.serve_connected_client();
         raw::disconnect_server(&self.handle);
         result
@@ -620,6 +688,12 @@ impl WindowsPipeServer {
         loop {
             let bytes_read = match raw::read(&self.handle, &mut read_buffer) {
                 Ok(bytes_read) => bytes_read,
+                Err(error)
+                    if self.stop_requested.load(Ordering::Acquire)
+                        && raw::is_operation_aborted(&error) =>
+                {
+                    return Ok(());
+                }
                 Err(error) if raw::is_broken_pipe(&error) => return Ok(()),
                 Err(error) => return Err(error),
             };
@@ -735,6 +809,47 @@ mod tests {
             .expect("bootstrap invitation is valid");
         assert_eq!(bootstrap.pipe_name(), invitation.pipe_name());
         assert_eq!(bootstrap.session_id(), invitation.session_id());
+    }
+
+    #[test]
+    fn host_stop_signal_prevents_a_pending_server_from_accepting_a_client() {
+        let policy = HostPolicy::new(
+            "test.application",
+            vec![Capability::DiagnosticsRead],
+            "test-host",
+        )
+        .expect("test policy is valid");
+        let (server, _invitation) =
+            WindowsPipeServer::create(policy, "stopped-session").expect("pipe server creates");
+        server.stop_signal().request_stop();
+        server
+            .serve_one()
+            .expect("a stopped pending server returns safely");
+    }
+
+    #[test]
+    fn host_stop_signal_ends_a_connected_pipe_worker() {
+        let policy = HostPolicy::new(
+            "test.application",
+            vec![Capability::DiagnosticsRead],
+            "test-host",
+        )
+        .expect("test policy is valid");
+        let (server, invitation) = WindowsPipeServer::create(policy, "connected-stop-session")
+            .expect("pipe server creates");
+        let client =
+            raw::connect_client(&wide_null(invitation.pipe_name())).expect("test client connects");
+        let stop = server.stop_signal();
+        let worker = thread::spawn(move || server.serve_one());
+
+        thread::sleep(Duration::from_millis(10));
+        stop.request_stop();
+        drop(client);
+
+        worker
+            .join()
+            .expect("stopped pipe worker does not panic")
+            .expect("stopped pipe worker returns safely");
     }
 
     #[test]

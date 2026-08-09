@@ -59,6 +59,9 @@ input, close, dialog, and retained-file resources that one host-owned native
 application window will consume. This is a verified-launch building block, not
 a public window API or a substitute for signed application provisioning.
 
+The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
+cancel a pending accept or read without exposing IPC control to applications.
+
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
 blur, bevels, and filtered image scaling. The Anodrel mark ships as the authored

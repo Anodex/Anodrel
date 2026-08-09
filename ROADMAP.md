@@ -144,8 +144,10 @@ Status: **Direct Windows host in progress**
   for the first in-memory diagnostic log and its bounded authenticated read:**
   a closed event catalogue has no application input, persistence, export, or
   arbitrary error surface; Protocol 1.11 exposes only its fixed records through
-  the existing `diagnostics.read` grant (Decision 0053). Crash reporting and
-  public/application logging remain separate work.
+  the existing `diagnostics.read` grant (Decision 0053). Windows pipe workers
+  also have a host-only pending-I/O stop signal for a later product lifecycle
+  owner (Decision 0059). Crash reporting, child-exit lifecycle coordination,
+  and public/application logging remain separate work.
 - Establish verified executable identity. **In progress:** the direct Windows
   Authenticode adapter verifies an embedded signature and returns a leaf
   certificate fingerprint (Decision 0017). The installed application-record

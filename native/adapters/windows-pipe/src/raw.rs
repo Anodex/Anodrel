@@ -21,6 +21,7 @@ const OPEN_EXISTING: Dword = 3;
 const ERROR_PIPE_CONNECTED: i32 = 535;
 const ERROR_PIPE_BUSY: i32 = 231;
 const ERROR_BROKEN_PIPE: i32 = 109;
+const ERROR_OPERATION_ABORTED: i32 = 995;
 const BCRYPT_USE_SYSTEM_PREFERRED_RNG: Dword = 0x0000_0002;
 
 #[repr(C)]
@@ -54,6 +55,7 @@ unsafe extern "system" {
     ) -> HandleValue;
     fn ConnectNamedPipe(pipe: HandleValue, overlapped: *mut core::ffi::c_void) -> Bool;
     fn DisconnectNamedPipe(pipe: HandleValue) -> Bool;
+    fn CancelIoEx(pipe: HandleValue, overlapped: *mut core::ffi::c_void) -> Bool;
     fn CreateFileW(
         name: *const u16,
         desired_access: Dword,
@@ -173,25 +175,23 @@ pub fn disconnect_server(handle: &OwnedHandle) {
     }
 }
 
+/// Best-effort cancellation of pending synchronous pipe I/O during host shutdown.
+pub fn cancel_pending_io(handle: &OwnedHandle) {
+    // SAFETY: the handle remains live through this call. A null OVERLAPPED
+    // cancels every pending operation issued through this one host-owned pipe.
+    let _ = unsafe { CancelIoEx(handle.value(), ptr::null_mut()) };
+}
+
+pub fn is_operation_aborted(error: &io::Error) -> bool {
+    error.raw_os_error() == Some(ERROR_OPERATION_ABORTED)
+}
+
 pub fn connect_client(name: &[u16]) -> io::Result<OwnedHandle> {
     for _ in 0..2 {
-        // SAFETY: name is a null-terminated UTF-16 pipe name. The client asks
-        // only for data read/write and synchronization, not generic write.
-        let handle = unsafe {
-            CreateFileW(
-                name.as_ptr(),
-                PIPE_CLIENT_ACCESS,
-                0,
-                ptr::null(),
-                OPEN_EXISTING,
-                0,
-                0,
-            )
+        let error = match connect_client_once(name) {
+            Ok(handle) => return Ok(handle),
+            Err(error) => error,
         };
-        if let Ok(handle) = OwnedHandle::new(handle) {
-            return Ok(handle);
-        }
-        let error = io::Error::last_os_error();
         if error.raw_os_error() != Some(ERROR_PIPE_BUSY) {
             return Err(error);
         }
@@ -205,6 +205,25 @@ pub fn connect_client(name: &[u16]) -> io::Result<OwnedHandle> {
         io::ErrorKind::WouldBlock,
         "named pipe remained busy after the bounded wait",
     ))
+}
+
+/// Attempts one immediate local client connection without waiting for a busy
+/// endpoint. Host lifecycle code uses this only to wake an unstarted accept.
+pub fn connect_client_once(name: &[u16]) -> io::Result<OwnedHandle> {
+    // SAFETY: name is a null-terminated UTF-16 pipe name. The client asks only
+    // for data read/write and synchronization, not generic write.
+    let handle = unsafe {
+        CreateFileW(
+            name.as_ptr(),
+            PIPE_CLIENT_ACCESS,
+            0,
+            ptr::null(),
+            OPEN_EXISTING,
+            0,
+            0,
+        )
+    };
+    OwnedHandle::new(handle)
 }
 
 pub fn read(handle: &OwnedHandle, output: &mut [u8]) -> io::Result<usize> {

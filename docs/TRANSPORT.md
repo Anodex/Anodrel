@@ -141,6 +141,11 @@ synchronization rights required for a client; it deliberately excludes
 The adapter uses a 4 KiB fixed read buffer and passes chunks to the bounded
 session engine. It performs blocking pipe I/O only in the caller's worker
 thread; the Windows message loop must never call `serve_one` directly.
+Each endpoint also supplies a host-only stop signal. It can wake an accept that
+has not started through one private local connection and cancel pending accept
+or read I/O through `CancelIoEx`; a stop never produces a protocol response or
+reveals a native error. This lets a product lifecycle owner shut down safely
+when a verified child exits before authenticating. See Decision 0059.
 
 ### Startup Lab loopback
 

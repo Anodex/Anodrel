@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0059: Windows pipe workers use a host-only stop signal.
+
 - 0058: Registered interactive-session resources stay host-owned.
 
 - 0057: Registered sessions compose identity-bound native services.
