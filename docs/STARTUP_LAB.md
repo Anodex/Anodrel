@@ -58,7 +58,7 @@ records the reasoning.
 
 | Tile | State | Behaviour |
 | --- | --- | --- |
-| Launch Sample | **Planned** — needs verified executable identity | Dimmed, labelled, inert. |
+| Launch Sample | **Resolved before the surface opens** | Live only when a verification-only preflight confirms a machine record and signed executable; otherwise dimmed, labelled, inert. |
 | Open Logs | **Linked** | Opens a native view of the safe typed startup-event ledger. |
 | Inspect Package | **Linked** | Opens a native window showing the verified package facts. |
 | Runtime Diagnostics | **Linked** | Opens a native window showing protocol, transport, and process readings. |
@@ -66,6 +66,18 @@ records the reasoning.
 A planned tile states the gate it is waiting on instead of a description, does
 not respond to hover, and takes no pointer cursor. `ROADMAP.md` tracks each one
 against the decision that gates it.
+
+Launch Sample is the one tile whose state is not a constant. Before the window
+is created, the host runs the launch service's verification-only sequence —
+machine record, locked digest revalidation, Authenticode, publisher fingerprint
+— which creates no process, pipe, or bootstrap material. Drawing, hover, and
+hit-testing all read that one resolved value, so the tile cannot be live on a
+machine where the record or signature does not validate, and it cannot be made
+live by changing how it looks. A live tile starts exactly one product session on
+a worker thread and hands it to a window that owns its lifetime. The surface
+reports no reason for an unavailable or failed launch: no path, certificate,
+fingerprint, or Windows error reaches it. See `docs/PRODUCT_FIXTURE.md` and
+Decision 0061.
 
 The three linked tiles introduce no capability. They display values the host
 already held after startup: the package's identity, declared relative content
@@ -154,7 +166,10 @@ Startup Lab** window opens and shows:
   brand crate rather than from a compiled icon resource;
 - the `org.anodrel.sample` identity below the hero mark;
 - Platform Core, Verified Package, Private IPC, and Native Shell as ready;
-- Launch Sample dimmed and marked `PLANNED`;
+- Launch Sample dimmed and marked `PLANNED` on a machine with no provisioned
+  product fixture — and, when `docs/PRODUCT_FIXTURE.md` has been provisioned,
+  live instead, reading *Verified signed fixture* and opening one product
+  session window;
 - Open Logs, Inspect Package, and Runtime Diagnostics highlighting under the
   pointer, taking a hand cursor, and each opening a native window when
   clicked;

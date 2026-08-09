@@ -1,7 +1,10 @@
 # Windows verified product sessions
 
-**Status:** Internal Windows-host contract. No provisioned signed application
-fixture ships yet, so this is not a Startup Lab command or public SDK surface.
+**Status:** Internal Windows-host contract. It is not a public SDK surface. Two
+host-only entry points activate it: the `--product-session <applicationId>`
+command and the Startup Lab launch tile, which exists only while a machine
+record and signed executable currently validate. The one application that can
+be provisioned today is the development fixture in `docs/PRODUCT_FIXTURE.md`.
 
 ## Purpose
 
@@ -39,6 +42,26 @@ window, then call `finish` after the window returns. Dropping it also requests
 shutdown, so an error path cannot intentionally orphan the child. `finish`
 joins both workers and reports only safe host failure categories.
 
+## Host activation
+
+`--product-session <applicationId>` starts the coordinator on a worker, waits
+for it, then runs the authenticated window on the host's own UI thread and calls
+`finish` when that window returns. The identity selects which already-provisioned
+machine record to read; it supplies no record, package, executable, capability,
+or child argument.
+
+The Startup Lab tile takes a different ownership route because its message loop
+is already running. A click starts the coordinator on a worker; the worker posts
+one private window message; the UI thread then creates the product window and
+that window's view owns the session. Destroying the window drops the session,
+which requests shutdown of the child, the pipe worker, and the exit watcher.
+Exactly one product session may exist at a time, and a failed start reports only
+the tile's existing planned state.
+
+## What it still does not do
+
 The current coordinator has no restart, background mode, application-driven
 graceful-exit protocol, output capture, public window API, or multi-window
-policy. See Decisions 0020, 0058, 0059, and 0060.
+policy. It is not a packaging, installation, or update mechanism, and it makes
+no claim of parity with a framework runtime. See Decisions 0020, 0058, 0059,
+0060, and 0061.

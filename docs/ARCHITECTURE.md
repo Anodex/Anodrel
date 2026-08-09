@@ -107,8 +107,12 @@ gate it waits on, and is inert; hit-testing and drawing read the same value, so
 a tile cannot be enabled by changing its appearance. Its three linked tiles
 open native windows that display values the host already held, introducing
 no capability. The log view reads a bounded typed event ledger that cannot
-accept dynamic application or native diagnostic text. See `docs/STARTUP_LAB.md`,
-`docs/LOGGING.md`, Decisions 0014 and 0016.
+accept dynamic application or native diagnostic text. Its one launch tile is the
+exception to the compile-time rule: its state comes from a verification-only
+preflight that runs before the surface opens, and drawing, hover, and
+hit-testing all read that single value, so the tile cannot be live on a machine
+where the record or signature does not validate. See `docs/STARTUP_LAB.md`,
+`docs/LOGGING.md`, `docs/PRODUCT_FIXTURE.md`, Decisions 0014, 0016, and 0061.
 
 The Windows instance adapter gives the package text surface one bounded,
 current-session primary instance per validated application identity. A second
@@ -131,9 +135,14 @@ checks Authenticode and the publisher fingerprint, creates only the exact
 argument-free `.exe`, and returns a child handle that terminates on host
 shutdown. `anodrel-windows-product-session` now joins that child, one
 registered interactive pipe, and one grouped native UI session under one
-host-owned lifetime. Record provisioning and host UI activation remain required
-before a product process can be launched. See `docs/SIGNING.md`,
-`docs/LAUNCH.md`, and Decisions 0017 through 0020.
+host-owned lifetime. A separate verification-only entry point runs the same
+pre-launch sequence without creating a process, so a surface can decide whether
+a launch is currently possible. A development-only signed fixture and a
+controlled provisioning helper — both outside the host, which never writes
+machine policy, installs trust, or signs anything — exercise the joined path on
+a development machine. Production packaging, installation, updates, and a real
+signing identity remain separate work. See `docs/SIGNING.md`, `docs/LAUNCH.md`,
+`docs/PRODUCT_FIXTURE.md`, and Decisions 0017 through 0020 and 0061.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. That builder derives fixed
@@ -214,7 +223,17 @@ The product-session adapter creates the group before bootstrap delivery, starts
 the pipe only on a worker, and observes the tracked child on a separate worker.
 Child exit ends pending pipe I/O and closes the native window; pipe exit closes
 the window and ends the child. This control path is host-only and has no
-protocol message. See Decision 0060.
+protocol message. The host activates it from a command-line route or the
+preflight-resolved Startup Lab tile; in both cases the blocking start runs on a
+worker and only the resulting grouped resources reach a window. See Decisions
+0060 and 0061.
+
+`anodrel-product-fixture` and `anodrel-product-provisioning` are development
+tools, not part of the shipped host. The fixture is a first-party child that
+speaks only the authenticated protocol; the provisioning helper is the one
+component that writes machine policy, and it can write exactly one value for one
+compile-time identity after validating the record through the host's own parser.
+See `docs/PRODUCT_FIXTURE.md`.
 
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It
 measures either the owned in-process wire, authenticated transport, and core

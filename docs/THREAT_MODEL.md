@@ -64,6 +64,9 @@ authority for permissions.
 | A link launches a command, file, custom protocol, or leaks a destination through diagnostics. | Validate only bounded ASCII HTTPS links with one DNS-style authority before the native call; pass no verb, parameters, directory, or shell string; return a safe unavailable category and never log the address or native status. |
 | A child process gains arbitrary shell authority or outlives the host. | The launch service supplies only the policy-approved `.exe` with no child arguments or shell. The product-session owner retains the child, pipe worker, and window as one lifetime: child exit stops the pipe and closes the window; pipe exit closes the window and terminates the child. |
 | A mutable package substitutes a trusted but unauthorized executable. | Do not treat a package-held manifest or an Authenticode result alone as launch authority; require an external installed application record, lock the contained executable against write/delete/rename, hash it through that lock, then match its verified signer to the record's application-ID-bound publisher fingerprint. |
+| A host surface offers a launch that cannot actually be verified, or reveals why it cannot. | Resolve the Startup Lab launch tile from one verification-only preflight — machine record, locked digest revalidation, Authenticode, publisher fingerprint — that creates no process, pipe, or bootstrap material. Drawing, hover, and hit-testing read that single value, so the tile is inert and drawn as planned unless the record and signature validate right now. A failed preflight or a failed start reports only that same planned state: no path, certificate, digest, fingerprint, or Windows error reaches the surface. |
+| A development verification fixture becomes a way to weaken production trust. | The fixture satisfies every existing check rather than bypassing one: it is machine-provisioned, digest-locked, signer-matched, argument-free, and granted only `ui.document.write`, `ui.events.read`, and `session.close`. Its identity is a compile-time constant distinct from the shipped sample. Its certificate is generated on the developer's own machine, installed into machine trust only for a development session, and removed by the same script. The native host never creates a certificate, installs trust, writes the registry, or signs anything. See `docs/PRODUCT_FIXTURE.md` and Decision 0061. |
+| A provisioning tool writes a machine-policy record the host would reject, or writes one for another application. | Keep record writing in one development helper that the host does not link. Compose the record only from a recomputed executable digest and an Authenticode leaf fingerprint Windows accepted, validate it through the host's own parser before writing, and expose no hive, key path, value name, application ID, or capability argument. |
 | An application chooses or substitutes its launch policy. | Read the installed record only from the fixed 64-bit `HKEY_LOCAL_MACHINE` policy location selected by the host; accept no current-user, package, environment, protocol, or UI policy source. Require the registry key, record, and validated package to carry the same application ID. |
 | A child process grants itself a capability. | Convert only the validated installed record's strict capability array into the host session policy; reject unknown or duplicate grants, treat version 1.0 records as grant-free, and never accept grants from package, bootstrap, pipe, protocol, or UI data. |
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
@@ -190,9 +193,17 @@ outside the package that binds an application ID, executable digest, and
 approved signer fingerprint. Decision 0019 adds the fixed, read-only,
 machine-wide Windows registry source for that record; it rejects current-user
 and fallback sources. Decision 0020 adds locked pre-launch revalidation,
-tracked child lifetime, and post-verification bootstrap binding. Record
-provisioning and host UI integration remain before the first Launch Sample
-capability becomes available.
+tracked child lifetime, and post-verification bootstrap binding.
+
+Decision 0061 adds the development-only signed fixture that finally exercises
+that path. The Startup Lab's Launch Sample tile is now resolved from a
+verification-only preflight rather than a compile-time constant, so it exists
+only while a machine record and signed executable validate. This is a
+development-machine capability: it depends on a locally generated certificate
+installed into machine trust, which is a development-environment assumption and
+not a production publisher identity. Production packaging, installation,
+updates, and a real signing identity remain separate gates before any shipped
+application uses this path.
 
 ## Before additional privileged capabilities
 

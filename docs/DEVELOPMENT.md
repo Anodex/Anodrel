@@ -62,6 +62,8 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-session-policy
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-registered-session
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-product-session
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
+cargo test --manifest-path native/Cargo.toml -p anodrel-product-fixture
+cargo test --manifest-path native/Cargo.toml -p anodrel-product-provisioning
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-storage
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-storage
@@ -236,6 +238,76 @@ visible, then activate it. The document carries no position: the host retains,
 clamps, and applies the vertical offset locally before the normal authenticated
 semantic-action round trip closes the session. The development client waits at
 most two minutes for the action.
+
+### Development Windows product fixture
+
+This is the only path that exercises the complete verified product session:
+machine policy, locked digest revalidation, Authenticode publisher match,
+child-only bootstrap delivery, authenticated pipe, host-owned native window,
+one semantic action, and coordinated shutdown.
+
+It is a **development-machine** procedure. Provisioning installs a locally
+generated code-signing certificate into the machine root and trusted-publisher
+stores and writes one `HKEY_LOCAL_MACHINE` policy record. Both need an elevated
+PowerShell session, and both are reversed by `-Remove`. Read
+`docs/PRODUCT_FIXTURE.md` before running it.
+
+From an **elevated** PowerShell session at the repository root:
+
+~~~powershell
+.\scripts\provision-product-fixture.ps1
+~~~
+
+The script builds the fixture and its provisioning helper, stages a package
+under `%LOCALAPPDATA%\Anodrel\ProductFixture`, creates or reuses the development
+certificate, signs the staged executable, installs machine trust, and writes the
+record. It ends by reporting that the machine record validates.
+
+Then, from an ordinary session:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --product-session org.anodrel.product-fixture
+~~~
+
+Confirm each of the following:
+
+1. an **Anodrel Product Session** window opens on a host-owned waiting screen;
+2. it is replaced by the fixture's document, headed *Signed child, authenticated
+   window*;
+3. **Complete product session** responds to hover, and Tab plus Enter reaches it;
+4. activating it closes the window within a moment — that is the fixture's
+   `session.close` reaching the host-owned close signal, not the window manager;
+5. the host process exits; and
+6. `anodrel-product-fixture.exe` is gone from Task Manager.
+
+Also check the two failure paths. Close the window with its title-bar button
+instead of activating the action: the window must close, the host must exit, and
+the child must still disappear. Separately, end `anodrel-product-fixture.exe`
+from Task Manager while the window is open: the window must close on its own.
+
+The Startup Lab reads the same provisioning state:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json
+~~~
+
+With the fixture provisioned, **Launch Sample** is drawn live, reads *Verified
+signed fixture*, responds to hover, and starts one product session in its own
+window. Run `.\scripts\provision-product-fixture.ps1 -Remove` and repeat: the
+tile must return to its dimmed **PLANNED** state and ignore clicks.
+
+Remove the fixture when you are finished:
+
+~~~powershell
+.\scripts\provision-product-fixture.ps1 -Remove
+~~~
+
+The protocol half of this path is covered automatically and needs no
+provisioning:
+
+~~~text
+cargo test --manifest-path native/Cargo.toml -p anodrel-product-fixture
+~~~
 
 ## Working process
 

@@ -61,9 +61,22 @@ a public window API or a substitute for signed application provisioning.
 
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.
-The verified Windows product-session adapter now joins that pipe, one locked
+The verified Windows product-session adapter joins that pipe, one locked
 signed child launch, and one grouped native UI session under the host's single
-lifetime owner; it awaits a provisioned signed fixture before host activation.
+lifetime owner.
+
+That path now runs. A development-only signed, machine-provisioned fixture — a
+first-party child, a controlled provisioning helper, and a Windows-tooling-only
+script — exercises machine policy, locked digest revalidation, Authenticode
+publisher match, child-only bootstrap delivery, the authenticated pipe, a
+host-owned native window, one semantic action, and coordinated shutdown. The
+host activates it through a `--product-session` route, and the Startup Lab's
+launch tile is now resolved from a verification-only preflight instead of a
+compile-time constant, so it is inert unless a machine record and signed
+executable currently validate. This is a development-machine fixture: it relies
+on a locally generated certificate installed into machine trust, and it is not
+production packaging, installation, updates, or a claim of framework parity.
+See `docs/PRODUCT_FIXTURE.md`.
 
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,
@@ -125,8 +138,9 @@ handle. Existing TypeScript and React applications remain UI clients through
 the SDK rather than importing native APIs. The first host-validated application
 package is a deliberately limited text surface. A host-only registered launch
 service separately binds executable digest and publisher policy before it can
-start a process; the Startup Lab does not expose it until a signed application
-is provisioned.
+start a process. The Startup Lab exposes its launch tile only while a
+verification-only preflight confirms that a machine record and signed executable
+validate right now.
 
 ## Repository map
 
@@ -161,6 +175,8 @@ host-only Windows launch sequence that binds executable and publisher policy
 before process launch.
 `docs/PRODUCT_SESSIONS.md` defines the host-only verified Windows product
 session and its shutdown rules.
+`docs/PRODUCT_FIXTURE.md` defines the development-only signed fixture,
+provisioning contract, and host activation routes that exercise it.
 `docs/PATHS.md` defines the host-owned per-application directory layout.
 `docs/CREDENTIALS.md` defines the host-only Windows credential-store boundary.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.

@@ -112,8 +112,9 @@ Status: **Direct Windows host in progress**
   service from the machine-validated application identity before pipe
   authentication; the host-only Windows product-session coordinator now joins
   verified launch, pipe, child exit, and native window shutdown (Decision
-  0060). A provisioned signed product fixture and non-Windows adapters remain
-  separate work.
+  0060). A development-only signed, machine-provisioned fixture now exercises
+  that coordinator end to end (Decision 0061); production packaging,
+  installation, updates, and non-Windows adapters remain separate work.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and
@@ -156,11 +157,15 @@ Status: **Direct Windows host in progress**
   foundation now binds the expected executable digest and publisher fingerprint
   to a validated package identity outside the package directory (Decision
   0018). The direct Windows policy adapter now reads that record only from the
-  machine-wide 64-bit registry (Decision 0019). Record provisioning and
-  Startup Lab integration remain required. The direct launch service now locks,
+  machine-wide 64-bit registry (Decision 0019). The direct launch service locks,
   revalidates, verifies, and tracks a policy-approved executable before
-  delivering bootstrap material (Decision 0020); it has no installed sample to
-  launch yet.
+  delivering bootstrap material (Decision 0020), and now also has a
+  verification-only entry point that runs the same sequence without creating a
+  process. A development-only signed fixture, a controlled provisioning helper,
+  the host `--product-session` route, and a preflight-resolved Startup Lab tile
+  exercise the whole path on a development machine (Decision 0061). A production
+  signing identity, packaging, installation, and updates remain required before
+  a shipped application uses it.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
@@ -171,9 +176,18 @@ bounded framing and session engine. Decision 0008 adds the authenticated direct
 Windows named-pipe adapter. Decision 0009 adds private one-time invitation
 delivery. Decision 0010 adds a digest-verified, no-script application-package
 text surface. A development-only Node sample now proves the full bootstrap,
-authentication, and `platform.health` path over the real pipe. Remaining
-acceptance work includes verified executable launch bound to an application
-identity, a capability bridge, and operation-specific native tests.
+authentication, and `platform.health` path over the real pipe.
+
+Decision 0061 adds a first-party signed fixture child that runs the verified
+product session end to end: machine policy, locked digest revalidation,
+Authenticode publisher match, child-only bootstrap delivery, authenticated
+pipe, host-owned native window, one semantic action, and coordinated shutdown.
+This is a development-machine fixture, not an installed product: it depends on
+a locally generated certificate placed in machine trust, and it says nothing
+about packaging, installation, updates, multi-window policy, restart, or
+background execution. Remaining acceptance work includes a production signing
+and packaging story, a capability bridge, and broader operation-specific native
+tests.
 
 ## Startup Lab action tiles
 
@@ -185,7 +199,7 @@ is then a data change plus its operation, not a redesign.
 
 | Tile | State | Gate to link it |
 | --- | --- | --- |
-| Launch Sample | Planned | Signed package distribution and verified executable identity, bound to a validated application ID through the existing private bootstrap boundary. This is the Phase 2 acceptance item and carries the largest threat-model change; it must not be linked before that entry exists. |
+| Launch Sample | **Resolved at run time** | Its state is no longer a constant. A verification-only preflight — machine record, locked digest revalidation, Authenticode, publisher fingerprint — decides it before the surface opens. With the development fixture of Decision 0061 provisioned it is live and starts one verified product session; on any other machine it stays planned, dimmed, and inert. Production packaging, installation, updates, and a real signing identity remain separate gates before a shipped application uses it. |
 | Open Logs | **Linked** | Done. Shows only the bounded typed host events defined by `docs/LOGGING.md`; it exposes no application text, persistence, export, or capability. |
 | Inspect Package | **Linked** | Done. Displays facts already verified at startup; introduces no capability. |
 | Runtime Diagnostics | **Linked** | Done. Displays this process's own readings; introduces no capability. |

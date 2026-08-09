@@ -125,9 +125,10 @@ track the child, and end both child and window on shutdown.
 
 `anodrel-windows-product-session` now supplies that host-only coordinator.
 It joins the registered interactive session, locked launch, pipe worker, and
-child-exit watcher without making any of them application-facing. The current
-native host has no provisioned signed product fixture to invoke it; see
-`docs/PRODUCT_SESSIONS.md` for the exact ownership and shutdown contract.
+child-exit watcher without making any of them application-facing. See
+`docs/PRODUCT_SESSIONS.md` for the exact ownership and shutdown contract, and
+`docs/PRODUCT_FIXTURE.md` for the development-only signed application that
+exercises it.
 
 ## Compatibility and failures
 
@@ -181,10 +182,19 @@ file lock closes only after `CreateProcessW` has returned. This prevents a
 write, delete, or rename race between digest/signature verification and Windows
 opening the process image.
 
-The Startup Lab tile remains planned because the repository does not include a
-machine-provisioned signed application record or a product child executable.
-When those exist, the host can call this service from a worker and move the tile
-to linked with an operation-specific integration test.
+The same module exposes a **verification-only** entry point that runs steps 1
+through 4 and then releases the lock. It creates no process, pipe, bootstrap
+material, or session, and returns no path, digest, certificate value, or native
+error. A host surface uses it to decide whether to offer a launch action at all;
+a successful result describes that moment only, because every launch re-runs the
+full sequence.
+
+The Startup Lab tile is resolved from that preflight rather than from a
+compile-time constant. It is live only while a machine record and signed
+executable currently validate, and it is drawn, hovered, and hit-tested from
+that one value. `docs/PRODUCT_FIXTURE.md` defines the development-only signed
+application that can be provisioned today; production packaging, installation,
+updates, and a real signing identity remain separate work.
 
 ~~~text
 trusted Windows policy directory
