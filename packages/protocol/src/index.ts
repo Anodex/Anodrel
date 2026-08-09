@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 12 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 13 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -42,7 +42,8 @@ export type Capability =
   | "storage.state.clear"
   | "credential.read"
   | "credential.write"
-  | "credential.delete";
+  | "credential.delete"
+  | "notification.show";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -90,6 +91,17 @@ export interface PlatformOperationMap {
   "credential.delete": {
     readonly payload: { readonly name: string };
     readonly result: { readonly status: "deleted" } | { readonly status: "not_found" };
+  };
+  /**
+   * Shows one bounded notification.
+   *
+   * The result reports only that the host handed the values over. It never
+   * describes what the user experienced: whether notifications are silenced,
+   * a focus mode is active, or this application is muted is not observable.
+   */
+  "notification.show": {
+    readonly payload: { readonly title: string; readonly body: string };
+    readonly result: { readonly status: "shown" };
   };
   "ui.document.replace": {
     readonly payload: { readonly document: string };
@@ -245,7 +257,10 @@ export type ProtocolErrorCode =
   | "diagnostics.unavailable"
   | "credential.unavailable"
   | "credential.access_denied"
-  | "credential.stored_secret_invalid";
+  | "credential.stored_secret_invalid"
+  | "notification.unavailable"
+  | "notification.busy"
+  | "notification.text_invalid";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -453,6 +468,53 @@ export function isCredentialWritePayload(
     isCredentialName(value.name) &&
     isCanonicalCredentialSecret(value.secret)
   );
+}
+
+/** Maximum UTF-16 code units in a notification title. */
+export const MAX_NOTIFICATION_TITLE_UTF16_UNITS = 63;
+
+/** Maximum UTF-16 code units in a notification body. */
+export const MAX_NOTIFICATION_BODY_UTF16_UNITS = 255;
+
+/**
+ * Returns whether a value is exactly one notification title and body.
+ *
+ * An extra field is a mismatch rather than something to ignore, so a future
+ * urgency, icon, or action field cannot be smuggled past protocol 1.13.
+ */
+export function isNotificationShowPayload(
+  value: unknown,
+): value is PayloadFor<"notification.show"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    isNotificationText(value.title, MAX_NOTIFICATION_TITLE_UTF16_UNITS, false) &&
+    isNotificationText(value.body, MAX_NOTIFICATION_BODY_UTF16_UNITS, true)
+  );
+}
+
+/**
+ * Returns whether a value is bounded notification text.
+ *
+ * Length is measured in UTF-16 code units because that is what the host's
+ * native buffers count. Control characters are rejected so text cannot forge a
+ * second message or misrepresent its source; a body may carry line feeds
+ * because the target surface renders them as breaks.
+ */
+function isNotificationText(value: unknown, maximumUnits: number, allowLineFeed: boolean): boolean {
+  if (typeof value !== "string" || value.length === 0 || value.length > maximumUnits) {
+    return false;
+  }
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    if (allowLineFeed && code === 0x0a) {
+      continue;
+    }
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Returns whether a value is the stable protocol credential-name grammar. */

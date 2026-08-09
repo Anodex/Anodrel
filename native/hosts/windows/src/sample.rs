@@ -33,6 +33,7 @@ enum SampleDialogRequest {
     Scroll,
     Diagnostics,
     Credentials,
+    Notification,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -107,6 +108,17 @@ pub fn run_ui_session_with_credentials(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Credentials)
 }
 
+/// Runs the UI-session diagnostic and asks its client to show one notification.
+///
+/// The client learns only that the host accepted the values. Whether the
+/// notification appeared is for the operator to observe on screen.
+pub fn run_ui_session_with_notification(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Notification)
+}
+
 fn run_ui_session_with_dialog(
     node_path: &str,
     client_path: &str,
@@ -117,6 +129,7 @@ fn run_ui_session_with_dialog(
     let close_signal = SessionCloseSignal::default();
     let file_dialog_mailbox = FileDialogMailbox::new();
     let file_text = WindowsFileTextService::new();
+    let notifications = anodrel_notifications::NotificationMailbox::new();
     run_with_optional_session_view(
         node_path,
         client_path,
@@ -126,6 +139,7 @@ fn run_ui_session_with_dialog(
             close_signal,
             file_dialog_mailbox,
             file_text,
+            notifications,
         )),
         dialog_request,
     )
@@ -140,6 +154,7 @@ fn run_with_optional_session_view(
         SessionCloseSignal,
         FileDialogMailbox,
         WindowsFileTextService,
+        anodrel_notifications::NotificationMailbox,
     )>,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
@@ -162,25 +177,38 @@ fn run_with_optional_session_view(
             Capability::CredentialRead,
             Capability::CredentialWrite,
             Capability::CredentialDelete,
+            Capability::NotificationShow,
         ],
         "anodrel-windows-host",
     )?;
     let (server, invitation) = match mailboxes.as_ref() {
-        Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) => {
-            WindowsPipeServer::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
+        Some((
+            mailbox,
+            input_mailbox,
+            close_signal,
+            file_dialog_mailbox,
+            file_text,
+            notifications,
+        )) => {
+            // Composing the bundle keeps every service named at its own call
+            // rather than positionally in one ever-growing constructor.
+            let services = anodrel_core::HostServices::unavailable()
+                .with_clipboard(WindowsClipboard::new(0))
+                .with_external_links(WindowsExternalLinks)
+                .with_file_dialogs(file_dialog_mailbox.clone())
+                .with_file_selections(SelectionFileDialogMailbox::new(file_dialog_mailbox.clone()))
+                .with_file_text(file_text.clone())
+                .with_storage(sample_storage()?)
+                .with_diagnostics(sample_diagnostics())
+                .with_credentials(sample_credentials()?)
+                .with_notifications(notifications.clone());
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
                 "sample-session",
                 mailbox.clone(),
                 input_mailbox.clone(),
                 close_signal.clone(),
-                WindowsClipboard::new(0),
-                WindowsExternalLinks,
-                file_dialog_mailbox.clone(),
-                SelectionFileDialogMailbox::new(file_dialog_mailbox.clone()),
-                file_text.clone(),
-                sample_storage()?,
-                sample_diagnostics(),
-                sample_credentials()?,
+                services,
             )?
         }
         None => WindowsPipeServer::create(policy, "sample-session")?,
@@ -203,12 +231,20 @@ fn run_with_optional_session_view(
             SampleDialogRequest::Scroll => command.arg("--request-scroll-document")?,
             SampleDialogRequest::Diagnostics => command.arg("--request-diagnostics")?,
             SampleDialogRequest::Credentials => command.arg("--request-credentials")?,
+            SampleDialogRequest::Notification => command.arg("--request-notification")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
     };
     let child = launch(&command, &bootstrap)?;
-    if let Some((mailbox, input_mailbox, close_signal, file_dialog_mailbox, file_text)) = mailboxes
+    if let Some((
+        mailbox,
+        input_mailbox,
+        close_signal,
+        file_dialog_mailbox,
+        file_text,
+        notifications,
+    )) = mailboxes
     {
         crate::win32::run_ui_session(
             mailbox,
@@ -216,10 +252,7 @@ fn run_with_optional_session_view(
             close_signal,
             file_dialog_mailbox,
             file_text,
-            // This diagnostic's session is built without a notification
-            // service, so nothing can ever place a request in this mailbox. It
-            // exists only to satisfy the window's one shape.
-            anodrel_notifications::NotificationMailbox::new(),
+            notifications,
         )?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;

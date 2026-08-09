@@ -104,6 +104,19 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-notification")) {
+      // Acceptance means the host handed the values to the operating system.
+      // There is deliberately nothing here that could report whether the user
+      // saw, silenced, or dismissed it.
+      const shown = await client.showNotification(
+        "Anodrel notification diagnostic",
+        "This came through the private pipe.\nActivate the window action to finish.",
+      );
+      if (shown.status !== "shown") {
+        return 24;
+      }
+    }
+
     if (process.argv.includes("--request-credentials")) {
       const result = await runCredentialDiagnostic(client);
       if (result !== 0) {

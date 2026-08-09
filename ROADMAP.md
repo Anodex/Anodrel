@@ -127,8 +127,11 @@ Status: **Direct Windows host in progress**
   Protocol 1.13 maps the single `notification.show` grant to one operation,
   installed record version 1.3 adds that grant as a strict superset of 1.2, and
   registered interactive sessions carry the mailbox with the host servicing it
-  from the owning UI thread. A development client that calls the operation and
-  manual desktop verification remain. See `docs/NOTIFICATIONS.md`.
+  from the owning UI thread. The SDK, mock host, contract tests, and a
+  development diagnostic complete the path; confirming a notification is
+  visible remains a manual desktop check. Actions, replace, callbacks, toast
+  notifications, and non-Windows adapters stay deferred. See
+  `docs/NOTIFICATIONS.md`.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

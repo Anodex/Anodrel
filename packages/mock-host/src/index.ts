@@ -6,6 +6,7 @@ import {
   isClipboardWritePayload,
   isCredentialReadPayload,
   isCredentialWritePayload,
+  isNotificationShowPayload,
   isExternalOpenPayload,
   isFileDialogOpenPayload,
   isFileTextReadPayload,
@@ -285,6 +286,22 @@ export class MockHost {
         return this.success("credential.delete", request.requestId, {
           status: this.credentials.delete(request.payload.name) ? "deleted" : "not_found",
         });
+
+      case "notification.show":
+        if (request.protocolVersion.minor < 13) {
+          return this.failure(request.requestId, "operation.unsupported", "notification.show requires protocol 1.13 or later.");
+        }
+        if (!isNotificationShowPayload(request.payload)) {
+          // The failure never echoes the offending text back: a refusal must
+          // not become a way to have the host repeat content.
+          return this.failure(request.requestId, "request.payload_invalid", "notification.show requires one title and one body string.");
+        }
+        if (!this.hasCapability(sessionId, "notification.show")) {
+          return this.failure(request.requestId, "capability.denied", "notification.show requires the notification.show capability.", { capability: "notification.show" });
+        }
+        // Handed over, never seen: the mock reports acceptance and nothing
+        // about what a user would have experienced.
+        return this.success("notification.show", request.requestId, { status: "shown" });
 
       case "ui.document.replace":
       case "ui.document.replace.v2":

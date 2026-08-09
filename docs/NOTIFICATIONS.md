@@ -1,14 +1,15 @@
 # Anodrel notification foundation
 
-**Status:** Implemented end to end for registered Windows sessions: the portable
-values and UI-thread bridge in `anodrel-notifications`, the direct Windows
-adapter in `anodrel-windows-notifications`, the Protocol 1.13 operation,
-installed record version 1.3, and host wiring that services the mailbox from the
-owning UI thread.
+**Status:** Implemented end to end: the portable values and UI-thread bridge in
+`anodrel-notifications`, the direct Windows adapter in
+`anodrel-windows-notifications`, the Protocol 1.13 operation, installed record
+version 1.3, host wiring that services the mailbox from the owning UI thread,
+the SDK method, the mock host, and a development client that calls it.
 
-Two things remain: a development client that actually calls the operation, and
-manual verification that a notification appears on a real desktop. Until a
-machine record grants `notification.show`, no application reaches it.
+The path has been run: the development diagnostic completes `notification.show`
+and continues, where an operating-system refusal would have stopped it at its
+own stage. Confirming that a notification is actually **visible** needs a person
+looking at a desktop; `docs/DEVELOPMENT.md` carries that check.
 
 ## Boundary
 
@@ -247,10 +248,16 @@ rejected notification never echoes its text back. Record tests cover version 1.3
 accepting the new grant while keeping every earlier one, and earlier versions
 refusing to name it.
 
-Host wiring is covered indirectly: every session view carries the mailbox, and
-the existing view tests exercise that shape. What no automated test can cover is
-a notification actually appearing, because Shell32 needs a real desktop session.
-That manual check waits for a development client that calls the operation.
+Protocol contract tests run the SDK against the mock host: the independent
+grant, the bounded values including each one exactly at its limit, the control
+characters that could forge a second message, a title refusing line feeds, and a
+refusal that does not echo the text it rejected.
+
+Host wiring is covered indirectly by the session-view tests, and directly by the
+development diagnostic in `docs/DEVELOPMENT.md`. What no automated test can
+cover is a notification actually being **seen**, because Shell32 needs a real
+desktop and because this contract deliberately refuses to report whether a user
+saw anything. That check is a person looking at a screen.
 
 ## Deferred
 

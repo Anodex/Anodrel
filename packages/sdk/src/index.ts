@@ -76,6 +76,17 @@ export class PlatformClient {
     return this.request("credential.delete", { name });
   }
 
+  /**
+   * Shows one bounded notification.
+   *
+   * A successful result means the host handed the values to the operating
+   * system, not that anyone saw them. There is deliberately no way to learn
+   * whether the user has notifications silenced or this application muted.
+   */
+  showNotification(title: string, body: string): Promise<ResultFor<"notification.show">> {
+    return this.request("notification.show", { title, body });
+  }
+
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {
     return this.request("ui.document.replace", { document });
   }

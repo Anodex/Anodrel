@@ -227,6 +227,28 @@ semantic UI action. The pipe worker performs the synchronous store work; the
 UI thread does not. This is a development diagnostic, not a product credential
 session; it does not show or log the test value.
 
+To exercise the bounded notification boundary through the same authenticated
+session, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-notification-client $nodePath $clientPath
+~~~
+
+The client delivers its document and then calls `notification.show` once. Watch
+for an **Anodrel notification diagnostic** notification from the notification
+area; the entry carries the Anodrel brand icon and appears only once the first
+notification is sent. Then complete the normal semantic action to close the
+session, which removes the entry.
+
+Two things this check cannot tell you, by design. The client learns only that
+the host accepted the values, so a notification you have silenced or muted still
+reports success — that is the privacy line in `docs/NOTIFICATIONS.md`, not a
+fault. And if nothing appears, check Windows notification settings for this
+application before suspecting the host.
+
+If the operating system refuses outright, the client stops at safe stage 24
+within about a second rather than waiting for the action.
+
 To exercise a version 2 scroll document through that same session, run:
 
 ~~~powershell

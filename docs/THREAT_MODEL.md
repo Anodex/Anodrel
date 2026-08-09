@@ -221,10 +221,11 @@ The native-host decision must extend this model with:
 
 No application-facing filesystem, process, credential, dialog, notification,
 or external-link operation may be implemented until its contract and these
-host-specific controls are documented and tested. `docs/NOTIFICATIONS.md` and
-Decision 0062 now supply the notification contract; its portable values, UI-thread
-bridge, Windows adapter, and capability remain to be implemented and tested
-before any application can reach it. The bounded text clipboard,
+host-specific controls are documented and tested. `docs/NOTIFICATIONS.md` and Decision 0062 now supply the notification contract,
+and its portable values, UI-thread bridge, Windows adapter, Protocol 1.13
+operation, and record version 1.3 grant are implemented and tested. It is a
+one-way announce with no read surface, so it adds no way for an application to
+observe the user. The bounded text clipboard,
 validated external links, and UI-thread-routed open-file dialog are the current
 application-facing exceptions: `docs/CLIPBOARD.md`, `docs/EXTERNAL_LINKS.md`,
 and `docs/FILE_DIALOGS.md` define their separate controls.
