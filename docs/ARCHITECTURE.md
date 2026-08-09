@@ -170,7 +170,11 @@ separate product gates. See `docs/CREDENTIALS.md`, Decisions 0022 and 0056.
 
 The direct Win32 host also owns a per-window view registry. Each native handle
 maps to one immutable host-created view, and the UI message loop exits only
-after the final registered window closes. The `--window-lab` diagnostic proves
+after the final registered window closes. Each window message runs inside a
+panic-containment boundary, because the callback is `extern "system"` and an
+escaping panic would abort the process without running a destructor — stranding
+a verified product child. A contained panic ends the loop instead, and the
+ordinary drop paths perform the cleanup. The `--window-lab` diagnostic proves
 this two-window lifecycle without creating a public window-management API. See
 `docs/WINDOW_LIFECYCLE.md`.
 

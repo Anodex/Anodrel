@@ -603,10 +603,14 @@ fn run_windows(
         show_and_update(window);
     }
     let result = message_loop();
-    // The loop has ended, so no window can collect a session that finished
-    // starting during shutdown — a posted message is only delivered while the
-    // loop runs. This is the last point at which such a session can be ended,
-    // because statics are never dropped at process exit.
+    // The loop normally ends only after the last window is destroyed, but a
+    // contained panic ends it while views are still registered. Dropping them
+    // here shuts down anything they own; the registry is a static and would
+    // otherwise never be dropped at all.
+    let _ = registry::clear();
+    // No window can now collect a session that finished starting during
+    // shutdown either, because a posted message is only delivered while the
+    // loop runs.
     product_tile::discard();
     result
 }
@@ -1247,12 +1251,44 @@ fn set_ambient_running(window: Hwnd, running: bool) {
     }
 }
 
+/// Runs one window-procedure body, reporting `None` if it panicked.
+///
+/// A panic must not leave this function. `window_proc` is `extern "system"`,
+/// which does not unwind, so Rust turns an escaping panic into an immediate
+/// process abort — and an abort runs no destructor. That would leave a verified
+/// product child running with no host, and a notification-area entry on screen
+/// with nothing behind it.
+///
+/// The payload is dropped here rather than inspected. A panic message can carry
+/// arbitrary values, and nothing derived from one may reach a protocol
+/// response, the diagnostic ledger, or an application.
+fn contain_panic(body: impl FnOnce() -> Lresult) -> Option<Lresult> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(body)).ok()
+}
+
 unsafe extern "system" fn window_proc(
     window: Hwnd,
     message: Uint,
     wparam: Wparam,
     lparam: Lparam,
 ) -> Lresult {
+    // SAFETY: the dispatch body keeps the same contract this callback always
+    // had; only its unwinding behaviour changes.
+    match contain_panic(|| unsafe { dispatch(window, message, wparam, lparam) }) {
+        Some(result) => result,
+        None => {
+            // Fail closed but orderly. Ending the message loop lets `run_windows`
+            // return and drop every registered view, which shuts down a running
+            // product child and removes any notification entry — the cleanup an
+            // abort would have skipped entirely.
+            // SAFETY: posting a quit message is valid from a window procedure.
+            unsafe { PostQuitMessage(1) };
+            0
+        }
+    }
+}
+
+unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult {
     match message {
         message
             if ACTIVATION_MESSAGE
@@ -1956,6 +1992,35 @@ mod tests {
                 action.kind
             );
         }
+    }
+
+    #[test]
+    fn a_panicking_window_message_is_contained_rather_than_aborting() {
+        // `window_proc` is `extern "system"`, which does not unwind, so an
+        // escaping panic aborts the process and runs no destructor. That would
+        // strand a verified product child with no host to shut it down.
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let contained = super::contain_panic(|| panic!("a paint failure must not abort the host"));
+        std::panic::set_hook(previous);
+
+        assert_eq!(contained, None);
+        assert_eq!(super::contain_panic(|| 42), Some(42));
+    }
+
+    #[test]
+    fn clearing_the_registry_drops_views_the_loop_left_behind() {
+        // A contained panic ends the message loop while windows are still
+        // registered, so the host clears them itself.
+        let _exclusive = super::registry::tests_exclusive();
+        super::registry::insert(
+            -901,
+            super::View::Document(document::Document::from_text("stranded", "test", "body")),
+        )
+        .expect("view registers");
+
+        assert_eq!(super::registry::clear().expect("registry clears"), 1);
+        assert_eq!(super::registry::clear().expect("registry clears again"), 0);
     }
 
     #[test]

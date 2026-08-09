@@ -25,6 +25,26 @@ only when the final registered host window is destroyed. If creating a later
 window fails, the host destroys every already-created window and returns a safe
 failure rather than entering a partial message loop.
 
+## Panic containment
+
+The window procedure is `extern "system"`, which does not unwind, so a panic
+escaping it becomes an immediate process abort — and an abort runs no
+destructor. A defect while painting or servicing a timer would therefore strand
+a verified product child with no host to shut it down, and leave a
+notification-area entry on screen with nothing behind it.
+
+Each window message is run inside a containment boundary. A panic ends the
+message loop instead of the process: the loop returns, the host clears every
+remaining view, and the ordinary drop paths shut down whatever those views
+owned. The host exits with a failure status.
+
+The panic payload is dropped rather than inspected. A message can carry
+arbitrary values, so nothing derived from one reaches a protocol response, the
+diagnostic ledger, or an application.
+
+This is containment, not recovery. The host does not resume after a contained
+panic, because the state that produced it is not known to be sound.
+
 A removed view is dropped after the registry lock is released, never while it is
 held. Most views drop trivially, but a view that owns a verified product session
 ends that session as it goes: it shuts down the child and joins two worker

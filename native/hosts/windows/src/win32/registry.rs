@@ -182,11 +182,44 @@ pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
     Ok(remaining)
 }
 
+/// Drops every remaining view and returns how many there were.
+///
+/// The message loop normally ends only after the last window is destroyed, so
+/// this usually finds nothing. It matters when the loop ends early — a
+/// contained panic posts a quit message while windows are still registered.
+/// Without this, those views would live in a process-wide static that is never
+/// dropped, and a product session among them would keep its child running.
+///
+/// Views are dropped after the lock is released, for the reason [`remove`]
+/// gives.
+pub(super) fn clear() -> io::Result<usize> {
+    let remaining = {
+        let mut views = lock_views()?;
+        std::mem::take(&mut *views)
+    };
+    let count = remaining.len();
+    drop(remaining);
+    Ok(count)
+}
+
 fn lock_views() -> io::Result<std::sync::MutexGuard<'static, BTreeMap<Hwnd, View>>> {
     VIEWS
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
         .map_err(|_| io::Error::other("window registry is unavailable"))
+}
+
+/// The registry is process-global, so tests that assert on the remaining window
+/// count must not overlap with tests that register windows.
+#[cfg(test)]
+static EXCLUSIVE: Mutex<()> = Mutex::new(());
+
+/// Serializes a test that touches the process-global view registry.
+#[cfg(test)]
+pub(super) fn tests_exclusive() -> std::sync::MutexGuard<'static, ()> {
+    EXCLUSIVE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 #[cfg(test)]
@@ -197,10 +230,6 @@ mod tests {
     use crate::win32::ui_lab::UiLab;
     use anodrel_diagnostics::LogBook;
     use std::time::Instant;
-
-    /// The registry is process-global, so tests that assert on the remaining
-    /// window count must not overlap with tests that register windows.
-    static EXCLUSIVE: Mutex<()> = Mutex::new(());
 
     fn document_view(title: &str) -> View {
         View::Document(Document::from_text(title, "test", "body"))
@@ -233,7 +262,7 @@ mod tests {
 
     #[test]
     fn keeps_each_window_view_and_final_close_count_independent() {
-        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let _exclusive = super::tests_exclusive();
         let primary = -101;
         let companion = -102;
         insert(primary, document_view("primary")).expect("primary view registers");
@@ -257,7 +286,7 @@ mod tests {
 
     #[test]
     fn startup_lab_state_is_mutated_in_place() {
-        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let _exclusive = super::tests_exclusive();
         let window = -201;
         insert(window, startup_lab_view()).expect("lab view registers");
 
@@ -281,7 +310,7 @@ mod tests {
 
     #[test]
     fn ui_lab_state_is_mutated_only_for_a_ui_lab_window() {
-        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let _exclusive = super::tests_exclusive();
         let window = -203;
         insert(window, ui_lab_view()).expect("UI Lab view registers");
         assert_eq!(
@@ -303,7 +332,7 @@ mod tests {
 
     #[test]
     fn only_interactive_native_ui_views_use_system_appearance() {
-        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let _exclusive = super::tests_exclusive();
         let lab = -204;
         let document = -205;
         insert(lab, ui_lab_view()).expect("UI Lab view registers");
@@ -316,7 +345,7 @@ mod tests {
 
     #[test]
     fn mutating_a_document_window_reports_no_startup_lab() {
-        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let _exclusive = super::tests_exclusive();
         let window = -202;
         insert(window, document_view("document")).expect("document view registers");
         assert!(
@@ -332,7 +361,7 @@ mod tests {
         // A product-session view ends its session on drop, which joins two
         // worker threads. This proves the registry is usable from that drop
         // rather than locked behind it.
-        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let _exclusive = super::tests_exclusive();
         let window = -206;
         let companion = -207;
         insert(window, document_view("dropping")).expect("view registers");

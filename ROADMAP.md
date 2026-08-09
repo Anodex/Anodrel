@@ -166,8 +166,13 @@ Status: **Direct Windows host in progress**
   arbitrary error surface; Protocol 1.11 exposes only its fixed records through
   the existing `diagnostics.read` grant (Decision 0053). Windows pipe workers
   also have a host-only pending-I/O stop signal for a later product lifecycle
-  owner (Decision 0059). Crash reporting, child-exit lifecycle coordination,
-  and public/application logging remain separate work.
+  owner (Decision 0059). Child-exit lifecycle coordination is now part of the
+  product-session owner (Decision 0060). The first crash boundary is panic
+  containment at the Win32 callback: an escaping panic would abort the process
+  and run no destructor, stranding a tracked child, so a contained panic ends
+  the message loop and lets the ordinary drop paths clean up. Crash *reporting*
+  — any persisted or transmitted record of a failure — and public/application
+  logging remain separate work.
 - Establish verified executable identity. **In progress:** the direct Windows
   Authenticode adapter verifies an embedded signature and returns a leaf
   certificate fingerprint (Decision 0017). The installed application-record

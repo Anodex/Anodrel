@@ -93,6 +93,7 @@ authority for permissions.
 | Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
 | A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
 | Two native windows render each other's state or one close ends the host early. | Keep immutable host-created views in a handle-keyed registry and exit the UI loop only after the final registered window is destroyed. |
+| A host defect aborts the process and strands a tracked child. | The window procedure is `extern "system"` and does not unwind, so an escaping panic would abort and run no destructor, leaving a verified product child with no host. Contain each window message: a panic ends the message loop, the host clears every remaining view, and the ordinary drop paths shut down the child, join its workers, and remove any notification entry. The payload is discarded, never inspected, so nothing derived from a panic reaches a response, the ledger, or an application. The host does not resume afterwards. |
 
 ## Security invariants
 
