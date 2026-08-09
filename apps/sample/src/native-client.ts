@@ -3,18 +3,13 @@ import { readFileSync } from "node:fs";
 import { PlatformClient } from "@anodrel/sdk";
 import { WindowsNamedPipeTransport, decodeBootstrapInvitation } from "@anodrel/windows-transport";
 
+import { pollSchedule } from "./poll-schedule.js";
 import {
   SCROLL_SESSION_ACTION,
   SCROLL_SESSION_DOCUMENT,
   STANDARD_SESSION_ACTION,
   STANDARD_SESSION_DOCUMENT,
 } from "./session-documents.js";
-
-// The native diagnostic is intentionally interactive. Two minutes leaves room
-// to inspect, scroll, or dismiss one host-owned dialog without creating an
-// unbounded background event read.
-const UI_EVENT_WAIT_ATTEMPTS = 1_200;
-const UI_EVENT_WAIT_MILLISECONDS = 100;
 
 process.on("uncaughtException", () => {
   process.exitCode = 14;
@@ -136,12 +131,20 @@ async function run(): Promise<number> {
   }
 }
 
+/**
+ * Waits for the one semantic action the host renders for this diagnostic.
+ *
+ * The wait is paced by the shared backoff schedule, so an immediate click is
+ * answered within a few tens of milliseconds while an open window costs far
+ * fewer idle round trips than a fixed interval. Running out of schedule is the
+ * timeout.
+ */
 async function waitForSampleAction(
   client: PlatformClient,
   revision: string,
   expectedAction: string,
 ): Promise<number> {
-  for (let attempt = 0; attempt < UI_EVENT_WAIT_ATTEMPTS; attempt += 1) {
+  for (const interval of pollSchedule()) {
     const result = await client.readUiEvents();
     if (result.dropped !== 0 || result.discarded !== 0) {
       return 17;
@@ -157,7 +160,7 @@ async function waitForSampleAction(
         ? 0
         : 17;
     }
-    await delay(UI_EVENT_WAIT_MILLISECONDS);
+    await delay(interval);
   }
 
   return 17;

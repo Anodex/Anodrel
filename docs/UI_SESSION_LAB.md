@@ -39,7 +39,11 @@ current-session named pipe, checks `platform.health`, then submits one strict
 window must replace the waiting screen with that document. The regular and
 scroll diagnostics close only after their expected semantic action has returned
 through `ui.events.read`; closing the native window is the safe manual abort.
-The development client waits at most two minutes for that action.
+The development client waits at most two minutes for that action. It paces that
+wait by backoff rather than a fixed interval — 25 ms growing by half to a
+one-second cap — so an immediate click is still answered promptly while an open
+window does not cost a constant stream of `ui.events.read` round trips. The
+native product fixture uses the same schedule.
 
 ## Boundary
 

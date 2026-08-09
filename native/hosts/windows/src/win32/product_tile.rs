@@ -37,14 +37,16 @@ static WINDOW: AtomicIsize = AtomicIsize::new(0);
 /// A started session waiting for the UI thread to collect it.
 static STARTED: OnceLock<Mutex<Option<RunningProductSession>>> = OnceLock::new();
 
-/// Starts one product session on a worker, if none is already active.
+/// Starts one product session on a worker, unless one is already active.
 ///
-/// Returns `false` when a session is already starting or running. `notify` is
-/// called on the worker thread once the attempt finishes, successfully or not,
-/// so the caller can post its own private window message.
-pub(super) fn request_start(notify: impl FnOnce() + Send + 'static) -> bool {
+/// A click arriving while a session is starting or running is ignored: there is
+/// nothing useful a surface could do with a second session, and reporting the
+/// refusal would tell it something about machine state. `notify` runs on the
+/// worker once the attempt finishes, successfully or not, so the caller can post
+/// its own private window message.
+pub(super) fn request_start(notify: impl FnOnce() + Send + 'static) {
     if ACTIVE.swap(true, Ordering::SeqCst) {
-        return false;
+        return;
     }
     let session_id = format!("product-lab-{}", std::process::id());
     let spawned = std::thread::Builder::new()
@@ -69,9 +71,7 @@ pub(super) fn request_start(notify: impl FnOnce() + Send + 'static) -> bool {
 
     if spawned.is_err() {
         ACTIVE.store(false, Ordering::SeqCst);
-        return false;
     }
-    true
 }
 
 /// Collects a started session on the UI thread, if the worker produced one.
