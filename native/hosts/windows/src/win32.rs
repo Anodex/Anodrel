@@ -14,6 +14,7 @@
 mod appicon;
 mod document;
 mod present;
+mod product_tile;
 mod registry;
 mod startup_lab;
 mod stats;
@@ -33,6 +34,8 @@ use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
 
 use document::{Body, Document, Section};
+
+pub use product_tile::FIXTURE_APPLICATION_ID;
 
 type Atom = u16;
 pub(super) type Bool = i32;
@@ -84,6 +87,12 @@ const VK_TAB: Wparam = 0x09;
 const VK_RETURN: Wparam = 0x0D;
 const VK_PRIOR: Wparam = 0x21;
 const VK_NEXT: Wparam = 0x22;
+
+/// Private message telling the Startup Lab that a product-session start
+/// attempt has finished. It carries no payload: the started session, if any, is
+/// collected from the host-owned slot in [`product_tile`].
+const WM_APP: Uint = 0x8000;
+const WM_ANODREL_PRODUCT_SESSION: Uint = WM_APP + 1;
 
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 const REVEAL_TIMER: usize = 1;
@@ -234,6 +243,13 @@ pub(super) struct StartupLab {
     pub(super) hovered: Option<usize>,
     /// `true` once the reveal has finished and the surface is breathing.
     ambient: bool,
+    /// `true` only when a verification-only preflight confirmed, before this
+    /// surface opened, that the registered product fixture currently launches.
+    ///
+    /// This is the single value behind the launch tile's appearance and its
+    /// hit-testing, so the surface cannot offer a launch on a machine where the
+    /// record or signature does not validate. See `docs/PRODUCT_FIXTURE.md`.
+    pub(super) launch_available: bool,
 }
 
 /// Builds the diagnostic history displayed by the Startup Lab.
@@ -321,6 +337,7 @@ unsafe extern "system" {
     fn GetKeyState(virtual_key: i32) -> i16;
     fn InvalidateRect(window: Hwnd, rectangle: *const Rect, erase: Bool) -> Bool;
     fn SendMessageW(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult;
+    fn PostMessageW(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Bool;
     fn SetTimer(window: Hwnd, id: usize, elapse: Uint, callback: usize) -> usize;
     fn KillTimer(window: Hwnd, id: usize) -> Bool;
     fn TrackMouseEvent(track: *mut TrackMouseEventStruct) -> Bool;
@@ -371,10 +388,14 @@ pub fn run_application(
 ///
 /// `startup` is the time from process start to this call, which the surface
 /// reports as its startup reading.
+/// `launch_available` must come from the caller's verification-only preflight.
+/// The surface never runs that check itself, so drawing code cannot decide that
+/// a launch is possible.
 pub fn run_startup_lab(
     package: PackageFacts,
     instance: &PrimaryInstance,
     startup: std::time::Duration,
+    launch_available: bool,
 ) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
@@ -391,6 +412,7 @@ pub fn run_startup_lab(
                 revealed_at: Instant::now(),
                 hovered: None,
                 ambient: false,
+                launch_available,
             }),
         }],
         Some(instance),
@@ -836,6 +858,54 @@ fn open_document_window(title: &str, document: Document) -> io::Result<()> {
     apply_icons(window);
     show_and_update(window);
     Ok(())
+}
+
+/// Opens the native window for one collected product session.
+///
+/// The window consumes only that session's grouped resources and owns its
+/// lifetime: destroying it drops the session, which requests shutdown of the
+/// verified child, the pipe worker, and the exit watcher.
+fn open_product_session_window(
+    session: anodrel_windows_product_session::RunningProductSession,
+) -> io::Result<()> {
+    let instance = module_handle()?;
+    let class_name = to_wide_null("Anodrel.DirectWindowsHost");
+    ensure_window_class(instance, &class_name)?;
+    let scale = primary_scale();
+    let definition = WindowDefinition {
+        title: "Anodrel Product Session".to_owned(),
+        width: (920.0 * scale) as i32,
+        height: (660.0 * scale) as i32,
+        view: View::UiSession(ui_session_view::UiSessionView::for_product_session(session)),
+    };
+    let window = create_window(instance, &class_name, &definition)?;
+    if let Err(error) = registry::insert(window, definition.view) {
+        destroy_window(window);
+        return Err(error);
+    }
+    product_tile::note_window(window);
+    apply_icons(window);
+    // SAFETY: the window was just created on this thread's message queue and
+    // its timer stops when the window is destroyed.
+    unsafe {
+        SetTimer(window, UI_SESSION_TIMER, UI_SESSION_POLL_INTERVAL_MILLIS, 0);
+    }
+    show_and_update(window);
+    Ok(())
+}
+
+/// Starts one product session for the Startup Lab's launch tile.
+///
+/// The blocking verification and launch run on a worker; this returns
+/// immediately so the message loop keeps pumping.
+fn begin_product_session(window: Hwnd) {
+    product_tile::request_start(move || {
+        // SAFETY: posting to a window this process created is safe from any
+        // thread, and the message carries no pointer or payload.
+        unsafe {
+            PostMessageW(window, WM_ANODREL_PRODUCT_SESSION, 0, 0);
+        }
+    });
 }
 
 /// Builds the document behind a linked action tile.
@@ -1427,13 +1497,17 @@ unsafe extern "system" fn window_proc(
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| {
-                    let hovered = startup_lab::action_at(
+                    let hit = startup_lab::action_at(
                         rect.width() as f32,
                         rect.height() as f32,
                         point(x as f32, y as f32),
-                    )
-                    .filter(|index| startup_lab::ACTIONS[*index].linked);
+                    );
                     registry::with_startup_lab(window, |lab| {
+                        // Hover follows the same availability value as drawing
+                        // and clicking, so a planned tile never highlights.
+                        let hovered = hit.filter(|index| {
+                            startup_lab::tile_is_live(&startup_lab::ACTIONS[*index], lab)
+                        });
                         let changed = lab.hovered != hovered;
                         lab.hovered = hovered;
                         changed
@@ -1540,20 +1614,42 @@ unsafe extern "system" fn window_proc(
                 }
                 return 0;
             }
-            let clicked = startup_lab::action_at(
+            let hit = startup_lab::action_at(
                 rect.width() as f32,
                 rect.height() as f32,
                 point(x as f32, y as f32),
             )
-            .map(|index| &startup_lab::ACTIONS[index])
-            .filter(|action| action.linked);
-            if let Some(action) = clicked
+            .map(|index| &startup_lab::ACTIONS[index]);
+            if let Some(action) = hit
                 && let Ok(Some(View::StartupLab(lab))) = registry::view_for(window)
-                && let Some((title, document)) = action_document(action.kind, &lab)
+                // Hit-testing and drawing read the same availability value, so a
+                // tile drawn as planned cannot be activated by a click.
+                && startup_lab::tile_is_live(action, &lab)
             {
-                // A failure to open a diagnostic window is not fatal to the
-                // surface that launched it.
-                let _ = open_document_window(&title, document);
+                if action.kind == startup_lab::ActionKind::LaunchSample {
+                    begin_product_session(window);
+                } else if let Some((title, document)) = action_document(action.kind, &lab) {
+                    // A failure to open a diagnostic window is not fatal to the
+                    // surface that launched it.
+                    let _ = open_document_window(&title, document);
+                }
+            }
+            0
+        }
+        WM_ANODREL_PRODUCT_SESSION => {
+            match product_tile::take_started() {
+                Some(session) => {
+                    if open_product_session_window(session).is_err() {
+                        // The session is dropped by the failed call, which
+                        // requests its own shutdown. Release the guard so the
+                        // tile can be tried again.
+                        product_tile::release();
+                    }
+                }
+                // A start that produced nothing has already released its guard
+                // and reports no reason: a verified launch can fail for causes
+                // this surface must not describe.
+                None => product_tile::release(),
             }
             0
         }
@@ -1582,7 +1678,12 @@ unsafe extern "system" fn window_proc(
             // a no-op, and this window is being destroyed by the current UI
             // thread.
             unsafe { KillTimer(window, UI_SESSION_TIMER) };
-            if registry::remove(window).is_ok_and(|remaining| remaining == 0) {
+            // Removing the view drops this window's product session, if it owns
+            // one, which requests shutdown of its child, pipe worker, and exit
+            // watcher before the guard is released.
+            let removed = registry::remove(window);
+            product_tile::note_destroyed(window);
+            if removed.is_ok_and(|remaining| remaining == 0) {
                 // SAFETY: this only posts a quit message after the final
                 // native top-level window is being destroyed.
                 unsafe { PostQuitMessage(0) };
@@ -1623,6 +1724,17 @@ mod tests {
             revealed_at: Instant::now(),
             hovered: Some(2),
             ambient: false,
+            // The shipped default: no machine record has been verified, so the
+            // launch tile stays planned.
+            launch_available: false,
+        }
+    }
+
+    /// Representative surface state for a chosen preflight outcome.
+    pub(super) fn startup_lab_fixture(launch_available: bool) -> StartupLab {
+        StartupLab {
+            launch_available,
+            ..sample_lab()
         }
     }
 

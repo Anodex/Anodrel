@@ -251,8 +251,10 @@ dependencies = [
  "anodrel-windows-file-access",
  "anodrel-windows-file-dialog",
  "anodrel-windows-instance",
+ "anodrel-windows-launch",
  "anodrel-windows-paths",
  "anodrel-windows-pipe",
+ "anodrel-windows-product-session",
  "anodrel-windows-storage",
  "anodrel-wire",
 ]

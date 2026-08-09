@@ -31,28 +31,60 @@ pub fn launch_registered_application(
     application_id: &str,
     invitation: &BootstrapInvitation,
 ) -> Result<TrackedApplication, LaunchError> {
-    let installed = load_installed_application(application_id).map_err(LaunchError::Policy)?;
-    let mut executable =
-        raw::lock_executable(installed.executable_path()).map_err(LaunchError::Io)?;
-    let executable_path = executable.path().to_path_buf();
-    installed
-        .revalidate_executable(&executable_path, &mut executable)
-        .map_err(LaunchError::Record)?;
-
-    let signer = verify_embedded_signature(&executable_path).map_err(LaunchError::Signature)?;
-    if !installed.matches_publisher(signer.as_bytes()) {
-        return Err(LaunchError::PublisherMismatch);
-    }
-
-    let program = executable_path
+    let verified = verify_locked_executable(application_id)?;
+    let program = verified
+        .path
         .to_str()
         .ok_or(LaunchError::InvalidExecutablePath)?;
     let command = BootstrapCommand::new(program).map_err(LaunchError::Command)?;
     let process =
         anodrel_windows_bootstrap::launch(&command, invitation).map_err(LaunchError::Bootstrap)?;
-    drop(executable);
+    // The lock is released only after CreateProcessW has returned, so the
+    // process image cannot be replaced between verification and creation.
+    drop(verified);
 
     Ok(TrackedApplication { process })
+}
+
+/// Runs the launch verification sequence without creating a process.
+///
+/// This exists so a host surface can decide whether a registered application is
+/// currently launchable before it offers a launch action. It performs the same
+/// machine-policy read, locked digest revalidation, Authenticode evaluation, and
+/// publisher comparison as a launch, then releases the lock. It creates no
+/// process, pipe, bootstrap material, or session, and returns no path,
+/// certificate, digest, or native error.
+///
+/// A successful result describes this moment only. Every launch re-runs the
+/// full sequence; an earlier verification never authorizes a later executable.
+/// Call this from a worker, never the Win32 UI thread.
+pub fn verify_registered_application(application_id: &str) -> Result<(), LaunchError> {
+    verify_locked_executable(application_id).map(|_| ())
+}
+
+/// One executable that passed every pre-launch check, with its lock still held.
+struct VerifiedExecutable {
+    path: std::path::PathBuf,
+    _lock: raw::LockedExecutable,
+}
+
+fn verify_locked_executable(application_id: &str) -> Result<VerifiedExecutable, LaunchError> {
+    let installed = load_installed_application(application_id).map_err(LaunchError::Policy)?;
+    let mut executable =
+        raw::lock_executable(installed.executable_path()).map_err(LaunchError::Io)?;
+    let path = executable.path().to_path_buf();
+    installed
+        .revalidate_executable(&path, &mut executable)
+        .map_err(LaunchError::Record)?;
+
+    let signer = verify_embedded_signature(&path).map_err(LaunchError::Signature)?;
+    if !installed.matches_publisher(signer.as_bytes()) {
+        return Err(LaunchError::PublisherMismatch);
+    }
+    Ok(VerifiedExecutable {
+        path,
+        _lock: executable,
+    })
 }
 
 /// A launched child whose lifetime remains attached to the native host.
@@ -127,5 +159,38 @@ impl std::error::Error for LaunchError {
             Self::Bootstrap(error) => Some(error),
             Self::PublisherMismatch | Self::InvalidExecutablePath => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anodrel_windows_policy::PolicyStoreError;
+
+    use super::{LaunchError, verify_registered_application};
+
+    #[test]
+    fn verification_rejects_an_invalid_identity_before_reading_machine_policy() {
+        assert!(matches!(
+            verify_registered_application("org.anodrel/escape"),
+            Err(LaunchError::Policy(PolicyStoreError::InvalidApplicationId))
+        ));
+    }
+
+    #[test]
+    fn verification_fails_closed_on_an_unprovisioned_machine_record() {
+        // A host surface must treat this as "no launch action", never as a
+        // reason to try launching anyway.
+        assert!(matches!(
+            verify_registered_application("org.anodrel.launch-verify-unprovisioned-test"),
+            Err(LaunchError::Policy(PolicyStoreError::RecordNotFound))
+        ));
+    }
+
+    #[test]
+    fn launch_failure_categories_stay_free_of_native_detail() {
+        // The displayed category is what a host may surface; it must never
+        // name a path, certificate, digest, or Windows status.
+        let message = LaunchError::PublisherMismatch.to_string();
+        assert_eq!(message, "registered application publisher is not approved");
     }
 }

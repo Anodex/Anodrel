@@ -21,6 +21,8 @@ anodrel-ui-session = { path = "../../crates/ui-session" }
 anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
+anodrel-windows-launch = { path = "../../adapters/windows-launch" }
+anodrel-windows-product-session = { path = "../../adapters/windows-product-session" }
 anodrel-windows-clipboard = { path = "../../adapters/windows-clipboard" }
 anodrel-windows-credentials = { path = "../../adapters/windows-credentials" }
 anodrel-windows-external-links = { path = "../../adapters/windows-external-links" }

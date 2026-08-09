@@ -110,7 +110,38 @@ pub(super) struct Action {
     /// A planned tile is drawn dimmed with a marker and does not respond to a
     /// click. It is shown rather than hidden so the surface reflects the whole
     /// intended shape of the platform; see `ROADMAP.md`.
+    ///
+    /// A tile whose availability depends on machine state declares `false` here
+    /// and is resolved at run time by [`tile_is_live`].
     pub(super) linked: bool,
+}
+
+/// Whether a tile may be drawn as live and respond to a click.
+///
+/// Drawing and hit-testing both read this one function, so a tile can never be
+/// made clickable by changing how it looks, and never drawn as available while
+/// it is inert.
+///
+/// `LaunchSample` is the only tile whose answer depends on machine state. It
+/// requires a verification-only preflight — machine record, locked digest
+/// revalidation, Authenticode, and publisher fingerprint — to have succeeded
+/// before this surface opened. On a machine with no provisioned record, or one
+/// whose executable or signature no longer validates, it stays planned.
+#[must_use]
+pub(super) fn tile_is_live(action: &Action, lab: &StartupLab) -> bool {
+    match action.kind {
+        ActionKind::LaunchSample => lab.launch_available,
+        _ => action.linked,
+    }
+}
+
+/// The subtitle a tile shows for the current machine state.
+fn tile_subtitle(action: &Action, lab: &StartupLab) -> &'static str {
+    if action.kind == ActionKind::LaunchSample && lab.launch_available {
+        "Verified signed fixture"
+    } else {
+        action.subtitle
+    }
 }
 
 /// The action strip, in display order.
@@ -1040,8 +1071,9 @@ fn draw_actions(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, elapsed_
         let slot = layout
             .action_rect(index)
             .translate(0.0, rise(progress, layout.unit(16.0)));
-        let hovered = lab.hovered == Some(index) && action.linked;
-        let dim = if action.linked { 1.0 } else { 0.45 };
+        let live = tile_is_live(action, lab);
+        let hovered = lab.hovered == Some(index) && live;
+        let dim = if live { 1.0 } else { 0.45 };
 
         if hovered {
             canvas.fill_rounded_rect(
@@ -1102,7 +1134,11 @@ fn draw_actions(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, elapsed_
             Align::Left,
             &Paint::solid(palette::INK.scale_alpha(progress * dim)),
         );
-        let subtitle = TextSpec::new(action.subtitle, layout.font(12.0), WEIGHT_REGULAR);
+        let subtitle = TextSpec::new(
+            tile_subtitle(action, lab),
+            layout.font(12.0),
+            WEIGHT_REGULAR,
+        );
         text::draw(
             canvas,
             &subtitle,
@@ -1111,7 +1147,7 @@ fn draw_actions(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, elapsed_
             &Paint::solid(palette::INK_MUTED.scale_alpha(progress * dim)),
         );
 
-        if action.linked {
+        if live {
             draw_chevron(
                 canvas,
                 point(slot.right - layout.unit(28.0), slot.center().y),
@@ -1270,7 +1306,10 @@ fn draw_footer(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, progress:
 
 #[cfg(test)]
 mod tests {
-    use super::{ACTIONS, ActionKind, BASE_HEIGHT, BASE_WIDTH, CARDS, Layout, action_at, stage};
+    use super::{
+        ACTIONS, ActionKind, BASE_HEIGHT, BASE_WIDTH, CARDS, Layout, action_at, stage,
+        tile_is_live, tile_subtitle,
+    };
     use anodrel_canvas::point;
 
     #[test]
@@ -1416,5 +1455,49 @@ mod tests {
                 action.kind
             );
         }
+    }
+
+    #[test]
+    fn the_launch_tile_is_inert_until_a_preflight_says_the_fixture_validated() {
+        let unprovisioned = super::super::tests::startup_lab_fixture(false);
+        let provisioned = super::super::tests::startup_lab_fixture(true);
+
+        for action in &ACTIONS {
+            let live_when_unprovisioned = tile_is_live(action, &unprovisioned);
+            if action.kind == ActionKind::LaunchSample {
+                assert!(
+                    !live_when_unprovisioned,
+                    "the launch tile is live without a validated fixture"
+                );
+                assert!(
+                    tile_is_live(action, &provisioned),
+                    "the launch tile stays inert after a successful preflight"
+                );
+            } else {
+                // Every other tile displays values the host already held, so
+                // machine provisioning must not change its availability.
+                assert_eq!(live_when_unprovisioned, action.linked);
+                assert_eq!(tile_is_live(action, &provisioned), action.linked);
+            }
+        }
+    }
+
+    #[test]
+    fn the_launch_tile_never_states_a_capability_it_does_not_have() {
+        let launch = ACTIONS
+            .iter()
+            .find(|action| action.kind == ActionKind::LaunchSample)
+            .expect("the launch tile exists");
+
+        let unprovisioned = super::super::tests::startup_lab_fixture(false);
+        assert_eq!(
+            tile_subtitle(launch, &unprovisioned),
+            "Needs signed identity"
+        );
+        let provisioned = super::super::tests::startup_lab_fixture(true);
+        assert_eq!(
+            tile_subtitle(launch, &provisioned),
+            "Verified signed fixture"
+        );
     }
 }

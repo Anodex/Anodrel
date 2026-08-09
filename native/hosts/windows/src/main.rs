@@ -1,5 +1,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod product;
 mod sample;
 mod win32;
 
@@ -71,6 +72,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return sample::run_ui_session_with_credentials(node_path, client_path);
     }
+    if let [command, application_id] = arguments.as_slice()
+        && command == "--product-session"
+    {
+        return product::run(application_id);
+    }
     if let [command, manifest_path] = arguments.as_slice()
         && command == "--application"
     {
@@ -95,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js>]",
         )
         .into());
     }
@@ -167,7 +173,17 @@ fn run_startup_lab(manifest_path: &str, started: Instant) -> Result<(), Box<dyn 
         vec![Capability::DiagnosticsRead],
         "anodrel-windows-host",
     )?)?;
-    win32::run_startup_lab(package_facts(&package), &instance, started.elapsed())?;
+    // Verification only: this reads machine policy, revalidates the locked
+    // executable digest, and checks Authenticode without creating a process,
+    // pipe, or bootstrap material. Its single answer decides whether the launch
+    // tile exists at all; see `docs/PRODUCT_FIXTURE.md`.
+    let launch_available = product::fixture_is_launchable();
+    win32::run_startup_lab(
+        package_facts(&package),
+        &instance,
+        started.elapsed(),
+        launch_available,
+    )?;
     Ok(())
 }
 

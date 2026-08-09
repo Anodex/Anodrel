@@ -171,6 +171,7 @@ mod tests {
             revealed_at: Instant::now(),
             hovered: None,
             ambient: false,
+            launch_available: false,
         })
     }
 

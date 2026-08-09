@@ -1,11 +1,14 @@
 //! One host-controlled native consumer of a bounded authenticated UI mailbox.
 
+use std::sync::Arc;
+
 use anodrel_canvas::Point;
 use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{UiDocumentMailbox, UiDocumentRevision, UiInputCandidate, UiInputMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_product_session::RunningProductSession;
 
 use super::ui_lab::UiLab;
 
@@ -19,6 +22,14 @@ pub(super) struct UiSessionView {
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     revision: UiDocumentRevision,
+    /// The product session whose resources this view consumes, when the window
+    /// owns one.
+    ///
+    /// Holding it here ties the verified child, pipe worker, and exit watcher to
+    /// this window's lifetime: removing the view when the window is destroyed
+    /// drops the last reference, and `RunningProductSession` requests full
+    /// shutdown on drop. A diagnostic session view holds `None`.
+    product_session: Option<Arc<RunningProductSession>>,
 }
 
 impl UiSessionView {
@@ -38,7 +49,26 @@ impl UiSessionView {
             file_dialog_mailbox,
             file_text,
             revision: UiDocumentRevision::INITIAL,
+            product_session: None,
         }
+    }
+
+    /// Creates the view for one verified product session and takes ownership of
+    /// its lifetime.
+    ///
+    /// Every resource comes from that same session's group, so this window can
+    /// never poll another session's mailbox.
+    pub(super) fn for_product_session(session: RunningProductSession) -> Self {
+        let ui = session.ui();
+        let mut view = Self::new(
+            ui.document_mailbox(),
+            ui.input_mailbox(),
+            ui.close_signal(),
+            ui.file_dialog_mailbox(),
+            ui.file_text_service(),
+        );
+        view.product_session = Some(Arc::new(session));
+        view
     }
 
     /// Applies at most one newer accepted snapshot from this view's mailbox.
