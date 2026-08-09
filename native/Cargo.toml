@@ -39,6 +39,7 @@ members = [
   "adapters/windows-appearance",
   "hosts/windows",
   "tools/perf-lab",
+  "tools/product-fixture",
 ]
 resolver = "2"
 

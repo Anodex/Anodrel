@@ -100,9 +100,10 @@ only signal. Codes name a boundary, never a cause:
 | `16` | `ui.events.read` failed, dropped, or discarded a candidate |
 | `17` | the expected semantic action did not arrive before the wait bound |
 | `18` | `session.close` was not accepted |
-| `19` | an unexpected internal failure occurred |
 
 No code carries a path, invitation, token, certificate value, or Windows error.
+Every code stays below 32, so none of them can be confused with the `0xA11D`
+exit the launch service uses when it terminates a child during host shutdown.
 
 ## Signing and machine trust
 

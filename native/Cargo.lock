@@ -98,6 +98,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-product-fixture"
+version = "0.1.0"
+dependencies = [
+ "anodrel-bootstrap",
+ "anodrel-json",
+ "anodrel-ui-document",
+ "anodrel-wire",
+]
+
+[[package]]
 name = "anodrel-protocol"
 version = "0.1.0"
 dependencies = [

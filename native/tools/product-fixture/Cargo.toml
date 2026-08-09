@@ -1,0 +1,19 @@
+[package]
+name = "anodrel-product-fixture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-product-fixture"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-bootstrap = { path = "../../crates/bootstrap" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-wire = { path = "../../crates/wire" }
+
+[dev-dependencies]
+# Test-only: proves the compiled-in document decodes through the exact codec the
+# host uses, so a fixture run cannot fail at the UI boundary.
+anodrel-ui-document = { path = "../../crates/ui-document" }

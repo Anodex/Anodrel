@@ -10,7 +10,7 @@ use std::{fmt, io::Read};
 
 use anodrel_json::JsonError;
 use anodrel_protocol::{JsonValue, object};
-use anodrel_transport::SessionCredentials;
+use anodrel_transport::{SessionCredentials, authentication_message};
 
 pub const BOOTSTRAP_MAGIC: [u8; 4] = *b"ANBI";
 pub const BOOTSTRAP_MAJOR: u16 = 1;
@@ -58,6 +58,19 @@ impl BootstrapInvitation {
 
     pub fn session_id(&self) -> &str {
         &self.session_id
+    }
+
+    /// Builds the first control message a launched child sends on the pipe.
+    ///
+    /// This is the child-side counterpart of the host's invitation payload. It
+    /// exists so a launched application never has to read the raw token: the
+    /// secret stays inside this value and leaves only as the one authentication
+    /// frame. Callers must write it to the invited pipe and nowhere else.
+    pub fn authentication_message(&self) -> Result<String, BootstrapError> {
+        let token =
+            std::str::from_utf8(&self.token).map_err(|_| BootstrapError::InvalidInvitation)?;
+        authentication_message(&self.session_id, token)
+            .map_err(|_| BootstrapError::InvalidInvitation)
     }
 
     /// Builds the complete one-use frame. Callers must write it exactly once
@@ -267,6 +280,33 @@ mod tests {
         let debug = format!("{:?}", invitation());
         assert!(debug.contains("<redacted>"));
         assert!(!debug.contains(TOKEN));
+    }
+
+    #[test]
+    fn builds_one_authentication_message_without_a_token_getter() {
+        let message = invitation()
+            .authentication_message()
+            .expect("the invitation authenticates");
+        let fields = JsonValue::parse(&message)
+            .expect("the authentication message is JSON")
+            .as_object()
+            .cloned()
+            .expect("the authentication message is an object");
+
+        assert_eq!(
+            fields.get("kind").and_then(JsonValue::as_string),
+            Some("session.authenticate")
+        );
+        assert_eq!(
+            fields.get("sessionId").and_then(JsonValue::as_string),
+            Some(SESSION_ID)
+        );
+        // The token reaches the pipe only through this message; the invitation
+        // still has no accessor that would let a child copy it elsewhere.
+        assert_eq!(
+            fields.get("token").and_then(JsonValue::as_string),
+            Some(TOKEN)
+        );
     }
 
     #[test]
