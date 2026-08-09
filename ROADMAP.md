@@ -115,11 +115,14 @@ Status: **Direct Windows host in progress**
   0060). A development-only signed, machine-provisioned fixture now exercises
   that coordinator end to end (Decision 0061); production packaging,
   installation, updates, and non-Windows adapters remain separate work.
-  Notifications now have a contract but no implementation: Decision 0062
+  Notifications have a contract and their portable values: Decision 0062
   defines a one-way bounded announce over `Shell_NotifyIconW`, deliberately
   without identifiers, actions, callbacks, or any read surface, and records why
-  toast notifications wait for a packaging identity. See
-  `docs/NOTIFICATIONS.md`.
+  toast notifications wait for a packaging identity. `anodrel-notifications`
+  implements the validated title, body, service boundary, and safe failure
+  categories. The UI-thread bridge, the Windows adapter, and the
+  `notification.show` capability remain; no application can reach a
+  notification yet. See `docs/NOTIFICATIONS.md`.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

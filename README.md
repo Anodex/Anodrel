@@ -184,8 +184,9 @@ provisioning contract, and host activation routes that exercise it.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
 boundary.
-`docs/NOTIFICATIONS.md` defines the planned one-way bounded notification
-boundary.
+`docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary; its
+portable values exist, and its host bridge, Windows adapter, and capability do
+not.
 `docs/STORAGE.md` defines the bounded application-state storage boundary and
 its recovery and capability contract.
 `docs/STARTUP_LAB.md` defines the Windows visual startup-test surface.

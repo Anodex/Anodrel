@@ -1,9 +1,8 @@
 # Anodrel notification foundation
 
-**Status:** Contract only. The portable values, the UI-thread bridge, the direct
-Windows adapter, and a protocol capability are not implemented yet. This
-document defines the boundary before any of them exist, as
-`docs/DEVELOPMENT.md` requires.
+**Status:** The portable values in `anodrel-notifications` are implemented and
+tested. The UI-thread bridge, the direct Windows adapter, and a protocol
+capability are not. No application can reach a notification yet.
 
 ## Boundary
 
@@ -134,6 +133,20 @@ application's own window, so it is treated as untrusted display data:
 
 The host attaches at most one notification icon at a time and removes it on
 every path, so a failed call cannot leave a stale icon in the notification area.
+
+## Verification
+
+Unit tests in `anodrel-notifications` prove that both values are required, that
+each is accepted exactly at its bound and rejected one unit beyond it, that
+length is measured in UTF-16 code units rather than bytes or characters, that
+control characters which could forge a second message are rejected, that a line
+feed is allowed only in the body, and that neither failure category describes
+the user's attention state.
+
+The remaining pieces each need their own verification before an application can
+reach a notification: bridge tests for the one-pending rule and its timeout,
+boundary tests for the Windows adapter, and protocol contract tests for the
+capability check.
 
 ## Deferred
 
