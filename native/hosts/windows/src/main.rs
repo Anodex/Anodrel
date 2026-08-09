@@ -167,17 +167,22 @@ fn run_startup_lab(manifest_path: &str, started: Instant) -> Result<(), Box<dyn 
         InstanceClaim::Primary(instance) => instance,
         InstanceClaim::Existing(existing) => return Ok(existing.activate()?),
     };
+    // Verification only: this reads machine policy, revalidates the locked
+    // executable digest, and checks Authenticode without creating a process,
+    // pipe, or bootstrap material. It is the most expensive check here on a
+    // provisioned machine, so it runs beside the two below rather than after
+    // them. Its single answer decides whether the launch tile exists at all;
+    // see `docs/PRODUCT_FIXTURE.md`.
+    let preflight = product::FixturePreflight::begin();
     check_core_health()?;
     run_health_self_test(HostPolicy::new(
         package.identity().application_id(),
         vec![Capability::DiagnosticsRead],
         "anodrel-windows-host",
     )?)?;
-    // Verification only: this reads machine policy, revalidates the locked
-    // executable digest, and checks Authenticode without creating a process,
-    // pipe, or bootstrap material. Its single answer decides whether the launch
-    // tile exists at all; see `docs/PRODUCT_FIXTURE.md`.
-    let launch_available = product::fixture_is_launchable();
+    // Joined before the window exists: the tile's state must be resolved before
+    // the surface opens, so drawing and hit-testing share one settled value.
+    let launch_available = preflight.finish();
     win32::run_startup_lab(
         package_facts(&package),
         &instance,

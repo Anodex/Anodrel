@@ -180,6 +180,17 @@ against write, delete, and rename, recanonicalize and rehash it through that
 lock, call Windows Authenticode, and compare the approved publisher fingerprint.
 The preflight creates no process, no pipe, and no bootstrap material.
 
+On a provisioned machine it is the most expensive check the host runs before its
+window exists — a full executable hash plus an Authenticode chain evaluation
+that may reach revocation infrastructure — so it starts on a worker as soon as
+the host owns the surface and runs beside the core health check and the private
+pipe loopback. It is joined immediately before window creation, because the
+tile's state must be settled before the surface opens: that is what lets drawing
+and hit-testing share one value instead of a tile that changes under the
+pointer. A preflight that could not be started, or that stopped unexpectedly,
+answers "not launchable"; an unavailable check never widens what the surface
+offers.
+
 The tile is drawn and hit-tested from that one resolved value:
 
 - preflight failed, or no record is provisioned → the tile stays **planned**,

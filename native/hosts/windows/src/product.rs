@@ -54,6 +54,53 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// One launch preflight running on its own worker thread.
+///
+/// The preflight is the most expensive thing the Startup Lab does before its
+/// window exists: on a provisioned machine it hashes the whole executable
+/// through a lock and asks Windows to evaluate an Authenticode chain, which can
+/// reach revocation infrastructure. Running it beside the core health check and
+/// the private pipe loopback removes almost all of that from the critical path.
+///
+/// The answer is still required *before* the window is created. Every document
+/// that describes the launch tile promises its state is resolved before the
+/// surface opens, and keeping that promise is what lets drawing and hit-testing
+/// share one immutable value instead of a tile that changes under the pointer.
+pub struct FixturePreflight(Option<thread::JoinHandle<bool>>);
+
+impl FixturePreflight {
+    /// Starts the verification-only preflight for the development fixture.
+    ///
+    /// Call this as early as the host knows it owns the surface, then call
+    /// [`Self::finish`] immediately before window creation.
+    #[must_use]
+    pub fn begin() -> Self {
+        Self(
+            thread::Builder::new()
+                .name("anodrel-product-preflight".to_owned())
+                .spawn(|| is_launchable(crate::win32::FIXTURE_APPLICATION_ID))
+                .ok(),
+        )
+    }
+
+    /// Waits for the preflight and reports whether a launch action may exist.
+    ///
+    /// A worker that could not be started, or that stopped unexpectedly, answers
+    /// `false`: an unavailable preflight can never widen what the surface offers.
+    #[must_use]
+    pub fn finish(self) -> bool {
+        self.0
+            .and_then(|worker| worker.join().ok())
+            .unwrap_or(false)
+    }
+}
+
+impl std::fmt::Debug for FixturePreflight {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("FixturePreflight(..)")
+    }
+}
+
 /// Reports whether a registered application is currently launchable.
 ///
 /// This runs the launch verification sequence without creating a process, so a
@@ -61,27 +108,12 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
 /// identity, an absent record, a changed executable, or a rejected signature all
 /// answer `false` with no detail.
 ///
-/// The check is blocking machine work, so it runs on a worker even though the
-/// caller is the future UI thread. The answer describes this moment only; every
-/// launch re-runs the full sequence.
+/// It blocks on machine work, so a UI thread must reach it through
+/// [`FixturePreflight`] rather than calling it directly. The answer describes
+/// this moment only; every launch re-runs the full sequence.
 #[must_use]
-pub fn is_launchable(application_id: &str) -> bool {
-    if !is_valid_application_id(application_id) {
-        return false;
-    }
-    let application_id = application_id.to_owned();
-    thread::Builder::new()
-        .name("anodrel-product-preflight".to_owned())
-        .spawn(move || verify_registered_application(&application_id).is_ok())
-        .ok()
-        .and_then(|worker| worker.join().ok())
-        .unwrap_or(false)
-}
-
-/// Reports whether the one development product fixture currently launches.
-#[must_use]
-pub fn fixture_is_launchable() -> bool {
-    is_launchable(crate::win32::FIXTURE_APPLICATION_ID)
+fn is_launchable(application_id: &str) -> bool {
+    is_valid_application_id(application_id) && verify_registered_application(application_id).is_ok()
 }
 
 /// Starts the coordinator on a worker and waits for its result.
@@ -104,7 +136,7 @@ fn start_off_the_ui_thread(
 
 #[cfg(test)]
 mod tests {
-    use super::{is_launchable, run};
+    use super::{FixturePreflight, is_launchable, run};
 
     #[test]
     fn an_invalid_identity_never_reaches_machine_policy_or_a_window() {
@@ -120,5 +152,28 @@ mod tests {
         assert!(!is_launchable(
             "org.anodrel.product-route-unprovisioned-test"
         ));
+    }
+
+    #[test]
+    fn a_backgrounded_preflight_answers_the_same_way_as_a_direct_check() {
+        // Moving the preflight off the startup path must not change what the
+        // surface is allowed to offer.
+        assert_eq!(
+            FixturePreflight::begin().finish(),
+            is_launchable(crate::win32::FIXTURE_APPLICATION_ID)
+        );
+    }
+
+    #[test]
+    fn a_preflight_that_never_ran_reports_no_launch_action() {
+        assert!(!FixturePreflight(None).finish());
+    }
+
+    #[test]
+    fn a_preflight_handle_never_reveals_its_result_in_debug_output() {
+        assert_eq!(
+            format!("{:?}", FixturePreflight(None)),
+            "FixturePreflight(..)"
+        );
     }
 }

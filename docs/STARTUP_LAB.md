@@ -70,7 +70,11 @@ against the decision that gates it.
 Launch Sample is the one tile whose state is not a constant. Before the window
 is created, the host runs the launch service's verification-only sequence —
 machine record, locked digest revalidation, Authenticode, publisher fingerprint
-— which creates no process, pipe, or bootstrap material. Drawing, hover, and
+— which creates no process, pipe, or bootstrap material. It runs on a worker
+beside the core health check and the pipe loopback rather than after them, so a
+provisioned machine does not pay its full cost in startup latency, and it is
+joined before window creation so the tile's state is settled when the surface
+opens. Drawing, hover, and
 hit-testing all read that one resolved value, so the tile cannot be live on a
 machine where the record or signature does not validate, and it cannot be made
 live by changing how it looks. A live tile starts exactly one product session on
