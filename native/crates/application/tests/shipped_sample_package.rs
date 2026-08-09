@@ -77,8 +77,7 @@ fn the_shipped_manifest_digest_matches_its_content() {
             .content()
             .digest()
             .chars()
-            .all(|character| character.is_ascii_hexdigit()
-                && !character.is_ascii_uppercase()),
+            .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase()),
         "the digest must be lower-case hexadecimal"
     );
 }

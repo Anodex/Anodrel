@@ -259,11 +259,7 @@ mod tests {
         let center = canvas_side as f32 / 2.0;
         icon.draw(
             &mut canvas,
-            Rect::centered(
-                anodrel_canvas::point(center, center),
-                box_side,
-                box_side,
-            ),
+            Rect::centered(anodrel_canvas::point(center, center), box_side, box_side),
             1.5,
             &Paint::solid(Color::WHITE),
         );
@@ -317,7 +313,10 @@ mod tests {
         // Two side-by-side rings are far wider than tall. Normalising must
         // scale them up, never stretch them into a square.
         let glyph = Icon::Ipc.unit_bounds();
-        assert!(glyph.width() > glyph.height() * 1.4, "the ring pair is wide");
+        assert!(
+            glyph.width() > glyph.height() * 1.4,
+            "the ring pair is wide"
+        );
 
         let box_side = 60.0;
         let (left, top, right, bottom) = drawn_extent(Icon::Ipc, box_side);
