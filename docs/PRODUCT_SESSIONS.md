@@ -38,9 +38,16 @@ pipe ends, its worker signals the window and terminates the tracked child.
 Explicit shutdown does all three operations as best-effort host cleanup.
 
 The caller must keep `RunningProductSession` alive while it runs the native
-window, then call `finish` after the window returns. Dropping it also requests
-shutdown, so an error path cannot intentionally orphan the child. `finish`
-joins both workers and reports only safe host failure categories.
+window. Ending it does the same work whichever way it happens: `finish` requests
+shutdown, joins both workers, and reports a safe host failure category, while
+dropping the value requests shutdown and joins both workers without a category.
+
+Both endings are complete because a host may own the session through a native
+window rather than through a call stack. If an implicit end only signalled, a
+closed product window would leave a pipe worker and an exit watcher running for
+the rest of the host's life. Neither join waits on user-paced work: shutdown has
+already cancelled pending pipe I/O and terminated the tracked child, so both
+workers are returning before the first join begins.
 
 ## Host activation
 
@@ -54,9 +61,8 @@ The Startup Lab tile takes a different ownership route because its message loop
 is already running. A click starts the coordinator on a worker; the worker posts
 one private window message; the UI thread then creates the product window and
 that window's view owns the session. Destroying the window drops the session,
-which requests shutdown of the child, the pipe worker, and the exit watcher.
-Exactly one product session may exist at a time, and a failed start reports only
-the tile's existing planned state.
+which ends it exactly as `finish` would. Exactly one product session may exist
+at a time, and a failed start reports only the tile's existing planned state.
 
 ## What it still does not do
 

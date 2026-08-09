@@ -73,8 +73,10 @@ pub fn start_registered_product_session(
 
 /// The host-owned state for one running verified Windows product session.
 ///
-/// Keep this value alive while running its matching native window. Call
-/// [`Self::finish`] after that window closes to join the two worker threads.
+/// Keep this value alive while running its matching native window. Ending it
+/// shuts the session down and joins its two worker threads either way: call
+/// [`Self::finish`] to also receive a safe failure category, or let the value
+/// drop when a native window rather than a call stack owns the session.
 pub struct RunningProductSession {
     application: Arc<TrackedApplication>,
     pipe_stop: PipeStopSignal,
@@ -101,18 +103,43 @@ impl RunningProductSession {
     }
 
     /// Requests shutdown and joins the pipe worker and child-exit watcher.
+    ///
+    /// Use this when the caller owns the session on its own call stack and can
+    /// report a failure. A session that instead ends by being dropped performs
+    /// the same work; only the reported category is lost.
     pub fn finish(mut self) -> Result<(), ProductSessionError> {
-        self.shutdown();
-        let pipe_result = join_pipe_worker(self.pipe_worker.take());
+        let pipe_result = join_pipe_worker(self.stop_and_take_pipe_worker());
         let watcher_result = join_exit_watcher(self.exit_watcher.take());
         pipe_result?;
         watcher_result
     }
+
+    /// Requests shutdown, then hands back the pipe worker for joining.
+    ///
+    /// Shutdown always precedes a join so neither worker is still waiting on a
+    /// connection, a read, or a running child when the join begins.
+    fn stop_and_take_pipe_worker(&mut self) -> Option<JoinHandle<io::Result<()>>> {
+        self.shutdown();
+        self.pipe_worker.take()
+    }
 }
 
 impl Drop for RunningProductSession {
+    /// Ends the session exactly as [`Self::finish`] does, discarding only the
+    /// failure category.
+    ///
+    /// A host may own this value through a native window rather than through a
+    /// call stack, so an implicit end has to be as complete as an explicit one:
+    /// otherwise closing a product window would leave a pipe worker and an exit
+    /// watcher running for the rest of the host's life.
+    ///
+    /// Neither join waits on user-paced work. `shutdown` has already cancelled
+    /// pending pipe I/O and terminated the tracked child, so both workers are
+    /// returning by the time the first join begins. That is what makes this
+    /// safe to run from a window-destruction message.
     fn drop(&mut self) {
-        self.shutdown();
+        let _ = join_pipe_worker(self.stop_and_take_pipe_worker());
+        let _ = join_exit_watcher(self.exit_watcher.take());
     }
 }
 
@@ -243,9 +270,13 @@ impl std::error::Error for ProductSessionError {
 
 #[cfg(test)]
 mod tests {
+    use std::{io, thread};
+
     use anodrel_windows_policy::PolicyStoreError;
 
-    use super::{ProductSessionError, start_registered_product_session};
+    use super::{
+        ProductSessionError, join_exit_watcher, join_pipe_worker, start_registered_product_session,
+    };
 
     #[test]
     fn rejects_an_invalid_application_id_before_product_launch() {
@@ -257,5 +288,75 @@ mod tests {
                 )
             ))
         ));
+    }
+
+    #[test]
+    fn an_already_joined_session_reports_success_instead_of_joining_twice() {
+        // `finish` and `Drop` both take the handles, so the second caller sees
+        // `None`. That has to be an ordinary end, not a failure.
+        assert!(join_pipe_worker(None).is_ok());
+        assert!(join_exit_watcher(None).is_ok());
+    }
+
+    #[test]
+    fn a_completed_worker_reports_its_own_safe_category() {
+        let clean = thread::spawn(|| Ok(()));
+        assert!(join_pipe_worker(Some(clean)).is_ok());
+
+        let failed = thread::spawn(|| Err(io::Error::other("pipe worker fixture failure")));
+        assert!(matches!(
+            join_pipe_worker(Some(failed)),
+            Err(ProductSessionError::Pipe(_))
+        ));
+    }
+
+    #[test]
+    fn an_exit_code_is_observed_without_becoming_a_result_value() {
+        // The child's exit code is host lifecycle data. Joining reports only
+        // whether it could be observed, never the code itself.
+        let observed = thread::spawn(|| Ok(0xA11D));
+        assert!(join_exit_watcher(Some(observed)).is_ok());
+
+        let unobservable = thread::spawn(|| Err(io::Error::other("exit watcher fixture failure")));
+        assert!(matches!(
+            join_exit_watcher(Some(unobservable)),
+            Err(ProductSessionError::ChildExit(_))
+        ));
+    }
+
+    #[test]
+    fn a_panicking_worker_becomes_a_safe_category_rather_than_a_payload() {
+        let panicking = thread::spawn(|| -> io::Result<()> { panic!("pipe worker fixture panic") });
+        assert!(matches!(
+            join_pipe_worker(Some(panicking)),
+            Err(ProductSessionError::WorkerPanicked)
+        ));
+
+        let panicking =
+            thread::spawn(|| -> io::Result<u32> { panic!("exit watcher fixture panic") });
+        assert!(matches!(
+            join_exit_watcher(Some(panicking)),
+            Err(ProductSessionError::ExitWatcherPanicked)
+        ));
+    }
+
+    #[test]
+    fn every_failure_category_states_a_boundary_without_native_detail() {
+        for (error, expected) in [
+            (
+                ProductSessionError::WorkerPanicked,
+                "registered product pipe worker stopped unexpectedly",
+            ),
+            (
+                ProductSessionError::ExitWatcherPanicked,
+                "registered product exit watcher stopped unexpectedly",
+            ),
+            (
+                ProductSessionError::Pipe(io::Error::other("native detail")),
+                "registered product pipe worker failed",
+            ),
+        ] {
+            assert_eq!(error.to_string(), expected);
+        }
     }
 }

@@ -29,6 +29,14 @@ same three actions. The adapter returns the one grouped UI resource set only
 through its running-session object; applications cannot create, control, or
 inspect this lifecycle.
 
+Ending the session is the same operation however it happens. `finish` requests
+shutdown, joins both workers, and reports a safe category; dropping the value
+does the same work and discards only the category. A host may own the session
+through a native window rather than a call stack, so an implicit end has to be
+as complete as an explicit one — otherwise a closed product window would leave
+two workers running for the rest of the host's life. Because shutdown always
+precedes a join, neither join waits on a connection, a read, or a running child.
+
 ## Consequences
 
 Positive:

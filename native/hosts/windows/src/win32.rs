@@ -1679,8 +1679,9 @@ unsafe extern "system" fn window_proc(
             // thread.
             unsafe { KillTimer(window, UI_SESSION_TIMER) };
             // Removing the view drops this window's product session, if it owns
-            // one, which requests shutdown of its child, pipe worker, and exit
-            // watcher before the guard is released.
+            // one, which shuts down its child and joins both workers before the
+            // guard is released. Shutdown precedes those joins, so this stays a
+            // brief call rather than a wait on user-paced work.
             let removed = registry::remove(window);
             product_tile::note_destroyed(window);
             if removed.is_ok_and(|remaining| remaining == 0) {

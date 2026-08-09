@@ -27,8 +27,9 @@ pub(super) struct UiSessionView {
     ///
     /// Holding it here ties the verified child, pipe worker, and exit watcher to
     /// this window's lifetime: removing the view when the window is destroyed
-    /// drops the last reference, and `RunningProductSession` requests full
-    /// shutdown on drop. A diagnostic session view holds `None`.
+    /// drops the last reference, and `RunningProductSession` then performs the
+    /// same shutdown and worker joins its explicit `finish` would. A diagnostic
+    /// session view holds `None`.
     product_session: Option<Arc<RunningProductSession>>,
 }
 
