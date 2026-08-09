@@ -127,8 +127,9 @@ Status: **Direct Windows host in progress**
   result for `dialog.open_file.v2` (Decision 0050). The development Windows UI
   session captures and holds the selected regular-file identity before it
   returns that reference to the authenticated pipe worker (Decision 0049);
-  product session integration, file writes, and non-Windows adapters remain
-  deferred.
+  registered interactive-session composition now binds that UI resource to one
+  machine-validated application session before authentication. Signed product
+  launch, file writes, and non-Windows adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded

@@ -7,7 +7,10 @@ license.workspace = true
 [dependencies]
 anodrel-application = { path = "../../crates/application" }
 anodrel-core = { path = "../../crates/core" }
+anodrel-file-access = { path = "../../crates/file-access" }
+anodrel-file-dialog = { path = "../../crates/file-dialog" }
 anodrel-session-policy = { path = "../../crates/session-policy" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
 anodrel-windows-pipe = { path = "../windows-pipe" }
 anodrel-windows-policy = { path = "../windows-policy" }
 anodrel-windows-paths = { path = "../windows-paths" }
@@ -15,6 +18,7 @@ anodrel-windows-storage = { path = "../windows-storage" }
 anodrel-windows-credentials = { path = "../windows-credentials" }
 anodrel-windows-clipboard = { path = "../windows-clipboard" }
 anodrel-windows-external-links = { path = "../windows-external-links" }
+anodrel-windows-file-access = { path = "../windows-file-access" }
 
 [dev-dependencies]
 anodrel-protocol = { path = "../../crates/protocol" }

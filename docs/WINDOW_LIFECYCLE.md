@@ -41,6 +41,13 @@ window-management capability requires a versioned protocol, verified executable
 identity, explicit permissions, cancellation rules, and its own threat-model
 extension.
 
+The host now also has an internal authenticated-session window entry point. It
+accepts only one grouped set of mailboxes and native file resources created by
+the registered-session adapter; titles and dimensions remain host-selected.
+It does not expose application window creation, targets, enumeration, or
+handles. A provisioned signed application and tracked-child shutdown policy are
+still required before this becomes a product launch path.
+
 ## Manual verification
 
 From the repository root, run:

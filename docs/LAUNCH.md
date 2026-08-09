@@ -114,6 +114,15 @@ executable, or deliver the invitation. The native host must still perform
 locked executable and signer verification before using the private bootstrap
 adapter.
 
+For an interactive application, the same adapter can instead create one
+grouped registered UI session. It binds the pipe to a host-created document
+mailbox, semantic-input mailbox, close signal, UI-thread dialog mailbox, and
+retained file-text service before the peer authenticates. The group can enter
+only the host's internal authenticated-window entry point; it has no launch,
+title, handle, or application-request API. A future launch coordinator must
+still create it before bootstrap delivery, run locked executable verification,
+track the child, and end both child and window on shutdown.
+
 ## Compatibility and failures
 
 Records are exact at their declared version because they influence process

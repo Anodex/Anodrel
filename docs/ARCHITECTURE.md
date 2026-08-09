@@ -201,6 +201,13 @@ an endpoint and a separate sensitive invitation, but does not start a process,
 deliver the invitation, or perform pipe I/O. Those remain explicit caller-owned
 lifecycle steps.
 
+For an interactive registered session, the same boundary creates one grouped
+set of document, input, close, dialog, and retained-file resources and attaches
+them to the authenticated transport before the client connects. The Windows
+host may consume that group through its internal authenticated-session window
+entry point; it cannot be selected or assembled by an application. The group
+has no process-launch or native-handle authority. See Decision 0058.
+
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It
 measures either the owned in-process wire, authenticated transport, and core
 path or the same path through a temporary authenticated Windows named-pipe

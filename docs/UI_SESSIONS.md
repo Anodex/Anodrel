@@ -87,8 +87,10 @@ notified or polls it. It must never use the mailbox for semantic action events.
 
 The Windows UI Session Lab is the first consumer. It polls one explicitly
 supplied mailbox on its UI thread and applies only a newer revision to its own
-host-created view. It is a development diagnostic, not a public application
-window. See `docs/UI_SESSION_LAB.md`.
+host-created view. The registered Windows-session adapter can now create the
+same resources as one grouped host-owned interactive session, ready for a
+future verified product window. It is not a public application window or a
+launch path. See `docs/UI_SESSION_LAB.md` and Decision 0058.
 
 ## Semantic input delivery
 

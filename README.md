@@ -52,7 +52,12 @@ application record into a fixed service bundle before pipe authentication. Its
 identity binds state storage and Credential Manager, while its host-owned
 clipboard and HTTPS handoff services remain independent narrow seams. Record
 version 1.2 adds the existing storage, credential, and file-operation grants;
-UI-bound file services remain unavailable until public window lifecycle exists.
+UI-bound file services remain unavailable in its non-interactive path.
+
+Registered interactive sessions now also group the authenticated document,
+input, close, dialog, and retained-file resources that one host-owned native
+application window will consume. This is a verified-launch building block, not
+a public window API or a substitute for signed application provisioning.
 
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,

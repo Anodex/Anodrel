@@ -466,10 +466,34 @@ pub fn run_ui_session(
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
 ) -> io::Result<()> {
+    run_authenticated_ui_session(
+        "Anodrel UI Session Lab",
+        mailbox,
+        input_mailbox,
+        close_signal,
+        file_dialog_mailbox,
+        file_text,
+    )
+}
+
+/// Opens one host-selected authenticated application session window.
+///
+/// The caller must supply resources created together for one already
+/// authenticated session. This is host lifecycle code, not an application
+/// window-management API: the application cannot choose the title, create a
+/// window, pass a handle, or attach a different session's resource.
+pub fn run_authenticated_ui_session(
+    title: &str,
+    mailbox: UiDocumentMailbox,
+    input_mailbox: UiInputMailbox,
+    close_signal: SessionCloseSignal,
+    file_dialog_mailbox: FileDialogMailbox,
+    file_text: WindowsFileTextService,
+) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
         vec![WindowDefinition {
-            title: "Anodrel UI Session Lab".to_owned(),
+            title: title.to_owned(),
             width: (920.0 * scale) as i32,
             height: (660.0 * scale) as i32,
             view: View::UiSession(ui_session_view::UiSessionView::new(

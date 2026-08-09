@@ -283,6 +283,29 @@ impl WindowsPipeServer {
         })
     }
 
+    /// Creates an authenticated interactive endpoint from host-owned UI
+    /// components and a complete service bundle. The native window that owns
+    /// the components is selected separately by host code.
+    pub fn create_with_session_components_and_service_bundle(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        services: HostServices,
+    ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_session_components_and_service_bundle(
+                policy,
+                credentials,
+                ui_document_mailbox,
+                ui_input_mailbox,
+                session_close_signal,
+                services,
+            )
+        })
+    }
+
     /// Creates an authenticated worker-thread endpoint with only an
     /// identity-bound credential service enabled.
     pub fn create_with_credential_service(

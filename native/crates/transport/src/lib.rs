@@ -276,6 +276,32 @@ impl TransportSession {
         }
     }
 
+    /// Creates an interactive session from host-owned UI components and one
+    /// complete native service bundle. The components are fixed before the
+    /// peer authenticates and cannot be selected through protocol traffic.
+    #[must_use]
+    pub fn with_session_components_and_service_bundle(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_document_mailbox: UiDocumentMailbox,
+        ui_input_mailbox: UiInputMailbox,
+        session_close_signal: SessionCloseSignal,
+        services: HostServices,
+    ) -> Self {
+        Self {
+            decoder: FrameDecoder::new(),
+            host: CoreHost::with_session_components_and_service_bundle(
+                policy,
+                ui_input_mailbox,
+                session_close_signal,
+                services,
+            ),
+            ui_document_mailbox,
+            pending_cancellations: BTreeSet::new(),
+            state: SessionState::Pending(credentials),
+        }
+    }
+
     /// Creates an authenticated session with only an identity-bound credential
     /// service enabled. Other platform services remain unavailable.
     pub fn with_credential_service(
@@ -1097,6 +1123,44 @@ mod tests {
         assert_eq!(snapshot.revision().value(), 1);
         assert_eq!(snapshot.document().root().id().as_str(), "root");
         assert!(mailbox.take().is_none());
+    }
+
+    #[test]
+    fn service_bundle_session_delivers_documents_to_its_host_owned_mailbox() {
+        let mailbox = UiDocumentMailbox::new();
+        let mut transport = TransportSession::with_session_components_and_service_bundle(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiDocumentWrite],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            mailbox.clone(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            HostServices::unavailable(),
+        );
+        authenticate(&mut transport);
+
+        let response = transport
+            .receive(&encode_json(&ui_document_request()).expect("request encodes"))
+            .expect("authenticated request succeeds");
+        assert_eq!(
+            decode_response(&response[0])
+                .as_object()
+                .expect("response object")["status"]
+                .as_string(),
+            Some("success")
+        );
+        assert_eq!(
+            mailbox
+                .take()
+                .expect("accepted document is published")
+                .revision()
+                .value(),
+            1
+        );
     }
 
     #[test]
