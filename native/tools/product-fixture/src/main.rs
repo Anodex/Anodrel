@@ -16,8 +16,9 @@ mod document;
 mod pipe;
 mod session;
 mod stages;
+mod wait;
 
-use std::{io, process::ExitCode, thread, time::Duration};
+use std::{io, process::ExitCode, thread};
 
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_json::JsonValue;
@@ -25,12 +26,7 @@ use anodrel_json::JsonValue;
 use document::{FIXTURE_ACTION, FIXTURE_DOCUMENT};
 use session::{FixtureSession, field};
 use stages::Stage;
-
-/// The host renders the delivered document and waits for a person to activate
-/// its action. Two minutes matches the existing interactive diagnostics and
-/// keeps a forgotten window from leaving a child running indefinitely.
-const ACTION_ATTEMPTS: u32 = 1_200;
-const ACTION_INTERVAL: Duration = Duration::from_millis(100);
+use wait::PollSchedule;
 
 /// The exact grants the fixture's machine record declares, in sorted order.
 ///
@@ -120,8 +116,13 @@ fn delivers_first_document(session: &mut FixtureSession) -> bool {
 }
 
 /// Polls the bounded semantic-input path until the rendered action arrives.
+///
+/// The wait is paced by [`PollSchedule`], so an immediate click is answered
+/// within a few tens of milliseconds while an open window costs far fewer idle
+/// round trips than a fixed interval would. Running out of schedule is the
+/// timeout.
 fn wait_for_fixture_action(session: &mut FixtureSession) -> Stage {
-    for _ in 0..ACTION_ATTEMPTS {
+    for interval in PollSchedule::new() {
         let Some(result) = session.request("fixture-events", "ui.events.read", "{}") else {
             return Stage::EventReadFailed;
         };
@@ -132,7 +133,7 @@ fn wait_for_fixture_action(session: &mut FixtureSession) -> Stage {
             return Stage::EventReadFailed;
         };
         match events.first() {
-            None => thread::sleep(ACTION_INTERVAL),
+            None => thread::sleep(interval),
             Some(event) if is_fixture_action(event) => return Stage::Completed,
             Some(_) => return Stage::EventReadFailed,
         }

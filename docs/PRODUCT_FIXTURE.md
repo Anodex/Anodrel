@@ -87,6 +87,20 @@ It has no command line, no configuration file, no environment input, no network
 access, no filesystem write, and no console output. The host passes it no
 arguments; `docs/LAUNCH.md` forbids that.
 
+### Waiting on a person
+
+Step 6 waits for a human, and every poll is a real round trip that wakes the
+host's pipe worker, drains a mailbox, and encodes a response. The fixture
+therefore backs off rather than polling at a fixed rate: intervals start at
+25 ms, grow by half each time, and cap at one second, with the whole wait
+bounded at two minutes.
+
+A click in the first moment is still answered within a few tens of milliseconds,
+and the worst case a person can experience is the one-second cap. Over the full
+two minutes that is **128 round trips instead of the 1,200** a fixed 100 ms
+interval would make — an idle product window should not cost a constant stream
+of IPC.
+
 ### Fixture exit stages
 
 The bootstrap launcher redirects child output to `NUL`, so an exit code is the
