@@ -263,6 +263,13 @@ under `%LOCALAPPDATA%\Anodrel\ProductFixture`, creates or reuses the development
 certificate, signs the staged executable, installs machine trust, and writes the
 record. It ends by reporting that the machine record validates.
 
+To check the current state at any time — including before provisioning anything
+— use the query-only switch, which changes nothing and needs no elevation:
+
+~~~powershell
+.\scripts\provision-product-fixture.ps1 -Verify
+~~~
+
 Then, from an ordinary session:
 
 ~~~powershell

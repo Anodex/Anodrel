@@ -14,5 +14,9 @@ stages a package outside the repository, signs the executable with a locally
 generated development certificate, installs that certificate into machine trust,
 and writes one machine-policy record.
 
-It needs an elevated PowerShell session, it changes machine certificate trust,
-and it is for development machines only. Run it with `-Remove` when finished.
+Provisioning and `-Remove` need an elevated PowerShell session, change machine
+certificate trust, and are for development machines only. Run it with `-Remove`
+when finished.
+
+`-Verify` reports whether the machine record currently validates. It is a query
+only, changes nothing, and needs no elevation.

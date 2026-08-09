@@ -25,10 +25,17 @@ repository so generated output never lands in tracked source directories.
 
 .PARAMETER Remove
 Removes the machine-policy record, the staged package, and the development
-certificate from both machine stores.
+certificate from both machine stores. Needs elevation.
+
+.PARAMETER Verify
+Reports whether the machine record currently validates and changes nothing.
+This is a query only, so it does not need elevation.
 
 .EXAMPLE
 PS> .\scripts\provision-product-fixture.ps1
+
+.EXAMPLE
+PS> .\scripts\provision-product-fixture.ps1 -Verify
 
 .EXAMPLE
 PS> .\scripts\provision-product-fixture.ps1 -Remove
@@ -37,7 +44,8 @@ PS> .\scripts\provision-product-fixture.ps1 -Remove
 [CmdletBinding()]
 param(
     [string] $StagingRoot = (Join-Path $env:LOCALAPPDATA 'Anodrel\ProductFixture'),
-    [switch] $Remove
+    [switch] $Remove,
+    [switch] $Verify
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,6 +71,52 @@ function Get-ToolPath {
     return $path
 }
 
+<#
+Runs an external program and decides success from its exit code alone.
+
+Cargo writes its progress to standard error, and the provisioning helper writes
+its safe failure categories there too. Under the script-wide 'Stop' preference
+Windows PowerShell turns any such line into a terminating error, so calling
+these programs directly would abort on ordinary output. Exit codes are the
+contract both programs actually document, so this relaxes the preference for the
+call and then restores it.
+#>
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory)] [string] $FilePath,
+        [string[]] $Arguments = @(),
+        [Parameter(Mandatory)] [string] $FailureMessage,
+        [switch] $PassThroughExitCode
+    )
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $FilePath @Arguments
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+
+    if ($PassThroughExitCode) {
+        return $exitCode
+    }
+    if ($exitCode -ne 0) {
+        throw $FailureMessage
+    }
+    return 0
+}
+
+function Build-Tools {
+    param([string[]] $Packages)
+    Write-Host 'Building in release.'
+    $arguments = @('build', '--release', '--manifest-path', $Manifest)
+    $arguments += @($Packages | ForEach-Object { '-p'; $_ })
+    Invoke-Native -FilePath 'cargo' -Arguments $arguments `
+        -FailureMessage 'The fixture build failed. Nothing was changed.' | Out-Null
+}
+
 function Remove-FixtureCertificates {
     # The private key lives only in the machine personal store. Removing all
     # three entries leaves no trust behind.
@@ -76,21 +130,31 @@ function Remove-FixtureCertificates {
     }
 }
 
+if ($Remove -and $Verify) {
+    throw 'Choose either -Remove or -Verify, not both.'
+}
+
+if ($Verify) {
+    # A query only: it opens the machine policy key for reading and reports a
+    # safe category. Nothing here needs elevation or changes machine state.
+    Build-Tools -Packages @('anodrel-product-provisioning')
+    # A record that does not validate is an answer, not a script failure, so the
+    # helper's exit code is passed through unchanged.
+    exit (Invoke-Native -FilePath (Get-ToolPath -Name 'anodrel-product-provisioning') `
+            -Arguments @('verify') -FailureMessage 'unused' -PassThroughExitCode)
+}
+
 Assert-Elevated
 
 if ($Remove) {
     Write-Host 'Removing the Anodrel development product fixture.'
 
-    $helper = Join-Path $RepositoryRoot 'native\target\release\anodrel-product-provisioning.exe'
-    if (Test-Path $helper) {
-        & $helper remove
-        if ($LASTEXITCODE -ne 0) {
-            throw 'The machine-policy record could not be removed.'
-        }
-    }
-    else {
-        Write-Warning 'The provisioning helper is not built; the machine-policy record was left in place. Build it and re-run -Remove.'
-    }
+    # Removal builds the helper if needed: a checkout that was cleaned since
+    # provisioning must still be able to take the record back out.
+    Build-Tools -Packages @('anodrel-product-provisioning')
+    Invoke-Native -FilePath (Get-ToolPath -Name 'anodrel-product-provisioning') `
+        -Arguments @('remove') `
+        -FailureMessage 'The machine-policy record could not be removed.' | Out-Null
 
     if (Test-Path $StagingRoot) {
         Write-Host "Removing the staged package at $StagingRoot."
@@ -102,20 +166,14 @@ if ($Remove) {
     return
 }
 
-Write-Host 'Building the fixture and the provisioning helper in release.'
-& cargo build --release --manifest-path $Manifest -p anodrel-product-fixture -p anodrel-product-provisioning
-if ($LASTEXITCODE -ne 0) {
-    throw 'The fixture build failed. Nothing was provisioned.'
-}
+Build-Tools -Packages @('anodrel-product-fixture', 'anodrel-product-provisioning')
 
 $fixtureBinary = Get-ToolPath -Name 'anodrel-product-fixture'
 $helper = Get-ToolPath -Name 'anodrel-product-provisioning'
 
 Write-Host "Staging the fixture package at $StagingRoot."
-& $helper stage $StagingRoot
-if ($LASTEXITCODE -ne 0) {
-    throw 'The fixture package could not be staged. Nothing was provisioned.'
-}
+Invoke-Native -FilePath $helper -Arguments @('stage', $StagingRoot) `
+    -FailureMessage 'The fixture package could not be staged. Nothing was provisioned.' | Out-Null
 
 $stagedExecutable = Join-Path $StagingRoot 'bin\anodrel-product-fixture.exe'
 Copy-Item $fixtureBinary $stagedExecutable -Force
@@ -157,14 +215,13 @@ if ($signature.Status -ne 'Valid') {
 }
 
 Write-Host 'Writing the machine-policy record.'
-& $helper provision $StagingRoot
-if ($LASTEXITCODE -ne 0) {
-    throw 'The machine-policy record was not written.'
-}
+Invoke-Native -FilePath $helper -Arguments @('provision', $StagingRoot) `
+    -FailureMessage 'The machine-policy record was not written.' | Out-Null
 
 Write-Host ''
 Write-Host 'The development product fixture is provisioned.'
 Write-Host 'Run the host route:'
 Write-Host '  cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --product-session org.anodrel.product-fixture'
 Write-Host ''
+Write-Host 'Check the state at any time with -Verify; no elevation is needed for that.'
 Write-Host 'Run this script with -Remove when you are finished.'

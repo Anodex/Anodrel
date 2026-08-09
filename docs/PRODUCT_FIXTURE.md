@@ -150,7 +150,9 @@ Provisioning is a two-part operation and both parts are outside the host:
 1. `scripts/provision-product-fixture.ps1` — Windows tooling only. It builds the
    fixture and the helper with Cargo, stages the package, creates or reuses the
    development certificate, signs the executable, installs machine trust, and
-   then calls the helper. Removal reverses every step.
+   then calls the helper. Removal reverses every step. Provisioning and removal
+   require elevation; a separate `-Verify` switch reports the current state as a
+   query only and needs none.
 2. `anodrel-product-provisioning` — a first-party Rust helper. Given the staged
    package root it recomputes the executable's SHA-256 digest, asks the existing
    Windows Authenticode adapter for the accepted leaf certificate fingerprint,
