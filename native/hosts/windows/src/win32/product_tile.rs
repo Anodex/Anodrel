@@ -86,13 +86,20 @@ pub(super) fn note_window(window: Hwnd) {
 
 /// Releases the single-session guard when the product window is destroyed.
 ///
+/// Every window in the host reports its destruction here, so this must act only
+/// on the one window that owns a session. Clearing the tracked handle for any
+/// other window would orphan the guard: the product window's own destruction
+/// would then no longer match, and the tile would stay dead for the rest of the
+/// process.
+///
 /// The session itself is owned by that window's view, so removing the view is
-/// what requests shutdown of the child, pipe worker, and exit watcher.
+/// what shuts down the child, pipe worker, and exit watcher.
 pub(super) fn note_destroyed(window: Hwnd) {
-    if WINDOW.swap(0, Ordering::SeqCst) == window {
+    if WINDOW
+        .compare_exchange(window, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
         ACTIVE.store(false, Ordering::SeqCst);
-    } else {
-        WINDOW.store(0, Ordering::SeqCst);
     }
 }
 
@@ -125,18 +132,49 @@ mod tests {
     #[test]
     fn only_the_owning_window_releases_the_single_session_guard() {
         let _exclusive = EXCLUSIVE.lock().expect("product tile tests are serialized");
+        let product = -501;
+        let unrelated = -502;
         ACTIVE.store(true, Ordering::SeqCst);
-        WINDOW.store(-501, Ordering::SeqCst);
+        WINDOW.store(product, Ordering::SeqCst);
 
-        note_destroyed(-502);
+        // The Startup Lab, its document windows, and the product window all
+        // report destruction here. Only the last one may free the guard.
+        note_destroyed(unrelated);
         assert!(
             ACTIVE.load(Ordering::SeqCst),
             "an unrelated window must not free a running product session"
         );
+        // It must also leave the tracked handle intact. Clearing it here would
+        // orphan the guard: the product window's own destruction would no
+        // longer match, and the tile would stay dead for the whole process.
+        assert_eq!(
+            WINDOW.load(Ordering::SeqCst),
+            product,
+            "an unrelated window must not forget which window owns the session"
+        );
 
-        WINDOW.store(-501, Ordering::SeqCst);
-        note_destroyed(-501);
+        note_destroyed(product);
         assert!(!ACTIVE.load(Ordering::SeqCst));
+        assert_eq!(WINDOW.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn a_session_can_start_again_after_an_unrelated_window_closed_during_one() {
+        // The end-to-end shape of the bug above: open a product session, close a
+        // document window, then close the product window. The tile must be
+        // usable again afterwards.
+        let _exclusive = EXCLUSIVE.lock().expect("product tile tests are serialized");
+        let product = -511;
+        ACTIVE.store(true, Ordering::SeqCst);
+        WINDOW.store(product, Ordering::SeqCst);
+
+        note_destroyed(-512);
+        note_destroyed(product);
+
+        assert!(
+            !ACTIVE.load(Ordering::SeqCst),
+            "the launch tile must work again after its session ends"
+        );
     }
 
     #[test]
