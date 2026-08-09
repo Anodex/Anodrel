@@ -71,12 +71,16 @@ script — exercises machine policy, locked digest revalidation, Authenticode
 publisher match, child-only bootstrap delivery, the authenticated pipe, a
 host-owned native window, one semantic action, and coordinated shutdown. The
 host activates it through a `--product-session` route, and the Startup Lab's
-launch tile is now resolved from a verification-only preflight instead of a
-compile-time constant, so it is inert unless a machine record and signed
-executable currently validate. This is a development-machine fixture: it relies
-on a locally generated certificate installed into machine trust, and it is not
-production packaging, installation, updates, or a claim of framework parity.
-See `docs/PRODUCT_FIXTURE.md`.
+**Development Fixture** tile is resolved from a verification-only preflight
+instead of a compile-time constant, so it is inert unless a machine record and
+signed executable currently validate.
+
+This is a development-machine fixture and is never presented as a product
+launch. It relies on a locally generated certificate installed into machine
+trust, and **that has not been done on any machine yet, so the joined signed
+path remains unvalidated in practice**. Production signing identity, packaging,
+installation, and updates are deliberately deferred; see `ROADMAP.md` and
+`docs/PRODUCT_FIXTURE.md`.
 
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,

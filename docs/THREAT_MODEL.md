@@ -197,7 +197,7 @@ and fallback sources. Decision 0020 adds locked pre-launch revalidation,
 tracked child lifetime, and post-verification bootstrap binding.
 
 Decision 0061 adds the development-only signed fixture that finally exercises
-that path. The Startup Lab's Launch Sample tile is now resolved from a
+that path. The Startup Lab's Development Fixture tile is now resolved from a
 verification-only preflight rather than a compile-time constant, so it exists
 only while a machine record and signed executable validate. This is a
 development-machine capability: it depends on a locally generated certificate

@@ -20,7 +20,8 @@ use anodrel_windows_product_session::{
 };
 
 const HOST_NAME: &str = "anodrel-windows-host";
-const WINDOW_TITLE: &str = "Anodrel Product Session";
+/// Named in full so the window can never be mistaken for a product session.
+const WINDOW_TITLE: &str = "Anodrel Development Product Fixture";
 
 /// Runs one verified product session and its native window to completion.
 ///

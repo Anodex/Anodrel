@@ -76,6 +76,19 @@ Tradeoffs:
 - without a replace or revoke operation, an application that needs to correct a
   message can only send another one.
 
+## Confirmed in use
+
+The Shell32 mapping is the accepted native Windows baseline. It has been run on
+Windows 11: a notification requested through the development diagnostic appeared
+with the supplied title and body.
+
+That run also showed the cost of the deferred packaging decision. Windows
+attributes the notification to `anodrel-windows-host.exe` rather than to a
+product name, because Shell32 has no application identity to use. Fixing that
+needs the same Application User Model ID toast notifications need, so both wait
+on the production identity and packaging decision, which is deferred
+deliberately and recorded in `ROADMAP.md`.
+
 ## Revisit conditions
 
 Revisit when Anodrel has a documented packaging and installation identity that

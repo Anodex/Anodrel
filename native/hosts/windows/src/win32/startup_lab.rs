@@ -87,8 +87,13 @@ const CARDS: [Card; 4] = [
 /// What a click on an action tile does.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum ActionKind {
-    /// Start the validated application. Requires verified executable identity.
-    LaunchSample,
+    /// Start the development product fixture.
+    ///
+    /// This is never a product launch. The identity it activates is a
+    /// compile-time constant naming the development fixture in
+    /// `docs/PRODUCT_FIXTURE.md`, and the tile is inert unless a live preflight
+    /// validates that fixture's machine record and signature.
+    LaunchDevelopmentFixture,
     /// Show runtime logs. Requires a logging boundary.
     OpenLogs,
     /// Open a native view of the verified package facts.
@@ -122,23 +127,28 @@ pub(super) struct Action {
 /// made clickable by changing how it looks, and never drawn as available while
 /// it is inert.
 ///
-/// `LaunchSample` is the only tile whose answer depends on machine state. It
-/// requires a verification-only preflight — machine record, locked digest
-/// revalidation, Authenticode, and publisher fingerprint — to have succeeded
-/// before this surface opened. On a machine with no provisioned record, or one
-/// whose executable or signature no longer validates, it stays planned.
+/// `LaunchDevelopmentFixture` is the only tile whose answer depends on machine
+/// state. It requires a verification-only preflight — machine record, locked
+/// digest revalidation, Authenticode, and publisher fingerprint — to have
+/// succeeded before this surface opened. On a machine with no provisioned
+/// record, or one whose executable or signature no longer validates, it stays
+/// planned.
 #[must_use]
 pub(super) fn tile_is_live(action: &Action, lab: &StartupLab) -> bool {
     match action.kind {
-        ActionKind::LaunchSample => lab.launch_available,
+        ActionKind::LaunchDevelopmentFixture => lab.launch_available,
         _ => action.linked,
     }
 }
 
 /// The subtitle a tile shows for the current machine state.
+///
+/// A live fixture tile says what it is rather than what it proves. Reading
+/// "verified" next to a launch control would invite treating a development
+/// fixture as a product launch, which is exactly what it is not.
 fn tile_subtitle(action: &Action, lab: &StartupLab) -> &'static str {
-    if action.kind == ActionKind::LaunchSample && lab.launch_available {
-        "Verified signed fixture"
+    if action.kind == ActionKind::LaunchDevelopmentFixture && lab.launch_available {
+        "Development only, not a product"
     } else {
         action.subtitle
     }
@@ -147,11 +157,14 @@ fn tile_subtitle(action: &Action, lab: &StartupLab) -> &'static str {
 /// The action strip, in display order.
 pub(super) const ACTIONS: [Action; 4] = [
     Action {
-        kind: ActionKind::LaunchSample,
+        kind: ActionKind::LaunchDevelopmentFixture,
         icon: Icon::Launch,
         accent: palette::ACCENT_CORE,
-        title: "Launch Sample",
-        subtitle: "Needs signed identity",
+        // "Development Product Fixture" in full overruns this slot at the
+        // smallest supported window; the two lines together carry the label,
+        // and the window it opens is titled in full.
+        title: "Development Fixture",
+        subtitle: "Not provisioned",
         linked: false,
     },
     Action {
@@ -1307,8 +1320,8 @@ fn draw_footer(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, progress:
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTIONS, ActionKind, BASE_HEIGHT, BASE_WIDTH, CARDS, Layout, action_at, stage,
-        tile_is_live, tile_subtitle,
+        ACTIONS, ActionKind, BASE_HEIGHT, BASE_WIDTH, CARDS, Layout, TextSpec, WEIGHT_MEDIUM,
+        WEIGHT_REGULAR, action_at, stage, tile_is_live, tile_subtitle,
     };
     use anodrel_canvas::point;
 
@@ -1464,7 +1477,7 @@ mod tests {
 
         for action in &ACTIONS {
             let live_when_unprovisioned = tile_is_live(action, &unprovisioned);
-            if action.kind == ActionKind::LaunchSample {
+            if action.kind == ActionKind::LaunchDevelopmentFixture {
                 assert!(
                     !live_when_unprovisioned,
                     "the launch tile is live without a validated fixture"
@@ -1483,21 +1496,62 @@ mod tests {
     }
 
     #[test]
-    fn the_launch_tile_never_states_a_capability_it_does_not_have() {
+    fn every_tile_label_fits_its_slot_at_the_smallest_supported_size() {
+        // Tile text is drawn from the badge's right edge to the slot's right
+        // edge and is never wrapped or ellipsized, so a label that overruns is
+        // simply painted over its neighbour.
+        let unprovisioned = super::super::tests::startup_lab_fixture(false);
+        let provisioned = super::super::tests::startup_lab_fixture(true);
+
+        for (width, height) in [(900.0, 660.0), (BASE_WIDTH, BASE_HEIGHT)] {
+            let layout = Layout::new(width, height);
+            for (index, action) in ACTIONS.iter().enumerate() {
+                let slot = layout.action_rect(index);
+                // Mirrors the badge geometry the drawing code uses.
+                let text_left =
+                    slot.left + layout.unit(22.0) + layout.unit(44.0) + layout.unit(15.0);
+                let available = slot.right - text_left - layout.unit(30.0);
+
+                for label in [
+                    action.title,
+                    tile_subtitle(action, &unprovisioned),
+                    tile_subtitle(action, &provisioned),
+                ] {
+                    let size = if label == action.title { 16.0 } else { 12.0 };
+                    let weight = if label == action.title {
+                        WEIGHT_MEDIUM
+                    } else {
+                        WEIGHT_REGULAR
+                    };
+                    let measured =
+                        super::text::width(&TextSpec::new(label, layout.font(size), weight));
+                    assert!(
+                        measured <= available,
+                        "{label:?} needs {measured} of {available} at {width}x{height}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_launch_tile_names_itself_a_development_fixture_in_both_states() {
+        // The tile must never read as a product launch. The word "development"
+        // in its title is what stops it being mistaken for one.
         let launch = ACTIONS
             .iter()
-            .find(|action| action.kind == ActionKind::LaunchSample)
+            .find(|action| action.kind == ActionKind::LaunchDevelopmentFixture)
             .expect("the launch tile exists");
+        assert!(launch.title.contains("Development"));
 
         let unprovisioned = super::super::tests::startup_lab_fixture(false);
-        assert_eq!(
-            tile_subtitle(launch, &unprovisioned),
-            "Needs signed identity"
-        );
+        assert_eq!(tile_subtitle(launch, &unprovisioned), "Not provisioned");
+
         let provisioned = super::super::tests::startup_lab_fixture(true);
-        assert_eq!(
-            tile_subtitle(launch, &provisioned),
-            "Verified signed fixture"
-        );
+        let live = tile_subtitle(launch, &provisioned);
+        assert_eq!(live, "Development only, not a product");
+        // A live tile must not claim more than it is. "Verified" beside a
+        // launch control invites reading a fixture as a product.
+        assert!(!live.to_ascii_lowercase().contains("verified"));
     }
 }

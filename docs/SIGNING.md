@@ -79,7 +79,10 @@ service locks the executable against write, delete, and rename handles while it
 checks the digest, invokes Windows trust policy, and creates the child. The
 work must run off the Win32 UI thread because Windows trust policy can consult
 certificate and revocation state. A provisioned signed sample and host UI
-integration remain required before Launch Sample can become linked.
+integration remain required before any product launch exists. The Startup Lab's
+one launch control is the **Development Fixture** tile, which activates a
+development fixture and is never presented as a product launch; production
+signing identity and packaging are deliberately deferred in `ROADMAP.md`.
 
 ## Logging and privacy
 

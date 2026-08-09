@@ -6,10 +6,16 @@
 version 1.3, host wiring that services the mailbox from the owning UI thread,
 the SDK method, the mock host, and a development client that calls it.
 
-The path has been run: the development diagnostic completes `notification.show`
-and continues, where an operating-system refusal would have stopped it at its
-own stage. Confirming that a notification is actually **visible** needs a person
-looking at a desktop; `docs/DEVELOPMENT.md` carries that check.
+The path has been run and the notification has been **seen** on Windows 11: the
+development diagnostic delivered its document, called `notification.show`, and a
+notification appeared with the title and body it supplied, its body line feed
+rendered as a real line break.
+
+One observable consequence of the deferred packaging decision: Windows attributes
+the notification to `anodrel-windows-host.exe`, the host executable, because
+Shell32 has no application identity to use instead. A product name there needs
+the Application User Model ID that toast notifications also need, and that waits
+on the same decision.
 
 ## Boundary
 

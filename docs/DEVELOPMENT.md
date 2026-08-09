@@ -240,6 +240,11 @@ area; the entry carries the Anodrel brand icon and appears only once the first
 notification is sent. Then complete the normal semantic action to close the
 session, which removes the entry.
 
+This check has passed on Windows 11: the notification appeared with the client's
+title and body, and its body line feed rendered as a line break. Windows
+attributes it to `anodrel-windows-host.exe`, which is expected — Shell32 has no
+application identity to show instead.
+
 Two things this check cannot tell you, by design. The client learns only that
 the host accepted the values, so a notification you have silenced or muted still
 reports success — that is the privacy line in `docs/NOTIFICATIONS.md`, not a
@@ -315,7 +320,7 @@ the child must still disappear. Separately, end `anodrel-product-fixture.exe`
 from Task Manager while the window is open: the window must close on its own.
 
 There is a third path worth checking from the Startup Lab, because a launch
-takes a noticeable moment. Click **Launch Sample** and immediately close the
+takes a noticeable moment. Click **Development Fixture** and immediately close the
 Startup Lab window, before the product window appears. The host must exit and
 `anodrel-product-fixture.exe` must not be left running: a session that finishes
 starting after its surface has gone is ended by the host rather than handed to a
@@ -327,10 +332,11 @@ The Startup Lab reads the same provisioning state:
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --showcase apps/sample/anodrel.application.json
 ~~~
 
-With the fixture provisioned, **Launch Sample** is drawn live, reads *Verified
-signed fixture*, responds to hover, and starts one product session in its own
-window. Run `.\scripts\provision-product-fixture.ps1 -Remove` and repeat: the
-tile must return to its dimmed **PLANNED** state and ignore clicks.
+With the fixture provisioned, **Development Fixture** is drawn live, reads
+*Development only, not a product*, responds to hover, and opens a window titled
+**Anodrel Development Product Fixture**. Run
+`.\scripts\provision-product-fixture.ps1 -Remove` and repeat: the tile must
+return to *Not provisioned*, dimmed and marked **PLANNED**, and ignore clicks.
 
 Remove the fixture when you are finished:
 

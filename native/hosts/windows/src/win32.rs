@@ -891,7 +891,9 @@ fn open_product_session_window(
     ensure_window_class(instance, &class_name)?;
     let scale = primary_scale();
     let definition = WindowDefinition {
-        title: "Anodrel Product Session".to_owned(),
+        // Named in full here, where there is room for it. The tile that opens
+        // this window has to fit its label into a quarter of a strip.
+        title: "Anodrel Development Product Fixture".to_owned(),
         width: (920.0 * scale) as i32,
         height: (660.0 * scale) as i32,
         view: View::UiSession(ui_session_view::UiSessionView::for_product_session(session)),
@@ -1125,7 +1127,7 @@ fn action_document(
                 ]),
             },
         )),
-        startup_lab::ActionKind::LaunchSample => None,
+        startup_lab::ActionKind::LaunchDevelopmentFixture => None,
     }
 }
 
@@ -1683,7 +1685,7 @@ unsafe extern "system" fn window_proc(
                 // tile drawn as planned cannot be activated by a click.
                 && startup_lab::tile_is_live(action, &lab)
             {
-                if action.kind == startup_lab::ActionKind::LaunchSample {
+                if action.kind == startup_lab::ActionKind::LaunchDevelopmentFixture {
                     begin_product_session(window);
                 } else if let Some((title, document)) = action_document(action.kind, &lab) {
                     // A failure to open a diagnostic window is not fatal to the

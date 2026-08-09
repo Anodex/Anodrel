@@ -207,12 +207,19 @@ pointer. A preflight that could not be started, or that stopped unexpectedly,
 answers "not launchable"; an unavailable check never widens what the surface
 offers.
 
-The tile is drawn and hit-tested from that one resolved value:
+The tile is labelled **Development Fixture** and is drawn and hit-tested from
+that one resolved value:
 
-- preflight failed, or no record is provisioned → the tile stays **planned**,
-  dimmed, and inert, exactly as before;
-- preflight succeeded → the tile becomes **linked** and starts one product
-  session.
+- preflight failed, or no record is provisioned → the tile reads *Not
+  provisioned* and stays dimmed and inert, exactly as before;
+- preflight succeeded → the tile becomes live and reads *Development only, not a
+  product*.
+
+It is never labelled as a product launch, and the window it opens is titled
+**Anodrel Development Product Fixture** in full. The tile itself carries the
+shorter form because the full phrase overruns a quarter-width slot at the
+smallest supported window size; a test measures every tile label against its
+slot so that cannot regress into text painted over its neighbour.
 
 Because drawing and hit-testing read the same value, the tile cannot be made
 live by changing how it looks, and it cannot be live on a machine where the
@@ -254,9 +261,26 @@ Automated coverage lives with each component:
 - the Startup Lab has a test that the launch tile is linked only when a
   preflight result says the fixture validated.
 
-The joined path needs a real machine. `docs/DEVELOPMENT.md` carries the manual
-sequence: provision, run the host route, confirm the delivered document,
-activate the action, watch the window close, and confirm the child is gone.
+### End-to-end validation is still pending
+
+**The joined signed path has never been run.** Provisioning installs a locally
+generated code-signing certificate into machine trust, and that has deliberately
+not been done on any machine yet. So while every component is unit tested, and
+the protocol half of the fixture's own conversation is covered by an integration
+test that needs no provisioning, the following remain unverified in practice:
+
+- that Windows Authenticode accepts the generated development certificate;
+- that the composed record passes the host's own parser against a real signed
+  executable;
+- that the locked launch, bootstrap delivery, and child start succeed together;
+- that the Startup Lab tile goes live and back again with provisioning; and
+- that the child, pipe worker, and window shut down cleanly on each path.
+
+Treat this fixture as designed and tested in parts, not as demonstrated.
+`docs/DEVELOPMENT.md` carries the manual sequence for whenever installing that
+certificate is acceptable: provision, run the host route, confirm the delivered
+document, activate the action, watch the window close, and confirm the child is
+gone.
 
 See `docs/LAUNCH.md`, `docs/PRODUCT_SESSIONS.md`, `docs/SIGNING.md`, and
 Decisions 0017 through 0020, 0058 through 0060, and 0061.

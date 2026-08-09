@@ -216,7 +216,7 @@ is then a data change plus its operation, not a redesign.
 
 | Tile | State | Gate to link it |
 | --- | --- | --- |
-| Launch Sample | **Resolved at run time** | Its state is no longer a constant. A verification-only preflight — machine record, locked digest revalidation, Authenticode, publisher fingerprint — decides it before the surface opens. With the development fixture of Decision 0061 provisioned it is live and starts one verified product session; on any other machine it stays planned, dimmed, and inert. Production packaging, installation, updates, and a real signing identity remain separate gates before a shipped application uses it. |
+| Development Fixture | **Resolved at run time** | Its state is no longer a constant. A verification-only preflight — machine record, locked digest revalidation, Authenticode, publisher fingerprint — decides it before the surface opens. With the development fixture of Decision 0061 provisioned it is live and reads *Development only, not a product*; on any other machine it stays *Not provisioned*, dimmed, and inert. It is deliberately not called a product launch, and there is no product-launch tile: that waits on the deferred signing and packaging decision. |
 | Open Logs | **Linked** | Done. Shows only the bounded typed host events defined by `docs/LOGGING.md`; it exposes no application text, persistence, export, or capability. |
 | Inspect Package | **Linked** | Done. Displays facts already verified at startup; introduces no capability. |
 | Runtime Diagnostics | **Linked** | Done. Displays this process's own readings; introduces no capability. |
@@ -260,6 +260,12 @@ Status: **Planned**
 
 ## Explicitly deferred
 
+- **Production signing identity, packaging, installation, and updates.**
+  Deferred by decision, not by oversight. Until it is made, the platform has no
+  production application identity, so the only thing it can provision is the
+  development fixture of Decision 0061, and toast notifications stay out of
+  reach because they need an Application User Model ID this platform cannot
+  honestly claim. Nothing built so far may be presented as production-ready.
 - A full native UI toolkit beyond the constrained foundation in Decision 0025.
 - Custom browser engine.
 - Custom operating system.

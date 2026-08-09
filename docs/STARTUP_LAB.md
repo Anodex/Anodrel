@@ -58,7 +58,7 @@ records the reasoning.
 
 | Tile | State | Behaviour |
 | --- | --- | --- |
-| Launch Sample | **Resolved before the surface opens** | Live only when a verification-only preflight confirms a machine record and signed executable; otherwise dimmed, labelled, inert. |
+| Development Fixture | **Resolved before the surface opens** | Live only when a verification-only preflight confirms a machine record and signed executable; otherwise dimmed, labelled *Not provisioned*, inert. Never presented as a product launch. |
 | Open Logs | **Linked** | Opens a native view of the safe typed startup-event ledger. |
 | Inspect Package | **Linked** | Opens a native window showing the verified package facts. |
 | Runtime Diagnostics | **Linked** | Opens a native window showing protocol, transport, and process readings. |
@@ -67,7 +67,7 @@ A planned tile states the gate it is waiting on instead of a description, does
 not respond to hover, and takes no pointer cursor. `ROADMAP.md` tracks each one
 against the decision that gates it.
 
-Launch Sample is the one tile whose state is not a constant. Before the window
+The Development Fixture tile is the one whose state is not a constant. Before the window
 is created, the host runs the launch service's verification-only sequence —
 machine record, locked digest revalidation, Authenticode, publisher fingerprint
 — which creates no process, pipe, or bootstrap material. It runs on a worker
@@ -175,10 +175,10 @@ Startup Lab** window opens and shows:
   brand crate rather than from a compiled icon resource;
 - the `org.anodrel.sample` identity below the hero mark;
 - Platform Core, Verified Package, Private IPC, and Native Shell as ready;
-- Launch Sample dimmed and marked `PLANNED` on a machine with no provisioned
-  product fixture — and, when `docs/PRODUCT_FIXTURE.md` has been provisioned,
-  live instead, reading *Verified signed fixture* and opening one product
-  session window;
+- Development Fixture dimmed, reading *Not provisioned*, and marked `PLANNED` on
+  a machine with no provisioned fixture — and, once `docs/PRODUCT_FIXTURE.md`
+  has been provisioned, live instead, reading *Development only, not a product*
+  and opening a window titled **Anodrel Development Product Fixture**;
 - Open Logs, Inspect Package, and Runtime Diagnostics highlighting under the
   pointer, taking a hand cursor, and each opening a native window when
   clicked;
