@@ -25,6 +25,13 @@ only when the final registered host window is destroyed. If creating a later
 window fails, the host destroys every already-created window and returns a safe
 failure rather than entering a partial message loop.
 
+A removed view is dropped after the registry lock is released, never while it is
+held. Most views drop trivially, but a view that owns a verified product session
+ends that session as it goes: it shuts down the child and joins two worker
+threads. Doing that under the process-wide registry lock would hold every other
+window's message handling behind it, and would deadlock if a worker ever needed
+to read the registry on its way out.
+
 The existing package window and Startup Lab remain one-window host surfaces.
 `--window-lab` is an Anodrel diagnostic that creates a primary and a companion
 window to exercise the view registry and final-window shutdown behavior.

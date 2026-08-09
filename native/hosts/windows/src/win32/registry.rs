@@ -124,10 +124,21 @@ pub(super) fn with_ui_session<R>(
 }
 
 /// Removes a window and returns the number of host windows that remain.
+///
+/// The removed view is dropped after the registry lock is released. That
+/// matters because dropping a product-session view ends its session: it shuts
+/// down the verified child and joins two worker threads. Doing that while
+/// holding the process-wide registry lock would block every other window's
+/// message handling behind it, and would deadlock outright if a worker ever
+/// needed to consult the registry on its way out.
 pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
-    let mut views = lock_views()?;
-    views.remove(&window);
-    Ok(views.len())
+    let (removed, remaining) = {
+        let mut views = lock_views()?;
+        let removed = views.remove(&window);
+        (removed, views.len())
+    };
+    drop(removed);
+    Ok(remaining)
 }
 
 fn lock_views() -> io::Result<std::sync::MutexGuard<'static, BTreeMap<Hwnd, View>>> {
@@ -273,6 +284,26 @@ mod tests {
                 .is_none()
         );
         remove(window).expect("document closes");
+    }
+
+    #[test]
+    fn removal_releases_the_registry_before_dropping_the_view() {
+        // A product-session view ends its session on drop, which joins two
+        // worker threads. This proves the registry is usable from that drop
+        // rather than locked behind it.
+        let _exclusive = EXCLUSIVE.lock().expect("registry tests are serialized");
+        let window = -206;
+        let companion = -207;
+        insert(window, document_view("dropping")).expect("view registers");
+        insert(companion, document_view("companion")).expect("companion registers");
+
+        let remaining = remove(window).expect("removal succeeds");
+        assert_eq!(remaining, 1);
+        // The lock is free immediately afterwards, which is what a view's drop
+        // would need if it reached back into the registry.
+        assert!(view_for(window).expect("lookup succeeds").is_none());
+        assert!(view_for(companion).expect("lookup succeeds").is_some());
+        remove(companion).expect("companion closes");
     }
 
     #[test]
