@@ -69,6 +69,7 @@ authority for permissions.
 | A provisioning tool writes a machine-policy record the host would reject, or writes one for another application. | Keep record writing in one development helper that the host does not link. Compose the record only from a recomputed executable digest and an Authenticode leaf fingerprint Windows accepted, validate it through the host's own parser before writing, and expose no hive, key path, value name, application ID, or capability argument. |
 | An application chooses or substitutes its launch policy. | Read the installed record only from the fixed 64-bit `HKEY_LOCAL_MACHINE` policy location selected by the host; accept no current-user, package, environment, protocol, or UI policy source. Require the registry key, record, and validated package to carry the same application ID. |
 | A child process grants itself a capability. | Convert only the validated installed record's strict capability array into the host session policy; reject unknown or duplicate grants, treat version 1.0 records as grant-free, and never accept grants from package, bootstrap, pipe, protocol, or UI data. |
+| A notification impersonates another application, spoofs a second message, or becomes a channel back to the application. | Accept only a bounded title and body validated as UTF-16 code units with control characters rejected, so text cannot forge a second message or a source. Keep the notification icon host-owned and generated from the brand crate, so artwork cannot impersonate an identity. Provide no identifier, replace, revoke, callback, or read surface at all, so a notification carries no return path. Report only that the host accepted the values: an application must not be able to observe that the user has silenced, muted, or ignored it. See `docs/NOTIFICATIONS.md` and Decision 0062. |
 | A secret reaches the renderer or logs. | Use operating-system credential storage; redact secrets, raw native errors, and sensitive paths from protocol diagnostics and logs. |
 | A host diagnostic log captures untrusted or sensitive data. | The first log accepts only a closed typed host-event enum; it has no dynamic message, payload, path, error, credential, persistence, export, or protocol input. |
 | An application uses diagnostics to obtain arbitrary host data or an unbounded event stream. | `diagnostics.entries.read` requires the existing immediate `diagnostics.read` grant, accepts only `{}`, returns at most 64 records from the closed typed catalogue, and exposes no filter, cursor, time, native detail, write, clear, export, or subscription operation. |
@@ -220,7 +221,10 @@ The native-host decision must extend this model with:
 
 No application-facing filesystem, process, credential, dialog, notification,
 or external-link operation may be implemented until its contract and these
-host-specific controls are documented and tested. The bounded text clipboard,
+host-specific controls are documented and tested. `docs/NOTIFICATIONS.md` and
+Decision 0062 now supply the notification contract; its portable values, UI-thread
+bridge, Windows adapter, and capability remain to be implemented and tested
+before any application can reach it. The bounded text clipboard,
 validated external links, and UI-thread-routed open-file dialog are the current
 application-facing exceptions: `docs/CLIPBOARD.md`, `docs/EXTERNAL_LINKS.md`,
 and `docs/FILE_DIALOGS.md` define their separate controls.
