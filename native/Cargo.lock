@@ -285,6 +285,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-notifications"
+version = "0.1.0"
+dependencies = [
+ "anodrel-notifications",
+]
+
+[[package]]
 name = "anodrel-windows-paths"
 version = "0.1.0"
 dependencies = [

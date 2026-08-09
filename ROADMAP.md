@@ -121,8 +121,12 @@ Status: **Direct Windows host in progress**
   toast notifications wait for a packaging identity. `anodrel-notifications`
   implements the validated title, body, service boundary, safe failure
   categories, and the one-request UI-thread bridge with its short response
-  timeout. The Windows adapter and the `notification.show` capability remain;
-  no application can reach a notification yet. See `docs/NOTIFICATIONS.md`.
+  timeout. `anodrel-windows-notifications` adds the direct Shell32 adapter,
+  which keeps one host-owned notification-area entry per process because
+  removing an entry also dismisses the balloon it was asked to show. The
+  `notification.show` capability, host wiring, and manual desktop verification
+  remain; no application can reach a notification yet. See
+  `docs/NOTIFICATIONS.md`.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

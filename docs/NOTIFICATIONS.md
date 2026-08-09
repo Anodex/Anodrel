@@ -1,8 +1,10 @@
 # Anodrel notification foundation
 
-**Status:** The portable values and the UI-thread bridge in
-`anodrel-notifications` are implemented and tested. The direct Windows adapter
-and a protocol capability are not. No application can reach a notification yet.
+**Status:** The portable values and UI-thread bridge in `anodrel-notifications`
+and the direct Windows adapter in `anodrel-windows-notifications` are
+implemented. A protocol capability, host wiring, and manual verification of the
+real notification-area behaviour are not. No application can reach a
+notification yet.
 
 ## Boundary
 
@@ -90,20 +92,41 @@ the call it claims to describe.
 
 ## Windows mapping
 
-The first Windows adapter uses `Shell_NotifyIconW` from Shell32 with the
-`NIF_INFO` flag: it adds a host-owned notification icon, supplies the validated
-title and body, and removes the icon again. It uses only direct Windows APIs and
-adds no runtime dependency.
+The first Windows adapter uses `Shell_NotifyIconW` from Shell32. It uses only
+direct Windows APIs and adds no runtime dependency.
 
 The `NOTIFYICONDATAW` fields behind this mapping are fixed-size UTF-16 buffers —
 64 units for the title and 256 for the body, each including a terminator — which
 is where the portable limits above come from. The adapter never truncates: a
-value that validated portably always fits.
+value that validated portably always fits. A test pins the two sides together,
+so neither bound can move without the other.
 
-The icon is host-owned and generated from the brand crate at run time, exactly
-as the window icon already is. An application cannot supply, select, or replace
-it, so a notification cannot impersonate another application's identity through
-its artwork.
+### The entry's lifetime is the session's, not the message's
+
+The adapter adds one notification-area entry when it is created, shows each
+notification on that entry with `NIM_MODIFY` and `NIF_INFO`, and removes the
+entry when it is dropped.
+
+It does **not** add and remove an entry around each notification. Removing an
+entry also dismisses the balloon that was just requested, so a per-message
+add-and-remove would reliably show nothing. The entry is therefore visible for
+as long as the owning session can send notifications, which is the honest cost
+of this mapping.
+
+Exactly one entry exists per process, and dropping the adapter removes it on
+every path, so no failure can leave a stale icon behind.
+
+### Host-owned artwork and no sound
+
+The icon is host-selected: host code supplies one generated from the brand
+crate, exactly as the window icon already is, and the adapter falls back to the
+shared system application icon if none is given. An application cannot supply,
+select, read, or replace it, and the entry's hover text is fixed host text. A
+notification therefore cannot impersonate another application's identity through
+its artwork or its label.
+
+Notifications are requested with `NIIF_NOSOUND` and no balloon artwork, so an
+application cannot demand attention beyond the text it was granted.
 
 ### Why not toast notifications
 
@@ -145,8 +168,8 @@ application's own window, so it is treated as untrusted display data:
 - it cannot name or impersonate another application, because the title is text
   and the icon is host-owned.
 
-The host attaches at most one notification icon at a time and removes it on
-every path, so a failed call cannot leave a stale icon in the notification area.
+The host attaches at most one notification-area entry per process and removes it
+on every path, so a failed call cannot leave a stale icon behind.
 
 ## Verification
 
@@ -162,9 +185,18 @@ Bridge tests cover the one-request handover, the refusal of a second request as
 thread has taken the request, and a request the UI thread never answers — which
 must fail safely and leave the session usable again.
 
-The remaining pieces each need their own verification before an application can
-reach a notification: boundary tests for the Windows adapter and protocol
-contract tests for the capability check.
+Windows adapter tests cover the UTF-16 field writer that fills the fixed
+`NOTIFYICONDATAW` buffers — copying, terminating, surrogate pairs, and the
+overflow guard that protects the neighbouring fields — the agreement between
+those field capacities and the portable bounds, the declared structure size
+against its real layout, and the refusal to create an entry without a host
+window.
+
+What those tests cannot cover is the notification actually appearing. Shell32
+behaviour needs a real desktop session, so a manual check belongs in
+`docs/DEVELOPMENT.md` once host wiring exists.
+
+The protocol capability still needs its own contract tests for the grant check.
 
 ## Deferred
 
