@@ -119,10 +119,10 @@ Status: **Direct Windows host in progress**
   defines a one-way bounded announce over `Shell_NotifyIconW`, deliberately
   without identifiers, actions, callbacks, or any read surface, and records why
   toast notifications wait for a packaging identity. `anodrel-notifications`
-  implements the validated title, body, service boundary, and safe failure
-  categories. The UI-thread bridge, the Windows adapter, and the
-  `notification.show` capability remain; no application can reach a
-  notification yet. See `docs/NOTIFICATIONS.md`.
+  implements the validated title, body, service boundary, safe failure
+  categories, and the one-request UI-thread bridge with its short response
+  timeout. The Windows adapter and the `notification.show` capability remain;
+  no application can reach a notification yet. See `docs/NOTIFICATIONS.md`.
   The clipboard is limited to bounded Unicode text through a direct Windows
   adapter and separate Protocol 1.5 read/write grants (Decisions 0040 and
   0041). The external-link foundation accepts only validated HTTPS values and

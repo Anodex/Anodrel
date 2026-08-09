@@ -1,8 +1,8 @@
 # Anodrel notification foundation
 
-**Status:** The portable values in `anodrel-notifications` are implemented and
-tested. The UI-thread bridge, the direct Windows adapter, and a protocol
-capability are not. No application can reach a notification yet.
+**Status:** The portable values and the UI-thread bridge in
+`anodrel-notifications` are implemented and tested. The direct Windows adapter
+and a protocol capability are not. No application can reach a notification yet.
 
 ## Boundary
 
@@ -68,11 +68,25 @@ that keeps a pipe worker away from User32 keeps it away from Shell32. The
 authenticated worker therefore cannot show a notification directly.
 
 Delivery uses the existing bridge shape: the worker places one bounded request
-in a per-session mailbox, the owning native UI thread takes it, performs the
-operating-system call, and completes it. One request may be pending at a time,
-and a request that is not completed within a fixed timeout fails safely. This
-mirrors `docs/FILE_DIALOGS.md`; the difference is that a notification returns no
-value beyond acceptance.
+in a per-session `NotificationMailbox`, the owning native UI thread takes it
+exactly once, performs the operating-system call, and completes it. This mirrors
+`docs/FILE_DIALOGS.md`; the difference is that a notification returns no value
+beyond acceptance.
+
+One request may be pending at a time. A second request while one is pending is
+refused as `Busy` rather than `Unavailable`, because those are different
+answers: `Busy` means try again, `Unavailable` means this host cannot show
+notifications at all.
+
+The response timeout is **5 seconds**, far shorter than the file-dialog bridge's
+two minutes. A dialog waits on a person deciding; a notification waits only on a
+shell call that should finish in milliseconds, so a worker blocked longer than
+that is stuck rather than patient. A timed-out request clears the session's slot,
+so one stuck call cannot leave that session permanently busy.
+
+A completion is ignored unless it names the active request **and** that request
+has already been taken by the UI thread, so a response can never race ahead of
+the call it claims to describe.
 
 ## Windows mapping
 
@@ -143,10 +157,14 @@ control characters which could forge a second message are rejected, that a line
 feed is allowed only in the body, and that neither failure category describes
 the user's attention state.
 
+Bridge tests cover the one-request handover, the refusal of a second request as
+`Busy`, the rejection of a completion that is stale or arrives before the UI
+thread has taken the request, and a request the UI thread never answers — which
+must fail safely and leave the session usable again.
+
 The remaining pieces each need their own verification before an application can
-reach a notification: bridge tests for the one-pending rule and its timeout,
-boundary tests for the Windows adapter, and protocol contract tests for the
-capability check.
+reach a notification: boundary tests for the Windows adapter and protocol
+contract tests for the capability check.
 
 ## Deferred
 

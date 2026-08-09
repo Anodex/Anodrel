@@ -12,7 +12,11 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod mailbox;
+
 use std::fmt;
+
+pub use mailbox::{NOTIFICATION_RESPONSE_TIMEOUT, NotificationMailbox, NotificationRequest};
 
 /// Maximum UTF-16 code units in a notification title.
 ///
