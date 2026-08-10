@@ -33,6 +33,7 @@ members = [
   "adapters/windows-launch",
   "adapters/windows-paths",
   "adapters/windows-storage",
+  "adapters/windows-crash",
   "adapters/windows-credentials",
   "adapters/windows-clipboard",
   "adapters/windows-notifications",
