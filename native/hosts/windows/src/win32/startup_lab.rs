@@ -154,6 +154,75 @@ fn tile_subtitle(action: &Action, lab: &StartupLab) -> &'static str {
     }
 }
 
+/// The marker drawn at a tile's right edge when it has no action.
+///
+/// It replaces the chevron rather than joining it, so a tile reads as "no
+/// action here" rather than as an action that failed.
+const PLANNED_MARKER: &str = "PLANNED";
+
+/// Builds the planned marker's text at a layout's scale.
+///
+/// Drawing and [`tile_subtitle_limit`] both build it here, so the room reserved
+/// for it is measured from the same text that gets painted.
+fn planned_marker(layout: &Layout) -> TextSpec {
+    TextSpec::new(PLANNED_MARKER, layout.font(9.0), WEIGHT_SEMIBOLD)
+        .tracked(layout.unit(0.6).round() as i32)
+}
+
+/// Tops of a tile's title and subtitle lines.
+///
+/// Returned together, and read by both drawing and
+/// `the_planned_marker_clears_the_title_it_sits_below`, so the two lines and
+/// anything aligned to them cannot drift apart.
+fn tile_text_rows(layout: &Layout, slot: Rect) -> (f32, f32) {
+    (
+        slot.center().y - layout.unit(19.0),
+        slot.center().y + layout.unit(3.0),
+    )
+}
+
+/// A tile's right-hand furniture: where it is drawn, and the room it takes.
+///
+/// Drawing reads `anchor` to place the chevron or the marker, and
+/// `every_tile_label_fits_its_slot_at_the_smallest_supported_size` reads the two
+/// limits. One function answers both, so a label can never be measured against
+/// room its marker is really using — which is exactly how the marker came to be
+/// painted through the fixture tile's title. Nothing here wraps or ellipsizes;
+/// a label that overruns is simply painted over whatever it meets.
+struct TileMarker {
+    /// Chevron centre on a live tile, marker right edge on a planned one.
+    anchor: f32,
+    /// The x the title must stay left of.
+    title_limit: f32,
+    /// The x the subtitle must stay left of.
+    subtitle_limit: f32,
+}
+
+/// Resolves a tile's marker geometry.
+///
+/// A live tile's chevron is centred between the two lines of text, so both have
+/// to clear it. The planned marker is a word rather than a few pixels and sits
+/// on the subtitle's line, which is what leaves the title the whole slot: the
+/// tile carrying the longest title is the one that stays planned until a
+/// machine is provisioned.
+fn tile_marker(layout: &Layout, slot: Rect, live: bool) -> TileMarker {
+    if live {
+        let limit = slot.right - layout.unit(30.0);
+        TileMarker {
+            anchor: slot.right - layout.unit(28.0),
+            title_limit: limit,
+            subtitle_limit: limit,
+        }
+    } else {
+        let anchor = slot.right - layout.unit(16.0);
+        TileMarker {
+            anchor,
+            title_limit: anchor,
+            subtitle_limit: anchor - text::width(&planned_marker(layout)) - layout.unit(10.0),
+        }
+    }
+}
+
 /// The action strip, in display order.
 pub(super) const ACTIONS: [Action; 4] = [
     Action {
@@ -1139,23 +1208,41 @@ fn draw_actions(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, elapsed_
         );
 
         let text_left = badge.right + layout.unit(15.0);
+        let (title_top, subtitle_top) = tile_text_rows(layout, slot);
+        let marker_at = tile_marker(layout, slot, live);
         let title = TextSpec::new(action.title, layout.font(16.0), WEIGHT_MEDIUM);
-        text::draw(
-            canvas,
-            &title,
-            point(text_left, slot.center().y - layout.unit(19.0)),
-            Align::Left,
-            &Paint::solid(palette::INK.scale_alpha(progress * dim)),
-        );
         let subtitle = TextSpec::new(
             tile_subtitle(action, lab),
             layout.font(12.0),
             WEIGHT_REGULAR,
         );
+        // Neither line wraps or ellipsizes, so one that does not fit is painted
+        // over its marker. `every_tile_label_fits_its_slot_at_the_smallest_supported_size`
+        // is the guard; these hold the same line at the point of drawing, so a
+        // label added later is caught by any development run rather than only
+        // by remembering to extend that test.
+        debug_assert!(
+            text_left + text::width(&title) <= marker_at.title_limit,
+            "{:?} overruns its tile",
+            action.title
+        );
+        debug_assert!(
+            text_left + text::width(&subtitle) <= marker_at.subtitle_limit,
+            "{:?} overruns its tile",
+            tile_subtitle(action, lab)
+        );
+
+        text::draw(
+            canvas,
+            &title,
+            point(text_left, title_top),
+            Align::Left,
+            &Paint::solid(palette::INK.scale_alpha(progress * dim)),
+        );
         text::draw(
             canvas,
             &subtitle,
-            point(text_left, slot.center().y + layout.unit(3.0)),
+            point(text_left, subtitle_top),
             Align::Left,
             &Paint::solid(palette::INK_MUTED.scale_alpha(progress * dim)),
         );
@@ -1163,7 +1250,7 @@ fn draw_actions(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, elapsed_
         if live {
             draw_chevron(
                 canvas,
-                point(slot.right - layout.unit(28.0), slot.center().y),
+                point(marker_at.anchor, slot.center().y),
                 layout.unit(5.0),
                 layout.unit(1.6).max(1.0),
                 &Paint::solid(
@@ -1176,16 +1263,19 @@ fn draw_actions(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, elapsed_
                 ),
             );
         } else {
-            // Occupies the chevron's position, so a tile reads as "no action
-            // here" rather than as an action that failed.
-            let marker = TextSpec::new("PLANNED", layout.font(9.0), WEIGHT_SEMIBOLD)
-                .tracked(layout.unit(0.6).round() as i32);
+            // On the subtitle's line rather than centred where the chevron
+            // goes. The marker is a word, and the tile that carries it has the
+            // longest title on the strip; sharing the title's line meant the
+            // title was painted straight through it. The subtitle beside it
+            // says what is missing, so the two read together.
+            let marker = planned_marker(layout);
             text::draw(
                 canvas,
                 &marker,
                 point(
-                    slot.right - layout.unit(16.0),
-                    slot.center().y - text::line_height(&marker) / 2.0,
+                    marker_at.anchor,
+                    subtitle_top
+                        + (text::line_height(&subtitle) - text::line_height(&marker)) / 2.0,
                 ),
                 Align::Right,
                 &Paint::solid(palette::PLANNED.scale_alpha(progress)),
@@ -1321,7 +1411,8 @@ fn draw_footer(canvas: &mut Canvas, layout: &Layout, lab: &StartupLab, progress:
 mod tests {
     use super::{
         ACTIONS, ActionKind, BASE_HEIGHT, BASE_WIDTH, CARDS, Layout, TextSpec, WEIGHT_MEDIUM,
-        WEIGHT_REGULAR, action_at, stage, tile_is_live, tile_subtitle,
+        WEIGHT_REGULAR, action_at, planned_marker, stage, tile_is_live, tile_marker, tile_subtitle,
+        tile_text_rows,
     };
     use anodrel_canvas::point;
 
@@ -1497,9 +1588,10 @@ mod tests {
 
     #[test]
     fn every_tile_label_fits_its_slot_at_the_smallest_supported_size() {
-        // Tile text is drawn from the badge's right edge to the slot's right
-        // edge and is never wrapped or ellipsized, so a label that overruns is
-        // simply painted over its neighbour.
+        // Tile text is drawn from the badge's right edge towards the slot's
+        // right edge and is never wrapped or ellipsized, so a label that
+        // overruns is simply painted over whatever is there — the chevron on a
+        // live tile, the planned marker on one that is not.
         let unprovisioned = super::super::tests::startup_lab_fixture(false);
         let provisioned = super::super::tests::startup_lab_fixture(true);
 
@@ -1510,27 +1602,55 @@ mod tests {
                 // Mirrors the badge geometry the drawing code uses.
                 let text_left =
                     slot.left + layout.unit(22.0) + layout.unit(44.0) + layout.unit(15.0);
-                let available = slot.right - text_left - layout.unit(30.0);
 
-                for label in [
-                    action.title,
-                    tile_subtitle(action, &unprovisioned),
-                    tile_subtitle(action, &provisioned),
-                ] {
-                    let size = if label == action.title { 16.0 } else { 12.0 };
-                    let weight = if label == action.title {
-                        WEIGHT_MEDIUM
-                    } else {
-                        WEIGHT_REGULAR
-                    };
-                    let measured =
-                        super::text::width(&TextSpec::new(label, layout.font(size), weight));
-                    assert!(
-                        measured <= available,
-                        "{label:?} needs {measured} of {available} at {width}x{height}"
-                    );
+                // Both states of every tile: a tile that is planned on this
+                // machine has far less room than the same tile when it is live.
+                for lab in [&unprovisioned, &provisioned] {
+                    let marker = tile_marker(&layout, slot, tile_is_live(action, lab));
+                    for (label, size, weight, limit) in [
+                        (action.title, 16.0, WEIGHT_MEDIUM, marker.title_limit),
+                        (
+                            tile_subtitle(action, lab),
+                            12.0,
+                            WEIGHT_REGULAR,
+                            marker.subtitle_limit,
+                        ),
+                    ] {
+                        let available = limit - text_left;
+                        let measured =
+                            super::text::width(&TextSpec::new(label, layout.font(size), weight));
+                        assert!(
+                            measured <= available,
+                            "{label:?} needs {measured} of {available} at {width}x{height}"
+                        );
+                    }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn the_planned_marker_clears_the_title_it_sits_below() {
+        // The marker used to be centred on the slot, where a long title ran
+        // straight through it. It now shares the subtitle's line, so what has
+        // to hold is that the line it moved to is genuinely clear of the one
+        // above: horizontal room alone would not have caught the original
+        // fault either.
+        for (width, height) in [(900.0, 660.0), (BASE_WIDTH, BASE_HEIGHT)] {
+            let layout = Layout::new(width, height);
+            let slot = layout.action_rect(0);
+            let (title_top, subtitle_top) = tile_text_rows(&layout, slot);
+            let title = TextSpec::new("Development Fixture", layout.font(16.0), WEIGHT_MEDIUM);
+            let marker = planned_marker(&layout);
+            let title_bottom = title_top + super::text::line_height(&title);
+            assert!(
+                subtitle_top >= title_bottom,
+                "the marker's line starts at {subtitle_top}, inside a title ending at {title_bottom}"
+            );
+            assert!(
+                super::text::line_height(&marker) <= super::text::line_height(&title),
+                "the marker is taller than the line it was moved out of"
+            );
         }
     }
 
