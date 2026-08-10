@@ -28,6 +28,24 @@ current-user root and derives these locations:
 `- logs\
 ~~~
 
+The host also has locations of its own, in a namespace beside `Applications`
+rather than inside it:
+
+~~~text
+%LOCALAPPDATA%\Anodrel\Host\
+`- logs\
+~~~
+
+`HostDirectories` derives these from the same root and takes no identity,
+because what goes here belongs to no application. A host defect filed under
+whichever application happened to be loaded would be misattributed, and would
+put one application's evidence where another application's host will look. See
+`docs/CRASH_REPORTS.md` and Decision 0065 for the first use.
+
+Because `Host` is a sibling of `Applications`, no application identity can
+resolve to it. A unit test asserts that rather than leaving it to the identity
+grammar.
+
 The portable layout builder accepts only the existing validated application-ID
 grammar: 3 to 128 lowercase ASCII letters, digits, `.`, `-`, or `_`, beginning
 and ending with a letter or digit. It rejects a relative operating-system root
@@ -42,10 +60,11 @@ directory with an operation-specific containment and recovery policy.
 ## Compatibility
 
 This is layout version 1. The `Anodrel\Applications\<applicationId>` namespace
-and the three leaf names are stable once data is written there. A compatible
-extension may add a new named location. Renaming a location, changing the root,
-or changing an application-ID-to-directory mapping needs an explicit migration
-and a new documented version.
+and the three leaf names are stable once data is written there, as is
+`Anodrel\Host`. A compatible extension may add a new named location; the host
+namespace was added that way. Renaming a location, changing the root, or
+changing an application-ID-to-directory mapping needs an explicit migration and
+a new documented version.
 
 No `platform.paths` operation exists in Protocol v1. Until a host exposes a
 documented storage or logging capability, these absolute paths remain native

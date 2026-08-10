@@ -79,6 +79,77 @@ impl fmt::Debug for ApplicationDirectories {
     }
 }
 
+/// Stable host-owned locations that belong to no application.
+///
+/// A sibling of the `Applications` namespace, for what the host records about
+/// itself. A host defect is not an application's, and filing one under whichever
+/// application happened to be loaded would both misattribute it and leak that
+/// application's presence into another's directory. See Decision 0065.
+///
+/// This is a compatible extension to layout v1: it adds a namespace and reads
+/// or creates nothing, exactly like [`ApplicationDirectories`].
+#[derive(Clone, Eq, PartialEq)]
+pub struct HostDirectories {
+    host_root: PathBuf,
+    logs: PathBuf,
+}
+
+impl HostDirectories {
+    /// Derives the host's own locations below an absolute local-data root.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HostDirectoriesError::LocalDataRootNotAbsolute`] when the
+    /// operating-system adapter supplied a relative root. There is no identity
+    /// to validate: that is the point of this layout.
+    pub fn from_local_data_root(local_data_root: &Path) -> Result<Self, HostDirectoriesError> {
+        if !local_data_root.is_absolute() {
+            return Err(HostDirectoriesError::LocalDataRootNotAbsolute);
+        }
+        let host_root = local_data_root.join("Anodrel").join("Host");
+        Ok(Self {
+            logs: host_root.join("logs"),
+            host_root,
+        })
+    }
+
+    /// Returns the stable root shared by the host's own locations.
+    #[must_use]
+    pub fn host_root(&self) -> &Path {
+        &self.host_root
+    }
+
+    /// Returns the location for host-owned diagnostic records.
+    ///
+    /// A location, not a promise that a directory exists. Nothing here creates
+    /// one; a writer owns its own creation and containment policy.
+    #[must_use]
+    pub fn logs(&self) -> &Path {
+        &self.logs
+    }
+}
+
+impl fmt::Debug for HostDirectories {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("HostDirectories(..)")
+    }
+}
+
+/// A safe category for a host-directory layout failure.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HostDirectoriesError {
+    /// The operating-system adapter returned a relative root.
+    LocalDataRootNotAbsolute,
+}
+
+impl fmt::Display for HostDirectoriesError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("host local-data root is not absolute")
+    }
+}
+
+impl std::error::Error for HostDirectoriesError {}
+
 /// A safe category for an application-directory layout failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ApplicationDirectoriesError {
@@ -108,7 +179,9 @@ mod tests {
 
     use anodrel_application::ApplicationManifest;
 
-    use super::{ApplicationDirectories, ApplicationDirectoriesError};
+    use super::{
+        ApplicationDirectories, ApplicationDirectoriesError, HostDirectories, HostDirectoriesError,
+    };
 
     fn identity() -> anodrel_application::ApplicationIdentity {
         ApplicationManifest::parse(
@@ -178,5 +251,56 @@ mod tests {
         )
         .expect("fixture directories are valid");
         assert_eq!(format!("{directories:?}"), "ApplicationDirectories(..)");
+
+        let host = HostDirectories::from_local_data_root(Path::new(
+            r"C:\Anodrel-paths-test-root-that-does-not-exist",
+        ))
+        .expect("fixture host directories are valid");
+        assert_eq!(format!("{host:?}"), "HostDirectories(..)");
+    }
+
+    #[test]
+    fn derives_the_host_locations_without_touching_the_filesystem() {
+        let root = Path::new(r"C:\Anodrel-paths-test-root-that-does-not-exist");
+        assert!(!root.exists(), "fixture root must not already exist");
+
+        let host =
+            HostDirectories::from_local_data_root(root).expect("an absolute root is accepted");
+        assert_eq!(
+            host.host_root(),
+            Path::new(r"C:\Anodrel-paths-test-root-that-does-not-exist\Anodrel\Host")
+        );
+        assert_eq!(
+            host.logs(),
+            Path::new(r"C:\Anodrel-paths-test-root-that-does-not-exist\Anodrel\Host\logs")
+        );
+        assert!(!host.host_root().exists());
+    }
+
+    #[test]
+    fn the_host_namespace_cannot_collide_with_an_application() {
+        // `Host` sits beside `Applications`, not inside it, so no application
+        // identity can ever resolve to the host's own location. The identity
+        // grammar forbids a path separator, but this is the property that
+        // matters and it should be asserted rather than inferred.
+        let root = Path::new(r"C:\Anodrel-paths-test-root-that-does-not-exist");
+        let host = HostDirectories::from_local_data_root(root).expect("host layout is valid");
+        let application = ApplicationDirectories::from_local_data_root(root, &identity())
+            .expect("application layout is valid");
+        assert!(
+            !host
+                .host_root()
+                .starts_with(root.join("Anodrel\\Applications"))
+        );
+        assert!(!application.application_root().starts_with(host.host_root()));
+        assert_ne!(host.logs(), application.logs());
+    }
+
+    #[test]
+    fn the_host_layout_rejects_a_relative_operating_system_root() {
+        assert_eq!(
+            HostDirectories::from_local_data_root(Path::new("local-data")),
+            Err(HostDirectoriesError::LocalDataRootNotAbsolute)
+        );
     }
 }
