@@ -203,10 +203,10 @@ contract.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance
 adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the one-directional Windows accessibility
-boundary. Its mapping and a read-only UI Automation provider for the window
-exist; semantic children are not published yet, so a screen reader announces the
-window and finds nothing inside it. Accessibility support is not complete until
-its Narrator and Inspect checks have been run by a person.
+boundary. Its mapping and a read-only UI Automation provider exist, publishing
+the window and its semantic elements to a real UI Automation client.
+Accessibility support is not complete until its Narrator and Inspect checks have
+been run by a person and passed.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows

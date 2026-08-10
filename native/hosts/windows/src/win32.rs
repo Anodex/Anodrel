@@ -339,6 +339,7 @@ unsafe extern "system" {
     fn BeginPaint(window: Hwnd, paint: *mut PaintStruct) -> Hdc;
     fn EndPaint(window: Hwnd, paint: *const PaintStruct) -> Bool;
     fn GetClientRect(window: Hwnd, rectangle: *mut Rect) -> Bool;
+    fn ClientToScreen(window: Hwnd, point: *mut Point) -> Bool;
     fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
     fn SetCursor(cursor: Hcursor) -> Hcursor;
     fn GetKeyState(virtual_key: i32) -> i16;
@@ -919,6 +920,38 @@ fn open_product_session_window(
     Ok(())
 }
 
+/// Maps a window's current layout into publishable accessibility elements.
+///
+/// The semantics come from the same layout the surface draws, so what a screen
+/// reader is told cannot drift from what is on screen. A window with no UI
+/// document publishes nothing, which is the honest answer for a document or
+/// Startup Lab surface.
+fn accessible_elements_for(window: Hwnd) -> Vec<anodrel_windows_accessibility::AccessibleElement> {
+    let rect = client_rect(window);
+    let Ok(Some(snapshot)) =
+        registry::accessibility_snapshot(window, rect.width() as f32, rect.height() as f32)
+    else {
+        return Vec::new();
+    };
+    anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
+        &snapshot,
+        client_origin(window),
+    ))
+}
+
+/// Locates a window's client area on screen, with its current density.
+fn client_origin(window: Hwnd) -> anodrel_windows_accessibility::ClientOrigin {
+    let mut origin = Point { x: 0, y: 0 };
+    // SAFETY: `origin` is writable stack storage and the window belongs to this
+    // process; the call converts it in place to screen coordinates.
+    unsafe {
+        ClientToScreen(window, &mut origin);
+    }
+    // The layout is already composed at the display's real pixel density, so
+    // its logical units are physical ones and need no further scaling.
+    anodrel_windows_accessibility::ClientOrigin::new(origin.x, origin.y, 1.0)
+}
+
 /// Shows one pending notification for a session window, if it has one.
 ///
 /// The Shell32 call runs outside the window registry's lock, so a slow shell
@@ -1294,10 +1327,11 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
     // reaches the default procedure. The provider is read-only: it publishes
     // semantics outward and accepts nothing from Windows or an application.
     if message == WM_GETOBJECT {
+        let elements = accessible_elements_for(window);
         // SAFETY: this window belongs to the current thread's message queue,
         // which is the only thread that dispatches to this procedure.
         if let Some(result) =
-            unsafe { anodrel_windows_uia::answer_get_object(window, wparam, lparam) }
+            unsafe { anodrel_windows_uia::answer_get_object(window, wparam, lparam, elements) }
         {
             return result;
         }

@@ -250,6 +250,19 @@ impl UiLab {
         }
     }
 
+    /// Derives the accessibility semantics for this view's current layout.
+    ///
+    /// The same layout the surface draws produces these, so what a screen
+    /// reader is told cannot drift from what is on screen.
+    pub(super) fn accessibility_snapshot(
+        &self,
+        width: f32,
+        height: f32,
+    ) -> anodrel_ui::UiAccessibilitySnapshot {
+        self.document
+            .accessibility_snapshot(&self.layout(width, height))
+    }
+
     fn layout(&self, width: f32, height: f32) -> UiLayout {
         let surface = Surface::new(width, height);
         self.document.layout_with_scroll_offsets(

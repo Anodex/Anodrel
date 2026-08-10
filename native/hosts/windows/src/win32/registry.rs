@@ -164,6 +164,24 @@ pub(super) fn with_ui_session<R>(
     }
 }
 
+/// Derives accessibility semantics for whichever view a window carries.
+///
+/// Only the two views that render a UI document have semantics to publish. A
+/// document or Startup Lab window reports none, so assistive technology sees
+/// the window itself and nothing inside it.
+pub(super) fn accessibility_snapshot(
+    window: Hwnd,
+    width: f32,
+    height: f32,
+) -> io::Result<Option<anodrel_ui::UiAccessibilitySnapshot>> {
+    let views = lock_views()?;
+    Ok(match views.get(&window) {
+        Some(View::UiLab(lab)) => Some(lab.accessibility_snapshot(width, height)),
+        Some(View::UiSession(session)) => Some(session.lab().accessibility_snapshot(width, height)),
+        _ => None,
+    })
+}
+
 /// Removes a window and returns the number of host windows that remain.
 ///
 /// The removed view is dropped after the registry lock is released. That

@@ -1,14 +1,15 @@
 # Anodrel Windows accessibility
 
-**Status:** Contract, mapping, and the **first** provider slice are implemented.
-An Anodrel window now answers UI Automation as a server-side provider, and a
-real UI Automation client reads its name, control type, and automation ID from
-that provider.
+**Status:** Contract, mapping, and both provider slices are implemented. An
+Anodrel window answers UI Automation as a server-side provider, and a real UI
+Automation client reads the window and walks its published elements — their
+names, control types, automation IDs, enabled and focusable state, and screen
+rectangles.
 
-Semantic children are **not** published yet, so a screen reader announces the
-window and finds nothing inside it. Accessibility support is **not complete**,
-and must not be described as complete until the Narrator and Inspect checks
-below have actually been run by a person.
+Accessibility support is **not complete**. It must not be described as complete
+until the Narrator and Inspect checks below have been run by a person and
+passed. A client library reading correct values proves the plumbing; only
+listening proves the result is usable.
 
 ## Boundary
 
@@ -75,12 +76,19 @@ The adapter is a pure function from one snapshot node to Windows values.
 | --- | --- |
 | `Name` (30005) | The node's plain-text name, or empty where the role has none. |
 | `ControlType` (30003) | The table above. |
-| `IsEnabled` (30010) | The node's enabled flag. Only a button is ever disabled. |
+| `IsEnabled` (30010) | The node's enabled flag **for a button**; always true for text and groups. |
 | `AutomationId` (30011) | The document element ID. |
 | `IsKeyboardFocusable` (30009) | The table above. |
 | `IsControlElement` (30016) | Always true; every node in the snapshot is visible. |
 | `IsContentElement` (30017) | Always true, for the same reason. |
 | `BoundingRectangle` (30001) | Converted as below. |
+
+`IsEnabled` deserves its exception. UI Automation reads it as "can be interacted
+with", and a screen reader announces a disabled element as unavailable. Only an
+action can be unavailable; text and containers are not interactive in the first
+place, so passing the snapshot's flag straight through would have Narrator
+describe ordinary prose as dimmed and out of reach. Real UI Automation
+verification is what caught this.
 
 `AutomationId` carries the element ID the application authored. It is a semantic
 identifier already present in the document, it is bounded to 64 ASCII
@@ -151,15 +159,22 @@ The provider is built only when `UiaClientsAreListening` reports a client. That
 answer never leaves the crate: exposing it would tell an application that
 somebody is using assistive technology.
 
-**Slice 2 — semantic children. Not implemented.**
-`IRawElementProviderFragment` and `IRawElementProviderFragmentRoot`, tree
-navigation over the mapped nodes, `GetRuntimeId` with its safe array, and
-`get_BoundingRectangle`.
+**Slice 2 — semantic children. Implemented.**
+The window is also an `IRawElementProviderFragmentRoot`, and each published
+element answers `IRawElementProviderFragment`: navigation, `GetRuntimeId` as a
+safe array, `get_BoundingRectangle`, and hit testing from a screen point.
 
-Until that exists a screen reader announces the window and finds **nothing
-inside it**, because the mapped elements are not yet reachable from the root.
+`SetFocus` returns `UIA_E_NOTSUPPORTED`. Moving focus is an action, and this
+provider performs none. `GetFocus` returns nothing, because reporting focus to
+assistive technology is its own slice and guessing would be worse than silence.
 
-**Slice 3 — verification.** Narrator and Inspect, by a person. See below.
+The published tree is **flat**, and groups are filtered out of it. A container
+whose children sit beside it rather than inside it would be announced as an
+empty thing to step through, which is worse than not publishing it. Hierarchy,
+and with it meaningful grouping, is deferred.
+
+**Slice 3 — verification. Not done.** Narrator and Inspect, by a person. Until
+that passes, accessibility support is not complete. See below.
 
 Also deferred, each needing its own contract and decision: automation events and
 live announcements, focus changes reported to assistive technology, action
@@ -183,23 +198,34 @@ instead of unwinding, and the read-only promise that no pattern is supplied.
 
 ### Confirmed against real UI Automation
 
-Slice 1 has been queried by a real UI Automation client — `UIAutomationClient`
-driving `AutomationElement.FindFirst` against a running `--ui-lab` window:
+Both slices have been queried by a real UI Automation client —
+`UIAutomationClient` driving `FindFirst` and `FindAll` against a running
+`--ui-lab` window. The window reports `AutomationId = anodrel.surface`, which
+Windows' default window provider leaves empty, so the host's own provider was
+accepted, `QueryInterface` succeeded, and `GetPropertyValue` returned a
+correctly read `BSTR`.
+
+Walking its children returns all eleven published elements with their control
+types, names, automation IDs, enabled and focusable state, and screen
+rectangles:
 
 ~~~text
-Name         = Anodrel UI Lab
-ControlType  = ControlType.Window
-AutomationId = anodrel.surface
-IsEnabled    = True
+[ControlType.Text]   enabled=True focusable=False name='NATIVE UI FOUNDATION'
+[ControlType.Button] enabled=True focusable=True  name='Inspect layout'
 ~~~
 
-`AutomationId` is the decisive value. Windows' default window provider leaves it
-empty, so reading `anodrel.surface` proves the host's own provider was accepted,
-`QueryInterface` succeeded, and `GetPropertyValue` was called and its `BSTR`
-read back correctly.
+That exercises navigation, property lookup, runtime identifiers, bounding
+rectangles, and reference counting against real Windows.
 
-That is evidence the COM plumbing is sound. It is **not** evidence that the
-surface is usable, because there are still no children to read.
+**It is evidence the plumbing is sound, not that the surface is usable.** What a
+client library reads and what a screen reader announces are different questions,
+and only the second matters to a person. That is why the manual check below is
+the gate.
+
+This check also earned its keep: it caught text elements reporting
+`IsEnabled=False`, which a screen reader announces as unavailable. No unit test
+had flagged it, because the mapping faithfully passed through a flag that means
+something different on each side of the boundary.
 
 ### Manual screen-reader verification
 
@@ -208,8 +234,7 @@ passed.** No automated result substitutes for it: the question is whether a
 screen reader announces something a person can act on, and only listening
 answers that.
 
-Running it today will show the window announced and nothing inside it, because
-slice 2 is not built. Run it in full once children are published:
+Both provider slices are in place, so this can be run now:
 
 1. Open a native UI surface, for example
    `cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab`.

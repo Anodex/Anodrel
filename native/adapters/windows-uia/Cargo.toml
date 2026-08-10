@@ -6,3 +6,7 @@ license.workspace = true
 
 [dependencies]
 anodrel-windows-accessibility = { path = "../windows-accessibility" }
+
+[dev-dependencies]
+anodrel-ui = { path = "../../crates/ui" }
+anodrel-ui-document = { path = "../../crates/ui-document" }

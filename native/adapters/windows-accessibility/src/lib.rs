@@ -121,7 +121,7 @@ pub fn accessible_element(
         // what "this element is not named" means there.
         name: node.name().unwrap_or_default().to_owned(),
         control_type: control_type_for(node.role()),
-        enabled: node.enabled(),
+        enabled: is_enabled(node),
         keyboard_focusable: keyboard_focusable(node.role()),
         bounds: screen_rect(node.bounds(), origin),
         runtime_id: [UIA_APPEND_RUNTIME_ID, runtime_index(index)],
@@ -135,6 +135,21 @@ pub const fn control_type_for(role: UiAccessibilityRole) -> i32 {
         UiAccessibilityRole::Group => control_type::GROUP,
         UiAccessibilityRole::StaticText => control_type::TEXT,
         UiAccessibilityRole::Button => control_type::BUTTON,
+    }
+}
+
+/// Returns the `IsEnabled` value for one node.
+///
+/// UI Automation reads `IsEnabled` as "can be interacted with", and a screen
+/// reader announces a disabled element as unavailable. Only an action can be
+/// unavailable; text and containers are not interactive in the first place, so
+/// reporting the snapshot's flag for them would have Narrator describe ordinary
+/// prose as dimmed and out of reach.
+#[must_use]
+pub fn is_enabled(node: &UiAccessibilityNode) -> bool {
+    match node.role() {
+        UiAccessibilityRole::Button => node.enabled(),
+        UiAccessibilityRole::Group | UiAccessibilityRole::StaticText => true,
     }
 }
 
@@ -234,6 +249,11 @@ mod tests {
         assert_eq!(heading.name(), "Anodrel");
         assert_eq!(heading.control_type(), control_type::TEXT);
         assert!(!heading.keyboard_focusable());
+        // Non-interactive is not the same as unavailable. A screen reader
+        // announces a disabled element as out of reach, so reporting text as
+        // disabled would describe ordinary prose as dimmed.
+        assert!(heading.enabled(), "text must not be announced as disabled");
+        assert!(mapped[0].enabled(), "a container is not disabled either");
 
         let go = &mapped[2];
         assert_eq!(go.name(), "Continue");
