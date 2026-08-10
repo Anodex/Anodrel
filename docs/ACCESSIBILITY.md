@@ -1,15 +1,14 @@
 # Anodrel Windows accessibility
 
-**Status:** Contract, mapping, and both provider slices are implemented, and
-**Narrator has read an Anodrel surface aloud on Windows 11** — the elements were
-announced with their names and roles. That is the first time this platform has
-been usable by a screen reader.
+**Status:** **Read-only UI Automation support is implemented and verified.**
+Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
+with its name and role, and a property-by-property cross-check against the
+mapping table below passes with no failures.
 
-The remaining gate is an **Inspect** cross-check: confirming that the raw UI
-Automation tree matches the mapping table below property by property, and that
-highlighted rectangles sit over the elements on screen. Until that passes, treat
-accessibility as verified for reading but not yet verified for correctness of
-every published value.
+Read-only is the whole of it. Assistive technology can read this surface; it
+cannot act on it. No pattern is supplied, focus cannot be moved, no automation
+event or live announcement is raised, and the published tree is flat. Anything
+beyond reading is deferred and listed at the end of this document.
 
 ## Boundary
 
@@ -176,9 +175,9 @@ whose children sit beside it rather than inside it would be announced as an
 empty thing to step through, which is worse than not publishing it. Hierarchy,
 and with it meaningful grouping, is deferred.
 
-**Slice 3 — verification. Narrator done, Inspect outstanding.** Narrator has
-announced the surface's elements with their names and roles. The Inspect
-cross-check of every published property remains. See below.
+**Slice 3 — verification. Done.** Narrator announces the surface's elements with
+their names and roles, and every published property has been cross-checked
+against the table above. See below.
 
 Also deferred, each needing its own contract and decision: automation events and
 live announcements, focus changes reported to assistive technology, action
@@ -268,7 +267,34 @@ way to separate a provider fault from a Narrator one is to walk the control view
 with `TreeWalker::ControlViewWalker` from a UI Automation client — that is the
 same view Narrator navigates, and it needs no screen reader.
 
-### What this check caught
+### Inspect cross-check
+
+Run with the Windows SDK's **Inspect** tool open on a `--ui-lab` window, every
+published element was checked against the mapping table. All eleven passed with
+no failures:
+
+- control types are only `Text` and `Button`, matching their roles;
+- every element has a non-empty name and automation ID;
+- every element reports enabled, and only buttons report keyboard-focusable;
+- every element is both a control and a content element;
+- every bounding rectangle is non-empty and lies inside the window's own
+  rectangle, and `AutomationElement.FromPoint` at each element's centre returns
+  that same element — eleven of eleven, which exercises hit testing;
+- runtime identifiers are unique across the tree;
+- `HelpText` and `AcceleratorKey` are absent, as the table promises; and
+- **no element supplies any pattern**, which is what read-only means at the
+  client boundary.
+
+The window root reports two patterns, `Window` and `Transform`. Those come from
+the host provider Windows supplies for the `HWND` itself — minimising, moving,
+and resizing a top-level window are the system's business, not this provider's.
+Anodrel's own provider supplies no pattern anywhere, root included.
+
+One incidental confirmation: the window under test sat on a monitor left of the
+primary one, so its rectangle had negative screen coordinates throughout. The
+conversion handles that, as its unit test claims.
+
+### What these checks caught
 
 The first attempt was silent, and the cause was real: provider creation was
 gated on `UiaClientsAreListening`, so a window opened *before* Narrator started

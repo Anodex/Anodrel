@@ -203,10 +203,10 @@ contract.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance
 adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the one-directional Windows accessibility
-boundary. Its mapping and a read-only UI Automation provider publish the window
-and its semantic elements, and Narrator reads an Anodrel surface aloud on
-Windows 11. An Inspect cross-check of every published property remains before
-accessibility is called fully verified.
+boundary. **Read-only UI Automation support is implemented and verified:**
+Narrator reads an Anodrel surface aloud on Windows 11 and an Inspect
+cross-check of every published property passes. Assistive technology can read a
+surface but cannot act on it — no pattern is supplied and focus cannot be moved.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows
