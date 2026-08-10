@@ -277,6 +277,7 @@ dependencies = [
  "anodrel-windows-pipe",
  "anodrel-windows-product-session",
  "anodrel-windows-storage",
+ "anodrel-windows-uia",
  "anodrel-wire",
 ]
 
@@ -383,6 +384,13 @@ dependencies = [
  "anodrel-application",
  "anodrel-paths",
  "anodrel-storage",
+]
+
+[[package]]
+name = "anodrel-windows-uia"
+version = "0.1.0"
+dependencies = [
+ "anodrel-windows-accessibility",
 ]
 
 [[package]]

@@ -96,9 +96,13 @@ Status: **Direct Windows host in progress**
   UI Automation and turns the owned semantic snapshot into control types,
   property values, runtime IDs, and screen rectangles, one direction only — an
   application cannot read the tree, learn about focus, or detect that assistive
-  technology is present. The UI Automation **provider** is not implemented, so
-  **a screen reader cannot read an Anodrel surface yet**. See
-  `docs/ACCESSIBILITY.md`.
+  technology is present. The provider is staged: slice 1 answers `WM_GETOBJECT`
+  with a read-only `IRawElementProviderSimple` for the window, confirmed against
+  a real UI Automation client. Slice 2 — semantic children through
+  `IRawElementProviderFragment` — is not built, so **a screen reader announces
+  the window and finds nothing inside it**. Accessibility support is not
+  complete until the Narrator and Inspect checks in `docs/ACCESSIBILITY.md` have
+  been run by a person and passed.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

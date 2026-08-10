@@ -1,8 +1,14 @@
 # Anodrel Windows accessibility
 
-**Status:** Contract and the portable-to-Windows mapping are defined. The UI
-Automation provider that publishes that mapping to Windows is not implemented
-yet, so no assistive technology can read an Anodrel surface today.
+**Status:** Contract, mapping, and the **first** provider slice are implemented.
+An Anodrel window now answers UI Automation as a server-side provider, and a
+real UI Automation client reads its name, control type, and automation ID from
+that provider.
+
+Semantic children are **not** published yet, so a screen reader announces the
+window and finds nothing inside it. Accessibility support is **not complete**,
+and must not be described as complete until the Narrator and Inspect checks
+below have actually been run by a person.
 
 ## Boundary
 
@@ -125,16 +131,35 @@ The mapping cannot fail. Every snapshot node produces a complete set of values,
 and a node with no name produces an empty name rather than an error. There is no
 category to report, and therefore nothing an application could learn from one.
 
-## Not implemented yet
+## The provider, in slices
 
-The UI Automation **provider** is the remaining work: COM interfaces
-(`IRawElementProviderSimple`, `IRawElementProviderFragment`,
-`IRawElementProviderFragmentRoot`), `WM_GETOBJECT` handling through
-`UiaReturnRawElementProvider`, and tree navigation over the mapped nodes.
+The provider is built in stages so each one can be proved before the next
+begins.
 
-Until that exists, an Anodrel window exposes only the default accessibility
-Windows gives any top-level window: a title and a client area, with no semantic
-children. **A screen reader cannot read an Anodrel UI surface today.**
+**Slice 1 — the window as an automation root. Implemented.**
+`anodrel-windows-uia` answers `WM_GETOBJECT` for `UiaRootObjectId` with a
+reference-counted `IRawElementProviderSimple`. It reports the window's name,
+`Window` control type, a fixed host-owned automation ID, and its enabled and
+element flags, and defers everything else to the host provider Windows supplies.
+
+It is **read-only**: `GetPatternProvider` returns nothing for every pattern, so
+no element can be invoked, toggled, scrolled, or edited through it. Each COM
+method contains panics and converts one into a failure code, because these are
+`extern "system"` and an escaping panic would abort the host.
+
+The provider is built only when `UiaClientsAreListening` reports a client. That
+answer never leaves the crate: exposing it would tell an application that
+somebody is using assistive technology.
+
+**Slice 2 — semantic children. Not implemented.**
+`IRawElementProviderFragment` and `IRawElementProviderFragmentRoot`, tree
+navigation over the mapped nodes, `GetRuntimeId` with its safe array, and
+`get_BoundingRectangle`.
+
+Until that exists a screen reader announces the window and finds **nothing
+inside it**, because the mapped elements are not yet reachable from the root.
+
+**Slice 3 — verification.** Narrator and Inspect, by a person. See below.
 
 Also deferred, each needing its own contract and decision: automation events and
 live announcements, focus changes reported to assistive technology, action
@@ -150,10 +175,41 @@ uniqueness within a snapshot.
 
 The mapping is pure, so those tests need no window and no assistive technology.
 
+Provider tests cover the COM object without Windows: the interfaces it answers
+and the one it refuses, a refused query clearing its output, every method
+rejecting a null output rather than writing through it, reference counting
+freeing the object exactly once, a panicking body returning a failure code
+instead of unwinding, and the read-only promise that no pattern is supplied.
+
+### Confirmed against real UI Automation
+
+Slice 1 has been queried by a real UI Automation client — `UIAutomationClient`
+driving `AutomationElement.FindFirst` against a running `--ui-lab` window:
+
+~~~text
+Name         = Anodrel UI Lab
+ControlType  = ControlType.Window
+AutomationId = anodrel.surface
+IsEnabled    = True
+~~~
+
+`AutomationId` is the decisive value. Windows' default window provider leaves it
+empty, so reading `anodrel.surface` proves the host's own provider was accepted,
+`QueryInterface` succeeded, and `GetPropertyValue` was called and its `BSTR`
+read back correctly.
+
+That is evidence the COM plumbing is sound. It is **not** evidence that the
+surface is usable, because there are still no children to read.
+
 ### Manual screen-reader verification
 
-This path cannot be exercised until the provider exists. When it does, the check
-is:
+**Accessibility support is not complete until this has been run by a person and
+passed.** No automated result substitutes for it: the question is whether a
+screen reader announces something a person can act on, and only listening
+answers that.
+
+Running it today will show the window announced and nothing inside it, because
+slice 2 is not built. Run it in full once children are published:
 
 1. Open a native UI surface, for example
    `cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab`.

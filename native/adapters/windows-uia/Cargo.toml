@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-windows-uia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-windows-accessibility = { path = "../windows-accessibility" }

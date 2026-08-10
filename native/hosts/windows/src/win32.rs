@@ -65,6 +65,7 @@ const WM_SETTINGCHANGE: Uint = 0x001A;
 const WM_GETMINMAXINFO: Uint = 0x0024;
 const WM_SETICON: Uint = 0x0080;
 const WM_SETCURSOR: Uint = 0x0020;
+const WM_GETOBJECT: Uint = 0x003D;
 const WM_KEYDOWN: Uint = 0x0100;
 const WM_MOUSEWHEEL: Uint = 0x020A;
 const WM_MOUSEMOVE: Uint = 0x0200;
@@ -1289,6 +1290,18 @@ unsafe extern "system" fn window_proc(
 }
 
 unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult {
+    // Answered before the match below so an unrelated object request still
+    // reaches the default procedure. The provider is read-only: it publishes
+    // semantics outward and accepts nothing from Windows or an application.
+    if message == WM_GETOBJECT {
+        // SAFETY: this window belongs to the current thread's message queue,
+        // which is the only thread that dispatches to this procedure.
+        if let Some(result) =
+            unsafe { anodrel_windows_uia::answer_get_object(window, wparam, lparam) }
+        {
+            return result;
+        }
+    }
     match message {
         message
             if ACTIVATION_MESSAGE
