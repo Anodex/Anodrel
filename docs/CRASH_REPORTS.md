@@ -61,7 +61,13 @@ Exactly these fields, and no others:
 | `site` | Where containment happened, from the closed catalogue below. | The reporting call site. |
 | `surface` | What kind of window was being served, from a closed catalogue. | The host's own view registry. |
 | `hostVersion` | The host crate's compile-time version. | Constant. |
-| `sequence` | Process-local order, starting at 1. | The reporter. |
+| `sequence` | Order within the store, starting at 1. | The store, at write time. |
+
+The sequence belongs to the store rather than to the record. Containment ends
+the message loop, so a process writes at most one record, and a process-local
+counter that is always 1 would order nothing and would collide with every
+earlier run's file name. The store reads the sequences already present and takes
+the next one.
 
 The closed site catalogue:
 
@@ -90,12 +96,11 @@ A record also carries no absolute path, native status code, thread or process
 identifier, user or machine name, wall-clock time, application content, package
 manifest text, capability context, invitation, or credential.
 
-The absence of a clock is deliberate and costs something real: two records
-cannot be ordered against anything outside the process that wrote them. The
-`sequence` field orders records within one process, and the file name orders
-them within the directory. A wall-clock reading would be more useful and would
-also be the first field in this format that describes the person rather than the
-defect, so v1 does without and says so.
+The absence of a clock is deliberate and costs something real: records can be
+ordered against each other and against nothing else. The `sequence` field, which
+is also the file name, is the whole of the ordering. A wall-clock reading would
+be more useful and would also be the first field in this format that describes
+the person rather than the defect, so v1 does without and says so.
 
 ## Location, format, and retention
 

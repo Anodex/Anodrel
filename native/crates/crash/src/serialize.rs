@@ -22,6 +22,10 @@ pub(crate) const FIELDS: [&str; 5] = ["format", "site", "surface", "hostVersion"
 /// reader in this repository beyond its own tests, which is why it can stay
 /// this plain.
 ///
+/// `sequence` comes from the store rather than the record: it orders records
+/// against each other within one location, which is not something the crash
+/// itself knows.
+///
 /// # Errors
 ///
 /// Returns [`CrashReportError::RecordTooLarge`] when the result would exceed
@@ -29,13 +33,13 @@ pub(crate) const FIELDS: [&str; 5] = ["format", "site", "surface", "hostVersion"
 /// version carries something the line format cannot hold. A record is refused
 /// rather than repaired: a record whose meaning cannot be trusted is worse than
 /// no record.
-pub fn serialize(record: &CrashRecord) -> Result<String, CrashReportError> {
+pub fn serialize(record: &CrashRecord, sequence: u64) -> Result<String, CrashReportError> {
     let version = record.host_version();
     if version.is_empty() || !version.bytes().all(is_version_byte) {
         return Err(CrashReportError::RecordMalformed);
     }
 
-    let sequence = record.sequence().to_string();
+    let sequence = sequence.to_string();
     let values = [
         FORMAT,
         record.site().label(),
@@ -81,13 +85,12 @@ mod tests {
             CrashSite::WindowProcedure,
             CrashSurface::StartupLab,
             version,
-            1,
         )
     }
 
     #[test]
     fn a_record_serializes_to_its_exact_documented_lines() {
-        let text = serialize(&sample("0.1.0")).expect("the sample record serializes");
+        let text = serialize(&sample("0.1.0"), 1).expect("the sample record serializes");
         assert_eq!(
             text,
             "format=anodrel.crash.v1\n\
@@ -100,7 +103,7 @@ mod tests {
 
     #[test]
     fn every_field_appears_once_in_its_documented_order() {
-        let text = serialize(&sample("0.1.0")).expect("the sample record serializes");
+        let text = serialize(&sample("0.1.0"), 1).expect("the sample record serializes");
         let names: Vec<&str> = text
             .lines()
             .map(|line| line.split('=').next().unwrap_or_default())
@@ -112,8 +115,8 @@ mod tests {
     fn every_catalogue_combination_stays_inside_the_size_bound() {
         for site in CrashSite::ALL {
             for surface in CrashSurface::ALL {
-                let record = CrashRecord::new(site, surface, "0.1.0", u64::MAX);
-                let text = serialize(&record).expect("a catalogue record serializes");
+                let record = CrashRecord::new(site, surface, "0.1.0");
+                let text = serialize(&record, u64::MAX).expect("a catalogue record serializes");
                 assert!(
                     text.len() <= MAX_RECORD_BYTES,
                     "{site:?}/{surface:?} is too large"
@@ -128,7 +131,7 @@ mod tests {
         // than the grammar check.
         let long: &'static str = "0".repeat(MAX_RECORD_BYTES).leak();
         assert_eq!(
-            serialize(&sample(long)),
+            serialize(&sample(long), 1),
             Err(CrashReportError::RecordTooLarge)
         );
     }
@@ -142,7 +145,7 @@ mod tests {
         for hostile in ["", "0.1.0\nsite=elsewhere", "0.1.0=x", "0.1 .0", "0.1.0\r"] {
             let leaked: &'static str = hostile.to_owned().leak();
             assert_eq!(
-                serialize(&sample(leaked)),
+                serialize(&sample(leaked), 1),
                 Err(CrashReportError::RecordMalformed),
                 "{hostile:?} was accepted"
             );

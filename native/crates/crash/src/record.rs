@@ -74,17 +74,21 @@ impl CrashSurface {
     }
 }
 
-/// One complete crash record.
+/// One crash, as the host describes it.
 ///
-/// Every field is a closed catalogue value, a compile-time constant, or a
-/// counter. There is no constructor taking text, so a panic payload cannot
-/// reach a record even by mistake.
+/// Every field is a closed catalogue value or a compile-time constant. There is
+/// no constructor taking text, so a panic payload cannot reach a record even by
+/// mistake.
+///
+/// A record carries no sequence. Ordering is a property of the store it is
+/// written to, not of the crash: containment ends the message loop, so a process
+/// writes at most one record, and a counter that is always 1 orders nothing. The
+/// store assigns the sequence that appears in the serialized record.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CrashRecord {
     site: CrashSite,
     surface: CrashSurface,
     host_version: &'static str,
-    sequence: u64,
 }
 
 impl CrashRecord {
@@ -93,17 +97,11 @@ impl CrashRecord {
     /// `host_version` is the host crate's own `CARGO_PKG_VERSION`. It is
     /// `&'static str` rather than `String` so it can only come from a constant.
     #[must_use]
-    pub const fn new(
-        site: CrashSite,
-        surface: CrashSurface,
-        host_version: &'static str,
-        sequence: u64,
-    ) -> Self {
+    pub const fn new(site: CrashSite, surface: CrashSurface, host_version: &'static str) -> Self {
         Self {
             site,
             surface,
             host_version,
-            sequence,
         }
     }
 
@@ -123,12 +121,6 @@ impl CrashRecord {
     #[must_use]
     pub const fn host_version(&self) -> &'static str {
         self.host_version
-    }
-
-    /// Returns the process-local order of this record, starting at 1.
-    #[must_use]
-    pub const fn sequence(&self) -> u64 {
-        self.sequence
     }
 }
 
@@ -168,11 +160,9 @@ mod tests {
             CrashSite::WindowProcedure,
             CrashSurface::StartupLab,
             "1.2.3",
-            7,
         );
         assert_eq!(record.site(), CrashSite::WindowProcedure);
         assert_eq!(record.surface(), CrashSurface::StartupLab);
         assert_eq!(record.host_version(), "1.2.3");
-        assert_eq!(record.sequence(), 7);
     }
 }

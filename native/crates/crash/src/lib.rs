@@ -43,22 +43,25 @@ pub enum CrashReportError {
     RecordMalformed,
 }
 
-/// Writes crash records somewhere durable.
+/// A store that keeps crash records.
 ///
 /// A host implements this over its own filesystem. The trait takes a finished
 /// [`CrashRecord`] and never the panic that produced it, so no implementation
 /// can be handed a payload to be tempted by.
+///
+/// The store assigns each record's sequence and owns its own retention. Order
+/// is a property of the store, not of the crash — see [`CrashRecord`].
 ///
 /// An implementation must not panic, block indefinitely, or report a failure to
 /// a user, an application, or the diagnostic ledger. It is called while the
 /// host is already shutting down after a contained defect, and a reporter that
 /// makes noise there turns a handled defect into an unhandled one.
 pub trait CrashReporter {
-    /// Records one crash, returning why it could not be recorded.
+    /// Records one crash, returning the sequence the store assigned it.
     ///
     /// # Errors
     ///
     /// Returns a [`CrashReportError`] category when the record could not be
     /// written. The caller is expected to ignore it outside tests.
-    fn report(&self, record: &CrashRecord) -> Result<(), CrashReportError>;
+    fn report(&self, record: &CrashRecord) -> Result<u64, CrashReportError>;
 }
