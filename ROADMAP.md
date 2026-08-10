@@ -92,6 +92,13 @@ Status: **Direct Windows host in progress**
   The direct Windows UI Lab and session view now also substitute the user's
   fixed high-contrast system colours for their host palette without changing
   the portable document model (Decision 0055).
+  Windows accessibility has its contract and its mapping: Decision 0063 targets
+  UI Automation and turns the owned semantic snapshot into control types,
+  property values, runtime IDs, and screen rectangles, one direction only — an
+  application cannot read the tree, learn about focus, or detect that assistive
+  technology is present. The UI Automation **provider** is not implemented, so
+  **a screen reader cannot read an Anodrel surface yet**. See
+  `docs/ACCESSIBILITY.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

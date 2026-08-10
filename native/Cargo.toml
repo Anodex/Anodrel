@@ -38,6 +38,7 @@ members = [
   "adapters/windows-external-links",
   "adapters/windows-file-dialog",
   "adapters/windows-file-access",
+  "adapters/windows-accessibility",
   "adapters/windows-appearance",
   "hosts/windows",
   "tools/perf-lab",

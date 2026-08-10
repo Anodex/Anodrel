@@ -187,6 +187,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-accessibility"
+version = "0.1.0"
+dependencies = [
+ "anodrel-ui",
+ "anodrel-ui-document",
+]
+
+[[package]]
 name = "anodrel-windows-appearance"
 version = "0.1.0"
 

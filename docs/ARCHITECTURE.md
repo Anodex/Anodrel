@@ -279,6 +279,14 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`,
 `docs/SCROLLING.md`, and Decisions 0025 through 0039.
 
+`anodrel-windows-accessibility` sits directly above that snapshot. It is a pure
+mapping from one visible snapshot to the values Microsoft UI Automation asks
+for: control types, property values, runtime IDs, and screen-space rectangles.
+It performs no operating-system call and cannot fail, and the boundary runs one
+way — nothing reads the tree back, reports focus, or reveals that assistive
+technology is present. The UI Automation provider that would publish it to
+Windows is not implemented. See `docs/ACCESSIBILITY.md` and Decision 0063.
+
 ## Communication model
 
 The application-to-host boundary must use a documented, versioned protocol.

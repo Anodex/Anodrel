@@ -1,0 +1,11 @@
+[package]
+name = "anodrel-windows-accessibility"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-ui = { path = "../../crates/ui" }
+
+[dev-dependencies]
+anodrel-ui-document = { path = "../../crates/ui-document" }
