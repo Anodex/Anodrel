@@ -13,6 +13,11 @@ Each record should include:
 
 Current records (newest first):
 
+- 0062: Notifications start as a one-way bounded announce over Shell32.
+
+- 0061: Verified product sessions are proved by a development-only signed
+  fixture.
+
 - 0060: Verified Windows product components share one host-owned lifetime.
 
 - 0059: Windows pipe workers use a host-only stop signal.
