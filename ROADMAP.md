@@ -99,11 +99,14 @@ Status: **Direct Windows host in progress**
   technology is present. Both provider slices are built: the window answers
   `WM_GETOBJECT` as a read-only fragment root, and its published elements answer
   `IRawElementProviderFragment` with navigation, runtime identifiers, bounding
-  rectangles, and hit testing. A real UI Automation client walks the window and
-  all of its elements. The published tree is flat and defers grouping;
-  `SetFocus` is refused because the provider performs no action. Accessibility
-  support is **not complete** until the Narrator and Inspect checks in
-  `docs/ACCESSIBILITY.md` have been run by a person and passed.
+  rectangles, and hit testing. The published tree is flat and defers grouping;
+  `SetFocus` is refused because the provider performs no action. **Narrator has
+  read an Anodrel surface aloud on Windows 11**, announcing each element with
+  its name and role — the first time this platform has been usable by a screen
+  reader. An Inspect cross-check of every published property remains before
+  accessibility is called fully verified. Automation events, live
+  announcements, focus reporting, invocation, hierarchy, and non-Windows
+  adapters stay deferred. See `docs/ACCESSIBILITY.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

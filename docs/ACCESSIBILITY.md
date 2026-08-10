@@ -1,15 +1,15 @@
 # Anodrel Windows accessibility
 
-**Status:** Contract, mapping, and both provider slices are implemented. An
-Anodrel window answers UI Automation as a server-side provider, and a real UI
-Automation client reads the window and walks its published elements — their
-names, control types, automation IDs, enabled and focusable state, and screen
-rectangles.
+**Status:** Contract, mapping, and both provider slices are implemented, and
+**Narrator has read an Anodrel surface aloud on Windows 11** — the elements were
+announced with their names and roles. That is the first time this platform has
+been usable by a screen reader.
 
-Accessibility support is **not complete**. It must not be described as complete
-until the Narrator and Inspect checks below have been run by a person and
-passed. A client library reading correct values proves the plumbing; only
-listening proves the result is usable.
+The remaining gate is an **Inspect** cross-check: confirming that the raw UI
+Automation tree matches the mapping table below property by property, and that
+highlighted rectangles sit over the elements on screen. Until that passes, treat
+accessibility as verified for reading but not yet verified for correctness of
+every published value.
 
 ## Boundary
 
@@ -176,8 +176,9 @@ whose children sit beside it rather than inside it would be announced as an
 empty thing to step through, which is worse than not publishing it. Hierarchy,
 and with it meaningful grouping, is deferred.
 
-**Slice 3 — verification. Not done.** Narrator and Inspect, by a person. Until
-that passes, accessibility support is not complete. See below.
+**Slice 3 — verification. Narrator done, Inspect outstanding.** Narrator has
+announced the surface's elements with their names and roles. The Inspect
+cross-check of every published property remains. See below.
 
 Also deferred, each needing its own contract and decision: automation events and
 live announcements, focus changes reported to assistive technology, action
@@ -232,12 +233,13 @@ something different on each side of the boundary.
 
 ### Manual screen-reader verification
 
-**Accessibility support is not complete until this has been run by a person and
-passed.** No automated result substitutes for it: the question is whether a
-screen reader announces something a person can act on, and only listening
-answers that.
+**No automated result substitutes for this.** The question is whether a screen
+reader announces something a person can act on, and only listening answers it.
 
-Both provider slices are in place, so this can be run now:
+This has been run and **passed** on Windows 11: Narrator announced each element
+with its name and role. It also earned its keep — see the note after step 7.
+
+To repeat it:
 
 1. Open a native UI surface, for example
    `cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab`.
@@ -265,6 +267,19 @@ that the Anodrel window has focus, and only then suspect the provider. A quick
 way to separate a provider fault from a Narrator one is to walk the control view
 with `TreeWalker::ControlViewWalker` from a UI Automation client — that is the
 same view Narrator navigates, and it needs no screen reader.
+
+### What this check caught
+
+The first attempt was silent, and the cause was real: provider creation was
+gated on `UiaClientsAreListening`, so a window opened *before* Narrator started
+answered its early requests with nothing. Every automated check had passed,
+because they all attached a client to an already-live UI Automation session —
+never the order a person actually works in.
+
+Read alongside the `IsEnabled` defect that the UI Automation client query found,
+the pattern is worth keeping: each layer of verification caught a fault the one
+below it could not see. Unit tests proved the mapping, a client proved the COM
+plumbing, and only a screen reader proved the sequence.
 
 Report a mismatch between what Inspect shows and what this document promises as
 a defect in the adapter, not in the document: the table above is the contract.
