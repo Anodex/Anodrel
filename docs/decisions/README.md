@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0064: Retained raster effects may trade a bounded, tested error for frame
+  cost.
 - 0063: Windows accessibility maps the owned snapshot, one direction only.
 
 - 0062: Notifications start as a one-way bounded announce over Shell32.

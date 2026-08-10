@@ -410,11 +410,21 @@ impl Mask {
     /// Returns a copy positioned at a new origin in canvas space.
     #[must_use]
     pub fn positioned(&self, origin_x: i32, origin_y: i32) -> Self {
-        Self {
-            origin_x,
-            origin_y,
-            ..self.clone()
-        }
+        let mut moved = self.clone();
+        moved.reposition(origin_x, origin_y);
+        moved
+    }
+
+    /// Moves this mask to a new origin in canvas space.
+    ///
+    /// A mask's coverage does not depend on where it is placed, so a retained
+    /// mask can be composited at a new position without being rebuilt or
+    /// copied. That matters for a blurred mask: its coverage buffer is one
+    /// `f32` per pixel, so a mark-sized glow is around half a megabyte that
+    /// [`positioned`](Self::positioned) would duplicate on every frame.
+    pub const fn reposition(&mut self, origin_x: i32, origin_y: i32) {
+        self.origin_x = origin_x;
+        self.origin_y = origin_y;
     }
 
     /// Builds a mask sized to a path's bounds plus `padding`, and rasterizes it.
@@ -462,6 +472,16 @@ impl Mask {
         });
     }
 
+    /// Returns the box radius [`blur`](Self::blur) uses for a blur radius.
+    ///
+    /// The blur quantizes the radius it is given, so two radii that round to
+    /// the same box radius produce identical output. A caller retaining a
+    /// blurred mask can key on this rather than on the radius it asked for.
+    #[must_use]
+    pub fn blur_box_radius(radius: f32) -> usize {
+        ((radius / 3.0).round() as usize).max(1)
+    }
+
     /// Blurs the coverage with three box passes, approximating a Gaussian.
     ///
     /// Three passes are the standard trade: the error against a true Gaussian
@@ -471,7 +491,7 @@ impl Mask {
         if radius <= 0.0 || self.width == 0 || self.height == 0 {
             return;
         }
-        let box_radius = ((radius / 3.0).round() as usize).max(1);
+        let box_radius = Self::blur_box_radius(radius);
         let mut scratch = vec![0.0; self.coverage.len()];
         for _ in 0..3 {
             blur_horizontal(
@@ -683,6 +703,43 @@ mod tests {
     use crate::geometry::{Rect, point};
     use crate::paint::Paint;
     use crate::path::Path;
+
+    #[test]
+    fn repositioning_a_mask_moves_its_coverage_without_rebuilding_it() {
+        let mut mask = Mask::new(0, 0, 4, 4);
+        mask.fill_path(&Path::rect(Rect::new(1.0, 1.0, 3.0, 3.0)));
+        let moved = mask.positioned(20, 30);
+        mask.reposition(20, 30);
+
+        let mut from_copy = Canvas::new(40, 40);
+        let mut from_move = Canvas::new(40, 40);
+        from_copy.fill_mask(&moved, &Paint::solid(Color::WHITE));
+        from_move.fill_mask(&mask, &Paint::solid(Color::WHITE));
+        assert_eq!(from_copy.pixels(), from_move.pixels());
+        assert_eq!(from_move.pixel(21, 31), Color::WHITE);
+        assert_eq!(from_move.pixel(1, 1), Color::TRANSPARENT);
+    }
+
+    #[test]
+    fn a_reported_box_radius_is_the_one_the_blur_applies() {
+        // Radii that round together must blur identically, or a caller keying a
+        // retained mask on the reported radius would reuse the wrong blur.
+        let build = |radius: f32| {
+            let mut mask = Mask::new(0, 0, 24, 24);
+            mask.fill_path(&Path::rect(Rect::new(8.0, 8.0, 16.0, 16.0)));
+            mask.blur(radius);
+            mask
+        };
+        assert_eq!(Mask::blur_box_radius(5.9), Mask::blur_box_radius(6.1));
+        let (near, far) = (build(5.9), build(6.1));
+        for y in 0..24 {
+            for x in 0..24 {
+                assert_eq!(near.coverage_at(x, y), far.coverage_at(x, y));
+            }
+        }
+        assert_ne!(Mask::blur_box_radius(6.1), Mask::blur_box_radius(9.1));
+        assert_eq!(Mask::blur_box_radius(0.1), 1, "a blur never vanishes");
+    }
 
     #[test]
     fn a_pixel_aligned_rectangle_fills_exactly_its_pixels() {

@@ -424,26 +424,49 @@ fn draw_geometry(canvas: &mut Canvas, bounds: Rect, style: MarkStyle) {
     }
 }
 
-/// Blurs the raster's alpha channel into a glow behind `bounds`.
-fn draw_raster_glow(
-    canvas: &mut Canvas,
-    image: &Image,
-    bounds: Rect,
-    radius: f32,
-    style: MarkStyle,
-    glow: &Paint,
-) {
-    let padding = (radius * 1.5).ceil().max(1.0);
-    let origin_x = (bounds.left - padding).floor() as i32;
-    let origin_y = (bounds.top - padding).floor() as i32;
-    let width = (bounds.width() + padding * 2.0).ceil().max(1.0) as u32;
-    let height = (bounds.height() + padding * 2.0).ceil().max(1.0) as u32;
+/// Everything about a glow mask except where it is placed on the canvas.
+///
+/// Two requests with equal shapes produce identical coverage, so this is the
+/// cache key. `blur_radius` is the box radius the blur actually uses rather
+/// than the requested radius: the blur quantizes to it, so two radii that round
+/// together really do produce the same blur.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct GlowShape {
+    source_edge: u32,
+    mark_width: u32,
+    mark_height: u32,
+    padding: u32,
+    blur_radius: usize,
+}
+
+thread_local! {
+    /// Blurred glow masks, keyed by the shape that produced them.
+    static GLOWS: RefCell<Vec<(GlowShape, Mask)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Glow masks retained at once.
+///
+/// Each is one `f32` per pixel — a hero mark's glow is around half a megabyte —
+/// so this stays small. A surface draws the mark at one or two sizes, and the
+/// reveal animation asks for the same shape every frame.
+const GLOW_CACHE_LIMIT: usize = 3;
+
+/// Builds the blurred coverage for one glow shape, in mask-local coordinates.
+///
+/// The mark sits at `(padding, padding)` and the mask extends `padding` beyond
+/// it on every side, which is the room the blur needs to fall off in.
+fn glow_coverage(image: &Image, shape: GlowShape, radius: f32) -> Option<Mask> {
+    let padding = shape.padding as f32;
+    let mark_width = shape.mark_width as f32;
+    let mark_height = shape.mark_height as f32;
+    let width = shape.mark_width + shape.padding * 2;
+    let height = shape.mark_height + shape.padding * 2;
 
     let mut coverage = Vec::with_capacity((width as usize) * (height as usize));
     for y in 0..height {
-        let v = ((origin_y + y as i32) as f32 + 0.5 - bounds.top) / bounds.height();
+        let v = (y as f32 + 0.5 - padding) / mark_height;
         for x in 0..width {
-            let u = ((origin_x + x as i32) as f32 + 0.5 - bounds.left) / bounds.width();
+            let u = (x as f32 + 0.5 - padding) / mark_width;
             let inside = (0.0..1.0).contains(&u) && (0.0..1.0).contains(&v);
             coverage.push(if inside {
                 f32::from(image.sample_bilinear(u, v).alpha) / 255.0
@@ -453,21 +476,196 @@ fn draw_raster_glow(
         }
     }
 
-    let Some(mut mask) = Mask::from_coverage(origin_x, origin_y, width, height, coverage) else {
-        return;
-    };
+    let mut mask = Mask::from_coverage(0, 0, width, height, coverage)?;
     mask.blur(radius);
-    for _ in 0..style.glow_passes {
-        canvas.fill_mask(&mask, glow);
-    }
+    Some(mask)
+}
+
+/// Blurs the raster's alpha channel into a glow behind `bounds`.
+///
+/// The mask is retained across frames. A reveal moves and resizes the mark by
+/// well under a pixel per frame while the blur spreads its alpha over tens of
+/// pixels, so rebuilding the mask for that difference costs about 2 ms a frame
+/// and changes almost nothing: the mark is placed on whole pixels here and the
+/// retained mask is reused, which `a_retained_glow_matches_one_built_in_place`
+/// holds to a bounded difference. See `docs/RENDERER.md`.
+fn draw_raster_glow(
+    canvas: &mut Canvas,
+    image: &Image,
+    bounds: Rect,
+    radius: f32,
+    style: MarkStyle,
+    glow: &Paint,
+) {
+    let padding = (radius * 1.5).ceil().max(1.0);
+    let shape = GlowShape {
+        source_edge: image.width(),
+        mark_width: bounds.width().round().max(1.0) as u32,
+        mark_height: bounds.height().round().max(1.0) as u32,
+        padding: padding as u32,
+        blur_radius: Mask::blur_box_radius(radius),
+    };
+    let origin_x = bounds.left.round() as i32 - shape.padding as i32;
+    let origin_y = bounds.top.round() as i32 - shape.padding as i32;
+
+    GLOWS.with(|cache| {
+        let mut entries = cache.borrow_mut();
+        if !entries.iter().any(|(held, _)| *held == shape) {
+            let Some(mask) = glow_coverage(image, shape, radius) else {
+                return;
+            };
+            // A surface settles on a couple of shapes; past that, start over
+            // rather than retain buffers this size that nothing is asking for.
+            if entries.len() >= GLOW_CACHE_LIMIT {
+                entries.clear();
+            }
+            entries.push((shape, mask));
+        }
+        let Some((_, mask)) = entries.iter_mut().find(|(held, _)| *held == shape) else {
+            return;
+        };
+        mask.reposition(origin_x, origin_y);
+        for _ in 0..style.glow_passes {
+            canvas.fill_mask(mask, glow);
+        }
+    });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{MarkStyle, Piece, draw, face_paint, pieces, silhouette};
-    use anodrel_canvas::{Canvas, Color, Rect, point};
+    use super::{
+        GLOW_CACHE_LIMIT, GLOWS, MarkStyle, Piece, draw, draw_glow_layer, face_paint, glow_paint,
+        pieces, scaled_raster, silhouette,
+    };
+    use anodrel_canvas::{Canvas, Color, Mask, Rect, point};
 
     const UNIT: Rect = Rect::new(0.0, 0.0, 1.0, 1.0);
+
+    /// Draws the glow the way it was drawn before the mask was retained:
+    /// coverage sampled at the exact sub-pixel bounds, blurred, then composited.
+    ///
+    /// This is the reference the retained mask is held against, so it stays
+    /// spelled out here rather than sharing code with the path under test.
+    fn glow_built_in_place(canvas: &mut Canvas, bounds: Rect, style: MarkStyle) {
+        let image = scaled_raster(bounds.width().max(bounds.height())).expect("the mark decodes");
+        let paint = glow_paint(bounds).scale_alpha(style.opacity);
+        let radius = bounds.width() * style.glow_ratio;
+        let padding = (radius * 1.5).ceil().max(1.0);
+        let origin_x = (bounds.left - padding).floor() as i32;
+        let origin_y = (bounds.top - padding).floor() as i32;
+        let width = (bounds.width() + padding * 2.0).ceil().max(1.0) as u32;
+        let height = (bounds.height() + padding * 2.0).ceil().max(1.0) as u32;
+
+        let mut coverage = Vec::with_capacity((width as usize) * (height as usize));
+        for y in 0..height {
+            let v = ((origin_y + y as i32) as f32 + 0.5 - bounds.top) / bounds.height();
+            for x in 0..width {
+                let u = ((origin_x + x as i32) as f32 + 0.5 - bounds.left) / bounds.width();
+                coverage.push(if (0.0..1.0).contains(&u) && (0.0..1.0).contains(&v) {
+                    f32::from(image.sample_bilinear(u, v).alpha) / 255.0
+                } else {
+                    0.0
+                });
+            }
+        }
+
+        let mut mask = Mask::from_coverage(origin_x, origin_y, width, height, coverage)
+            .expect("the coverage matches its size");
+        mask.blur(radius);
+        for _ in 0..style.glow_passes {
+            canvas.fill_mask(&mask, &paint);
+        }
+    }
+
+    /// Largest per-channel difference between two canvases of the same size.
+    fn largest_channel_difference(left: &Canvas, right: &Canvas) -> i16 {
+        let mut worst = 0;
+        for y in 0..left.height() as i32 {
+            for x in 0..left.width() as i32 {
+                let (a, b) = (left.pixel(x, y), right.pixel(x, y));
+                for (from, to) in [
+                    (a.red, b.red),
+                    (a.green, b.green),
+                    (a.blue, b.blue),
+                    (a.alpha, b.alpha),
+                ] {
+                    worst = worst.max((i16::from(from) - i16::from(to)).abs());
+                }
+            }
+        }
+        worst
+    }
+
+    /// Largest channel difference the retained glow may show against one built
+    /// at the exact sub-pixel bounds, out of 255.
+    ///
+    /// The retained mask is placed on whole pixels and sized to whole pixels,
+    /// so it can sit up to half a pixel from where an exactly built one would.
+    /// The mark's alpha is spread over a 48-pixel blur before it is composited,
+    /// which is what turns that half pixel into a handful of levels rather than
+    /// a visible shift. Measured across quarter-pixel placements the two agree
+    /// exactly on the grid and differ by at most 7 at the half-pixel worst
+    /// case, so this is that with a step to spare.
+    const GLOW_TOLERANCE: i16 = 8;
+
+    #[test]
+    fn a_retained_glow_matches_one_built_in_place() {
+        let style = MarkStyle::hero();
+        // Every quarter-pixel placement, including the half-pixel worst case.
+        for step in 0..8_u8 {
+            // Both the position and the size are taken off the pixel grid, so
+            // the retained mask is rounded on every axis it can be rounded on.
+            let offset = f32::from(step) / 4.0;
+            let (left, top, edge) = (46.0 + offset, 38.0 + offset, 220.0 + offset);
+            let bounds = Rect::new(left, top, left + edge, top + edge);
+            let mut retained = Canvas::new(320, 300);
+            let mut in_place = Canvas::new(320, 300);
+            // Composited over the opaque backdrop it is drawn over in use. On a
+            // transparent canvas the fully transparent pixels around the glow
+            // keep whatever colour was blended at zero alpha, which is
+            // invisible but not equal.
+            retained.clear(Color::rgb(11, 13, 22));
+            in_place.clear(Color::rgb(11, 13, 22));
+
+            GLOWS.with(|cache| cache.borrow_mut().clear());
+            draw_glow_layer(&mut retained, bounds, style);
+            glow_built_in_place(&mut in_place, bounds, style);
+
+            let worst = largest_channel_difference(&retained, &in_place);
+            assert!(
+                worst <= GLOW_TOLERANCE,
+                "at a {offset} pixel offset the retained glow differs by {worst} of 255"
+            );
+        }
+    }
+
+    #[test]
+    fn a_reveal_reuses_one_retained_glow() {
+        // A reveal changes the mark's size by well under a pixel per frame.
+        // Every one of those frames has to land on the same retained mask, or
+        // the retention saves nothing.
+        GLOWS.with(|cache| cache.borrow_mut().clear());
+        let mut canvas = Canvas::new(320, 300);
+        for frame in 0..40_u8 {
+            let scale = 0.999 + 0.001 * (f32::from(frame) / 39.0);
+            let edge = 220.0 * scale;
+            let bounds = Rect::new(46.0, 38.0, 46.0 + edge, 38.0 + edge);
+            draw_glow_layer(&mut canvas, bounds, MarkStyle::hero());
+        }
+        assert_eq!(GLOWS.with(|cache| cache.borrow().len()), 1);
+    }
+
+    #[test]
+    fn retained_glows_stay_bounded() {
+        GLOWS.with(|cache| cache.borrow_mut().clear());
+        let mut canvas = Canvas::new(900, 900);
+        for step in 0..12_u8 {
+            let edge = 200.0 + f32::from(step) * 40.0;
+            let bounds = Rect::new(10.0, 10.0, 10.0 + edge, 10.0 + edge);
+            draw_glow_layer(&mut canvas, bounds, MarkStyle::hero());
+            assert!(GLOWS.with(|cache| cache.borrow().len()) <= GLOW_CACHE_LIMIT);
+        }
+    }
 
     #[test]
     fn every_piece_stays_inside_the_unit_square() {

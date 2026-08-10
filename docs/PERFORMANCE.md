@@ -93,18 +93,21 @@ times the batch has already run.
 
 AMD Ryzen 9 7900X, Windows 11 Pro 10.0.26200, release build, idle machine:
 
-| Figure | Value |
-| --- | --- |
-| Mean frame | ~7.9 ms of the 16 ms interval |
-| Worst sustained frame | ~10.0 ms, at 760 ms into the reveal |
-| First frame that fills the ambient layer | ~13.6 ms, once |
+| Figure | Before retaining the glow | Now |
+| --- | --- | --- |
+| Mean frame | 7.9 ms | **6.7 ms** of the 16 ms interval |
+| Worst sustained frame | 10.0 ms | **8.0 ms**, around 760 ms into the reveal |
+| First frame that fills the ambient layer | 13.6 ms, once | unchanged |
 
-Where the time goes in a reveal frame, measured by timing each stage of
-`startup_lab::draw`: the mark accounts for about 5.4 ms and the status cards for
-about 3.0 ms, with the header, actions, footer, and the cached backdrop
-together under 1 ms. Within the mark, the glow accounts for about 4.4 ms —
-1.0 ms sampling the artwork's alpha into a coverage mask, 1.0 ms blurring it,
-and 2.3 ms compositing it twice through a gradient.
+Where the time went in a reveal frame before that change, measured by timing
+each stage of `startup_lab::draw`: the mark accounted for about 5.4 ms and the
+status cards for about 3.0 ms, with the header, actions, footer, and the cached
+backdrop together under 1 ms. Within the mark, the glow accounted for about
+4.4 ms — 1.0 ms sampling the artwork's alpha into a coverage mask, 1.0 ms
+blurring it, and 2.3 ms compositing it twice through a gradient. Retaining the
+mask removed the first two; see
+[Decision 0064](decisions/0064-retained-raster-effects-trade-bounded-fidelity.md).
+The 2.3 ms composite is now the largest single cost in a frame.
 
 ## Owned transport performance lab
 

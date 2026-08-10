@@ -366,7 +366,8 @@ size of the canvas, so a surface made of many small pieces stays cheap. Blur is
 linear in the masked area and independent of radius. Nothing is cached inside
 the canvas; a surface is expected to be composed once per paint.
 
-Caching is therefore the host's job, and three caches carry the animated surface:
+Caching is therefore the caller's job, and four caches carry the animated
+surface. Three belong to the host:
 
 - **Glyph runs**, keyed by their text and typographic settings. A reveal
   repaints the same strings many times per second while only their colour and
@@ -383,18 +384,45 @@ Caching is therefore the host's job, and three caches carry the animated surface
   translucent type must be restored before it is repainted. A host test asserts
   that this partial path is pixel-identical to a full settled compose.
 
-Measured on the Startup Lab at 1240×900, the whole surface composes in roughly
-**10 ms** in a release build. `an_animated_frame_fits_inside_the_timer_interval`
-asserts that a frame fits inside the animation timer's interval, so the budget
-is enforced rather than noticed by eye.
+The fourth belongs to the brand crate:
+
+- **The mark's blurred glow**, keyed by the source raster bucket, the mark's
+  size in whole pixels, the padding, and the box radius the blur will actually
+  apply. A retained mask is repositioned to whole pixels and composited without
+  being rebuilt or copied.
+
+That last one is the only cache here that is not exact, and the difference is
+deliberate: see [Decision 0064](decisions/0064-retained-raster-effects-trade-bounded-fidelity.md).
+A reveal moves the mark by a fraction of a pixel per frame while the blur
+spreads its alpha over tens of pixels, so rebuilding the mask for that
+difference cost about 2 ms a frame and changed at most 7 levels out of 255 at
+the half-pixel worst case — nothing at all when the mark lands on the pixel
+grid. `a_retained_glow_matches_one_built_in_place` composites both paths over
+the backdrop they are drawn on and holds them to that bound.
+
+Two canvas methods exist for this and are worth knowing about before writing
+another retained effect:
+
+| Method | Use |
+| --- | --- |
+| `Mask::blur_box_radius(radius)` | The radius `blur` will actually apply. Key a retained mask on this, not on the radius asked for. |
+| `Mask::reposition(x, y)` | Moves a mask in place. A mark-sized glow is around half a megabyte of coverage that `positioned` would copy. |
+
+Measured on the Startup Lab at 1240×900 in a release build, a reveal frame
+composes in roughly **6.7 ms** and its most expensive sustained frame in
+roughly **8.0 ms**, against the animation timer's 16 ms interval. The
+`frame_budget` guards assert both, so the budget is enforced rather than
+noticed by eye; `docs/PERFORMANCE.md` records how they are measured and why
+their statistic is a minimum rather than a single run.
 
 An unoptimised build is about ten times slower and cannot hold the frame rate.
 This is why `start.bat` builds in release; it is a requirement, not a
 preference.
 
 The largest remaining cost is sampling a gradient per pixel under a large
-blurred mask. A quantised colour ramp would remove the per-sample stop search;
-it has not been needed yet.
+blurred mask: compositing the mark's glow twice through its gradient is about
+2.3 ms of a reveal frame, now that building the mask no longer is. A quantised
+colour ramp would remove the per-sample stop search; it has not been needed yet.
 
 ## Testing
 
