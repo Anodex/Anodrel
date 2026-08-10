@@ -129,6 +129,12 @@ directory that cannot be created, a disk that is full, a file that cannot be
 opened — resolves to a bounded category carrying no path and no native status,
 and the shutdown proceeds either way.
 
+The categories are `LocationUnavailable`, `WriteFailed`, `RecordTooLarge`, and
+`RecordMalformed`. The last covers a field the line format cannot carry — only
+the host version can reach it, since every other field is a catalogue value or a
+counter, and it exists so a version that stopped being a compile-time constant
+could not forge a second field with a newline.
+
 The reporter performs no retry, no fallback location, and no user-visible
 message. Nothing about a failed report reaches an application, the ledger, or a
 rendered surface.

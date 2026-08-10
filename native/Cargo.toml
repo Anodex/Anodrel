@@ -9,6 +9,7 @@ members = [
   "crates/ui-session",
   "crates/brand",
   "crates/diagnostics",
+  "crates/crash",
   "crates/wire",
   "crates/transport",
   "crates/bootstrap",
