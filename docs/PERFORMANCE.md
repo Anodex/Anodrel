@@ -13,7 +13,7 @@ Anodrel application is automatically faster.
 | --- | --- | --- |
 | Runtime ownership | No third-party shipped native runtime dependency. | Native dependency tree contains only Anodrel crates. |
 | Native work | Keep raw OS calls isolated behind small adapters. | Win32 calls live only under `native/hosts/windows/src/win32/`; the renderer and brand crates reach no OS API at all. |
-| Rendering | A frame must compose inside the animation timer's interval, or motion drops frames. | Measured and asserted by `an_animated_frame_fits_inside_the_timer_interval` in a release build; roughly 10 ms for the 1240×900 Startup Lab. |
+| Rendering | A frame must compose inside the animation timer's interval, or motion drops frames. | Measured and asserted by the `frame_budget` guards in a release build; see [Frame-cost guard](#frame-cost-guard). |
 | Message memory | Bound bytes before parsing and bound a single receive burst. | 64 KiB payload; four framed messages per receive. |
 | Startup | Do no application I/O, network work, or deferred-service initialization before the first window is responsive. | Current host performs only its internal health check. |
 | UI responsiveness | Never block the Windows message loop on stream I/O or expensive work. | Required by the transport contract; adapter work is not implemented yet. |
@@ -46,6 +46,65 @@ The wire and session unit tests verify framing, limits, fragmentation,
 coalescing, authentication, and capability policy without timing-sensitive
 assertions. The Windows adapter integration test exercises a real local named
 pipe from connection through authenticated health response.
+
+## Frame-cost guard
+
+The Startup Lab's reveal is driven by a 16 ms timer, so a frame that takes
+longer than 16 ms to compose drops the one after it. Two release-only tests in
+`native/hosts/windows/src/win32.rs` hold that line for the 1240×900 surface:
+
+| Test | Asserts |
+| --- | --- |
+| `an_animated_frame_fits_inside_the_timer_interval` | The mean frame in the measured window fits the interval. |
+| `no_single_frame_of_the_reveal_overruns_the_interval` | No individual frame in that window overruns it. |
+
+Both report their measurement on success as well as on failure, so the number
+can be read from a passing run with `-- --nocapture` and watched for drift.
+
+### Why the statistic is a minimum, not a mean of one run
+
+These are wall-clock measurements, so a single timed batch reports what the
+machine did during that batch rather than what the renderer costs. The
+difference is not small: **the same commit measured 8.5 ms per frame on an idle
+desktop and 16–18 ms on a busy one**, which is how this guard came to fail
+without anything in the renderer having changed. Checking the commit before the
+session's work reproduced the same 16–18 ms, confirming it as an environment
+effect rather than a regression.
+
+Each guard therefore composes five batches and keeps the **cheapest**
+observation of every frame. Contention can only make a batch slower, so the
+cheapest observation is the closest one to the renderer's own cost, and a rise
+in it is a real rise in that cost. On the reference machine below that turns a
+run-to-run spread of several milliseconds into about 1%, and a 24-way CPU load
+raises the reported figures by roughly 10% instead of doubling them.
+
+Frames are kept apart rather than averaged into a single number because the
+animation is not uniform: composing the mark's reveal costs several times what a
+settled frame costs, and a mean hides which frame is nearest the interval.
+
+Taking the cheapest observation also excludes one-time cache fills — the first
+frame that builds the retained ambient layer costs about 13.6 ms and every later
+frame at the same animation position costs about 0.9 ms. That is deliberate:
+these guards measure sustained frame cost. The one-off fill is real, and is
+recorded here rather than asserted, because asserting it would measure how many
+times the batch has already run.
+
+### Reference measurements
+
+AMD Ryzen 9 7900X, Windows 11 Pro 10.0.26200, release build, idle machine:
+
+| Figure | Value |
+| --- | --- |
+| Mean frame | ~7.9 ms of the 16 ms interval |
+| Worst sustained frame | ~10.0 ms, at 760 ms into the reveal |
+| First frame that fills the ambient layer | ~13.6 ms, once |
+
+Where the time goes in a reveal frame, measured by timing each stage of
+`startup_lab::draw`: the mark accounts for about 5.4 ms and the status cards for
+about 3.0 ms, with the header, actions, footer, and the cached backdrop
+together under 1 ms. Within the mark, the glow accounts for about 4.4 ms —
+1.0 ms sampling the artwork's alpha into a coverage mask, 1.0 ms blurring it,
+and 2.3 ms compositing it twice through a gradient.
 
 ## Owned transport performance lab
 
