@@ -184,8 +184,17 @@ Status: **Direct Windows host in progress**
   product-session owner (Decision 0060). The first crash boundary is panic
   containment at the Win32 callback: an escaping panic would abort the process
   and run no destructor, stranding a tracked child, so a contained panic ends
-  the message loop and lets the ordinary drop paths clean up. Crash *reporting*
-  — any persisted or transmitted record of a failure — and public/application
+  the message loop and lets the ordinary drop paths clean up. **Completed for
+  the first persisted crash record:** Decision 0065 adds a host-only bounded
+  record of a contained panic, written to the host's own `Anodrel\Host\logs`
+  location rather than any application's. It carries a closed site and surface
+  catalogue, the host version, and a store-assigned sequence — no panic payload,
+  path, native status, identifier, or clock. No protocol operation reads,
+  writes, or observes one, and a core test asserts that. Eight records are
+  retained, reporting failures are silent, and the scope is a contained Rust
+  panic only: access violations, stack overflow, `abort`, and hangs are stated
+  as out of scope in `docs/CRASH_REPORTS.md` rather than implied to be covered.
+  Transmitted reports, a structured-exception handler, and public/application
   logging remain separate work.
 - Establish verified executable identity. **In progress:** the direct Windows
   Authenticode adapter verifies an embedded signature and returns a leaf

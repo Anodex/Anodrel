@@ -2257,6 +2257,61 @@ mod tests {
     }
 
     #[test]
+    fn no_operation_or_capability_reaches_a_host_crash_record() {
+        // Crash records are host-only by design: the diagnostic ledger is
+        // readable behind `diagnostics.read`, and a crash record is readable
+        // through nothing at all. Merging the two would put host defect
+        // information behind a grant an application can hold. This is the
+        // invariant most likely to be broken by someone adding a convenience,
+        // so it is asserted rather than left to the absence of code.
+        // See docs/CRASH_REPORTS.md and Decision 0065.
+        for operation in [
+            "crash.read",
+            "crash.records.read",
+            "crash.report",
+            "diagnostics.crash.read",
+            "host.crash.read",
+        ] {
+            let response = JsonValue::parse(
+                &host_with_notifications(RecordingNotifications::default())
+                    .handle_json(&request_v1_13(operation, "{}")),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("operation.unsupported"),
+                "{operation} was answered by this host"
+            );
+        }
+
+        for capability in [
+            Capability::DiagnosticsRead,
+            Capability::UiDocumentWrite,
+            Capability::UiEventsRead,
+            Capability::SessionClose,
+            Capability::ClipboardRead,
+            Capability::ClipboardWrite,
+            Capability::ExternalOpen,
+            Capability::DialogOpenFile,
+            Capability::DialogSaveFile,
+            Capability::FileReadText,
+            Capability::StorageStateRead,
+            Capability::StorageStateReplace,
+            Capability::StorageStateClear,
+            Capability::CredentialRead,
+            Capability::CredentialWrite,
+            Capability::CredentialDelete,
+            Capability::NotificationShow,
+        ] {
+            assert!(
+                !capability.as_str().contains("crash"),
+                "{} names a crash surface",
+                capability.as_str()
+            );
+        }
+    }
+
+    #[test]
     fn a_granted_notification_reaches_the_service_unchanged() {
         let service = RecordingNotifications::default();
         let response = JsonValue::parse(&host_with_notifications(service).handle_json(

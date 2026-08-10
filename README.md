@@ -173,6 +173,10 @@ Anodrel/
 `docs/APPLICATIONS.md` defines the validated application-package contract.
 `docs/RENDERER.md` documents the renderer and brand API.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
+`docs/CRASH_REPORTS.md` defines the host-only bounded record of a contained
+panic. It is written to the host's own location, carries no panic payload, and
+is readable through no protocol operation at all. It covers contained Rust
+panics only, and says so.
 `docs/SIGNING.md` defines the Windows executable-signature foundation.
 `docs/LAUNCH.md` defines the installed application-record contract and the
 host-only Windows launch sequence that binds executable and publisher policy

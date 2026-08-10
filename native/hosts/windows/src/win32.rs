@@ -12,6 +12,7 @@
 #![allow(non_snake_case)]
 
 mod appicon;
+mod crash;
 mod document;
 mod present;
 mod product_tile;
@@ -33,6 +34,8 @@ use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
+
+use anodrel_crash::{CrashSite, CrashSurface};
 
 use crate::product::PreflightOutcome;
 use document::{Body, Document, Section};
@@ -450,6 +453,28 @@ pub fn run_window_lab() -> io::Result<()> {
         ],
         None,
     )
+}
+
+/// Writes one crash record through the ordinary reporting path, then exits.
+///
+/// A crash record is only useful if it is actually written on the machine it is
+/// meant to help, and the path that writes it is reached exactly once, during a
+/// defect, when nobody is watching. This is how an operator confirms the
+/// location, permissions, and format without waiting for a real failure.
+///
+/// It records the same `window-procedure` site a contained panic does, with no
+/// window registered, so the surface is `unknown`. It opens no window and
+/// prints only whether the record was written — never the location, which is in
+/// `docs/CRASH_REPORTS.md` for a person to look up rather than for a process to
+/// hand out.
+pub fn run_crash_report_selftest() -> Result<(), Box<dyn std::error::Error>> {
+    match crash::report(CrashSite::WindowProcedure, CrashSurface::Unknown) {
+        Some(sequence) => {
+            println!("Wrote crash record {sequence}. See docs/CRASH_REPORTS.md for its location.");
+            Ok(())
+        }
+        None => Err(io::Error::other("the host could not write a crash record").into()),
+    }
 }
 
 /// Opens the host-owned visual and input test for the native UI foundation.
@@ -1295,8 +1320,8 @@ fn set_ambient_running(window: Hwnd, running: bool) {
 ///
 /// The payload is dropped here rather than inspected. A panic message can carry
 /// arbitrary values, and nothing derived from one may reach a protocol
-/// response, the diagnostic ledger, or an application.
-fn contain_panic(body: impl FnOnce() -> Lresult) -> Option<Lresult> {
+/// response, the diagnostic ledger, a crash record, or an application.
+fn contain_panic<R>(body: impl FnOnce() -> R) -> Option<R> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(body)).ok()
 }
 
@@ -1311,6 +1336,11 @@ unsafe extern "system" fn window_proc(
     match contain_panic(|| unsafe { dispatch(window, message, wparam, lparam) }) {
         Some(result) => result,
         None => {
+            // Leave evidence before leaving. Containment on its own makes a
+            // defect look exactly like a clean exit, so the record is written
+            // here rather than after the loop, while the window that was being
+            // served is still known.
+            crash::report_contained_panic(window);
             // Fail closed but orderly. Ending the message loop lets `run_windows`
             // return and drop every registered view, which shuts down a running
             // product child and removes any notification entry — the cleanup an
@@ -2053,6 +2083,50 @@ mod tests {
 
         assert_eq!(contained, None);
         assert_eq!(super::contain_panic(|| 42), Some(42));
+    }
+
+    #[test]
+    fn a_crash_record_names_the_kind_of_surface_and_nothing_else() {
+        use anodrel_crash::CrashSurface;
+
+        let _exclusive = super::registry::tests_exclusive();
+        // An unregistered window first: a panic can arrive before a view is
+        // registered or after it is gone, and that must classify rather than
+        // fail. The record path exists to leave evidence, so it has no branch
+        // that gives up.
+        assert_eq!(super::registry::crash_surface(-950), CrashSurface::Unknown);
+
+        super::registry::insert(
+            -951,
+            super::View::Document(document::Document::from_text(
+                "a title nothing may record",
+                "test",
+                "body",
+            )),
+        )
+        .expect("view registers");
+        super::registry::insert(-952, super::View::StartupLab(sample_lab()))
+            .expect("view registers");
+
+        assert_eq!(super::registry::crash_surface(-951), CrashSurface::Document);
+        assert_eq!(
+            super::registry::crash_surface(-952),
+            CrashSurface::StartupLab
+        );
+
+        // The whole catalogue is plain labels. A surface that carried a title,
+        // an application identity, or a handle would put unbounded text into a
+        // file this platform promises holds none.
+        for surface in CrashSurface::ALL {
+            assert!(
+                surface
+                    .label()
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte == b'-')
+            );
+        }
+
+        super::registry::clear().expect("registry clears");
     }
 
     #[test]

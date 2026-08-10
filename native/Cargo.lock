@@ -52,6 +52,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-crash"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-credentials"
 version = "0.1.0"
 dependencies = [
@@ -216,6 +220,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-crash"
+version = "0.1.0"
+dependencies = [
+ "anodrel-crash",
+ "anodrel-paths",
+]
+
+[[package]]
 name = "anodrel-windows-credentials"
 version = "0.1.0"
 dependencies = [
@@ -253,6 +265,7 @@ dependencies = [
  "anodrel-brand",
  "anodrel-canvas",
  "anodrel-core",
+ "anodrel-crash",
  "anodrel-credentials",
  "anodrel-diagnostics",
  "anodrel-file-access",
@@ -267,6 +280,7 @@ dependencies = [
  "anodrel-windows-appearance",
  "anodrel-windows-bootstrap",
  "anodrel-windows-clipboard",
+ "anodrel-windows-crash",
  "anodrel-windows-credentials",
  "anodrel-windows-external-links",
  "anodrel-windows-file-access",

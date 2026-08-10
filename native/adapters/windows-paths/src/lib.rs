@@ -11,7 +11,7 @@ mod raw;
 use std::fmt;
 
 use anodrel_application::ApplicationIdentity;
-use anodrel_paths::{ApplicationDirectories, ApplicationDirectoriesError};
+use anodrel_paths::{ApplicationDirectories, ApplicationDirectoriesError, HostDirectories};
 
 /// Derives stable host-owned locations for one validated application identity.
 pub fn application_directories(
@@ -21,11 +21,26 @@ pub fn application_directories(
     ApplicationDirectories::from_local_data_root(&root, identity).map_err(WindowsPathsError::Layout)
 }
 
-/// A safe category for a Windows application-directory lookup failure.
+/// Derives the host's own locations, which belong to no application.
+///
+/// # Errors
+///
+/// Returns a [`WindowsPathsError`] when Windows cannot supply the current
+/// user's Local AppData root or the layout rejects it.
+pub fn host_directories() -> Result<HostDirectories, WindowsPathsError> {
+    let root = raw::local_application_data_root().map_err(WindowsPathsError::from)?;
+    HostDirectories::from_local_data_root(&root)
+        .map_err(|_| WindowsPathsError::LocalDataPathInvalid)
+}
+
+/// A safe category for a Windows directory lookup failure.
 #[derive(Debug)]
 pub enum WindowsPathsError {
+    /// Windows could not supply the current user's Local AppData root.
     LocalDataUnavailable,
+    /// The supplied root was not usable as a layout root.
     LocalDataPathInvalid,
+    /// The portable layout rejected the root or the identity.
     Layout(ApplicationDirectoriesError),
 }
 
@@ -62,7 +77,7 @@ impl std::error::Error for WindowsPathsError {
 mod tests {
     use anodrel_application::ApplicationManifest;
 
-    use super::application_directories;
+    use super::{application_directories, host_directories};
 
     #[test]
     fn reads_the_current_user_root_without_creating_a_directory() {
@@ -105,5 +120,19 @@ mod tests {
             Some("logs")
         );
         assert!(!directories.application_root().exists());
+    }
+
+    #[test]
+    fn the_host_root_is_absolute_and_separate_from_every_application() {
+        let host = host_directories().expect("Windows provides Local AppData for the current user");
+        assert!(host.host_root().is_absolute());
+        assert_eq!(
+            host.logs().file_name().and_then(|name| name.to_str()),
+            Some("logs")
+        );
+        assert_eq!(
+            host.host_root().file_name().and_then(|name| name.to_str()),
+            Some("Host")
+        );
     }
 }

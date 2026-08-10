@@ -7,6 +7,7 @@ use std::{
 };
 
 use super::{Hwnd, StartupLab, View, ui_lab::UiLab};
+use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 use anodrel_windows_file_access::WindowsFileTextService;
 
@@ -25,6 +26,29 @@ pub(super) fn insert(window: Hwnd, view: View) -> io::Result<()> {
 
 pub(super) fn view_for(window: Hwnd) -> io::Result<Option<View>> {
     Ok(lock_views()?.get(&window).cloned())
+}
+
+/// Classifies a window for a crash record.
+///
+/// A view-kind query only: it names the kind of surface and never its title,
+/// document, application identity, or handle. It clones nothing, because it is
+/// called while the host is shutting down after a contained panic and cloning a
+/// view there would be work at the worst possible moment.
+///
+/// An unregistered window and a poisoned registry both answer
+/// [`CrashSurface::Unknown`]. Neither can be allowed to fail: this runs on a
+/// path whose whole purpose is to leave evidence behind.
+pub(super) fn crash_surface(window: Hwnd) -> CrashSurface {
+    let Ok(views) = lock_views() else {
+        return CrashSurface::Unknown;
+    };
+    match views.get(&window) {
+        Some(View::StartupLab(_)) => CrashSurface::StartupLab,
+        Some(View::Document(_)) => CrashSurface::Document,
+        Some(View::UiLab(_)) => CrashSurface::UiLab,
+        Some(View::UiSession(_)) => CrashSurface::UiSession,
+        None => CrashSurface::Unknown,
+    }
 }
 
 /// Whether the window's current host-owned view reads system appearance while
