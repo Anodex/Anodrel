@@ -151,12 +151,6 @@ unsafe extern "system" {
         provider: *mut c_void,
     ) -> Lresult;
 
-    /// Whether any assistive technology is currently listening.
-    ///
-    /// Used only to avoid building a provider nobody asked for. The answer is
-    /// never exposed to an application: it would reveal that someone is using
-    /// assistive technology.
-    pub fn UiaClientsAreListening() -> i32;
 }
 
 #[link(name = "user32")]

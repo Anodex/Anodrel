@@ -60,10 +60,12 @@ pub unsafe fn answer_get_object(
     if lparam != UIA_ROOT_OBJECT_ID {
         return None;
     }
-    // SAFETY: this takes no argument and only reports whether a client exists.
-    if unsafe { raw::UiaClientsAreListening() } == 0 {
-        return None;
-    }
+    // The provider is returned whenever the root object is asked for, without
+    // first checking whether a client is listening. `UiaClientsAreListening`
+    // answers whether raising an *event* is worthwhile; using it as a gate here
+    // meant a window created before a screen reader started answered its early
+    // requests with nothing, and was resolved to the default window provider
+    // instead. Attaching a screen reader afterwards then found no semantics.
 
     let tree = Arc::new(Tree::new(window_title(window), elements));
     let provider = Provider::create(window, None, tree);

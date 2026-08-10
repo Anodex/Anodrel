@@ -155,9 +155,12 @@ no element can be invoked, toggled, scrolled, or edited through it. Each COM
 method contains panics and converts one into a failure code, because these are
 `extern "system"` and an escaping panic would abort the host.
 
-The provider is built only when `UiaClientsAreListening` reports a client. That
-answer never leaves the crate: exposing it would tell an application that
-somebody is using assistive technology.
+The provider is returned **whenever the root object is asked for**, without
+first checking whether a client is listening. `UiaClientsAreListening` answers
+whether raising an *event* is worthwhile, not whether to supply a provider;
+using it as a gate meant a window created before a screen reader started
+answered its early requests with nothing and was resolved to the default window
+provider instead.
 
 **Slice 2 — semantic children. Implemented.**
 The window is also an `IRawElementProviderFragmentRoot`, and each published
@@ -238,19 +241,30 @@ Both provider slices are in place, so this can be run now:
 
 1. Open a native UI surface, for example
    `cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab`.
-2. Start **Narrator** with `Ctrl+Windows+Enter`. Narrator ships with Windows and
-   needs no installation.
-3. Move through the surface with `Caps Lock+Left/Right`. Each visible element
-   should be announced with its name and its role — "button", "text", or
-   "group".
-4. Confirm a disabled action is announced as unavailable, and that an element
+2. Start **Narrator**. `Ctrl+Windows+Enter` toggles it, but that shortcut can be
+   disabled, so confirm it actually started rather than assuming: Narrator
+   announces itself, and `Get-Process Narrator` lists it. If the shortcut does
+   nothing, launch `%WINDIR%\System32\Narrator.exe` directly or enable it under
+   Settings → Accessibility → Narrator.
+3. **Click the Anodrel window** so it is in the foreground. Narrator reads the
+   focused window, and item navigation does nothing while another window has
+   focus.
+4. Move through the surface with `Caps Lock+Left/Right`. Each visible element
+   should be announced with its name and its role — "button" or "text".
+5. Confirm a disabled action is announced as unavailable, and that an element
    clipped out of view is not announced at all.
-5. Optionally cross-check with **Accessibility Insights for Windows** or the
+6. Optionally cross-check with **Accessibility Insights for Windows** or the
    Windows SDK's **Inspect** tool, which show the raw UI Automation tree
    including `AutomationId`, `ControlType`, `IsEnabled`, and
    `BoundingRectangle`. Confirm each matches the mapping table above and that
    the highlighted rectangle sits over the element on screen.
-6. Close Narrator with `Ctrl+Windows+Enter`.
+7. Close Narrator with `Ctrl+Windows+Enter`.
+
+If nothing is announced, check in this order: that Narrator is actually running,
+that the Anodrel window has focus, and only then suspect the provider. A quick
+way to separate a provider fault from a Narrator one is to walk the control view
+with `TreeWalker::ControlViewWalker` from a UI Automation client — that is the
+same view Narrator navigates, and it needs no screen reader.
 
 Report a mismatch between what Inspect shows and what this document promises as
 a defect in the adapter, not in the document: the table above is the contract.
