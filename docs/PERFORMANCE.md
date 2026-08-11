@@ -109,6 +109,66 @@ mask removed the first two; see
 [Decision 0064](decisions/0064-retained-raster-effects-trade-bounded-fidelity.md).
 The 2.3 ms composite is now the largest single cost in a frame.
 
+## Host startup and memory report
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --startup-report apps/sample/anodrel.application.json
+~~~
+
+Runs every check the host completes before a surface could open — package
+verification, the core health check, the private pipe loopback, and the launch
+preflight — then prints one JSON object and exits. It shares the exact sequence
+the Startup Lab runs, so the reported time is the time a surface really waits
+for rather than a second implementation that could drift from it.
+
+It deliberately does not claim the single-instance mutex: a measurement must not
+fight a running Startup Lab for it, or leave a claim that makes the next launch
+think a surface is already open.
+
+### What it measures, and what it excludes
+
+| Field | Meaning |
+| --- | --- |
+| `startupMicroseconds` | Process start to startup checks complete. |
+| `workingSetBytes` | Physical memory resident, including pages shared with other processes. |
+| `privateBytes` | Committed memory this process cannot share. |
+| `applicationId` | The validated package the checks ran against. |
+
+**It stops before the window exists.** No window is created and nothing is
+painted, so the time is a floor for cold start and must never be quoted as
+time-to-first-frame, and the memory is the host's cost with nothing rendered.
+The report's `scope` field says exactly this.
+
+### Reference measurements
+
+AMD Ryzen 9 7900X, Windows 11 Pro 10.0.26200, release build, sample package:
+
+| Figure | Value |
+| --- | --- |
+| Startup checks, first run after build | ~10.1 ms |
+| Startup checks, warm | ~1.4 ms |
+| Working set | ~10.5 MB |
+| Private bytes | ~1.8 MB |
+
+The first run is several times the warm one, and that difference is the disk
+reading the executable, not the host doing more work. Report both or say which.
+
+### Before comparing this with another runtime
+
+Two mistakes are easy here, and both would flatter Anodrel.
+
+**A multi-process runtime needs its whole tree.** Electron runs a browser
+process, a GPU process, a utility process, and one renderer per window.
+Comparing one Anodrel process against one Electron process measures nothing.
+Sum every process in the tree, and prefer **private bytes** — working set counts
+pages shared between processes, so a tree double-counts them.
+
+**The surfaces are not equivalent.** What Anodrel opens here is a diagnostic
+surface built from four node kinds. An application with text input, lists,
+images, or rich text would cost more than this, and that cost is not yet
+measurable because the platform cannot express those surfaces. Until it can,
+this figure is a floor for Anodrel and a full application for the other side.
+
 ## Owned transport performance lab
 
 `anodrel-perf-lab` is a first-party release measurement tool. It sends a

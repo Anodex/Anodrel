@@ -122,8 +122,12 @@ Status: **Direct Windows host in progress**
   drawing stages under a separate `anodrel.renderer.compose.v1` identifier, with
   per-stage pixel counts so a cost can be read per pixel. It opens no window and
   performs no blit, which the report's scope states, so it must never be quoted
-  as frame time. Startup, memory, and application comparisons remain separate
-  workloads.
+  as frame time. **Startup and memory are covered too:** the host's
+  `--startup-report` route runs the same checks a Startup Lab surface waits for
+  and prints elapsed time, working set, and private bytes as one JSON object. It
+  stops before the window exists, which its scope states, so it is a floor for
+  cold start rather than time-to-first-frame. Idle CPU after 30 seconds and
+  application-level comparisons remain separate workloads.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
   **Completed for the path and text-clipboard foundations:** host-only
   per-application `data`,

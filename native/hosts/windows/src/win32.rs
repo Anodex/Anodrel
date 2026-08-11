@@ -508,6 +508,43 @@ pub fn run_crash_selftest_panic() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Runs the real startup sequence, prints its readings, and exits.
+///
+/// The Startup Lab already shows a startup time and a working set in its
+/// footer. This is the same measurement in a form a script can keep, so a
+/// startup or memory figure can be recorded across builds instead of read off a
+/// screenshot.
+///
+/// # What it measures, and what it does not
+///
+/// The elapsed time covers everything the host does before a surface could
+/// open: package verification, the core health check, the private pipe
+/// loopback, and the launch preflight. It stops there. **It does not include
+/// creating the window or its first paint**, so it is a floor for cold start
+/// and must never be quoted as time-to-first-frame. See `docs/PERFORMANCE.md`.
+///
+/// No window opens, so the memory readings are the host's own cost with nothing
+/// rendered — also a floor, and the honest one to compare against another
+/// runtime's idle process.
+pub fn print_startup_report(application_id: &str, elapsed: std::time::Duration) {
+    let memory = stats::memory_readings();
+    // A local tooling format, shaped like the performance lab's report so both
+    // can be retained the same way. It is not a protocol and has no reader here.
+    println!(
+        concat!(
+            "{{\"benchmark\":\"anodrel.host.startup.v1\",",
+            "\"startupMicroseconds\":{},",
+            "\"workingSetBytes\":{},\"privateBytes\":{},",
+            "\"applicationId\":\"{}\",",
+            "\"scope\":\"host startup checks only; no window creation, no first paint\"}}"
+        ),
+        elapsed.as_micros(),
+        memory.working_set_bytes,
+        memory.private_bytes,
+        application_id,
+    );
+}
+
 /// Writes one crash record through the ordinary reporting path, then exits.
 ///
 /// A crash record is only useful if it is actually written on the machine it is
@@ -1263,7 +1300,19 @@ fn action_document(
                                 "Working set".to_owned(),
                                 format!(
                                     "{:.1} MB",
-                                    stats::working_set_bytes() as f32 / (1024.0 * 1024.0)
+                                    stats::memory_readings().working_set_bytes as f32
+                                        / (1024.0 * 1024.0)
+                                ),
+                            ),
+                            (
+                                // Reported beside the working set because the
+                                // two answer different questions, and only this
+                                // one adds up across a process tree.
+                                "Private bytes".to_owned(),
+                                format!(
+                                    "{:.1} MB",
+                                    stats::memory_readings().private_bytes as f32
+                                        / (1024.0 * 1024.0)
                                 ),
                             ),
                             ("Startup".to_owned(), format!("{} ms", lab.startup_millis)),

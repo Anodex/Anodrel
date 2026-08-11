@@ -153,6 +153,20 @@ Rendering itself is tested headless by asserting on pixels, so most visual
 regressions surface in `cargo test` without opening a window. See
 `docs/RENDERER.md` for the renderer's API and its testing approach.
 
+### Startup and memory readings
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --startup-report apps/sample/anodrel.application.json
+~~~
+
+Runs the startup checks, prints one JSON object, and exits without opening a
+window. Use it when changing anything on the startup path. Run it more than
+once: the first run after a build is several times slower because the
+executable is still being read from disk.
+
+See `docs/PERFORMANCE.md` for what the figures exclude and what has to be true
+before either is compared with another runtime.
+
 ### Crash records
 
 Two routes exercise the host's crash-record path. Run them after changing

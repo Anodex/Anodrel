@@ -108,6 +108,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return run_ui_preview(document_path);
     }
+    if let [command, manifest_path] = arguments.as_slice()
+        && command == "--startup-report"
+    {
+        return run_startup_report(manifest_path, started);
+    }
     if arguments.as_slice() == ["--crash-report-selftest"] {
         return win32::run_crash_report_selftest();
     }
@@ -120,7 +125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --crash-report-selftest | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --startup-report <anodrel.application.json> | --crash-report-selftest | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js>]",
         )
         .into());
     }
@@ -186,6 +191,24 @@ fn run_startup_lab(manifest_path: &str, started: Instant) -> Result<(), Box<dyn 
         InstanceClaim::Primary(instance) => instance,
         InstanceClaim::Existing(existing) => return Ok(existing.activate()?),
     };
+    let launch = complete_startup_checks(&package)?;
+    win32::run_startup_lab(
+        package_facts(&package),
+        &instance,
+        started.elapsed(),
+        launch,
+    )?;
+    Ok(())
+}
+
+/// Runs every check the host completes before a Startup Lab surface can open.
+///
+/// Shared by the surface and by `--startup-report`, so a reported startup time
+/// is the time the surface actually waits for rather than a second sequence
+/// that could drift from it.
+fn complete_startup_checks(
+    package: &ApplicationPackage,
+) -> Result<product::PreflightOutcome, Box<dyn Error>> {
     // Verification only: this reads machine policy, revalidates the locked
     // executable digest, and checks Authenticode without creating a process,
     // pipe, or bootstrap material. It is the most expensive check here on a
@@ -202,13 +225,18 @@ fn run_startup_lab(manifest_path: &str, started: Instant) -> Result<(), Box<dyn 
     // Joined before the window exists: the tile's state must be resolved before
     // the surface opens, so drawing and hit-testing share one settled value.
     // The same outcome also selects the surface's launch diagnostic entry.
-    let launch = preflight.finish();
-    win32::run_startup_lab(
-        package_facts(&package),
-        &instance,
-        started.elapsed(),
-        launch,
-    )?;
+    Ok(preflight.finish())
+}
+
+/// Runs the startup checks, prints their readings as JSON, and exits.
+///
+/// Deliberately does **not** claim the single-instance mutex. A measurement
+/// must not fight a running Startup Lab for it, and must not leave a claim that
+/// makes the next launch think a surface is already open.
+fn run_startup_report(manifest_path: &str, started: Instant) -> Result<(), Box<dyn Error>> {
+    let package = ApplicationPackage::load(manifest_path)?;
+    let _ = complete_startup_checks(&package)?;
+    win32::print_startup_report(package.identity().application_id(), started.elapsed());
     Ok(())
 }
 
