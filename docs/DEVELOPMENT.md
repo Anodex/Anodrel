@@ -153,6 +153,28 @@ Rendering itself is tested headless by asserting on pixels, so most visual
 regressions surface in `cargo test` without opening a window. See
 `docs/RENDERER.md` for the renderer's API and its testing approach.
 
+### Crash records
+
+Two routes exercise the host's crash-record path. Run them after changing
+anything on the panic-containment path, the window registry, or the record
+format:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --crash-report-selftest
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --crash-selftest-panic
+~~~
+
+The first writes one record and exits, confirming the location and format. The
+second opens the UI Lab and raises a real panic inside its first paint; the
+process must exit **without aborting**, and the new record must read
+`surface=ui-lab` rather than `unknown` — that value is what proves the crash was
+classified against a live window.
+
+The second route is debug-only, which is why it has no `--release`. Nothing a
+user runs can be asked to fault. Neither route is part of `cargo test`, and no
+automated test writes to the real record location. See `docs/CRASH_REPORTS.md`
+for what a record may contain and what this deliberately does not catch.
+
 ### Windows end-to-end development sample
 
 After `npm run build`, run this PowerShell command from the repository root:
