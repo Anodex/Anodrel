@@ -34,6 +34,7 @@ enum SampleDialogRequest {
     Diagnostics,
     Credentials,
     Notification,
+    WindowTitle,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -119,28 +120,67 @@ pub fn run_ui_session_with_notification(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Notification)
 }
 
+/// Runs the UI session diagnostic and asks its client to propose a window title.
+///
+/// The client deliberately proposes a name that would be a lie on its own, so
+/// the visible result is the composition rule working: the caption reads
+/// `Windows Security — Anodrel Sample`. See `docs/WINDOW_TITLE.md`.
+pub fn run_ui_session_with_window_title(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowTitle)
+}
+
+/// The host-owned UI resources one development sample session consumes.
+///
+/// Named rather than positional. The set had grown to six values passed by
+/// position, which is past the point where a reader can check a call site, and
+/// the registered-session path already groups the same resources this way.
+///
+/// This is the development path's stand-in for `RegisteredSessionUi`. It is not
+/// a registered session: there is no installed record here, so the display name
+/// below is chosen by the host rather than validated from machine policy.
+struct SampleSessionUi {
+    document: UiDocumentMailbox,
+    input: UiInputMailbox,
+    close: SessionCloseSignal,
+    file_dialog: FileDialogMailbox,
+    file_text: WindowsFileTextService,
+    notifications: anodrel_notifications::NotificationMailbox,
+    window_title: anodrel_window::WindowTitleMailbox,
+}
+
+/// The name the sample host appends to any title the sample proposes.
+///
+/// Host-chosen, exactly like a registered session's validated display name is
+/// host-held: what matters for the guarantee is that the application cannot
+/// influence it, not where the host got it.
+const SAMPLE_DISPLAY_NAME: &str = "Anodrel Sample";
+
+impl SampleSessionUi {
+    fn new() -> Self {
+        Self {
+            document: UiDocumentMailbox::new(),
+            input: UiInputMailbox::new(),
+            close: SessionCloseSignal::default(),
+            file_dialog: FileDialogMailbox::new(),
+            file_text: WindowsFileTextService::new(),
+            notifications: anodrel_notifications::NotificationMailbox::new(),
+            window_title: anodrel_window::WindowTitleMailbox::new(),
+        }
+    }
+}
+
 fn run_ui_session_with_dialog(
     node_path: &str,
     client_path: &str,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
-    let mailbox = UiDocumentMailbox::new();
-    let input_mailbox = UiInputMailbox::new();
-    let close_signal = SessionCloseSignal::default();
-    let file_dialog_mailbox = FileDialogMailbox::new();
-    let file_text = WindowsFileTextService::new();
-    let notifications = anodrel_notifications::NotificationMailbox::new();
     run_with_optional_session_view(
         node_path,
         client_path,
-        Some((
-            mailbox,
-            input_mailbox,
-            close_signal,
-            file_dialog_mailbox,
-            file_text,
-            notifications,
-        )),
+        Some(SampleSessionUi::new()),
         dialog_request,
     )
 }
@@ -148,14 +188,7 @@ fn run_ui_session_with_dialog(
 fn run_with_optional_session_view(
     node_path: &str,
     client_path: &str,
-    mailboxes: Option<(
-        UiDocumentMailbox,
-        UiInputMailbox,
-        SessionCloseSignal,
-        FileDialogMailbox,
-        WindowsFileTextService,
-        anodrel_notifications::NotificationMailbox,
-    )>,
+    session_ui: Option<SampleSessionUi>,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
     let policy = HostPolicy::new(
@@ -178,36 +211,31 @@ fn run_with_optional_session_view(
             Capability::CredentialWrite,
             Capability::CredentialDelete,
             Capability::NotificationShow,
+            Capability::WindowTitle,
         ],
         "anodrel-windows-host",
     )?;
-    let (server, invitation) = match mailboxes.as_ref() {
-        Some((
-            mailbox,
-            input_mailbox,
-            close_signal,
-            file_dialog_mailbox,
-            file_text,
-            notifications,
-        )) => {
+    let (server, invitation) = match session_ui.as_ref() {
+        Some(ui) => {
             // Composing the bundle keeps every service named at its own call
             // rather than positionally in one ever-growing constructor.
             let services = anodrel_core::HostServices::unavailable()
                 .with_clipboard(WindowsClipboard::new(0))
                 .with_external_links(WindowsExternalLinks)
-                .with_file_dialogs(file_dialog_mailbox.clone())
-                .with_file_selections(SelectionFileDialogMailbox::new(file_dialog_mailbox.clone()))
-                .with_file_text(file_text.clone())
+                .with_file_dialogs(ui.file_dialog.clone())
+                .with_file_selections(SelectionFileDialogMailbox::new(ui.file_dialog.clone()))
+                .with_file_text(ui.file_text.clone())
                 .with_storage(sample_storage()?)
                 .with_diagnostics(sample_diagnostics())
                 .with_credentials(sample_credentials()?)
-                .with_notifications(notifications.clone());
+                .with_notifications(ui.notifications.clone())
+                .with_window_title(ui.window_title.clone());
             WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
                 "sample-session",
-                mailbox.clone(),
-                input_mailbox.clone(),
-                close_signal.clone(),
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
                 services,
             )?
         }
@@ -216,7 +244,7 @@ fn run_with_optional_session_view(
     let bootstrap = invitation.bootstrap_invitation()?;
     let server_thread = thread::spawn(move || server.serve_one());
 
-    let command = if mailboxes.is_some() {
+    let command = if session_ui.is_some() {
         let command = BootstrapCommand::new(node_path)?
             .arg(client_path)?
             .arg("--wait-for-ui-event")?;
@@ -232,27 +260,22 @@ fn run_with_optional_session_view(
             SampleDialogRequest::Diagnostics => command.arg("--request-diagnostics")?,
             SampleDialogRequest::Credentials => command.arg("--request-credentials")?,
             SampleDialogRequest::Notification => command.arg("--request-notification")?,
+            SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
     };
     let child = launch(&command, &bootstrap)?;
-    if let Some((
-        mailbox,
-        input_mailbox,
-        close_signal,
-        file_dialog_mailbox,
-        file_text,
-        notifications,
-    )) = mailboxes
-    {
+    if let Some(ui) = session_ui {
         crate::win32::run_ui_session(
-            mailbox,
-            input_mailbox,
-            close_signal,
-            file_dialog_mailbox,
-            file_text,
-            notifications,
+            ui.document,
+            ui.input,
+            ui.close,
+            ui.file_dialog,
+            ui.file_text,
+            ui.notifications,
+            ui.window_title,
+            SAMPLE_DISPLAY_NAME,
         )?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;

@@ -77,6 +77,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return sample::run_ui_session_with_notification(node_path, client_path);
     }
+    if let [command, node_path, client_path] = arguments.as_slice()
+        && command == "--sample-ui-window-title-client"
+    {
+        return sample::run_ui_session_with_window_title(node_path, client_path);
+    }
     if let [command, application_id] = arguments.as_slice()
         && command == "--product-session"
     {
@@ -115,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --crash-report-selftest | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --crash-report-selftest | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js>]",
         )
         .into());
     }

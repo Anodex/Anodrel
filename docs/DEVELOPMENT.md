@@ -276,6 +276,35 @@ application before suspecting the host.
 If the operating system refuses outright, the client stops at safe stage 24
 within about a second rather than waiting for the action.
 
+To exercise the first public window capability through the same authenticated
+session, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-title-client $nodePath $clientPath
+~~~
+
+The client delivers its document and then calls `window.title.set` once,
+proposing **Windows Security** — a name that would be a lie on its own. The
+window's caption must read:
+
+~~~text
+Windows Security — Anodrel Sample
+~~~
+
+That is the whole check. The application supplied the first half and cannot
+supply, suppress, or forge the second, so a window can say what it is showing
+and never change what it is. Look at the taskbar and Alt+Tab as well as the
+title bar: those are the surfaces the guarantee exists for. Then complete the
+normal semantic action to close the session.
+
+This check has passed on Windows 11 with exactly that caption. If the client
+stops at safe stage 25 the host refused the proposal; a caption missing its
+suffix would mean the session had no validated display name, which for this
+sample would be a defect rather than the documented fallback.
+
+See `docs/WINDOW_TITLE.md` for what this capability deliberately does not do —
+there is no window target, no read, and no other window property.
+
 To exercise a version 2 scroll document through that same session, run:
 
 ~~~powershell

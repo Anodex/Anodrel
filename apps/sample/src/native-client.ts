@@ -117,6 +117,16 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-window-title")) {
+      // The host composes the caption: it appends the application's validated
+      // display name, so this proposal cannot claim to be another application.
+      // Deliberately proposes a name that would be a lie on its own.
+      const applied = await client.setWindowTitle("Windows Security");
+      if (applied.status !== "applied") {
+        return 25;
+      }
+    }
+
     if (process.argv.includes("--request-credentials")) {
       const result = await runCredentialDiagnostic(client);
       if (result !== 0) {

@@ -36,6 +36,7 @@ use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
 
 use anodrel_crash::{CrashSite, CrashSurface};
+use anodrel_window::WindowTitleMailbox;
 
 use crate::product::PreflightOutcome;
 use document::{Body, Document, Section};
@@ -568,6 +569,7 @@ pub fn run_ui_preview(document: UiDocument) -> io::Result<()> {
 /// Opens one host-controlled native view that consumes exactly one authenticated
 /// session's mailboxes. Actions enter only the bounded semantic-input mailbox
 /// and remain incapable of native operations in this diagnostic.
+#[allow(clippy::too_many_arguments)]
 pub fn run_ui_session(
     mailbox: UiDocumentMailbox,
     input_mailbox: UiInputMailbox,
@@ -575,6 +577,8 @@ pub fn run_ui_session(
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
+    window_title: WindowTitleMailbox,
+    display_name: &str,
 ) -> io::Result<()> {
     run_authenticated_ui_session(
         "Anodrel UI Session Lab",
@@ -584,6 +588,8 @@ pub fn run_ui_session(
         file_dialog_mailbox,
         file_text,
         notifications,
+        window_title,
+        display_name,
     )
 }
 
@@ -591,8 +597,14 @@ pub fn run_ui_session(
 ///
 /// The caller must supply resources created together for one already
 /// authenticated session. This is host lifecycle code, not an application
-/// window-management API: the application cannot choose the title, create a
-/// window, pass a handle, or attach a different session's resource.
+/// window-management API: the application cannot create a window, pass a
+/// handle, or attach a different session's resource.
+///
+/// `title` is the caption the host opens with. A session holding the
+/// `window.title` grant may later propose a replacement, which the host
+/// composes with `display_name` before applying — the application supplies one
+/// half and never the other. See `docs/WINDOW_TITLE.md`.
+#[allow(clippy::too_many_arguments)]
 pub fn run_authenticated_ui_session(
     title: &str,
     mailbox: UiDocumentMailbox,
@@ -601,6 +613,8 @@ pub fn run_authenticated_ui_session(
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
+    window_title: WindowTitleMailbox,
+    display_name: &str,
 ) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
@@ -608,14 +622,17 @@ pub fn run_authenticated_ui_session(
             title: title.to_owned(),
             width: (920.0 * scale) as i32,
             height: (660.0 * scale) as i32,
-            view: View::UiSession(ui_session_view::UiSessionView::new(
-                mailbox,
-                input_mailbox,
-                close_signal,
-                file_dialog_mailbox,
-                file_text,
-                notifications,
-            )),
+            view: View::UiSession(
+                ui_session_view::UiSessionView::new(
+                    mailbox,
+                    input_mailbox,
+                    close_signal,
+                    file_dialog_mailbox,
+                    file_text,
+                    notifications,
+                )
+                .with_window_title(window_title, display_name),
+            ),
         }],
         None,
     )
