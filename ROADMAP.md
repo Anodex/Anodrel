@@ -62,8 +62,16 @@ Status: **Direct Windows host in progress**
 - Implement window creation and controlled application content loading.
   **Completed for native Windows surfaces:** per-window immutable view
   routing, final-window shutdown, a two-window diagnostic, and the verified
-  no-script text package surface (Decision 0012). A public application window
-  capability remains deferred.
+  no-script text package surface (Decision 0012). **The first public window
+  capability now exists:** Protocol 1.14 `window.title.set` lets an
+  authenticated session holding the separate `window.title` grant propose the
+  title of the window it already owns, and the host composes the displayed
+  caption with a display name taken from the machine-validated installed record
+  (Decision 0066). The request carries no window target, handle, or identifier,
+  there is no read counterpart, and installed record version 1.4 adds the grant
+  as a strict superset of 1.3. Window creation, closing, geometry, enumeration,
+  focus, and every other window property remain deferred, each needing its own
+  grant, decision, and threat-model entry.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and

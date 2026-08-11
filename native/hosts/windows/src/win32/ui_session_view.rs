@@ -8,6 +8,7 @@ use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelect
 use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{UiDocumentMailbox, UiDocumentRevision, UiInputCandidate, UiInputMailbox};
+use anodrel_window::WindowTitleMailbox;
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
@@ -31,6 +32,18 @@ pub(super) struct UiSessionView {
     /// session window, including diagnostics that never notify. The entry lives
     /// as long as the view, so it is shared rather than recreated.
     notification_entry: Option<Arc<WindowsNotifications>>,
+    /// This session's one-request window-title bridge, when it has one.
+    ///
+    /// A diagnostic session view holds `None` and answers every proposal as
+    /// unavailable, which is the same thing an application would see on a host
+    /// with no window to title.
+    window_title: Option<WindowTitleMailbox>,
+    /// The validated display name appended to any title this session proposes.
+    ///
+    /// Held beside the mailbox rather than passed with each request: it comes
+    /// from the installed record, not from the application, and keeping it on
+    /// this side is what makes the suffix impossible to influence.
+    display_name: Option<String>,
     revision: UiDocumentRevision,
     /// The product session whose resources this view consumes, when the window
     /// owns one.
@@ -62,8 +75,48 @@ impl UiSessionView {
             file_text,
             notifications,
             notification_entry: None,
+            window_title: None,
+            display_name: None,
             revision: UiDocumentRevision::INITIAL,
             product_session: None,
+        }
+    }
+
+    /// Attaches this session's window-title bridge and its validated name.
+    ///
+    /// A builder rather than another `new` parameter: the two values arrive
+    /// together, only a registered session has them, and `new` already carries
+    /// as many resources as one signature usefully can.
+    #[must_use]
+    pub(super) fn with_window_title(
+        mut self,
+        mailbox: WindowTitleMailbox,
+        display_name: impl Into<String>,
+    ) -> Self {
+        self.window_title = Some(mailbox);
+        self.display_name = Some(display_name.into());
+        self
+    }
+
+    /// Takes a pending title proposal and composes the caption to apply.
+    ///
+    /// Composition happens here, on the side that holds the validated name, so
+    /// the value handed to User32 is never one an application chose outright.
+    pub(super) fn take_window_title_request(&self) -> Option<(u64, String)> {
+        let request = self.window_title.as_ref()?.take()?;
+        let caption = anodrel_window::compose(request.proposal(), self.display_name.as_deref());
+        Some((request.id(), caption))
+    }
+
+    /// Completes a title proposal after the host UI thread returns from User32.
+    pub(super) fn complete_window_title_request(&self, request_id: u64, applied: bool) -> bool {
+        let Some(mailbox) = self.window_title.as_ref() else {
+            return false;
+        };
+        if applied {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
         }
     }
 
@@ -106,7 +159,8 @@ impl UiSessionView {
             ui.file_dialog_mailbox(),
             ui.file_text_service(),
             ui.notification_mailbox(),
-        );
+        )
+        .with_window_title(ui.window_title_mailbox(), ui.display_name());
         view.product_session = Some(Arc::new(session));
         view
     }
@@ -228,7 +282,7 @@ mod tests {
     use anodrel_ui_session::{UiDocumentMailbox, UiDocumentSession, UiInputMailbox};
     use anodrel_windows_file_access::WindowsFileTextService;
 
-    use super::UiSessionView;
+    use super::{UiSessionView, WindowTitleMailbox};
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.action","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
@@ -253,6 +307,106 @@ mod tests {
 
         assert_eq!(view.poll(), (true, false));
         assert_eq!(view.poll(), (false, false));
+    }
+
+    /// A session view with a title bridge and the given validated name.
+    fn view_with_title(display_name: &str) -> (UiSessionView, WindowTitleMailbox) {
+        let mailbox = WindowTitleMailbox::new();
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_window_title(mailbox.clone(), display_name);
+        (view, mailbox)
+    }
+
+    /// Proposes a title from a worker and returns what the UI thread would apply.
+    fn caption_for(view: &UiSessionView, mailbox: &WindowTitleMailbox, proposal: &str) -> String {
+        let proposal =
+            anodrel_window::WindowTitleProposal::new(proposal).expect("the proposal is valid");
+        let worker = mailbox.clone();
+        let waiting = std::thread::spawn(move || {
+            anodrel_window::WindowTitleService::set_title(&worker, &proposal)
+        });
+        let (request_id, caption) = loop {
+            if let Some(taken) = view.take_window_title_request() {
+                break taken;
+            }
+            std::thread::yield_now();
+        };
+        assert!(view.complete_window_title_request(request_id, true));
+        waiting
+            .join()
+            .expect("the worker did not panic")
+            .expect("the proposal was accepted");
+        caption
+    }
+
+    #[test]
+    fn the_caption_a_session_applies_always_ends_with_its_validated_name() {
+        // This is the impersonation guard at the point it actually matters: the
+        // string handed to User32. Whatever the application proposes, the
+        // caption still names the application the host validated.
+        let (view, mailbox) = view_with_title("Anodrel Sample");
+
+        assert_eq!(
+            caption_for(&view, &mailbox, "Quarterly Report.pdf"),
+            "Quarterly Report.pdf \u{2014} Anodrel Sample"
+        );
+        assert_eq!(
+            caption_for(&view, &mailbox, "Windows Security"),
+            "Windows Security \u{2014} Anodrel Sample"
+        );
+        // Even a proposal that already carries the separator cannot end the
+        // caption before the real name.
+        assert!(
+            caption_for(&view, &mailbox, "Report \u{2014} Some Other App")
+                .ends_with(" \u{2014} Anodrel Sample")
+        );
+    }
+
+    #[test]
+    fn a_session_without_a_title_bridge_answers_nothing_and_completes_nothing() {
+        // The diagnostic session view has no bridge. It must not panic, and it
+        // must not claim to have completed a request it never had.
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_window_title_request().is_none());
+        assert!(!view.complete_window_title_request(1, true));
+    }
+
+    #[test]
+    fn one_session_cannot_take_another_sessions_title_proposal() {
+        // Each view holds its own bridge, so a proposal made to one session is
+        // invisible to every other window in the same message loop.
+        let (first, first_mailbox) = view_with_title("First Application");
+        let (second, _second_mailbox) = view_with_title("Second Application");
+
+        let proposal =
+            anodrel_window::WindowTitleProposal::new("Report").expect("the proposal is valid");
+        let worker = first_mailbox.clone();
+        let waiting = std::thread::spawn(move || {
+            anodrel_window::WindowTitleService::set_title(&worker, &proposal)
+        });
+        while {
+            let pending = second.take_window_title_request();
+            assert!(pending.is_none(), "a session took another's proposal");
+            first_mailbox.clone().take().is_none()
+        } {
+            std::thread::yield_now();
+        }
+        assert!(first.complete_window_title_request(1, false));
+        assert!(waiting.join().expect("the worker did not panic").is_err());
     }
 
     #[test]

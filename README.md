@@ -202,6 +202,10 @@ its recovery and capability contract.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
 `docs/WINDOW_LIFECYCLE.md` defines the multi-window host foundation.
+`docs/WINDOW_TITLE.md` defines the first public window capability: an
+authenticated session proposes its own window's title and the host composes the
+displayed caption with an application-name suffix the proposal cannot suppress
+or forge. There is no window target, no read, and no other window property.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance

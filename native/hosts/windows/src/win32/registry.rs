@@ -167,6 +167,33 @@ pub(super) fn complete_notification_request(
     }
 }
 
+/// Takes one pending title proposal only from its associated UI session.
+///
+/// The composed caption comes back with it so the User32 call can run outside
+/// this lock, matching how a notification is serviced.
+pub(super) fn take_window_title_request(window: Hwnd) -> io::Result<Option<(u64, String)>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_window_title_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one title proposal from its owning native UI session.
+pub(super) fn complete_window_title_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_window_title_request(request_id, applied),
+        )),
+        _ => Ok(None),
+    }
+}
+
 /// Returns the session-local file registry for the UI thread's capture flow.
 pub(super) fn file_text_service(window: Hwnd) -> io::Result<Option<WindowsFileTextService>> {
     let views = lock_views()?;

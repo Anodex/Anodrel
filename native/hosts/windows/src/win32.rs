@@ -335,6 +335,7 @@ unsafe extern "system" {
     fn UpdateWindow(window: Hwnd) -> Bool;
     fn SetForegroundWindow(window: Hwnd) -> Bool;
     fn DestroyWindow(window: Hwnd) -> Bool;
+    fn SetWindowTextW(window: Hwnd, text: *const u16) -> Bool;
     fn GetMessageW(message: *mut Msg, window: Hwnd, minimum: Uint, maximum: Uint) -> Bool;
     fn TranslateMessage(message: *const Msg) -> Bool;
     fn DispatchMessageW(message: *const Msg) -> Lresult;
@@ -1062,6 +1063,27 @@ fn service_notification(window: Hwnd) {
     let _ = registry::complete_notification_request(window, request.id(), shown, created);
 }
 
+/// Applies one pending window title for a session window, if it has one.
+///
+/// The `SetWindowTextW` call runs outside the window registry's lock, matching
+/// how a notification is serviced: a caption change is fast, but nothing that
+/// calls into User32 should hold a lock every other window's message handling
+/// waits on.
+///
+/// The caption arriving here is already composed — the application's proposal
+/// plus the session's validated display name — so this function has no way to
+/// apply a title an application chose outright. See `docs/WINDOW_TITLE.md`.
+fn service_window_title(window: Hwnd) {
+    let Ok(Some((request_id, caption))) = registry::take_window_title_request(window) else {
+        return;
+    };
+    let caption = to_wide_null(&caption);
+    // SAFETY: this runs on the thread that created the window, and `caption` is
+    // a null-terminated UTF-16 buffer that outlives the call.
+    let applied = unsafe { SetWindowTextW(window, caption.as_ptr()) } != 0;
+    let _ = registry::complete_window_title_request(window, request_id, applied);
+}
+
 /// Starts one product session for the Startup Lab's launch tile.
 ///
 /// The blocking verification and launch run on a worker; this returns
@@ -1523,6 +1545,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 }
             }
             service_notification(window);
+            service_window_title(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {
                     FileDialogRequestKind::Open => {

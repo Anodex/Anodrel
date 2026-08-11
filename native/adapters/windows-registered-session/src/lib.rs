@@ -18,6 +18,7 @@ use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
+use anodrel_window::WindowTitleMailbox;
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
@@ -40,10 +41,18 @@ pub struct RegisteredSessionUi {
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notification_mailbox: NotificationMailbox,
+    window_title_mailbox: WindowTitleMailbox,
+    /// The display name the host appends to any title this session proposes.
+    ///
+    /// Taken from the identity that matched the machine-validated installed
+    /// record, so it is not something the application can influence at run
+    /// time. Carrying it here is what lets the UI thread compose a caption an
+    /// application cannot forge. See `docs/WINDOW_TITLE.md`.
+    display_name: String,
 }
 
 impl RegisteredSessionUi {
-    fn new() -> Self {
+    fn new(display_name: impl Into<String>) -> Self {
         Self {
             document_mailbox: UiDocumentMailbox::new(),
             input_mailbox: UiInputMailbox::new(),
@@ -51,6 +60,8 @@ impl RegisteredSessionUi {
             file_dialog_mailbox: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
             notification_mailbox: NotificationMailbox::new(),
+            window_title_mailbox: WindowTitleMailbox::new(),
+            display_name: display_name.into(),
         }
     }
 
@@ -88,6 +99,18 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn notification_mailbox(&self) -> NotificationMailbox {
         self.notification_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread window-title mailbox.
+    #[must_use]
+    pub fn window_title_mailbox(&self) -> WindowTitleMailbox {
+        self.window_title_mailbox.clone()
+    }
+
+    /// Returns the validated display name the host appends to a proposed title.
+    #[must_use]
+    pub fn display_name(&self) -> &str {
+        &self.display_name
     }
 }
 
@@ -152,7 +175,7 @@ pub fn create_registered_ui_session(
         load_installed_application(application_id).map_err(RegisteredSessionError::Policy)?;
     let policy = host_policy_for_installed_application(&application, host_name)
         .map_err(|_| RegisteredSessionError::InvalidHostName)?;
-    let ui = RegisteredSessionUi::new();
+    let ui = RegisteredSessionUi::new(application.identity().display_name());
     let services = registered_interactive_services(&application, &ui)?;
     let (server, invitation) =
         WindowsPipeServer::create_with_session_components_and_service_bundle(
@@ -211,7 +234,10 @@ fn registered_interactive_services(
         .with_file_text(ui.file_text_service())
         // Notifications reach Shell32 through the owning UI thread, so the
         // session gets the mailbox rather than the adapter.
-        .with_notifications(ui.notification_mailbox()))
+        .with_notifications(ui.notification_mailbox())
+        // A window caption reaches User32 the same way, and the UI thread holds
+        // the validated display name it composes with.
+        .with_window_title(ui.window_title_mailbox()))
 }
 
 /// A safe failure category while creating a registered application session.
@@ -289,11 +315,38 @@ mod tests {
 
     #[test]
     fn interactive_ui_resources_keep_their_close_signal_session_local() {
-        let first = RegisteredSessionUi::new();
-        let second = RegisteredSessionUi::new();
+        let first = RegisteredSessionUi::new("First Application");
+        let second = RegisteredSessionUi::new("Second Application");
 
         first.close_signal().request();
         assert!(first.close_signal().take());
         assert!(!second.close_signal().take());
+    }
+
+    #[test]
+    fn each_session_carries_its_own_title_bridge_and_validated_name() {
+        // Two sessions must never share either half. A shared mailbox would let
+        // one application's proposal be applied to another's window, and a
+        // shared name would let a caption claim the wrong application.
+        let first = RegisteredSessionUi::new("First Application");
+        let second = RegisteredSessionUi::new("Second Application");
+
+        assert_eq!(first.display_name(), "First Application");
+        assert_eq!(second.display_name(), "Second Application");
+
+        let proposal =
+            anodrel_window::WindowTitleProposal::new("Report").expect("the proposal is valid");
+        let bridge = first.window_title_mailbox();
+        let waiting = std::thread::spawn(move || {
+            anodrel_window::WindowTitleService::set_title(&bridge, &proposal)
+        });
+        while first.window_title_mailbox().take().is_none() {
+            std::thread::yield_now();
+        }
+        // The pending proposal belongs to the session that made it, and the
+        // other session's bridge knows nothing about it.
+        assert!(second.window_title_mailbox().take().is_none());
+        assert!(first.window_title_mailbox().fail(1));
+        assert!(waiting.join().expect("the worker did not panic").is_err());
     }
 }
