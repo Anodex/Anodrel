@@ -155,15 +155,40 @@ produces exactly one record and that the message loop still ends.
 A separate test asserts that no protocol operation names a crash record, which
 is the invariant most likely to be broken by someone adding a convenience later.
 
-Manual check on Windows:
+Two manual checks on Windows, because they prove different things.
+
+**Can the store write?**
 
 ~~~text
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --crash-report-selftest
 ~~~
 
-That route writes one record from the ordinary reporting path and prints only
-whether it succeeded, then exits. Inspect the directory above; the file is
-plain text. Delete the directory to reset.
+Writes one record from the ordinary reporting path and prints only whether it
+succeeded, then exits. No window opens, so the record reads `surface=unknown`.
+This confirms the location, permissions, and format.
+
+**Is a real panic contained, classified, recorded, and shut down?**
+
+~~~text
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --crash-selftest-panic
+~~~
+
+Opens the UI Lab and raises a panic inside its first paint. Expect the process
+to exit without aborting, and one new record reading `site=window-procedure`
+with **`surface=ui-lab`** — the surface is the proof, because it can only be
+that value if classification ran against a live registered window instead of
+falling back to `unknown`.
+
+This route is compiled only in a debug build, which is why the command above has
+no `--release`. Everything a user runs is built in release, so nothing they run
+can be asked to fault. The fault disarms itself before panicking: the host
+repaints while shutting down, and a fault that re-armed would panic again inside
+the cleanup this route exists to observe.
+
+Neither route is exercised by the test suite, and no automated test writes to
+the real location — the adapter's tests use a private temporary root. Inspect
+the directory above after either run; the file is plain text. Delete the
+directory to reset.
 
 ## Compatibility
 

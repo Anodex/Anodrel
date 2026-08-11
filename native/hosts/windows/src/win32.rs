@@ -455,6 +455,57 @@ pub fn run_window_lab() -> io::Result<()> {
     )
 }
 
+/// Deliberate fault injection, for proving the containment path end to end.
+///
+/// A crash reporter that nobody can trigger is one nobody knows still works.
+/// The `--crash-report-selftest` route proves the store can write; this proves
+/// the part that matters more — that a panic raised inside a real window
+/// message is contained, classified, recorded, and shut down cleanly instead of
+/// aborting the process.
+///
+/// Compiled only in a debug build. `start.bat` and every shipped path build in
+/// release, so this cannot exist in a binary a user runs.
+#[cfg(debug_assertions)]
+mod crash_selftest {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static ARMED: AtomicBool = AtomicBool::new(false);
+
+    /// Arms the next window paint to panic.
+    pub(super) fn arm() {
+        ARMED.store(true, Ordering::Release);
+    }
+
+    /// Panics once if armed, disarming itself first.
+    ///
+    /// Disarming before panicking matters: the host repaints while shutting
+    /// down, and a fault that re-armed itself would panic again inside the
+    /// cleanup this route exists to observe.
+    pub(super) fn fault_if_armed() {
+        if ARMED.swap(false, Ordering::AcqRel) {
+            panic!("deliberate fault injected by --crash-selftest-panic");
+        }
+    }
+}
+
+/// Opens the UI Lab and panics inside its first paint, then reports the result.
+///
+/// Available in debug builds only. What to look for afterwards: the process
+/// exits without aborting, and a new record appears in the location named by
+/// `docs/CRASH_REPORTS.md` with `site=window-procedure` and `surface=ui-lab` —
+/// the surface being the proof that classification ran against a live window
+/// rather than falling back to `unknown`.
+#[cfg(debug_assertions)]
+pub fn run_crash_selftest_panic() -> Result<(), Box<dyn std::error::Error>> {
+    crash_selftest::arm();
+    run_ui_lab()?;
+    println!(
+        "The injected fault was contained and the host shut down. \
+         Check for a record with surface=ui-lab; see docs/CRASH_REPORTS.md."
+    );
+    Ok(())
+}
+
 /// Writes one crash record through the ordinary reporting path, then exits.
 ///
 /// A crash record is only useful if it is actually written on the machine it is
@@ -1397,6 +1448,8 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             0
         }
         WM_PAINT => {
+            #[cfg(debug_assertions)]
+            crash_selftest::fault_if_armed();
             let mut paint_struct = PaintStruct::default();
             // SAFETY: Windows calls this procedure for a valid window, and
             // paint_struct is writable stack storage for the matching EndPaint.

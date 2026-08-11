@@ -106,6 +106,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     if arguments.as_slice() == ["--crash-report-selftest"] {
         return win32::run_crash_report_selftest();
     }
+    // Debug builds only. Falls through to the usage error in a release build,
+    // which is the point: nothing a user runs can be asked to fault.
+    #[cfg(debug_assertions)]
+    if arguments.as_slice() == ["--crash-selftest-panic"] {
+        return win32::run_crash_selftest_panic();
+    }
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
