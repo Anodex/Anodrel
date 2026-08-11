@@ -485,6 +485,100 @@ test("notification text is bounded and cannot forge a second message", async () 
   });
 });
 
+test("a window title is a bounded proposal behind its own grant", async () => {
+  const client = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["window.title"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+
+  // Acceptance only. The composed caption is deliberately not returned: it
+  // would hand the application the host's framing format to probe, and it
+  // already knows both halves of what it would be told.
+  assert.deepEqual(await client.setWindowTitle("Quarterly Report.pdf"), {
+    status: "applied",
+  });
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.setWindowTitle("Quarterly Report.pdf"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "window.title",
+  );
+});
+
+test("a window title cannot be aimed at a window or split across lines", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.title"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  const rejected: readonly string[] = [
+    "",
+    // A title is a label rendered on one line. A newline or a carriage return
+    // could split one window's title into what reads as two, or push the
+    // visible text away from the host's application-name suffix.
+    "Report\nWindows Security",
+    "Report\rWindows Security",
+    // Written as an escape rather than a literal control byte, so the intent
+    // survives a copy and is visible to a reader.
+    "Report\u001B[2K",
+    "Report\u0000",
+    "t".repeat(97),
+  ];
+
+  for (const title of rejected) {
+    await assert.rejects(
+      () => client.setWindowTitle(title),
+      (error: unknown) =>
+        error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+      `${JSON.stringify(title)} was accepted`,
+    );
+  }
+
+  // A refusal must not repeat the text it rejected.
+  await assert.rejects(
+    () => client.setWindowTitle("Sensitive\rMarkerZQX"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError && !error.message.includes("MarkerZQX"),
+  );
+
+  // No target may ride along. The absence of a way to name a window is what
+  // makes this capability impossible to aim at somebody else's.
+  const transport = host.createTransport();
+  for (const payload of [
+    { title: "Report", target: "other-window" },
+    { title: "Report", windowId: 2 },
+    { caption: "Report" },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: { major: 1, minor: 14 },
+      kind: "request",
+      requestId: `aimed-${JSON.stringify(payload)}`,
+      operation: "window.title.set",
+      // Deliberately off-contract: this is the shape a client would send if it
+      // believed it could name a window, and the host must refuse it.
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+
+  // Accepted exactly at the bound.
+  assert.deepEqual(await client.setWindowTitle("t".repeat(96)), { status: "applied" });
+});
+
 test("session close requires a host-issued grant", async () => {
   const host = new MockHost({ applicationId: "test.application" });
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());

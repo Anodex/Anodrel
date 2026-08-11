@@ -49,6 +49,7 @@ dependencies = [
  "anodrel-storage",
  "anodrel-ui",
  "anodrel-ui-session",
+ "anodrel-window",
 ]
 
 [[package]]

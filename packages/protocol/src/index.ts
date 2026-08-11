@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 13 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 14 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -43,7 +43,8 @@ export type Capability =
   | "credential.read"
   | "credential.write"
   | "credential.delete"
-  | "notification.show";
+  | "notification.show"
+  | "window.title";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -102,6 +103,22 @@ export interface PlatformOperationMap {
   "notification.show": {
     readonly payload: { readonly title: string; readonly body: string };
     readonly result: { readonly status: "shown" };
+  };
+  /**
+   * Proposes the title of this session's own window.
+   *
+   * A proposal, not an assignment. The host validates it and composes the
+   * displayed caption with an application-name suffix that the proposal cannot
+   * suppress or forge, so a title can say what is being shown and never change
+   * what the application is.
+   *
+   * There is no window target: the host resolves the window from the
+   * authenticated session. The result reports acceptance only — the composed
+   * caption is deliberately not returned.
+   */
+  "window.title.set": {
+    readonly payload: { readonly title: string };
+    readonly result: { readonly status: "applied" };
   };
   "ui.document.replace": {
     readonly payload: { readonly document: string };
@@ -260,7 +277,10 @@ export type ProtocolErrorCode =
   | "credential.stored_secret_invalid"
   | "notification.unavailable"
   | "notification.busy"
-  | "notification.text_invalid";
+  | "notification.text_invalid"
+  | "window.unavailable"
+  | "window.busy"
+  | "window.title_invalid";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -510,6 +530,50 @@ function isNotificationText(value: unknown, maximumUnits: number, allowLineFeed:
     if (allowLineFeed && code === 0x0a) {
       continue;
     }
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Maximum UTF-16 code units an application may propose for its window title. */
+export const MAX_WINDOW_TITLE_UTF16_UNITS = 96;
+
+/**
+ * Returns whether a value is exactly one window-title proposal.
+ *
+ * An extra field is a mismatch rather than something to ignore, so a future
+ * window target, identifier, position, or size cannot be smuggled past protocol
+ * 1.14 — which is what keeps this capability impossible to aim at another
+ * window.
+ *
+ * Every control character is rejected, with no exception for a line feed. A
+ * title is a label rendered on one line, so a newline could split one window's
+ * title into what reads as two, or push the visible text away from the host's
+ * application-name suffix.
+ */
+export function isWindowTitleSetPayload(
+  value: unknown,
+): value is PayloadFor<"window.title.set"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    isWindowTitleProposal(value.title)
+  );
+}
+
+/** Returns whether a value is a bounded, single-line window-title proposal. */
+function isWindowTitleProposal(value: unknown): boolean {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > MAX_WINDOW_TITLE_UTF16_UNITS
+  ) {
+    return false;
+  }
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
     if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
       return false;
     }

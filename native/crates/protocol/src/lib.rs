@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 13;
+pub const PROTOCOL_MINOR: u16 = 14;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -61,6 +61,12 @@ pub enum Capability {
     /// Show one bounded notification. There is no read counterpart to grant,
     /// because a notification has no read surface at all.
     NotificationShow,
+    /// Propose the title of the session's own window.
+    ///
+    /// A proposal, not an assignment: the host composes the displayed caption
+    /// with a validated application-name suffix. There is no read counterpart
+    /// and no way to name a window. See `docs/WINDOW_TITLE.md`.
+    WindowTitle,
 }
 
 impl Capability {
@@ -83,6 +89,7 @@ impl Capability {
             Self::CredentialWrite => "credential.write",
             Self::CredentialDelete => "credential.delete",
             Self::NotificationShow => "notification.show",
+            Self::WindowTitle => "window.title",
         }
     }
 }
@@ -118,6 +125,16 @@ pub enum ProtocolErrorCode {
     /// The supplied title or body failed the documented bounds or character
     /// rules. The failure never echoes the offending text back.
     NotificationTextInvalid,
+    /// This session has no host window to title, or the native call failed.
+    ///
+    /// One code for both, deliberately: which it is describes host state an
+    /// application has no business learning.
+    WindowUnavailable,
+    /// Another window-title proposal for this session is still pending.
+    WindowBusy,
+    /// The proposed title failed the documented bounds or character rules. The
+    /// failure never echoes the offending text back.
+    WindowTitleInvalid,
 }
 
 impl ProtocolErrorCode {
@@ -147,6 +164,9 @@ impl ProtocolErrorCode {
             Self::NotificationUnavailable => "notification.unavailable",
             Self::NotificationBusy => "notification.busy",
             Self::NotificationTextInvalid => "notification.text_invalid",
+            Self::WindowUnavailable => "window.unavailable",
+            Self::WindowBusy => "window.busy",
+            Self::WindowTitleInvalid => "window.title_invalid",
         }
     }
 }

@@ -87,6 +87,21 @@ export class PlatformClient {
     return this.request("notification.show", { title, body });
   }
 
+  /**
+   * Proposes the title of this session's own window.
+   *
+   * A proposal, not an assignment. The host composes the displayed caption by
+   * appending the application's validated display name, so `Report.pdf` becomes
+   * `Report.pdf — Your Application`. That suffix cannot be suppressed or forged,
+   * which is what stops a title claiming to be another application.
+   *
+   * There is no window argument, and none is coming: the host resolves the
+   * window from the authenticated session.
+   */
+  setWindowTitle(title: string): Promise<ResultFor<"window.title.set">> {
+    return this.request("window.title.set", { title });
+  }
+
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {
     return this.request("ui.document.replace", { document });
   }

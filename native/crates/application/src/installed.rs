@@ -285,15 +285,21 @@ enum RecordVersion {
     V1_1,
     V1_2,
     V1_3,
+    V1_4,
 }
 
 impl RecordVersion {
     /// Whether this version accepts the grants version 1.2 introduced.
     ///
     /// Each later version is a superset, so a record written for 1.2 keeps its
-    /// exact meaning when read as 1.3.
+    /// exact meaning when read as 1.3 or 1.4.
     const fn accepts_v1_2_grants(self) -> bool {
-        matches!(self, Self::V1_2 | Self::V1_3)
+        matches!(self, Self::V1_2 | Self::V1_3 | Self::V1_4)
+    }
+
+    /// Whether this version accepts the grant version 1.3 introduced.
+    const fn accepts_v1_3_grants(self) -> bool {
+        matches!(self, Self::V1_3 | Self::V1_4)
     }
 }
 
@@ -403,9 +409,11 @@ fn capability_for_record_version(
         "credential.read" if version.accepts_v1_2_grants() => Some(Capability::CredentialRead),
         "credential.write" if version.accepts_v1_2_grants() => Some(Capability::CredentialWrite),
         "credential.delete" if version.accepts_v1_2_grants() => Some(Capability::CredentialDelete),
-        // Version 1.3 adds exactly one grant. An earlier record naming it stays
-        // invalid, so provisioning cannot widen a record by accident.
-        "notification.show" if version == RecordVersion::V1_3 => Some(Capability::NotificationShow),
+        // Versions 1.3 and 1.4 each add exactly one grant. An earlier record
+        // naming a later grant stays invalid, so provisioning cannot widen a
+        // record by accident.
+        "notification.show" if version.accepts_v1_3_grants() => Some(Capability::NotificationShow),
+        "window.title" if version == RecordVersion::V1_4 => Some(Capability::WindowTitle),
         _ => None,
     }
 }
@@ -509,6 +517,7 @@ fn validate_version(
         (1, 1) => Ok(RecordVersion::V1_1),
         (1, 2) => Ok(RecordVersion::V1_2),
         (1, 3) => Ok(RecordVersion::V1_3),
+        (1, 4) => Ok(RecordVersion::V1_4),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -843,6 +852,60 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_4_adds_the_window_title_grant_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 4")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"clipboard.read\", \"credential.read\", \"notification.show\", \"window.title\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.4 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::ClipboardRead,
+                anodrel_protocol::Capability::CredentialRead,
+                anodrel_protocol::Capability::NotificationShow,
+                anodrel_protocol::Capability::WindowTitle,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_window_title_grant() {
+        // The same widening guard as the notification grant, one version later.
+        // Version 1.3 is the interesting case: it is the newest version that
+        // predates this grant, so it is the one a stale provisioning step would
+        // most plausibly still be writing.
+        for minor in ["1", "2", "3"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"window.title\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.4 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

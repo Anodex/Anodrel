@@ -7,6 +7,7 @@ import {
   isCredentialReadPayload,
   isCredentialWritePayload,
   isNotificationShowPayload,
+  isWindowTitleSetPayload,
   isExternalOpenPayload,
   isFileDialogOpenPayload,
   isFileTextReadPayload,
@@ -302,6 +303,22 @@ export class MockHost {
         // Handed over, never seen: the mock reports acceptance and nothing
         // about what a user would have experienced.
         return this.success("notification.show", request.requestId, { status: "shown" });
+
+      case "window.title.set":
+        if (request.protocolVersion.minor < 14) {
+          return this.failure(request.requestId, "operation.unsupported", "window.title.set requires protocol 1.14 or later.");
+        }
+        if (!isWindowTitleSetPayload(request.payload)) {
+          // Never echoes the proposal: text refused for being unsafe to display
+          // must not be repeated in a failure that reaches a log.
+          return this.failure(request.requestId, "request.payload_invalid", "window.title.set requires one title string.");
+        }
+        if (!this.hasCapability(sessionId, "window.title")) {
+          return this.failure(request.requestId, "capability.denied", "window.title.set requires the window.title capability.", { capability: "window.title" });
+        }
+        // Acceptance only. A real host composes the caption with its validated
+        // application-name suffix and does not report what it became.
+        return this.success("window.title.set", request.requestId, { status: "applied" });
 
       case "ui.document.replace":
       case "ui.document.replace.v2":

@@ -38,6 +38,7 @@ use anodrel_protocol::{
 };
 use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
 use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
+use anodrel_window::{WindowTitleProposal, WindowTitleService, WindowTitleServiceError};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
@@ -116,6 +117,7 @@ pub struct CoreHost {
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
     notifications: Box<dyn NotificationService>,
+    window_title: Box<dyn WindowTitleService>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
@@ -136,6 +138,7 @@ pub struct HostServices {
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
     notifications: Box<dyn NotificationService>,
+    window_title: Box<dyn WindowTitleService>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
@@ -172,6 +175,15 @@ struct UnavailableNotifications;
 impl NotificationService for UnavailableNotifications {
     fn show(&self, _notification: &Notification) -> Result<(), NotificationServiceError> {
         Err(NotificationServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableWindowTitle;
+
+impl WindowTitleService for UnavailableWindowTitle {
+    fn set_title(&self, _proposal: &WindowTitleProposal) -> Result<(), WindowTitleServiceError> {
+        Err(WindowTitleServiceError::Unavailable)
     }
 }
 
@@ -243,6 +255,7 @@ impl HostServices {
             clipboard: Box::new(UnavailableClipboard),
             external_links: Box::new(UnavailableExternalLinks),
             notifications: Box::new(UnavailableNotifications),
+            window_title: Box::new(UnavailableWindowTitle),
             file_dialogs: Box::new(UnavailableFileDialogs),
             file_selections: Box::new(UnavailableFileSelectionService),
             file_text: Box::new(UnavailableFileTextService),
@@ -273,6 +286,17 @@ impl HostServices {
     #[must_use]
     pub fn with_notifications(mut self, service: impl NotificationService + 'static) -> Self {
         self.notifications = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed window-title service.
+    ///
+    /// The supplied service must reach User32 through the host UI thread, and
+    /// must apply the title only to the window this session owns. A session
+    /// worker never calls User32 itself, and never names a window.
+    #[must_use]
+    pub fn with_window_title(mut self, service: impl WindowTitleService + 'static) -> Self {
+        self.window_title = Box::new(service);
         self
     }
 
@@ -353,6 +377,7 @@ impl CoreHost {
             clipboard: services.clipboard,
             external_links: services.external_links,
             notifications: services.notifications,
+            window_title: services.window_title,
             file_dialogs: services.file_dialogs,
             file_selections: services.file_selections,
             file_text: services.file_text,
@@ -582,6 +607,7 @@ impl CoreHost {
             // notifications. Leaving it unavailable keeps every existing caller
             // exactly as capable as it was, rather than silently widening it.
             notifications: Box::new(UnavailableNotifications),
+            window_title: Box::new(UnavailableWindowTitle),
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
             file_text: Box::new(file_text),
@@ -674,6 +700,9 @@ impl CoreHost {
             }
             "notification.show" if request.protocol_version.minor >= 13 => {
                 self.handle_notification_show(request)
+            }
+            "window.title.set" if request.protocol_version.minor >= 14 => {
+                self.handle_window_title_set(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
@@ -1149,6 +1178,59 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::NotificationBusy,
                 "a notification is already pending.",
+                None,
+            ),
+        }
+    }
+
+    /// Proposes the title of this session's own window.
+    ///
+    /// The request names no window. The host resolves it from the authenticated
+    /// session, and the service composes the displayed caption with a validated
+    /// application-name suffix the proposal cannot suppress or forge. Success
+    /// reports acceptance only: returning the composed caption would hand the
+    /// application a way to probe the host's framing, and it already knows both
+    /// halves. See `docs/WINDOW_TITLE.md` and Decision 0066.
+    fn handle_window_title_set(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(title) = window_title_set_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.title.set requires one title string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::WindowTitle) {
+            return self.capability_denied(request.request_id, "window.title.set");
+        }
+
+        // A rejected proposal must not become a way to have the host repeat
+        // text back: the failure names the rule, never the value.
+        let Ok(proposal) = WindowTitleProposal::new(title) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowTitleInvalid,
+                "window.title.set title is invalid.",
+                None,
+            );
+        };
+
+        match self.window_title.set_title(&proposal) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("applied".to_owned()))]),
+            ),
+            Err(WindowTitleServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no window is available to title.",
+                None,
+            ),
+            Err(WindowTitleServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "a window title change is already pending.",
                 None,
             ),
         }
@@ -1672,6 +1754,19 @@ fn notification_show_payload(value: &JsonValue) -> Option<(&str, &str)> {
     Some((title, body))
 }
 
+/// Reads the exact one-field payload `window.title.set` accepts.
+///
+/// Any extra field is a mismatch rather than something to ignore, so a future
+/// window target, identifier, position, or size cannot be smuggled past this
+/// version — which is the whole reason the capability is safe at all.
+fn window_title_set_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("title"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
 fn external_open_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -1799,6 +1894,7 @@ mod tests {
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
+    use anodrel_window::{WindowTitleProposal, WindowTitleService, WindowTitleServiceError};
 
     use super::*;
 
@@ -2253,6 +2349,181 @@ mod tests {
         assert_eq!(
             field(field(&unsupported, "error"), "code").as_string(),
             Some("operation.unsupported")
+        );
+    }
+
+    /// A window-title service that records the proposals it was handed.
+    #[derive(Debug, Default)]
+    struct RecordingWindowTitle {
+        applied: std::sync::Mutex<Vec<String>>,
+        result: Option<WindowTitleServiceError>,
+    }
+
+    impl WindowTitleService for RecordingWindowTitle {
+        fn set_title(&self, proposal: &WindowTitleProposal) -> Result<(), WindowTitleServiceError> {
+            if let Some(error) = self.result {
+                return Err(error);
+            }
+            self.applied
+                .lock()
+                .expect("the test mutex is usable")
+                .push(proposal.as_str().to_owned());
+            Ok(())
+        }
+    }
+
+    fn request_v1_14(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":14}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn host_with_window_title(service: impl WindowTitleService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::WindowTitle],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_window_title(service),
+        )
+    }
+
+    #[test]
+    fn a_granted_window_title_reaches_the_service_unchanged() {
+        let service = RecordingWindowTitle::default();
+        let response = JsonValue::parse(&host_with_window_title(service).handle_json(
+            &request_v1_14("window.title.set", r#"{"title":"Quarterly Report.pdf"}"#),
+        ))
+        .expect("response JSON is valid");
+
+        assert_eq!(field(&response, "status").as_string(), Some("success"));
+        // Acceptance only. The composed caption is deliberately not returned:
+        // it would hand the application the host's framing format to probe.
+        assert_eq!(
+            field(field(&response, "result"), "status").as_string(),
+            Some("applied")
+        );
+    }
+
+    #[test]
+    fn a_window_title_needs_its_own_grant_and_its_own_protocol_version() {
+        let payload = r#"{"title":"Report"}"#;
+
+        // Held every other grant, but not this one.
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::NotificationShow, Capability::DiagnosticsRead],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable().with_window_title(RecordingWindowTitle::default()),
+            )
+            .handle_json(&request_v1_14("window.title.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        // Granted, but asked for at a protocol minor that predates it.
+        let unsupported = JsonValue::parse(
+            &host_with_window_title(RecordingWindowTitle::default())
+                .handle_json(&request_v1_13("window.title.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn a_window_title_payload_accepts_exactly_one_title_field() {
+        // An extra field is a mismatch rather than something to ignore, so a
+        // future target, identifier, position, or size cannot be smuggled past
+        // this version. That refusal is what keeps the capability un-aimable.
+        for payload in [
+            r#"{}"#,
+            r#"{"title":"Report","target":"other-window"}"#,
+            r#"{"title":"Report","windowId":2}"#,
+            r#"{"caption":"Report"}"#,
+            r#"{"title":7}"#,
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_title(RecordingWindowTitle::default())
+                    .handle_json(&request_v1_14("window.title.set", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn a_rejected_window_title_never_echoes_the_text_it_refused() {
+        // The marker is what a leak would look like: text refused for being
+        // unsafe to display must not be repeated in an error that reaches logs.
+        let marker = "MarkerZQX";
+        let response = host_with_window_title(RecordingWindowTitle::default()).handle_json(
+            &request_v1_14("window.title.set", &format!(r#"{{"title":"{marker}\n"}}"#)),
+        );
+        let parsed = JsonValue::parse(&response).expect("response JSON is valid");
+        assert_eq!(
+            field(field(&parsed, "error"), "code").as_string(),
+            Some("window.title_invalid")
+        );
+        assert!(!response.contains(marker), "the refused title was echoed");
+    }
+
+    #[test]
+    fn window_title_service_failures_map_to_their_own_codes() {
+        for (error, code) in [
+            (WindowTitleServiceError::Unavailable, "window.unavailable"),
+            (WindowTitleServiceError::Busy, "window.busy"),
+        ] {
+            let service = RecordingWindowTitle {
+                result: Some(error),
+                ..RecordingWindowTitle::default()
+            };
+            let response = JsonValue::parse(
+                &host_with_window_title(service)
+                    .handle_json(&request_v1_14("window.title.set", r#"{"title":"Report"}"#)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(code),
+                "{error:?} mapped to the wrong code"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_without_a_window_title_service_reports_unavailable() {
+        let response = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowTitle],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            )
+            .handle_json(&request_v1_14("window.title.set", r#"{"title":"Report"}"#)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("window.unavailable")
         );
     }
 
