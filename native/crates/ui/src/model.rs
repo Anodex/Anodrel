@@ -335,6 +335,130 @@ impl Action {
     }
 }
 
+/// Smallest permitted maximum length for a field's text, in characters.
+pub const MIN_FIELD_LENGTH: u16 = 1;
+/// Largest permitted maximum length for a field's text, in characters.
+pub const MAX_FIELD_LENGTH: u16 = 4_096;
+
+/// A single-line field a person can type into.
+///
+/// This node carries the text the application *starts* the field with. It is
+/// not a live value: once a surface is showing the field, the host owns the
+/// text, the caret, and the selection, and an application learns a value only
+/// by asking for a snapshot through a granted operation. There is no change
+/// event and no keystroke anywhere in this model.
+///
+/// There is deliberately no masked or password variant. See `docs/UI_FIELDS.md`
+/// and Decision 0067.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Field {
+    pub(crate) id: ElementId,
+    pub(crate) label: String,
+    pub(crate) value: String,
+    pub(crate) placeholder: Option<String>,
+    pub(crate) max_length: u16,
+    pub(crate) font_size: u16,
+    pub(crate) enabled: bool,
+}
+
+impl Field {
+    /// Builds a validated single-line field.
+    ///
+    /// `label` is required. A field with no label cannot be announced by a
+    /// screen reader, and a control a person cannot identify is not one this
+    /// model will produce.
+    ///
+    /// `value` may be empty — an empty field is the ordinary case — but is
+    /// otherwise validated like any visible text, and must fit `max_length`.
+    pub fn new(
+        id: ElementId,
+        label: impl Into<String>,
+        value: impl Into<String>,
+        max_length: u16,
+        font_size: u16,
+        enabled: bool,
+    ) -> Result<Self, UiError> {
+        let label = label.into();
+        let value = value.into();
+        validate_text(&label)?;
+        validate_font_size(font_size)?;
+        if !(MIN_FIELD_LENGTH..=MAX_FIELD_LENGTH).contains(&max_length) {
+            return Err(UiError::InvalidFieldLength);
+        }
+        // An empty starting value is ordinary, so it skips the non-empty rule
+        // that visible text carries — but not the single-line rule, which is
+        // what stops a field from arriving pre-filled with a forged second line.
+        if !value.is_empty() {
+            validate_text(&value)?;
+        }
+        if value.chars().count() > usize::from(max_length) {
+            return Err(UiError::InvalidText);
+        }
+        Ok(Self {
+            id,
+            label,
+            value,
+            placeholder: None,
+            max_length,
+            font_size,
+            enabled,
+        })
+    }
+
+    /// Sets the hint shown while the field is empty.
+    ///
+    /// A placeholder is never returned as a value: it is something the host
+    /// draws, not something the person typed.
+    pub fn with_placeholder(mut self, placeholder: impl Into<String>) -> Result<Self, UiError> {
+        let placeholder = placeholder.into();
+        validate_text(&placeholder)?;
+        self.placeholder = Some(placeholder);
+        Ok(self)
+    }
+
+    /// Returns this field's semantic element ID.
+    #[must_use]
+    pub fn id(&self) -> &ElementId {
+        &self.id
+    }
+
+    /// Returns the validated visible label.
+    #[must_use]
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// Returns the text the application starts this field with.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    /// Returns the hint shown while the field is empty.
+    #[must_use]
+    pub fn placeholder(&self) -> Option<&str> {
+        self.placeholder.as_deref()
+    }
+
+    /// Returns the largest number of characters the host will accept.
+    #[must_use]
+    pub const fn max_length(&self) -> u16 {
+        self.max_length
+    }
+
+    /// Returns the requested logical-pixel font size.
+    #[must_use]
+    pub const fn font_size(&self) -> u16 {
+        self.font_size
+    }
+
+    /// Returns whether this field accepts focus and input.
+    #[must_use]
+    pub const fn enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
 /// One supported node in a UI document.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UiNode {
@@ -346,6 +470,8 @@ pub enum UiNode {
     Text(Text),
     /// A semantic action.
     Action(Action),
+    /// A single-line field a person can type into.
+    Field(Field),
 }
 
 impl UiNode {
@@ -357,6 +483,7 @@ impl UiNode {
             Self::Scroll(scroll) => scroll.id(),
             Self::Text(text) => text.id(),
             Self::Action(action) => action.id(),
+            Self::Field(field) => field.id(),
         }
     }
 }
@@ -435,6 +562,14 @@ impl DocumentValidator {
             UiNode::Scroll(scroll) => self.visit(scroll.child(), depth + 1)?,
             UiNode::Text(text) => self.add_text(text.value.len())?,
             UiNode::Action(action) => self.add_text(action.label.len())?,
+            // Every string a field carries counts towards the document budget,
+            // including its starting value: a document that arrives with 512
+            // pre-filled fields is as large as one with 512 text runs.
+            UiNode::Field(field) => self.add_text(
+                field.label.len()
+                    + field.value.len()
+                    + field.placeholder.as_ref().map_or(0, String::len),
+            )?,
         }
         Ok(())
     }
@@ -469,6 +604,115 @@ mod tests {
             Stack::new(id(id_value), Axis::Vertical, Insets::zero(), 0, vec![child])
                 .expect("test stack is valid"),
         )
+    }
+
+    fn field(id_value: &str, value: &str) -> Field {
+        Field::new(id(id_value), "Name", value, 64, 14, true).expect("test field is valid")
+    }
+
+    #[test]
+    fn a_field_accepts_an_empty_starting_value_but_not_a_forged_second_line() {
+        // Empty is the ordinary case, so a field skips the non-empty rule that
+        // visible text carries. It does not skip the single-line rule: a value
+        // arriving with a newline could present one field as two.
+        assert!(Field::new(id("empty"), "Name", "", 64, 14, true).is_ok());
+        assert_eq!(
+            Field::new(id("forged"), "Name", "Alice\nBob", 64, 14, true),
+            Err(UiError::InvalidText)
+        );
+        assert_eq!(
+            Field::new(id("escape"), "Name", "Alice\u{1B}[2K", 64, 14, true),
+            Err(UiError::InvalidText)
+        );
+    }
+
+    #[test]
+    fn a_field_requires_a_label_because_an_unnamed_control_cannot_be_announced() {
+        assert_eq!(
+            Field::new(id("nameless"), "", "", 64, 14, true),
+            Err(UiError::InvalidText)
+        );
+    }
+
+    #[test]
+    fn a_field_bounds_its_maximum_length_and_its_starting_value() {
+        assert_eq!(
+            Field::new(id("zero"), "Name", "", MIN_FIELD_LENGTH - 1, 14, true),
+            Err(UiError::InvalidFieldLength)
+        );
+        assert_eq!(
+            Field::new(id("huge"), "Name", "", MAX_FIELD_LENGTH + 1, 14, true),
+            Err(UiError::InvalidFieldLength)
+        );
+        assert!(Field::new(id("edge"), "Name", "", MAX_FIELD_LENGTH, 14, true).is_ok());
+
+        // A starting value longer than the field will accept would put the host
+        // in a state a person could not have typed into.
+        assert!(Field::new(id("fits"), "Name", "abcd", 4, 14, true).is_ok());
+        assert_eq!(
+            Field::new(id("over"), "Name", "abcde", 4, 14, true),
+            Err(UiError::InvalidText)
+        );
+    }
+
+    #[test]
+    fn a_field_measures_its_starting_value_in_characters_not_bytes() {
+        // The limit is what a person may type, so it counts what they type.
+        // Four emoji are four characters and sixteen bytes.
+        let emoji = "\u{1F680}".repeat(4);
+        assert_eq!(emoji.chars().count(), 4);
+        assert_eq!(emoji.len(), 16);
+        assert!(Field::new(id("emoji"), "Name", emoji.clone(), 4, 14, true).is_ok());
+        assert_eq!(
+            Field::new(id("emoji-over"), "Name", emoji, 3, 14, true),
+            Err(UiError::InvalidText)
+        );
+    }
+
+    #[test]
+    fn every_string_a_field_carries_counts_towards_the_document_budget() {
+        // A document of pre-filled fields is as large as one of text runs, so
+        // the value and the placeholder are budgeted like any other text.
+        // Each value is within one field's own limit; it takes several of them
+        // to exceed the document's. That is exactly the case a per-field bound
+        // alone would miss.
+        let filler = "x".repeat(usize::from(MAX_FIELD_LENGTH));
+        let needed = MAX_TEXT_BYTES / usize::from(MAX_FIELD_LENGTH) + 1;
+        let children = (0..needed)
+            .map(|index| {
+                UiNode::Field(
+                    Field::new(
+                        id(format!("field-{index}")),
+                        "Name",
+                        filler.clone(),
+                        MAX_FIELD_LENGTH,
+                        14,
+                        true,
+                    )
+                    .expect("each value fits its own field"),
+                )
+            })
+            .collect();
+        let root = UiNode::Stack(
+            Stack::new(id("root"), Axis::Vertical, Insets::zero(), 0, children)
+                .expect("test stack is valid"),
+        );
+        assert_eq!(UiDocument::new(root), Err(UiError::TextLimitExceeded));
+    }
+
+    #[test]
+    fn a_placeholder_is_validated_and_kept_separate_from_the_value() {
+        let with_hint = field("hinted", "")
+            .with_placeholder("Your full name")
+            .expect("placeholder is valid");
+        assert_eq!(with_hint.placeholder(), Some("Your full name"));
+        // A placeholder is drawn, never returned as a value.
+        assert_eq!(with_hint.value(), "");
+        assert_eq!(field("plain", "").placeholder(), None);
+        assert_eq!(
+            field("bad", "").with_placeholder("two\nlines").unwrap_err(),
+            UiError::InvalidText
+        );
     }
 
     #[test]

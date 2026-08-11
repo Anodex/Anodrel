@@ -126,6 +126,10 @@ fn contains_enabled_action(node: &UiNode, expected: &ElementId) -> bool {
             .iter()
             .any(|child| contains_enabled_action(child, expected)),
         UiNode::Scroll(scroll) => contains_enabled_action(scroll.child(), expected),
-        UiNode::Text(_) => false,
+        // A field is not an action. Typing into one produces no event at all,
+        // so a delivered event can never name a field — which also means an
+        // application cannot use the event path to learn that a field was
+        // touched. See Decision 0067.
+        UiNode::Text(_) | UiNode::Field(_) => false,
     }
 }

@@ -30,8 +30,8 @@ pub const MAX_ENCODED_DOCUMENT_BYTES: usize = 64 * 1024;
 #[cfg(test)]
 mod tests {
     use anodrel_ui::{
-        Action, Axis, ElementId, Insets, Scroll, Stack, Text, UiActionTone, UiDocument, UiError,
-        UiNode, UiSurfaceTone, UiTextTone,
+        Action, Axis, ElementId, Field, Insets, Scroll, Stack, Text, UiActionTone, UiDocument,
+        UiError, UiNode, UiSurfaceTone, UiTextTone,
     };
 
     use super::{
@@ -75,6 +75,75 @@ mod tests {
 
         assert_eq!(decode(&encoded), Ok(document.clone()));
         assert_eq!(encode(&document), Ok(encoded));
+    }
+
+    #[test]
+    fn round_trips_a_field_with_and_without_its_optional_placeholder() {
+        for placeholder in [None, Some("Your full name")] {
+            let mut field =
+                Field::new(id("name"), "Name", "Ada", 64, 16, true).expect("test field is valid");
+            if let Some(hint) = placeholder {
+                field = field.with_placeholder(hint).expect("test hint is valid");
+            }
+            let document = UiDocument::new(UiNode::Field(field)).expect("test document is valid");
+            let encoded = encode(&document).expect("test document fits the format limit");
+
+            assert_eq!(decode(&encoded), Ok(document.clone()));
+            assert_eq!(encode(&document), Ok(encoded.clone()));
+            assert_eq!(
+                encoded.contains("placeholder"),
+                placeholder.is_some(),
+                "placeholder encoding disagrees with the node"
+            );
+        }
+    }
+
+    #[test]
+    fn a_field_document_refuses_an_unknown_property() {
+        // The strictness matters more here than elsewhere: a `secret` flag
+        // accepted by a host that does not implement masking would be a
+        // promise nothing keeps. See Decision 0067.
+        let base = r#"{"format":"anodrel.ui.document.v1","root":{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true"#;
+        assert!(decode(&format!("{base}}}}}")).is_ok());
+        for extra in [
+            r#","secret":true"#,
+            r#","multiline":true"#,
+            r#","pattern":"[0-9]*""#,
+        ] {
+            assert_eq!(
+                decode(&format!("{base}{extra}}}}}")),
+                Err(UiDocumentError::UnknownField),
+                "{extra} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn a_field_document_requires_every_property_except_the_placeholder() {
+        for missing in ["label", "value", "maxLength", "fontSize", "enabled"] {
+            let mut properties = vec![
+                (r#""id""#, r#""name""#),
+                (r#""kind""#, r#""field""#),
+                (r#""label""#, r#""Name""#),
+                (r#""value""#, r#""""#),
+                (r#""maxLength""#, "64"),
+                (r#""fontSize""#, "16"),
+                (r#""enabled""#, "true"),
+            ];
+            properties.retain(|(name, _)| *name != format!("\"{missing}\""));
+            let root = properties
+                .iter()
+                .map(|(name, value)| format!("{name}:{value}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            assert!(
+                decode(&format!(
+                    r#"{{"format":"anodrel.ui.document.v1","root":{{{root}}}}}"#
+                ))
+                .is_err(),
+                "a field without {missing} was accepted"
+            );
+        }
     }
 
     #[test]

@@ -8,9 +8,9 @@
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Color, Paint, Point, Rect, point};
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Scroll, Stack, Text, TextMeasurer, UiActionTone, UiDocument,
-    UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollWheel, UiSize,
-    UiSurfaceTone, UiTextTone,
+    Action, Axis, ElementId, FIELD_HORIZONTAL_PADDING, Field, Insets, Scroll, Stack, Text,
+    TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect,
+    UiScrollOffsets, UiScrollWheel, UiSize, UiSurfaceTone, UiTextTone,
 };
 use anodrel_ui_document::decode;
 use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
@@ -490,7 +490,67 @@ fn draw_node(
             );
         }
         UiNode::Action(action) => draw_action(canvas, lab, action, bounds, surface, palette),
+        UiNode::Field(field) => draw_field(canvas, field, bounds, surface, palette),
     }
+}
+
+/// Draws one field's box, label, and current text.
+///
+/// The text drawn here is the value the document carried. Typing is not wired
+/// to this surface yet, so the box is a faithful picture of the node and not
+/// somewhere a person can enter anything; the caret and key handling arrive
+/// with the host's field state. See `docs/UI_FIELDS.md`.
+fn draw_field(
+    canvas: &mut Canvas,
+    field: &Field,
+    bounds: UiRect,
+    surface: Surface,
+    palette: UiLabPalette,
+) {
+    let box_bounds = surface.to_canvas_rect(bounds);
+    let radius = 8.0 * surface.scale;
+    canvas.fill_rounded_rect(box_bounds, radius, &Paint::solid(palette.backdrop_lift));
+    canvas.stroke_rounded_rect(
+        box_bounds,
+        radius,
+        1.0 * surface.scale,
+        &Paint::solid(palette.panel_edge),
+    );
+
+    // The placeholder stands in only while there is nothing to show, and is
+    // drawn in the dimmer ink so it never reads as entered text.
+    let (value, color) = if field.value().is_empty() {
+        (
+            field.placeholder().unwrap_or(""),
+            if field.enabled() {
+                palette.ink_soft
+            } else {
+                palette.panel_edge
+            },
+        )
+    } else {
+        (
+            field.value(),
+            if field.enabled() {
+                palette.ink
+            } else {
+                palette.ink_soft
+            },
+        )
+    };
+    if value.is_empty() {
+        return;
+    }
+    let spec = TextSpec::new(value, surface.font(field.font_size()), WEIGHT_REGULAR);
+    let inset = FIELD_HORIZONTAL_PADDING * surface.scale;
+    let baseline = box_bounds.top + (box_bounds.height() - text::line_height(&spec)) / 2.0;
+    text::draw(
+        canvas,
+        &spec,
+        point(box_bounds.left + inset, baseline),
+        Align::Left,
+        &Paint::solid(color),
+    );
 }
 
 fn draw_text(

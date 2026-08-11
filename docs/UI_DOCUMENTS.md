@@ -86,6 +86,31 @@ from 0 through 256.
 | `enabled` | boolean | Whether the action participates in hit tests and focus. |
 | `tone` | string | `neutral` or `accent` |
 
+### Field
+
+A single-line field a person can type into. See `docs/UI_FIELDS.md` for what an
+application may and may not learn about what they type.
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `id` | string | Valid, document-unique element ID. |
+| `kind` | string | `field` |
+| `label` | string | Valid bounded single-line text. Required: an unlabelled control cannot be announced. |
+| `value` | string | The text the field starts with. May be empty; otherwise valid single-line text within `maxLength`. |
+| `placeholder` | string | *Optional.* Hint shown while the value is empty. The only optional property in this format. |
+| `maxLength` | integer | 1 through 4,096 characters. |
+| `fontSize` | integer | 8 through 96 |
+| `enabled` | boolean | Whether the field accepts focus and input. |
+
+`value` sets the field; it never reports one. A document is what an application
+tells the host, and the host's current text does not travel back this way — a
+value crosses to an application only through the granted snapshot described in
+`docs/UI_FIELDS.md`.
+
+There is no `secret`, `multiline`, or `pattern` property. This format rejects
+unknown properties, so a host that does not implement masking cannot silently
+accept a document that asks for it.
+
 ## Example
 
 ~~~json

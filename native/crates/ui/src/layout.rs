@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    Action, Axis, ElementId, Scroll, Stack, Text, UiDocument, UiNode, UiPoint, UiRect,
+    Action, Axis, ElementId, Field, Scroll, Stack, Text, UiDocument, UiNode, UiPoint, UiRect,
     UiScrollState, UiSize,
 };
 
@@ -13,6 +13,16 @@ pub const ACTION_HORIZONTAL_PADDING: f32 = 16.0;
 pub const ACTION_VERTICAL_PADDING: f32 = 12.0;
 /// The smallest action height in logical pixels.
 pub const ACTION_MINIMUM_HEIGHT: f32 = 36.0;
+
+/// Horizontal padding inside a field's box, on each side.
+pub const FIELD_HORIZONTAL_PADDING: f32 = 12.0;
+/// Vertical padding inside a field's box, on each side.
+pub const FIELD_VERTICAL_PADDING: f32 = 10.0;
+/// The smallest field height in logical pixels.
+///
+/// Slightly taller than an action's: a field is a pointer target that also has
+/// to hold a caret without the text touching its edge.
+pub const FIELD_MINIMUM_HEIGHT: f32 = 40.0;
 
 /// Host-owned measurement for the UI's plain text.
 ///
@@ -34,6 +44,8 @@ pub enum UiLayoutKind {
     Text,
     /// A semantic action.
     Action,
+    /// A single-line field a person can type into.
+    Field,
 }
 
 /// Host-owned scroll positions keyed by scroll-viewport element ID.
@@ -231,7 +243,9 @@ impl UiDocument {
 fn root_bounds(node: &UiNode, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiRect {
     match node {
         UiNode::Text(text) => bounded_text_bounds(text, client_bounds, measurer),
-        UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) => client_bounds,
+        UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
+            client_bounds
+        }
     }
 }
 
@@ -290,6 +304,13 @@ fn layout_node(
             kind: UiLayoutKind::Action,
             enabled: action.enabled,
         }),
+        UiNode::Field(field) => layout.items.push(UiLayoutItem {
+            id: field.id.clone(),
+            bounds: visible_bounds,
+            paint_bounds: bounds,
+            kind: UiLayoutKind::Field,
+            enabled: field.enabled,
+        }),
     }
 }
 
@@ -315,7 +336,9 @@ fn layout_stack_children(
                 let intrinsic = intrinsic_size(child, measurer);
                 let width = match child {
                     UiNode::Text(_) => intrinsic.width.min(content.width()),
-                    UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) => content.width(),
+                    UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
+                        content.width()
+                    }
                 };
                 let child_bounds =
                     UiRect::from_size(content.left, cursor, width.max(0.0), intrinsic.height);
@@ -336,7 +359,9 @@ fn layout_stack_children(
                 let intrinsic = intrinsic_size(child, measurer);
                 let height = match child {
                     UiNode::Text(_) => intrinsic.height.min(content.height()),
-                    UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) => content.height(),
+                    UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
+                        content.height()
+                    }
                 };
                 let child_bounds =
                     UiRect::from_size(cursor, content.top, intrinsic.width, height.max(0.0));
@@ -392,6 +417,7 @@ fn intrinsic_size(node: &UiNode, measurer: &dyn TextMeasurer) -> UiSize {
     match node {
         UiNode::Text(text) => measured_text(text.value(), text.font_size(), measurer),
         UiNode::Action(action) => intrinsic_action_size(action, measurer),
+        UiNode::Field(field) => intrinsic_field_size(field, measurer),
         UiNode::Stack(stack) => intrinsic_stack_size(stack, measurer),
         UiNode::Scroll(scroll) => intrinsic_size(scroll.child(), measurer),
     }
@@ -406,6 +432,23 @@ fn intrinsic_action_size(action: &Action, measurer: &dyn TextMeasurer) -> UiSize
     UiSize::new(
         label.width + ACTION_HORIZONTAL_PADDING * 2.0,
         (label.height + ACTION_VERTICAL_PADDING * 2.0).max(ACTION_MINIMUM_HEIGHT),
+    )
+}
+
+/// A field's height comes from its font, never from its current text.
+///
+/// Sizing to the value would make a field grow and shrink as someone types,
+/// moving every sibling under their cursor. It would also leak the length of
+/// what is being typed into the layout, which is the sort of thing an
+/// application can observe; a field that is the same size empty or full tells
+/// nobody anything. Width is taken from the stack, like an action's.
+fn intrinsic_field_size(field: &Field, measurer: &dyn TextMeasurer) -> UiSize {
+    // Measured from the label rather than the value, so the height reflects the
+    // font in use and not what has been entered.
+    let text = measured_text(field.label(), field.font_size(), measurer);
+    UiSize::new(
+        text.width + FIELD_HORIZONTAL_PADDING * 2.0,
+        (text.height + FIELD_VERTICAL_PADDING * 2.0).max(FIELD_MINIMUM_HEIGHT),
     )
 }
 

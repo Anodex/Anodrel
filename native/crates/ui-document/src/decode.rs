@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use anodrel_json::JsonValue;
 use anodrel_ui::{
-    Action, Axis, ElementId, Insets, Scroll, Stack, Text, UiActionTone, UiDocument, UiNode,
+    Action, Axis, ElementId, Field, Insets, Scroll, Stack, Text, UiActionTone, UiDocument, UiNode,
     UiSurfaceTone, UiTextTone,
 };
 
@@ -46,6 +46,7 @@ fn node(value: &JsonValue, allows_scroll: bool) -> Result<UiNode, UiDocumentErro
         "scroll" if allows_scroll => scroll(fields),
         "text" => text(fields),
         "action" => action(fields),
+        "field" => field(fields),
         _ => Err(UiDocumentError::UnsupportedNodeKind),
     }
 }
@@ -137,6 +138,48 @@ fn action(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentErro
         )?
         .with_tone(tone),
     ))
+}
+
+/// Decodes a field, whose `placeholder` is the format's only optional property.
+///
+/// Every other field is required, so a document that forgot one is rejected
+/// rather than silently defaulted — the rule the rest of this codec follows.
+/// `placeholder` is genuinely optional because a field with no hint is ordinary,
+/// so its absence is accepted and its presence is validated.
+fn field(fields: &BTreeMap<String, JsonValue>) -> Result<UiNode, UiDocumentError> {
+    let required = [
+        "id",
+        "kind",
+        "label",
+        "value",
+        "maxLength",
+        "fontSize",
+        "enabled",
+    ];
+    // Checked against both shapes so an unknown property is still refused: the
+    // strictness is what stops a future `secret` flag being accepted by a host
+    // that does not implement one. See Decision 0067.
+    if fields.contains_key("placeholder") {
+        let mut with_placeholder = required.to_vec();
+        with_placeholder.push("placeholder");
+        require_fields(fields, &with_placeholder)?;
+    } else {
+        require_fields(fields, &required)?;
+    }
+
+    let field = Field::new(
+        element_id(fields)?,
+        string_field(fields, "label")?,
+        string_field(fields, "value")?,
+        u16_field(fields, "maxLength")?,
+        u16_field(fields, "fontSize")?,
+        bool_field(fields, "enabled")?,
+    )?;
+    let field = match fields.get("placeholder") {
+        Some(_) => field.with_placeholder(string_field(fields, "placeholder")?)?,
+        None => field,
+    };
+    Ok(UiNode::Field(field))
 }
 
 fn padding(value: &JsonValue) -> Result<Insets, UiDocumentError> {

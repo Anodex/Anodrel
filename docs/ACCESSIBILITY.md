@@ -69,13 +69,22 @@ The adapter is a pure function from one snapshot node to Windows values.
 | --- | --- | --- |
 | `Group` | `Group` (50026) | no |
 | `StaticText` | `Text` (50020) | no |
+| `Edit` | `Edit` (50004) | no |
 | `Button` | `Button` (50000) | yes |
+
+An `Edit` is named by its **label**, never by its value. A field's text leaves
+the host only through the granted snapshot of Decision 0067, and this tree is a
+published surface — so assistive technology can find a field and cannot read
+what is in it, or move focus into it. That is the existing one-directional rule
+applied to the node where reading the value would matter most, and it is a real
+limitation for a screen-reader user filling a form. Lifting it needs its own
+decision rather than a quiet loosening of this one. See `docs/UI_FIELDS.md`.
 
 | UIA property | Source |
 | --- | --- |
 | `Name` (30005) | The node's plain-text name, or empty where the role has none. |
 | `ControlType` (30003) | The table above. |
-| `IsEnabled` (30010) | The node's enabled flag **for a button**; always true for text and groups. |
+| `IsEnabled` (30010) | The node's enabled flag **for a button or a field**; always true for text and groups. |
 | `AutomationId` (30011) | The document element ID. |
 | `IsKeyboardFocusable` (30009) | The table above. |
 | `IsControlElement` (30016) | Always true; every node in the snapshot is visible. |

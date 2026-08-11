@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{Action, ElementId, Text, UiDocument, UiLayout, UiNode, UiRect};
+use crate::{Action, ElementId, Field, Text, UiDocument, UiLayout, UiNode, UiRect};
 
 /// The semantic role of a visible UI node.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -13,6 +13,12 @@ pub enum UiAccessibilityRole {
     StaticText,
     /// A semantic action that may be enabled or disabled.
     Button,
+    /// A single-line field a person can type into.
+    ///
+    /// Named by its label. Its value is deliberately absent: see
+    /// `docs/UI_FIELDS.md` and `docs/ACCESSIBILITY.md`, which together mean
+    /// assistive technology can find a field and cannot read what is in it.
+    Edit,
 }
 
 /// One accessible semantic element from a visible layout pass.
@@ -116,7 +122,7 @@ fn collect_node(
             }
         }
         UiNode::Scroll(scroll) => collect_node(scroll.child(), visible_bounds, output),
-        UiNode::Text(_) | UiNode::Action(_) => {}
+        UiNode::Text(_) | UiNode::Action(_) | UiNode::Field(_) => {}
     }
 }
 
@@ -125,7 +131,22 @@ fn semantic_fields(node: &UiNode) -> (UiAccessibilityRole, Option<String>, bool)
         UiNode::Stack(_) | UiNode::Scroll(_) => (UiAccessibilityRole::Group, None, false),
         UiNode::Text(text) => text_fields(text),
         UiNode::Action(action) => action_fields(action),
+        UiNode::Field(field) => field_fields(field),
     }
+}
+
+/// A field is announced by its label and never by what has been typed into it.
+///
+/// The accessibility snapshot is a published surface, so putting the value here
+/// would hand it to anything reading the tree — including a path an application
+/// could reach later. The value leaves the host only through the granted
+/// snapshot of Decision 0067, and this is the other door it must not leave by.
+fn field_fields(field: &Field) -> (UiAccessibilityRole, Option<String>, bool) {
+    (
+        UiAccessibilityRole::Edit,
+        Some(field.label().to_owned()),
+        field.enabled(),
+    )
 }
 
 fn text_fields(text: &Text) -> (UiAccessibilityRole, Option<String>, bool) {

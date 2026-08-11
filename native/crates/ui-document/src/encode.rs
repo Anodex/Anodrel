@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 
 use anodrel_json::JsonValue;
 use anodrel_ui::{
-    Action, Axis, Scroll, Stack, Text, UiActionTone, UiDocument, UiNode, UiSurfaceTone, UiTextTone,
+    Action, Axis, Field, Scroll, Stack, Text, UiActionTone, UiDocument, UiNode, UiSurfaceTone,
+    UiTextTone,
 };
 
 use crate::{
@@ -47,6 +48,7 @@ fn node(node: &UiNode, allows_scroll: bool) -> Result<JsonValue, UiDocumentError
         UiNode::Scroll(_) => Err(UiDocumentError::UnsupportedFormat),
         UiNode::Text(text) => Ok(text_value(text)),
         UiNode::Action(action) => Ok(action_value(action)),
+        UiNode::Field(field) => Ok(field_value(field)),
     }
 }
 
@@ -132,6 +134,33 @@ fn action_value(action: &Action) -> JsonValue {
             .to_owned(),
         ),
     );
+    JsonValue::Object(fields)
+}
+
+/// Encodes a field, including the value the application starts it with.
+///
+/// This direction carries a value because a document *sets* one. Nothing here
+/// reads a value back out of a live surface: the host's current text never
+/// becomes a document. See `docs/UI_FIELDS.md`.
+fn field_value(field: &Field) -> JsonValue {
+    let mut fields = common_fields(field.id().as_str(), "field");
+    fields.insert(
+        "label".to_owned(),
+        JsonValue::String(field.label().to_owned()),
+    );
+    fields.insert(
+        "value".to_owned(),
+        JsonValue::String(field.value().to_owned()),
+    );
+    if let Some(placeholder) = field.placeholder() {
+        fields.insert(
+            "placeholder".to_owned(),
+            JsonValue::String(placeholder.to_owned()),
+        );
+    }
+    fields.insert("maxLength".to_owned(), number(field.max_length()));
+    fields.insert("fontSize".to_owned(), number(field.font_size()));
+    fields.insert("enabled".to_owned(), JsonValue::Bool(field.enabled()));
     JsonValue::Object(fields)
 }
 

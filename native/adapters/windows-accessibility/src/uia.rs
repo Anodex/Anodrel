@@ -14,6 +14,8 @@ pub mod control_type {
     pub const TEXT: i32 = 50_020;
     /// `UIA_GroupControlTypeId`.
     pub const GROUP: i32 = 50_026;
+    /// `UIA_EditControlTypeId`.
+    pub const EDIT: i32 = 50_004;
 }
 
 /// UI Automation property identifiers.

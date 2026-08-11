@@ -135,20 +135,21 @@ pub const fn control_type_for(role: UiAccessibilityRole) -> i32 {
         UiAccessibilityRole::Group => control_type::GROUP,
         UiAccessibilityRole::StaticText => control_type::TEXT,
         UiAccessibilityRole::Button => control_type::BUTTON,
+        UiAccessibilityRole::Edit => control_type::EDIT,
     }
 }
 
 /// Returns the `IsEnabled` value for one node.
 ///
 /// UI Automation reads `IsEnabled` as "can be interacted with", and a screen
-/// reader announces a disabled element as unavailable. Only an action can be
-/// unavailable; text and containers are not interactive in the first place, so
-/// reporting the snapshot's flag for them would have Narrator describe ordinary
-/// prose as dimmed and out of reach.
+/// reader announces a disabled element as unavailable. Only an action or a
+/// field can be unavailable; text and containers are not interactive in the
+/// first place, so reporting the snapshot's flag for them would have Narrator
+/// describe ordinary prose as dimmed and out of reach.
 #[must_use]
 pub fn is_enabled(node: &UiAccessibilityNode) -> bool {
     match node.role() {
-        UiAccessibilityRole::Button => node.enabled(),
+        UiAccessibilityRole::Button | UiAccessibilityRole::Edit => node.enabled(),
         UiAccessibilityRole::Group | UiAccessibilityRole::StaticText => true,
     }
 }

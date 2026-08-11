@@ -21,6 +21,8 @@ pub enum UiError {
     DepthLimitExceeded,
     /// Combined text and label bytes exceed the document limit.
     TextLimitExceeded,
+    /// A field's maximum length is outside the supported character range.
+    InvalidFieldLength,
 }
 
 impl fmt::Display for UiError {
@@ -34,6 +36,7 @@ impl fmt::Display for UiError {
             Self::NodeLimitExceeded => "document exceeds the node limit",
             Self::DepthLimitExceeded => "document exceeds the nesting-depth limit",
             Self::TextLimitExceeded => "document exceeds the combined text limit",
+            Self::InvalidFieldLength => "field maximum length is outside the supported range",
         };
         formatter.write_str(message)
     }
