@@ -102,7 +102,7 @@ impl UiFocus {
         layout
             .items()
             .iter()
-            .find(|item| is_focusable(item) && item.id() == current)
+            .find(|item| is_activatable(item) && item.id() == current)
             .map(|item| UiEvent::ActionInvoked(item.id().clone()))
     }
 
@@ -113,7 +113,20 @@ impl UiFocus {
     }
 }
 
+/// Whether keyboard traversal can land on an item.
+///
+/// A field takes focus because a person has to reach it to type; an action
+/// takes focus because a person has to reach it to press it.
 fn is_focusable(item: &UiLayoutItem) -> bool {
+    matches!(item.kind(), UiLayoutKind::Action | UiLayoutKind::Field) && item.enabled()
+}
+
+/// Whether activating an item produces a semantic event.
+///
+/// Deliberately narrower than [`is_focusable`]: only an action does. Enter in a
+/// focused field must produce nothing, because a field reports no event at all
+/// — not its text, and not that it was touched. See Decision 0067.
+fn is_activatable(item: &UiLayoutItem) -> bool {
     item.kind() == UiLayoutKind::Action && item.enabled()
 }
 
@@ -154,6 +167,43 @@ mod tests {
 
     fn layout(children: Vec<UiNode>) -> crate::UiLayout {
         document(children).layout(UiRect::from_size(0.0, 0.0, 200.0, 200.0), &FixedMeasurer)
+    }
+
+    fn field_node(id_value: &str, enabled: bool) -> UiNode {
+        UiNode::Field(
+            crate::Field::new(id(id_value), id_value, "", 64, 10, enabled)
+                .expect("test field is valid"),
+        )
+    }
+
+    #[test]
+    fn traversal_reaches_a_field_but_activating_one_produces_nothing() {
+        // A person has to be able to Tab into a field to type in it. Pressing
+        // Enter there must still produce no event: a field reports nothing at
+        // all, not its text and not that it was touched. See Decision 0067.
+        let layout = layout(vec![
+            field_node("name", true),
+            action("submit", true),
+            field_node("disabled", false),
+        ]);
+        let mut focus = UiFocus::new();
+
+        assert_eq!(focus.move_next(&layout), Some(id("name")));
+        assert_eq!(
+            focus.activate(&layout),
+            None,
+            "a focused field produced an event"
+        );
+
+        assert_eq!(focus.move_next(&layout), Some(id("submit")));
+        assert_eq!(
+            focus.activate(&layout),
+            Some(UiEvent::ActionInvoked(id("submit")))
+        );
+
+        // A disabled field is skipped exactly as a disabled action is, so it
+        // wraps back to the first target rather than landing on it.
+        assert_eq!(focus.move_next(&layout), Some(id("name")));
     }
 
     #[test]

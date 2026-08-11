@@ -16,6 +16,7 @@
 mod accessibility;
 mod appearance;
 mod error;
+mod field_state;
 mod focus;
 mod geometry;
 mod id;
@@ -26,6 +27,7 @@ mod scroll;
 pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
 pub use appearance::{UiActionTone, UiSurfaceTone, UiTextTone};
 pub use error::UiError;
+pub use field_state::{UiFieldState, UiFieldStates};
 pub use focus::UiFocus;
 pub use geometry::{UiPoint, UiRect, UiSize};
 pub use id::ElementId;

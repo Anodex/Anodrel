@@ -156,12 +156,17 @@ pub fn is_enabled(node: &UiAccessibilityNode) -> bool {
 
 /// Returns whether keyboard focus can reach one portable role.
 ///
-/// This matches the portable focus traversal exactly: only a semantic action
-/// takes focus, so assistive technology and the keyboard agree on what is
-/// reachable.
+/// This matches the portable focus traversal exactly: an action and a field
+/// take focus, so assistive technology and the keyboard agree on what is
+/// reachable. Reporting a field as unfocusable would be a plain lie to a screen
+/// reader — the one-directional rule of `docs/ACCESSIBILITY.md` is about this
+/// provider accepting no commands, not about misdescribing the surface.
 #[must_use]
 pub const fn keyboard_focusable(role: UiAccessibilityRole) -> bool {
-    matches!(role, UiAccessibilityRole::Button)
+    matches!(
+        role,
+        UiAccessibilityRole::Button | UiAccessibilityRole::Edit
+    )
 }
 
 /// Converts a source-order position into a runtime identifier component.
