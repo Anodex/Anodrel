@@ -223,6 +223,25 @@ scheduler noise, not rasterizer cost: each blur pass allocates a fresh
 half-megabyte coverage buffer. Read the medians for the renderer and the tails
 for the machine.
 
+### Comparing two builds with this workload
+
+Absolute numbers here drift with the machine by far more than a real
+optimization is likely to be worth. A cold run measured `surface-clear` — which
+touches no paint and cannot be affected by most renderer changes — 28% slower
+than a warm one.
+
+So a before-and-after must be **interleaved**, not sequential:
+
+1. Build the unchanged binary and copy it aside.
+2. Build the changed binary.
+3. Alternate runs, several of each, and take the median per stage.
+4. **Read the control stages first.** `surface-clear` and `mask-blur` use no
+   paint; `image-scale` uses no gradient. If one of those moves as much as the
+   stage under test, the run measured the machine and the result means nothing.
+
+`docs/RENDERER.md` records one optimization this method rejected, and why the
+rejection was the right outcome.
+
 ## Reference material
 
 - Electron process model: <https://www.electronjs.org/docs/latest/tutorial/process-model>

@@ -426,9 +426,34 @@ blurred mask: compositing the mark's glow twice through its gradient is about
 The perf lab's `--renderer` workload puts a number on why. Per pixel, a flat
 fill costs about **0.07 ns** and the same pixel filled through a gradient costs
 **19 ns** — two to three orders of magnitude more, purely for evaluating the
-paint. A quantised colour ramp would remove the per-sample stop search, and that
-workload is how anyone would show it worked. It has not been needed yet. See
-`docs/PERFORMANCE.md` for the full stage table and what the numbers exclude.
+paint. See `docs/PERFORMANCE.md` for the full stage table and what the numbers
+exclude.
+
+### What has already been tried
+
+**Hoisting the gradient's invariants out of the fill loop.** `Paint::sample`
+recomputes a linear gradient's axis and its squared length for every pixel,
+which looks like obvious waste. Preparing those once per fill and sampling
+through a borrowed struct — bit-identical output, held to that by a test —
+produced **no measurable improvement**: measured A/B against an unchanged
+binary, the two stages that use a paint moved less than stages that cannot have
+changed. LLVM already hoists that arithmetic, because the paint is borrowed
+immutably for the whole fill. The change was reverted rather than kept, since
+unpaid complexity is still complexity.
+
+That leaves the per-pixel stop lookup and the four-channel `lerp` as the
+remaining candidates, and a **quantised colour ramp** as the way to remove them.
+That one would change pixels, so it needs the treatment Decision 0064 describes:
+a bounded error, measured and asserted, not assumed.
+
+### Measuring a renderer change honestly
+
+The attempt above is also the method. A single before-and-after pair proved
+nothing here: the first baseline was taken on a cold machine and its *control*
+stage — one that touches no paint — moved 28% on its own. What worked was
+building both binaries, alternating runs, and reading the controls first. If a
+stage that cannot have changed moves as much as the stage under test, the
+measurement is of the machine.
 
 ## Testing
 
