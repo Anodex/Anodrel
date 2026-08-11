@@ -38,6 +38,16 @@
         "surfaceTone": "raised",
         "children": [
           {
+            "id": "ui.lab.field",
+            "kind": "field",
+            "label": "Sample field",
+            "value": "",
+            "placeholder": "Tab here and type",
+            "maxLength": 64,
+            "fontSize": 15,
+            "enabled": true
+          },
+          {
             "id": "ui.lab.inspect",
             "kind": "action",
             "label": "Inspect layout",
@@ -73,7 +83,7 @@
       {
         "id": "ui.lab.boundary",
         "kind": "text",
-        "value": "An action reports only its ID. It cannot call Windows or grant a capability.",
+        "value": "An action reports only its ID. What you type into a field reaches no application at all.",
         "fontSize": 13,
         "tone": "secondary"
       }

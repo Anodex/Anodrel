@@ -222,6 +222,25 @@ impl UiSessionView {
         self.lab.focus_previous(width, height)
     }
 
+    /// Applies one typed character to this view's focused field.
+    ///
+    /// The text stays in this view. Nothing here reaches the session's mailbox,
+    /// so an application learns nothing from a person typing. See
+    /// `docs/UI_FIELDS.md`.
+    pub(super) fn type_character(&mut self, width: f32, height: f32, character: char) -> bool {
+        self.lab.type_character(width, height, character)
+    }
+
+    /// Applies one editing key to this view's focused field.
+    pub(super) fn edit_focused_field(
+        &mut self,
+        width: f32,
+        height: f32,
+        edit: super::ui_lab::FieldEdit,
+    ) -> bool {
+        self.lab.edit_focused_field(width, height, edit)
+    }
+
     /// Moves a current v2 scroll viewport by one local native page.
     pub(super) fn scroll_page(&mut self, width: f32, height: f32, forward: bool) -> bool {
         self.lab.scroll_page(width, height, forward)

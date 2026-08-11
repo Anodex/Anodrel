@@ -9,8 +9,9 @@ use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Color, Paint, Point, Rect, point};
 use anodrel_ui::{
     Action, Axis, ElementId, FIELD_HORIZONTAL_PADDING, Field, Insets, Scroll, Stack, Text,
-    TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFocus, UiLayout, UiNode, UiPoint, UiRect,
-    UiScrollOffsets, UiScrollWheel, UiSize, UiSurfaceTone, UiTextTone,
+    TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFieldState, UiFieldStates, UiFocus,
+    UiLayout, UiLayoutKind, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollWheel, UiSize,
+    UiSurfaceTone, UiTextTone,
 };
 use anodrel_ui_document::decode;
 use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
@@ -23,6 +24,33 @@ const BASE_HEIGHT: f32 = 660.0;
 const WEIGHT_REGULAR: i32 = 400;
 const UI_LAB_DOCUMENT_JSON: &str = include_str!("ui_lab_document.json");
 
+/// One editing key applied to a focused field.
+///
+/// A closed set. Every key the host forwards is named here, so a future key
+/// cannot arrive as an opaque code the field logic has to interpret.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum FieldEdit {
+    Backspace,
+    Delete,
+    Left,
+    Right,
+    Home,
+    End,
+}
+
+/// Returns the field with one element ID, if the document holds it.
+fn find_field<'a>(node: &'a UiNode, id: &ElementId) -> Option<&'a Field> {
+    match node {
+        UiNode::Field(field) if field.id() == id => Some(field),
+        UiNode::Stack(stack) => stack
+            .children()
+            .iter()
+            .find_map(|child| find_field(child, id)),
+        UiNode::Scroll(scroll) => find_field(scroll.child(), id),
+        UiNode::Field(_) | UiNode::Text(_) | UiNode::Action(_) => None,
+    }
+}
+
 /// Host-owned state for the UI Lab view.
 #[derive(Clone)]
 pub(super) struct UiLab {
@@ -31,6 +59,11 @@ pub(super) struct UiLab {
     focus: UiFocus,
     scroll_offsets: UiScrollOffsets,
     wheel: UiScrollWheel,
+    /// What a person has typed into this view's fields.
+    ///
+    /// Host-owned and never sent anywhere. A document seeds it; after that only
+    /// a person changes it. See `docs/UI_FIELDS.md`.
+    fields: UiFieldStates,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
 }
@@ -100,6 +133,10 @@ impl UiLab {
 
     /// Replaces this local visual document and discards stale local input state.
     pub(super) fn replace_document(&mut self, document: UiDocument) {
+        // Reseeding discards what was typed. That follows from a document being
+        // a whole snapshot rather than a patch; Decision 0067 records it as a
+        // consequence an application has to know about.
+        self.fields.reseed(&document);
         self.document = document;
         self.focus = UiFocus::new();
         self.scroll_offsets.clear();
@@ -108,13 +145,70 @@ impl UiLab {
         self.last_action = None;
     }
 
+    /// Applies one typed character to the focused field.
+    ///
+    /// Returns whether anything changed, so the caller repaints only when it
+    /// did. A character arriving with no field focused, or one the field
+    /// refuses, changes nothing and is silently dropped — this is a person
+    /// typing, not an operation that needs to report a failure.
+    pub(super) fn type_character(&mut self, width: f32, height: f32, character: char) -> bool {
+        let Some(field) = self.focused_field(width, height) else {
+            return false;
+        };
+        let Some(state) = self.fields.get_mut(field.id()) else {
+            return false;
+        };
+        state.insert(character, &field)
+    }
+
+    /// Applies one editing key to the focused field.
+    pub(super) fn edit_focused_field(&mut self, width: f32, height: f32, edit: FieldEdit) -> bool {
+        let Some(field) = self.focused_field(width, height) else {
+            return false;
+        };
+        let Some(state) = self.fields.get_mut(field.id()) else {
+            return false;
+        };
+        match edit {
+            FieldEdit::Backspace => state.backspace(),
+            FieldEdit::Delete => state.delete(),
+            FieldEdit::Left => state.move_left(),
+            FieldEdit::Right => state.move_right(),
+            FieldEdit::Home => {
+                state.move_home();
+                true
+            }
+            FieldEdit::End => {
+                state.move_end();
+                true
+            }
+        }
+    }
+
+    /// Returns the focused field, if focus is on one that is still visible.
+    ///
+    /// Resolved against a fresh layout every time rather than remembered, so a
+    /// field that was removed, clipped, or disabled since the last keystroke
+    /// cannot still be typed into.
+    fn focused_field(&self, width: f32, height: f32) -> Option<Field> {
+        let focused = self.focus.focused()?;
+        let layout = self.layout(width, height);
+        layout.items().iter().find(|item| {
+            item.id() == focused && item.kind() == UiLayoutKind::Field && item.enabled()
+        })?;
+        find_field(self.document.root(), focused).cloned()
+    }
+
     fn from_document_with_status(document: UiDocument, status_target: Option<ElementId>) -> Self {
+        let mut fields = UiFieldStates::new();
+        fields.reseed(&document);
         Self {
             document,
             status_target,
             focus: UiFocus::new(),
             scroll_offsets: UiScrollOffsets::new(),
             wheel: UiScrollWheel::default(),
+            fields,
             hovered: None,
             last_action: None,
         }
@@ -490,18 +584,17 @@ fn draw_node(
             );
         }
         UiNode::Action(action) => draw_action(canvas, lab, action, bounds, surface, palette),
-        UiNode::Field(field) => draw_field(canvas, field, bounds, surface, palette),
+        UiNode::Field(field) => draw_field(canvas, lab, field, bounds, surface, palette),
     }
 }
 
-/// Draws one field's box, label, and current text.
+/// Draws one field's box, its current host-owned text, and the caret.
 ///
-/// The text drawn here is the value the document carried. Typing is not wired
-/// to this surface yet, so the box is a faithful picture of the node and not
-/// somewhere a person can enter anything; the caret and key handling arrive
-/// with the host's field state. See `docs/UI_FIELDS.md`.
+/// The text comes from the host's field state, not from the document: the
+/// document only ever seeded it. See `docs/UI_FIELDS.md`.
 fn draw_field(
     canvas: &mut Canvas,
+    lab: &UiLab,
     field: &Field,
     bounds: UiRect,
     surface: Surface,
@@ -509,17 +602,24 @@ fn draw_field(
 ) {
     let box_bounds = surface.to_canvas_rect(bounds);
     let radius = 8.0 * surface.scale;
+    let focused = lab.focus.focused() == Some(field.id());
     canvas.fill_rounded_rect(box_bounds, radius, &Paint::solid(palette.backdrop_lift));
     canvas.stroke_rounded_rect(
         box_bounds,
         radius,
-        1.0 * surface.scale,
-        &Paint::solid(palette.panel_edge),
+        if focused { 2.0 } else { 1.0 } * surface.scale,
+        &Paint::solid(if focused {
+            palette.accent_ipc
+        } else {
+            palette.panel_edge
+        }),
     );
 
+    let state = lab.fields.get(field.id());
+    let entered = state.map_or("", UiFieldState::text);
     // The placeholder stands in only while there is nothing to show, and is
     // drawn in the dimmer ink so it never reads as entered text.
-    let (value, color) = if field.value().is_empty() {
+    let (value, color) = if entered.is_empty() {
         (
             field.placeholder().unwrap_or(""),
             if field.enabled() {
@@ -530,7 +630,7 @@ fn draw_field(
         )
     } else {
         (
-            field.value(),
+            entered,
             if field.enabled() {
                 palette.ink
             } else {
@@ -538,18 +638,41 @@ fn draw_field(
             },
         )
     };
-    if value.is_empty() {
+
+    let inset = FIELD_HORIZONTAL_PADDING * surface.scale;
+    let left = box_bounds.left + inset;
+    let font = surface.font(field.font_size());
+    let spec = TextSpec::new(value, font, WEIGHT_REGULAR);
+    let baseline = box_bounds.top + (box_bounds.height() - text::line_height(&spec)) / 2.0;
+    if !value.is_empty() {
+        text::draw(
+            canvas,
+            &spec,
+            point(left, baseline),
+            Align::Left,
+            &Paint::solid(color),
+        );
+    }
+
+    if !focused {
         return;
     }
-    let spec = TextSpec::new(value, surface.font(field.font_size()), WEIGHT_REGULAR);
-    let inset = FIELD_HORIZONTAL_PADDING * surface.scale;
-    let baseline = box_bounds.top + (box_bounds.height() - text::line_height(&spec)) / 2.0;
-    text::draw(
-        canvas,
-        &spec,
-        point(box_bounds.left + inset, baseline),
-        Align::Left,
-        &Paint::solid(color),
+    // The caret is placed by measuring the text before it, so it lands between
+    // characters at any font and never inside one.
+    let Some(state) = state else {
+        return;
+    };
+    let before = TextSpec::new(&entered[..state.caret()], font, WEIGHT_REGULAR);
+    let caret_x = left + text::width(&before);
+    let caret_height = text::line_height(&spec);
+    canvas.fill_rect(
+        Rect::new(
+            caret_x,
+            baseline,
+            caret_x + (1.0 * surface.scale).max(1.0),
+            baseline + caret_height,
+        ),
+        &Paint::solid(palette.ink),
     );
 }
 
@@ -697,6 +820,81 @@ mod tests {
         ElementId::new(value).expect("fixed UI Lab ID is valid")
     }
 
+    /// Tabs until the sample field has focus, then returns the lab.
+    fn focused_on_the_field() -> UiLab {
+        let mut lab = UiLab::new();
+        for _ in 0..8 {
+            if lab.focus.focused() == Some(&id("ui.lab.field")) {
+                return lab;
+            }
+            lab.focus_next(BASE_WIDTH, BASE_HEIGHT);
+        }
+        panic!("focus never reached the sample field");
+    }
+
+    #[test]
+    fn typing_reaches_the_focused_field_and_nothing_else() {
+        let mut lab = focused_on_the_field();
+        for character in "Ada".chars() {
+            assert!(lab.type_character(BASE_WIDTH, BASE_HEIGHT, character));
+        }
+        assert_eq!(
+            lab.fields.get(&id("ui.lab.field")).map(UiFieldState::text),
+            Some("Ada")
+        );
+
+        // Typing produces no semantic event, so nothing an application could
+        // ever read has changed. See Decision 0067.
+        assert_eq!(lab.last_action, None);
+    }
+
+    #[test]
+    fn typing_with_an_action_focused_changes_nothing() {
+        let mut lab = UiLab::new();
+        lab.focus_next(BASE_WIDTH, BASE_HEIGHT);
+        while lab.focus.focused() == Some(&id("ui.lab.field")) {
+            lab.focus_next(BASE_WIDTH, BASE_HEIGHT);
+        }
+        assert!(!lab.type_character(BASE_WIDTH, BASE_HEIGHT, 'x'));
+        assert_eq!(
+            lab.fields.get(&id("ui.lab.field")).map(UiFieldState::text),
+            Some("")
+        );
+    }
+
+    #[test]
+    fn editing_keys_move_the_caret_and_remove_characters() {
+        let mut lab = focused_on_the_field();
+        for character in "abc".chars() {
+            assert!(lab.type_character(BASE_WIDTH, BASE_HEIGHT, character));
+        }
+        assert!(lab.edit_focused_field(BASE_WIDTH, BASE_HEIGHT, FieldEdit::Home));
+        assert!(lab.edit_focused_field(BASE_WIDTH, BASE_HEIGHT, FieldEdit::Delete));
+        assert_eq!(
+            lab.fields.get(&id("ui.lab.field")).map(UiFieldState::text),
+            Some("bc")
+        );
+        assert!(lab.edit_focused_field(BASE_WIDTH, BASE_HEIGHT, FieldEdit::End));
+        assert!(lab.edit_focused_field(BASE_WIDTH, BASE_HEIGHT, FieldEdit::Backspace));
+        assert_eq!(
+            lab.fields.get(&id("ui.lab.field")).map(UiFieldState::text),
+            Some("b")
+        );
+    }
+
+    #[test]
+    fn a_field_that_left_the_document_cannot_still_be_typed_into() {
+        // The focused field is resolved against a fresh layout on every
+        // keystroke, so a document replacement that removed it takes effect
+        // immediately rather than at the next repaint.
+        let mut lab = focused_on_the_field();
+        assert!(lab.type_character(BASE_WIDTH, BASE_HEIGHT, 'a'));
+
+        lab.replace_document(UiLab::waiting_for_session().document);
+        assert!(!lab.type_character(BASE_WIDTH, BASE_HEIGHT, 'b'));
+        assert!(lab.fields.get(&id("ui.lab.field")).is_none());
+    }
+
     #[test]
     fn every_action_reports_its_own_semantic_id() {
         let lab = UiLab::new();
@@ -782,8 +980,19 @@ mod tests {
     }
 
     #[test]
-    fn keyboard_focus_traverses_and_activates_only_semantic_actions() {
+    fn keyboard_focus_traverses_fields_and_actions_but_activates_only_actions() {
+        // Renamed from "traverses and activates only semantic actions": Tab now
+        // reaches a field too, because a person has to get to one to type. What
+        // has not changed is that only an action can be activated.
         let mut lab = UiLab::new();
+        assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
+        assert_eq!(lab.focus.focused(), Some(&id("ui.lab.field")));
+        assert!(
+            !lab.activate_focused(BASE_WIDTH, BASE_HEIGHT),
+            "a focused field was activated"
+        );
+        assert_eq!(lab.last_action, None);
+
         assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
         assert_eq!(lab.focus.focused(), Some(&id("ui.lab.inspect")));
         assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
@@ -843,10 +1052,16 @@ mod tests {
         let UiNode::Stack(actions) = &root.children()[3] else {
             panic!("fixed UI Lab actions are a stack");
         };
-        let emphasized_action = match &actions.children()[1] {
-            UiNode::Action(action) => action,
-            _ => panic!("fixed UI Lab action is semantic action"),
-        };
+        // Found by ID rather than by position: this document gains nodes over
+        // time, and an index would keep silently pointing at a different one.
+        let emphasized_action = actions
+            .children()
+            .iter()
+            .find_map(|child| match child {
+                UiNode::Action(action) if action.id() == &id("ui.lab.hit-test") => Some(action),
+                _ => None,
+            })
+            .expect("fixed UI Lab emphasized action exists");
 
         assert_eq!(eyebrow.tone(), UiTextTone::Accent);
         assert_eq!(detail.tone(), UiTextTone::Secondary);

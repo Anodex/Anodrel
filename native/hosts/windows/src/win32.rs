@@ -94,6 +94,22 @@ const VK_TAB: Wparam = 0x09;
 const VK_RETURN: Wparam = 0x0D;
 const VK_PRIOR: Wparam = 0x21;
 const VK_NEXT: Wparam = 0x22;
+const VK_END: Wparam = 0x23;
+const VK_HOME: Wparam = 0x24;
+const VK_LEFT: Wparam = 0x25;
+const VK_RIGHT: Wparam = 0x27;
+const VK_DELETE: Wparam = 0x2E;
+
+/// A typed character, already translated from a key by `TranslateMessage`.
+///
+/// Using `WM_CHAR` rather than decoding `WM_KEYDOWN` is what makes a field work
+/// with a keyboard layout the host knows nothing about: Windows has already
+/// applied the layout, dead keys, and modifiers by the time this arrives.
+const WM_CHAR: Uint = 0x0102;
+
+/// Backspace arrives as a control character through `WM_CHAR`, not as an edit
+/// key, so it is named here to be recognised and routed as one.
+const CHAR_BACKSPACE: u32 = 0x08;
 
 /// Private message telling the Startup Lab that a product-session start
 /// attempt has finished. It carries no payload: the started session, if any, is
@@ -1117,6 +1133,41 @@ fn service_notification(window: Hwnd) {
     let _ = registry::complete_notification_request(window, request.id(), shown, created);
 }
 
+/// Routes one typed character to whichever view this window carries.
+///
+/// Returns `None` when the window has no field-bearing view at all, so the
+/// caller can fall through to the default procedure, and `Some(changed)` when a
+/// view saw the character — including when it refused it, because a refusal is
+/// still this window's answer rather than the system's.
+fn type_character(window: Hwnd, rect: Rect, character: char) -> Option<bool> {
+    let (width, height) = (rect.width() as f32, rect.height() as f32);
+    registry::with_ui_lab(window, |lab| lab.type_character(width, height, character))
+        .ok()
+        .flatten()
+        .or_else(|| {
+            registry::with_ui_session(window, |session| {
+                session.type_character(width, height, character)
+            })
+            .ok()
+            .flatten()
+        })
+}
+
+/// Routes one editing key the same way.
+fn edit_focused_field(window: Hwnd, rect: Rect, edit: ui_lab::FieldEdit) -> Option<bool> {
+    let (width, height) = (rect.width() as f32, rect.height() as f32);
+    registry::with_ui_lab(window, |lab| lab.edit_focused_field(width, height, edit))
+        .ok()
+        .flatten()
+        .or_else(|| {
+            registry::with_ui_session(window, |session| {
+                session.edit_focused_field(width, height, edit)
+            })
+            .ok()
+            .flatten()
+        })
+}
+
 /// Applies one pending window title for a session window, if it has one.
 ///
 /// The `SetWindowTextW` call runs outside the window registry's lock, matching
@@ -1689,6 +1740,50 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             let _ = registry::with_ui_session(window, |session| {
                 session.clamp_scroll_offsets(rect.width() as f32, rect.height() as f32);
             });
+            0
+        }
+        WM_CHAR => {
+            let rect = client_rect(window);
+            // Backspace reaches a window as a control character rather than an
+            // edit key, so it is separated here and routed as the edit it is.
+            // Every other control character is dropped: a field refuses them,
+            // and Tab and Enter are already handled as navigation.
+            let handled = match u32::try_from(wparam).ok().and_then(char::from_u32) {
+                Some(character) if u32::from(character) == CHAR_BACKSPACE => {
+                    edit_focused_field(window, rect, ui_lab::FieldEdit::Backspace)
+                }
+                Some(character) if !character.is_control() => {
+                    type_character(window, rect, character)
+                }
+                _ => None,
+            };
+            let Some(changed) = handled else {
+                // SAFETY: a character this view does not consume is forwarded
+                // unchanged to the documented default Win32 procedure.
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            };
+            if changed {
+                invalidate(window);
+            }
+            0
+        }
+        WM_KEYDOWN if matches!(wparam, VK_LEFT | VK_RIGHT | VK_HOME | VK_END | VK_DELETE) => {
+            let rect = client_rect(window);
+            let edit = match wparam {
+                VK_LEFT => ui_lab::FieldEdit::Left,
+                VK_RIGHT => ui_lab::FieldEdit::Right,
+                VK_HOME => ui_lab::FieldEdit::Home,
+                VK_END => ui_lab::FieldEdit::End,
+                _ => ui_lab::FieldEdit::Delete,
+            };
+            let Some(changed) = edit_focused_field(window, rect, edit) else {
+                // SAFETY: with no field focused these keys keep their default
+                // meaning for the window.
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            };
+            if changed {
+                invalidate(window);
+            }
             0
         }
         WM_KEYDOWN => {
