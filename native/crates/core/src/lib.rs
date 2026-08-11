@@ -37,7 +37,10 @@ use anodrel_protocol::{
     is_empty_object, object, sent_at,
 };
 use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
-use anodrel_ui_session::{UiDocumentSession, UiDocumentSnapshot, UiInputMailbox};
+use anodrel_ui_session::{
+    UiDocumentSession, UiDocumentSnapshot, UiFieldReadError, UiFieldReader, UiFieldSnapshot,
+    UiInputMailbox,
+};
 use anodrel_window::{WindowTitleProposal, WindowTitleService, WindowTitleServiceError};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -118,6 +121,7 @@ pub struct CoreHost {
     external_links: Box<dyn ExternalLinkService>,
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
+    ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
@@ -139,6 +143,7 @@ pub struct HostServices {
     external_links: Box<dyn ExternalLinkService>,
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
+    ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
@@ -175,6 +180,15 @@ struct UnavailableNotifications;
 impl NotificationService for UnavailableNotifications {
     fn show(&self, _notification: &Notification) -> Result<(), NotificationServiceError> {
         Err(NotificationServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableUiFields;
+
+impl UiFieldReader for UnavailableUiFields {
+    fn read(&self) -> Result<UiFieldSnapshot, UiFieldReadError> {
+        Err(UiFieldReadError::Unavailable)
     }
 }
 
@@ -256,6 +270,7 @@ impl HostServices {
             external_links: Box::new(UnavailableExternalLinks),
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
+            ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
             file_selections: Box::new(UnavailableFileSelectionService),
             file_text: Box::new(UnavailableFileTextService),
@@ -286,6 +301,17 @@ impl HostServices {
     #[must_use]
     pub fn with_notifications(mut self, service: impl NotificationService + 'static) -> Self {
         self.notifications = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's field-value reader.
+    ///
+    /// The supplied reader must answer only for this session's own current
+    /// surface, and must accept no selector — see `docs/UI_FIELDS.md` for why
+    /// that absence is the security property rather than a simplification.
+    #[must_use]
+    pub fn with_ui_fields(mut self, reader: impl UiFieldReader + 'static) -> Self {
+        self.ui_fields = Box::new(reader);
         self
     }
 
@@ -378,6 +404,7 @@ impl CoreHost {
             external_links: services.external_links,
             notifications: services.notifications,
             window_title: services.window_title,
+            ui_fields: services.ui_fields,
             file_dialogs: services.file_dialogs,
             file_selections: services.file_selections,
             file_text: services.file_text,
@@ -608,6 +635,7 @@ impl CoreHost {
             // exactly as capable as it was, rather than silently widening it.
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
+            ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
             file_text: Box::new(file_text),
@@ -703,6 +731,9 @@ impl CoreHost {
             }
             "window.title.set" if request.protocol_version.minor >= 14 => {
                 self.handle_window_title_set(request)
+            }
+            "ui.fields.read" if request.protocol_version.minor >= 15 => {
+                self.handle_ui_fields_read(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
@@ -1231,6 +1262,55 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::WindowBusy,
                 "a window title change is already pending.",
+                None,
+            ),
+        }
+    }
+
+    /// Reads every field value on this session's own current surface.
+    ///
+    /// The payload is exactly `{}`. There is no selector, and that is the
+    /// security property rather than a simplification: a caller able to narrow
+    /// a read to one field could repeat it until the typing was reconstructed.
+    /// Returning the whole surface makes every read cost the same, so reading
+    /// often gains nothing. See `docs/UI_FIELDS.md` and Decision 0067.
+    fn handle_ui_fields_read(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.fields.read accepts no payload fields.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::UiFieldsRead) {
+            return self.capability_denied(request.request_id, "ui.fields.read");
+        }
+
+        match self.ui_fields.read() {
+            Ok(snapshot) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([(
+                    "fields",
+                    JsonValue::Array(
+                        snapshot
+                            .fields()
+                            .iter()
+                            .map(|field| {
+                                object([
+                                    ("id", JsonValue::String(field.id().as_str().to_owned())),
+                                    ("value", JsonValue::String(field.value().to_owned())),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                )]),
+            ),
+            Err(UiFieldReadError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::UiFieldsUnavailable,
+                "no field values are available.",
                 None,
             ),
         }
@@ -2525,6 +2605,188 @@ mod tests {
             field(field(&response, "error"), "code").as_string(),
             Some("window.unavailable")
         );
+    }
+
+    /// A reader returning fixed values, standing in for a live surface.
+    #[derive(Debug)]
+    struct FixedFields {
+        result: Result<Vec<(&'static str, &'static str)>, UiFieldReadError>,
+    }
+
+    impl UiFieldReader for FixedFields {
+        fn read(&self) -> Result<UiFieldSnapshot, UiFieldReadError> {
+            let pairs = self.result.as_ref().map_err(|error| *error)?;
+            let mut states = anodrel_ui::UiFieldStates::new();
+            let children = pairs
+                .iter()
+                .map(|(id, value)| {
+                    anodrel_ui::UiNode::Field(
+                        anodrel_ui::Field::new(
+                            anodrel_ui::ElementId::new(*id).expect("test ID is valid"),
+                            "Label",
+                            *value,
+                            64,
+                            14,
+                            true,
+                        )
+                        .expect("test field is valid"),
+                    )
+                })
+                .collect();
+            let document = anodrel_ui::UiDocument::new(anodrel_ui::UiNode::Stack(
+                anodrel_ui::Stack::new(
+                    anodrel_ui::ElementId::new("root").expect("test ID is valid"),
+                    anodrel_ui::Axis::Vertical,
+                    anodrel_ui::Insets::zero(),
+                    0,
+                    children,
+                )
+                .expect("test stack is valid"),
+            ))
+            .expect("test document is valid");
+            states.reseed(&document);
+            UiFieldSnapshot::from_states(&states).map_err(|_| UiFieldReadError::Unavailable)
+        }
+    }
+
+    fn request_v1_15(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":15}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn host_with_fields(reader: FixedFields) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiFieldsRead],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_ui_fields(reader),
+        )
+    }
+
+    #[test]
+    fn a_granted_field_read_returns_every_value_at_once() {
+        let response = JsonValue::parse(
+            &host_with_fields(FixedFields {
+                result: Ok(vec![("name", "Ada"), ("city", "London")]),
+            })
+            .handle_json(&request_v1_15("ui.fields.read", "{}")),
+        )
+        .expect("response JSON is valid");
+
+        assert_eq!(field(&response, "status").as_string(), Some("success"));
+        let JsonValue::Array(fields) = field(field(&response, "result"), "fields") else {
+            panic!("the result carries an array of fields");
+        };
+        let pairs: Vec<(Option<&str>, Option<&str>)> = fields
+            .iter()
+            .map(|entry| {
+                (
+                    field(entry, "id").as_string(),
+                    field(entry, "value").as_string(),
+                )
+            })
+            .collect();
+        // Element-ID order, so the sequence never reports which field was
+        // touched last.
+        assert_eq!(
+            pairs,
+            [(Some("city"), Some("London")), (Some("name"), Some("Ada"))]
+        );
+    }
+
+    #[test]
+    fn a_field_read_accepts_no_selector_of_any_kind() {
+        // The absence of a selector is the security property: a caller able to
+        // narrow a read to one field could repeat it until the typing was
+        // reconstructed. See Decision 0067.
+        for payload in [
+            r#"{"id":"password"}"#,
+            r#"{"fields":["password"]}"#,
+            r#"{"ids":[]}"#,
+            r#"{"since":1}"#,
+            r#"{"includeCaret":true}"#,
+        ] {
+            let response = JsonValue::parse(
+                &host_with_fields(FixedFields {
+                    result: Ok(vec![("name", "Ada")]),
+                })
+                .handle_json(&request_v1_15("ui.fields.read", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn a_field_read_needs_its_own_grant_and_its_own_protocol_version() {
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::UiDocumentWrite, Capability::UiEventsRead],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable().with_ui_fields(FixedFields {
+                    result: Ok(vec![("name", "Ada")]),
+                }),
+            )
+            .handle_json(&request_v1_15("ui.fields.read", "{}")),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        // Writing a document does not imply reading what was typed into it.
+        let unsupported = JsonValue::parse(
+            &host_with_fields(FixedFields {
+                result: Ok(vec![("name", "Ada")]),
+            })
+            .handle_json(&request_v1_14("ui.fields.read", "{}")),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn a_host_without_a_surface_reports_one_unavailable_code() {
+        for host in [
+            host_with_fields(FixedFields {
+                result: Err(UiFieldReadError::Unavailable),
+            }),
+            // No reader supplied at all takes the same path, so an application
+            // cannot tell a host without fields from one that refused.
+            CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::UiFieldsRead],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            ),
+        ] {
+            let response =
+                JsonValue::parse(&host.handle_json(&request_v1_15("ui.fields.read", "{}")))
+                    .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("ui.fields.unavailable")
+            );
+        }
     }
 
     #[test]

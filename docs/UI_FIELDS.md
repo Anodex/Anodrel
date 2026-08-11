@@ -73,14 +73,46 @@ that lineage, with its own decision, not as a `secret: true` flag on this one.
 ## Reading a value
 
 A value crosses to the application only through a granted operation, never on a
-timer and never as a side effect of anything else. Until that operation exists a
-field is display and input only, which is deliberately a usable state: a host
-surface can collect input and act on it without any application seeing it.
+timer and never as a side effect of anything else.
 
-When it does exist it will read a **snapshot**, not a stream: the current value
-of the named fields at the moment of the request. There is no change event, no
-keystroke event, and no subscription, because each of those would hand over the
+Protocol **1.15** defines that operation:
+
+| Field | Value |
+| --- | --- |
+| Operation | `ui.fields.read` |
+| Payload | `{ }` — exactly this, no field selector |
+| Grant | `ui.fields.read` |
+| Success | `{ "fields": [ { "id": string, "value": string }, ... ] }` |
+| Errors | `ui.fields.unavailable` |
+
+It reads a **snapshot**, not a stream: the current value of every field on the
+current surface, at the moment of the request. There is no change event, no
+keystroke event, and no subscription, because each of those hands over the
 typing rather than the value.
+
+### Why it takes no selector
+
+The payload is empty. An application cannot name which fields to read, and gets
+all of them or none.
+
+That is not a convenience decision. A selector is a question, and asking
+questions one at a time is how a stream gets rebuilt out of snapshots: polling
+`{"id": "password"}` in a loop reconstructs the typing at whatever resolution
+the caller likes. Returning the whole surface at once makes each read cost the
+same, so there is nothing to gain by reading often.
+
+It also means an application can only ever learn about **its own current
+document's** fields, because that is the only surface the host will answer for.
+
+### What it does not carry
+
+No caret position, no selection, no character count separate from the value, no
+timestamp, no indication of whether a field was edited, focused, or touched.
+Those describe the typing. An empty field and an untouched field are reported
+identically, because the difference between them is behaviour, not content.
+
+Installed record version **1.5** adds `ui.fields.read` as a strict superset of
+1.4. A record written for an earlier version that names the grant stays invalid.
 
 ## What a field must never become
 

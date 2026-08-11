@@ -286,6 +286,7 @@ enum RecordVersion {
     V1_2,
     V1_3,
     V1_4,
+    V1_5,
 }
 
 impl RecordVersion {
@@ -294,12 +295,17 @@ impl RecordVersion {
     /// Each later version is a superset, so a record written for 1.2 keeps its
     /// exact meaning when read as 1.3 or 1.4.
     const fn accepts_v1_2_grants(self) -> bool {
-        matches!(self, Self::V1_2 | Self::V1_3 | Self::V1_4)
+        matches!(self, Self::V1_2 | Self::V1_3 | Self::V1_4 | Self::V1_5)
     }
 
     /// Whether this version accepts the grant version 1.3 introduced.
     const fn accepts_v1_3_grants(self) -> bool {
-        matches!(self, Self::V1_3 | Self::V1_4)
+        matches!(self, Self::V1_3 | Self::V1_4 | Self::V1_5)
+    }
+
+    /// Whether this version accepts the grant version 1.4 introduced.
+    const fn accepts_v1_4_grants(self) -> bool {
+        matches!(self, Self::V1_4 | Self::V1_5)
     }
 }
 
@@ -413,7 +419,8 @@ fn capability_for_record_version(
         // naming a later grant stays invalid, so provisioning cannot widen a
         // record by accident.
         "notification.show" if version.accepts_v1_3_grants() => Some(Capability::NotificationShow),
-        "window.title" if version == RecordVersion::V1_4 => Some(Capability::WindowTitle),
+        "window.title" if version.accepts_v1_4_grants() => Some(Capability::WindowTitle),
+        "ui.fields.read" if version == RecordVersion::V1_5 => Some(Capability::UiFieldsRead),
         _ => None,
     }
 }
@@ -518,6 +525,7 @@ fn validate_version(
         (1, 2) => Ok(RecordVersion::V1_2),
         (1, 3) => Ok(RecordVersion::V1_3),
         (1, 4) => Ok(RecordVersion::V1_4),
+        (1, 5) => Ok(RecordVersion::V1_5),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -878,6 +886,58 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_5_adds_the_field_read_grant_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 5")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"clipboard.read\", \"notification.show\", \"window.title\", \"ui.fields.read\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.5 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::ClipboardRead,
+                anodrel_protocol::Capability::NotificationShow,
+                anodrel_protocol::Capability::WindowTitle,
+                anodrel_protocol::Capability::UiFieldsRead,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_field_read_grant() {
+        // 1.4 is the case that matters: the newest version predating this
+        // grant, so the one a stale provisioning step would still be writing.
+        for minor in ["2", "3", "4"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"ui.fields.read\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.5 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

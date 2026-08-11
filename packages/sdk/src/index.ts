@@ -110,6 +110,18 @@ export class PlatformClient {
     return this.request("ui.document.replace.v2", { document });
   }
 
+  /**
+   * Reads every field value on this session's own current surface.
+   *
+   * A snapshot taken when you ask, not a stream. There is no way to name a
+   * field and no change event, so this cannot be used to follow what someone
+   * is typing — call it when a person has finished, such as on a submit
+   * action. See `docs/UI_FIELDS.md`.
+   */
+  readUiFields(): Promise<ResultFor<"ui.fields.read">> {
+    return this.request("ui.fields.read", {});
+  }
+
   readUiEvents(): Promise<ResultFor<"ui.events.read">> {
     return this.request("ui.events.read", {});
   }

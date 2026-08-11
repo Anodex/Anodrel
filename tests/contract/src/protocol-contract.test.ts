@@ -579,6 +579,57 @@ test("a window title cannot be aimed at a window or split across lines", async (
   assert.deepEqual(await client.setWindowTitle("t".repeat(96)), { status: "applied" });
 });
 
+test("a field read is a whole-surface snapshot behind its own grant", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["ui.fields.read"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  // The mock has no surface, and that is the same single code a real host
+  // returns when it has none — an application cannot tell the cases apart.
+  await assert.rejects(
+    () => client.readUiFields(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError && error.code === "ui.fields.unavailable",
+  );
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.readUiFields(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "ui.fields.read",
+  );
+
+  // No selector may ride along. Its absence is what stops a caller narrowing a
+  // read to one field and repeating it until the typing is reconstructed.
+  const transport = host.createTransport();
+  for (const payload of [
+    { id: "password" },
+    { fields: ["password"] },
+    { since: 1 },
+    { includeCaret: true },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: { major: 1, minor: 15 },
+      kind: "request",
+      requestId: `selector-${JSON.stringify(payload)}`,
+      operation: "ui.fields.read",
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+});
+
 test("session close requires a host-issued grant", async () => {
   const host = new MockHost({ applicationId: "test.application" });
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());

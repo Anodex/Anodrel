@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 14;
+pub const PROTOCOL_MINOR: u16 = 15;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -67,6 +67,12 @@ pub enum Capability {
     /// with a validated application-name suffix. There is no read counterpart
     /// and no way to name a window. See `docs/WINDOW_TITLE.md`.
     WindowTitle,
+    /// Read every field value on the session's own current surface.
+    ///
+    /// A snapshot, not a stream. There is no selector and no change event, so
+    /// this grant cannot be used to reconstruct what someone is typing. See
+    /// `docs/UI_FIELDS.md` and Decision 0067.
+    UiFieldsRead,
 }
 
 impl Capability {
@@ -90,6 +96,7 @@ impl Capability {
             Self::CredentialDelete => "credential.delete",
             Self::NotificationShow => "notification.show",
             Self::WindowTitle => "window.title",
+            Self::UiFieldsRead => "ui.fields.read",
         }
     }
 }
@@ -135,6 +142,12 @@ pub enum ProtocolErrorCode {
     /// The proposed title failed the documented bounds or character rules. The
     /// failure never echoes the offending text back.
     WindowTitleInvalid,
+    /// This session has no surface whose field values can be read.
+    ///
+    /// One code for every reason. Distinguishing "no surface" from "no fields"
+    /// from "the host was busy" would report state that, read repeatedly,
+    /// describes what the person is doing.
+    UiFieldsUnavailable,
 }
 
 impl ProtocolErrorCode {
@@ -167,6 +180,7 @@ impl ProtocolErrorCode {
             Self::WindowUnavailable => "window.unavailable",
             Self::WindowBusy => "window.busy",
             Self::WindowTitleInvalid => "window.title_invalid",
+            Self::UiFieldsUnavailable => "ui.fields.unavailable",
         }
     }
 }

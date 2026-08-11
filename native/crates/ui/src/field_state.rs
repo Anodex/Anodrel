@@ -188,6 +188,15 @@ impl UiFieldStates {
         self.states.is_empty()
     }
 
+    /// Iterates every field's state in element-ID order.
+    ///
+    /// The order comes from the key, so it does not vary with focus or edit
+    /// history. A reader that reported fields in the order they were last
+    /// touched would leak which one that was through the sequence.
+    pub fn iter(&self) -> impl Iterator<Item = (&ElementId, &UiFieldState)> {
+        self.states.iter()
+    }
+
     /// Replaces all state from the fields of a newly applied document.
     ///
     /// Every field is seeded from the document and every field absent from it

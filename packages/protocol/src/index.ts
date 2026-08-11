@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 14 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 15 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -44,7 +44,8 @@ export type Capability =
   | "credential.write"
   | "credential.delete"
   | "notification.show"
-  | "window.title";
+  | "window.title"
+  | "ui.fields.read";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -119,6 +120,23 @@ export interface PlatformOperationMap {
   "window.title.set": {
     readonly payload: { readonly title: string };
     readonly result: { readonly status: "applied" };
+  };
+  /**
+   * Reads every field value on this session's own current surface.
+   *
+   * A snapshot, not a stream. The payload is empty and there is no selector:
+   * a caller able to narrow a read to one field could repeat it until what
+   * someone was typing had been reconstructed. Returning the whole surface
+   * makes every read cost the same, so reading often gains nothing.
+   *
+   * The result carries values only — no caret, selection, timestamp, or
+   * edited flag, because those describe the typing rather than the value.
+   */
+  "ui.fields.read": {
+    readonly payload: EmptyPayload;
+    readonly result: {
+      readonly fields: ReadonlyArray<{ readonly id: string; readonly value: string }>;
+    };
   };
   "ui.document.replace": {
     readonly payload: { readonly document: string };
@@ -280,7 +298,8 @@ export type ProtocolErrorCode =
   | "notification.text_invalid"
   | "window.unavailable"
   | "window.busy"
-  | "window.title_invalid";
+  | "window.title_invalid"
+  | "ui.fields.unavailable";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;

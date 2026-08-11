@@ -13,6 +13,7 @@
 
 mod error;
 mod event;
+mod fields;
 mod input_mailbox;
 mod mailbox;
 mod revision;
@@ -21,6 +22,10 @@ mod snapshot;
 
 pub use error::UiSessionError;
 pub use event::UiApplicationEvent;
+pub use fields::{
+    MAX_SNAPSHOT_FIELDS, UiFieldReadError, UiFieldReader, UiFieldSnapshot, UiFieldSnapshotError,
+    UiFieldValue,
+};
 pub use input_mailbox::{UI_INPUT_QUEUE_CAPACITY, UiInputBatch, UiInputCandidate, UiInputMailbox};
 pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;

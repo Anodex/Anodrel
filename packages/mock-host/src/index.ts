@@ -320,6 +320,23 @@ export class MockHost {
         // application-name suffix and does not report what it became.
         return this.success("window.title.set", request.requestId, { status: "applied" });
 
+      case "ui.fields.read":
+        if (request.protocolVersion.minor < 15) {
+          return this.failure(request.requestId, "operation.unsupported", "ui.fields.read requires protocol 1.15 or later.");
+        }
+        // No selector, deliberately: one would let a caller narrow a read and
+        // repeat it until the typing had been reconstructed.
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "ui.fields.read accepts no payload fields.");
+        }
+        if (!this.hasCapability(sessionId, "ui.fields.read")) {
+          return this.failure(request.requestId, "capability.denied", "ui.fields.read requires the ui.fields.read capability.", { capability: "ui.fields.read" });
+        }
+        // The mock has no surface, which is the same answer a real host gives
+        // when it has none: one code, so an application cannot tell the cases
+        // apart by asking.
+        return this.failure(request.requestId, "ui.fields.unavailable", "no field values are available.");
+
       case "ui.document.replace":
       case "ui.document.replace.v2":
         if (request.protocolVersion.minor < (request.operation === "ui.document.replace.v2" ? 4 : 1)) {
