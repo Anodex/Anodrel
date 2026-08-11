@@ -131,20 +131,23 @@ cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --w
 ~~~
 
 `--iterations` accepts a whole number from 10 through 100,000 and defaults to
-5,000. `--windows-pipe` selects the real Windows pipe loopback; omitting it
-selects the in-process workload. The tool runs 200 unreported warmup requests
-for each size. It writes one JSON object to standard output and performs no
-file I/O. To retain a result, redirect standard output to an ignored local
-`.anodrel/` directory along with the machine, OS build, power mode, compiler
-version, and workload notes.
+5,000. `--windows-pipe` selects the real Windows pipe loopback and `--renderer`
+selects the rasterizer workload below; omitting both selects the in-process
+workload, and supplying two is refused rather than reported under one
+identifier. The tool runs unreported warmup passes for each measurement. It
+writes one JSON object to standard output and performs no file I/O. To retain a
+result, redirect standard output to an ignored local `.anodrel/` directory along
+with the machine, OS build, power mode, compiler version, and workload notes.
 
 The report is a local tooling format, not a public protocol. Its v1 fields are:
 
 | Field | Meaning |
 | --- | --- |
-| `benchmark` | Exact workload identifier: `anodrel.transport.in-process.v1` or `anodrel.transport.windows-pipe-loopback.v1`. |
-| `iterations` | Measured requests per payload size, excluding warmup. |
-| `measurements[].payloadBytes` | Exact encoded JSON payload size. |
+| `benchmark` | Exact workload identifier: `anodrel.transport.in-process.v1`, `anodrel.transport.windows-pipe-loopback.v1`, or `anodrel.renderer.compose.v1`. |
+| `iterations` | Measured passes per measurement, excluding warmup. |
+| `measurements[].payloadBytes` | Exact encoded JSON payload size. Transport workloads only. |
+| `measurements[].stage` | Drawing stage identifier. Renderer workload only. |
+| `measurements[].pixels` | Pixels the stage composites over, so a cost can be read per pixel. Renderer workload only. |
 | `measurements[].samples` | Number of reported latency samples. |
 | `p50Nanoseconds`, `p95Nanoseconds`, `p99Nanoseconds` | Nearest-rank latency percentiles; rank is `ceil(percentile × samples / 100)`. |
 | `meanNanoseconds` | Integer mean latency across reported samples. |
@@ -158,10 +161,67 @@ The report deliberately omits computer/user names, paths, serial numbers,
 network data, power state, OS build, and compiler version. Add the latter three
 manually when retaining results, because they can materially affect comparison.
 
-This result must not be presented as startup time, process memory, rendering
-performance, or an Electron comparison. The in-process workload must not be
-presented as pipe latency. Both modes need an equivalent workload and recorded
-environment before a cross-runtime comparison is published.
+This result must not be presented as startup time, process memory, or an
+Electron comparison. The in-process workload must not be presented as pipe
+latency, and neither transport workload may be presented as rendering
+performance. Each mode needs an equivalent workload and recorded environment
+before a cross-runtime comparison is published.
+
+## Renderer workload
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-perf-lab -- --renderer --iterations 300
+~~~
+
+`--renderer` measures the owned software rasterizer one drawing stage at a
+time. The [frame-cost guard](#frame-cost-guard) says whether a frame still fits
+its interval; this says **which stage** to look at when it stops fitting.
+
+It opens no window and performs no blit, so it is deliberately less than the
+cost of a frame reaching the screen — the report's `scope` says so, and a
+result from it must never be quoted as frame time.
+
+The stages, their sizes fixed as constants so two runs are comparable:
+
+| Stage | What it measures |
+| --- | --- |
+| `surface-clear` | Filling the whole 1240×900 surface with a flat colour. |
+| `gradient-panel` | One rounded rectangle filled through a three-stop linear gradient, as a status card is. |
+| `mask-blur` | Blurring a 366² coverage mask at the hero mark's radius, including the buffer copy a caller must make. |
+| `mask-fill-gradient` | Compositing that blurred mask through a gradient. |
+| `image-scale` | Compositing a bilinear-scaled 256² image into 220², as the mark's artwork is. |
+
+The image is synthesized rather than taken from the brand crate. This tool
+measures the rasterizer, and depending on the artwork would tie a performance
+number to a design asset that is free to change. It is also a deliberate worst
+case: nearly every pixel carries alpha, while the real mark has large fully
+transparent regions that `draw_image` skips outright — so the real artwork
+composites faster than this stage reports.
+
+### Reference measurements
+
+AMD Ryzen 9 7900X, Windows 11 Pro 10.0.26200, release build, 300 iterations,
+median, expressed per pixel so the stages can be compared:
+
+| Stage | p50 | Per pixel |
+| --- | --- | --- |
+| `surface-clear` | 72.7 µs | **0.07 ns** |
+| `mask-blur` | 1.36 ms | 10 ns |
+| `mask-fill-gradient` | 2.54 ms | 19 ns |
+| `gradient-panel` | 1.39 ms | 33 ns |
+| `image-scale` | 2.14 ms | 44 ns |
+
+The spread is the finding. A flat fill costs essentially nothing per pixel; the
+moment a paint has to be *evaluated* per pixel it costs two to three orders of
+magnitude more. That is why `docs/RENDERER.md` names a quantised colour ramp as
+the largest remaining renderer optimization, and this is the measurement that
+would show whether it worked.
+
+The p95 and p99 figures are much wider than the medians — `mask-blur` reaches
+13.9 ms at p99 against a 1.36 ms median. Those tails are allocation and
+scheduler noise, not rasterizer cost: each blur pass allocates a fresh
+half-megabyte coverage buffer. Read the medians for the renderer and the tails
+for the machine.
 
 ## Reference material
 

@@ -9,7 +9,9 @@ use anodrel_wire::encode_json;
 
 use crate::arguments::Workload;
 use crate::environment::Environment;
-use crate::report::{LatencyMeasurement, Report};
+use crate::report::{Dimension, LatencyMeasurement, Report};
+
+mod renderer;
 
 const WARMUP_ITERATIONS: usize = 200;
 const PAYLOAD_SIZES: [usize; 2] = [1_024, 64 * 1_024];
@@ -26,10 +28,13 @@ pub fn measure(workload: Workload, iterations: usize) -> Result<Report, String> 
     if iterations == 0 {
         return Err("performance measurements require at least one iteration".to_owned());
     }
-    let measurements = PAYLOAD_SIZES
-        .into_iter()
-        .map(|payload_bytes| measure_payload(workload, payload_bytes, iterations))
-        .collect::<Result<Vec<_>, _>>()?;
+    let measurements = match workload {
+        Workload::Renderer => renderer::measurements(iterations)?,
+        Workload::InProcess | Workload::WindowsPipe => PAYLOAD_SIZES
+            .into_iter()
+            .map(|payload_bytes| measure_payload(workload, payload_bytes, iterations))
+            .collect::<Result<Vec<_>, _>>()?,
+    };
     Ok(Report {
         workload,
         iterations,
@@ -47,6 +52,11 @@ fn measure_payload(
     let samples = match workload {
         Workload::InProcess => in_process_samples(&request, iterations)?,
         Workload::WindowsPipe => windows_pipe_samples(&request, iterations)?,
+        // Unreachable: `measure` routes the renderer workload before it can
+        // reach a per-payload measurement, which is the point of the split.
+        Workload::Renderer => {
+            return Err("the renderer workload does not vary payload size".to_owned());
+        }
     };
     latency_measurement(payload_bytes, samples)
 }
@@ -83,15 +93,19 @@ fn windows_pipe_samples(request: &str, iterations: usize) -> Result<Vec<u128>, S
 
 fn latency_measurement(
     payload_bytes: usize,
-    mut samples: Vec<u128>,
+    samples: Vec<u128>,
 ) -> Result<LatencyMeasurement, String> {
+    measurement(Dimension::PayloadBytes(payload_bytes), samples)
+}
+
+fn measurement(dimension: Dimension, mut samples: Vec<u128>) -> Result<LatencyMeasurement, String> {
     if samples.is_empty() {
         return Err("performance measurement did not produce samples".to_owned());
     }
     samples.sort_unstable();
     let mean_nanoseconds = samples.iter().sum::<u128>() / samples.len() as u128;
     Ok(LatencyMeasurement {
-        payload_bytes,
+        dimension,
         samples: samples.len(),
         p50_nanoseconds: percentile(&samples, 50),
         p95_nanoseconds: percentile(&samples, 95),

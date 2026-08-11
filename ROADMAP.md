@@ -117,8 +117,13 @@ Status: **Direct Windows host in progress**
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency
-  with fixed warmup and documented percentile rules (Decision 0024). Startup,
-  memory, rendering, and application comparisons remain separate workloads.
+  with fixed warmup and documented percentile rules (Decision 0024). **Rendering
+  is now covered too:** its `--renderer` workload reports the owned rasterizer's
+  drawing stages under a separate `anodrel.renderer.compose.v1` identifier, with
+  per-stage pixel counts so a cost can be read per pixel. It opens no window and
+  performs no blit, which the report's scope states, so it must never be quoted
+  as frame time. Startup, memory, and application comparisons remain separate
+  workloads.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
   **Completed for the path and text-clipboard foundations:** host-only
   per-application `data`,

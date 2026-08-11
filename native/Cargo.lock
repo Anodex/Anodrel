@@ -101,6 +101,7 @@ dependencies = [
 name = "anodrel-perf-lab"
 version = "0.1.0"
 dependencies = [
+ "anodrel-canvas",
  "anodrel-core",
  "anodrel-transport",
  "anodrel-windows-pipe",

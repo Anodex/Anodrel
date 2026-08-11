@@ -421,8 +421,14 @@ preference.
 
 The largest remaining cost is sampling a gradient per pixel under a large
 blurred mask: compositing the mark's glow twice through its gradient is about
-2.3 ms of a reveal frame, now that building the mask no longer is. A quantised
-colour ramp would remove the per-sample stop search; it has not been needed yet.
+2.3 ms of a reveal frame, now that building the mask no longer is.
+
+The perf lab's `--renderer` workload puts a number on why. Per pixel, a flat
+fill costs about **0.07 ns** and the same pixel filled through a gradient costs
+**19 ns** — two to three orders of magnitude more, purely for evaluating the
+paint. A quantised colour ramp would remove the per-sample stop search, and that
+workload is how anyone would show it worked. It has not been needed yet. See
+`docs/PERFORMANCE.md` for the full stage table and what the numbers exclude.
 
 ## Testing
 

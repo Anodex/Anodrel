@@ -8,6 +8,7 @@ const MAX_ITERATIONS: usize = 100_000;
 pub enum Workload {
     InProcess,
     WindowsPipe,
+    Renderer,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,7 +22,9 @@ impl Options {
         let mut iterations = DEFAULT_ITERATIONS;
         let mut iterations_seen = false;
         let mut workload = Workload::InProcess;
-        let mut windows_pipe_seen = false;
+        // One flag per workload, but at most one workload: measuring two things
+        // in one run would report them under a single benchmark identifier.
+        let mut workload_seen = false;
         let mut arguments = arguments.into_iter();
         while let Some(argument) = arguments.next() {
             match argument.as_str() {
@@ -38,11 +41,18 @@ impl Options {
                     iterations_seen = true;
                 }
                 "--windows-pipe" => {
-                    if windows_pipe_seen {
-                        return Err("--windows-pipe may be supplied only once".to_owned());
+                    if workload_seen {
+                        return Err("only one workload may be selected".to_owned());
                     }
                     workload = Workload::WindowsPipe;
-                    windows_pipe_seen = true;
+                    workload_seen = true;
+                }
+                "--renderer" => {
+                    if workload_seen {
+                        return Err("only one workload may be selected".to_owned());
+                    }
+                    workload = Workload::Renderer;
+                    workload_seen = true;
                 }
                 "--help" | "-h" => return Err(help_text()),
                 _ => return Err(format!("unrecognized argument: {argument}")),
@@ -63,8 +73,10 @@ impl Options {
 
 fn help_text() -> String {
     format!(
-        "usage: anodrel-perf-lab [--iterations <{MIN_ITERATIONS}..{MAX_ITERATIONS}>] [--windows-pipe]\n\
-         Measures the owned in-process transport path, or a Windows named-pipe loopback, for 1 KiB and 64 KiB requests.\n\
+        "usage: anodrel-perf-lab [--iterations <{MIN_ITERATIONS}..{MAX_ITERATIONS}>] [--windows-pipe | --renderer]\n\
+         Default workload: the owned in-process transport path, for 1 KiB and 64 KiB requests.\n\
+         --windows-pipe measures the same requests across a real Windows named-pipe loopback.\n\
+         --renderer measures the owned software rasterizer's drawing stages; it opens no window and performs no blit.\n\
          Default iterations: {DEFAULT_ITERATIONS}."
     )
 }
@@ -115,5 +127,28 @@ mod tests {
             .is_err()
         );
         assert!(Options::parse(["--unknown".to_owned()]).is_err());
+    }
+
+    #[test]
+    fn selects_the_renderer_workload_and_refuses_two_at_once() {
+        assert_eq!(
+            Options::parse(["--renderer".to_owned()]),
+            Ok(Options {
+                iterations: DEFAULT_ITERATIONS,
+                workload: Workload::Renderer
+            })
+        );
+        // Two workloads in one run would report both under a single benchmark
+        // identifier, which is exactly the confusion the identifiers prevent.
+        for pair in [
+            ["--renderer", "--windows-pipe"],
+            ["--windows-pipe", "--renderer"],
+            ["--renderer", "--renderer"],
+        ] {
+            assert!(
+                Options::parse(pair.map(str::to_owned)).is_err(),
+                "{pair:?} was accepted"
+            );
+        }
     }
 }
