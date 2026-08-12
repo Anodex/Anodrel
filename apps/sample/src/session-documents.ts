@@ -128,21 +128,15 @@ export function fieldEchoDocument(
           fontSize: 16,
           tone: "primary" as const,
         })),
-        // Two short lines rather than one long one. A text node is a single
-        // line and clamps to the client width rather than wrapping, so a
-        // sentence written past the edge is simply cut off — which is what a
-        // first run of this document did.
+        // Deliberately one long sentence. An earlier run of this document was
+        // cut off mid-word at the window edge, because a text run did not wrap;
+        // it now reflows to the column, so this line is also the check that it
+        // still does. See `docs/UI.md`.
         {
           id: "sample.fields.echo.detail",
           kind: "text",
-          value: "No keystroke, caret, or timing crossed the boundary.",
-          fontSize: 16,
-          tone: "secondary",
-        },
-        {
-          id: "sample.fields.echo.detail.second",
-          kind: "text",
-          value: "Everything typed before you submitted happened without this application.",
+          value:
+            "No keystroke, caret, or timing crossed the boundary. Everything typed before you submitted happened without this application ever watching.",
           fontSize: 16,
           tone: "secondary",
         },

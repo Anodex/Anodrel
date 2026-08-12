@@ -344,10 +344,11 @@ Tab, typing and editing worked, and after **Submit field values** the window
 showed each field's exact text under *RECEIVED BY THE APPLICATION*, including an
 edit made to a pre-filled value. The host exited cleanly with no error output.
 
-Note while reading it that a text node is a **single line** and clamps to the
-client width rather than wrapping, so a long sentence is cut off at the edge
-rather than flowing onto a second line. Multi-line and wrapping text are not in
-the model; see `docs/UI.md`.
+That run also found the wrapping gap: the closing sentence was cut off mid-word
+at the window edge, because a text run did not reflow. It now wraps to the
+column (Decision 0068), and the sample's closing sentence is deliberately long
+so this check exercises it. Resize the window and the paragraph should reflow
+with nothing lost at either edge.
 
 See `docs/UI_FIELDS.md` for what a read carries and what it deliberately does
 not — no caret, selection, timing, or edited flag.

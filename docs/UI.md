@@ -65,7 +65,8 @@ deterministically:
 
 - a vertical stack places children from top to bottom; a horizontal stack
   places them left to right;
-- a text node takes its measured size, bounded by its stack's available area;
+- a text node wraps to the width its stack gives it and takes the measured size
+  of the resulting block of lines;
 - an action receives its label's measured size plus fixed owned padding, with a
   minimum 36-pixel height; stacks and actions stretch across the available
   cross axis;
@@ -81,9 +82,38 @@ height, translates only the child vertically, clips it on all four viewport
 edges, and returns `UiScrollMetrics` so the host can retain a clamped value for
 the next pass. `layout` remains the zero-offset convenience method. The model
 has no wheel or gesture input, scrollbar, horizontal scrolling, overscroll,
-inertia, wrapping, transforms, z-index, animation, pointer capture, text
-editing, or implicit native behavior. See `docs/SCROLLING.md` and Decision
-0038.
+inertia, flow or grid layout, transforms, z-index, animation, pointer capture,
+or implicit native behavior. See `docs/SCROLLING.md` and Decision 0038.
+
+## Text wrapping
+
+A text node's **value** is one line — the model refuses control characters, so
+there is no newline to carry. How many *visual* lines that value occupies is a
+different question, and it belongs to the host: it depends on the width the
+window happens to have, which the application does not know and must not need
+to.
+
+So a run wraps to the column its stack gives it, and a paragraph that no longer
+fits pushes what follows it down rather than running past the edge. Breaking is
+greedy and happens at spaces; a single word wider than the column is broken
+between characters, because leaving it whole would be the clipping this
+replaces. `MAX_TEXT_LINES` bounds how many lines one value may occupy, and text
+beyond it stays on the final line and is clipped as before — bounded, not
+truncated.
+
+Two properties make this safe to rely on:
+
+- **An application never learns the break points.** They are not in the
+  document, the layout it can observe, or any event. The same document at two
+  window widths is two different pictures and one unchanged application.
+- **Layout and painting cannot disagree.** Both call `wrap_text` with the same
+  measurer in the same logical space. Layout reports a run's width as its
+  widest line, and greedy breaking re-wraps identically at that width — a word
+  rejected at the wider column is still rejected at the narrower one. That
+  invariant is pinned by a test rather than left as an assumption.
+
+Wrapping changes only presentation, so it needs no protocol version, no grant,
+and no change to a stored document. Decision 0068 records the reasoning.
 
 Every visible `UiLayoutItem` carries both clipped `bounds` and un-clipped
 `paint_bounds`. Renderers draw the latter then clip their own output to the

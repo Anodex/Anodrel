@@ -11,7 +11,7 @@ use anodrel_ui::{
     Action, Axis, ElementId, FIELD_HORIZONTAL_PADDING, Field, Insets, Scroll, Stack, Text,
     TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFieldState, UiFieldStates, UiFocus,
     UiLayout, UiLayoutKind, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollWheel, UiSize,
-    UiSurfaceTone, UiTextTone,
+    UiSurfaceTone, UiTextTone, wrap_text,
 };
 use anodrel_ui_document::decode;
 use anodrel_ui_session::UiFieldSnapshot;
@@ -720,14 +720,41 @@ fn draw_text(
         UiTextTone::Secondary => palette.ink_soft,
         UiTextTone::Accent => palette.accent_shell,
     };
-    let position = point(bounds.left * surface.scale, bounds.top * surface.scale);
-    text::draw(
-        canvas,
-        &TextSpec::new(value, surface.font(text_node.font_size()), WEIGHT_REGULAR),
-        position,
-        Align::Left,
-        &Paint::solid(color),
+
+    // Wrapped with the same function and the same measurer that produced these
+    // bounds, in the same logical space, so the painted lines are the lines the
+    // layout measured. `bounds` is the widest line, and greedy breaking gives
+    // the same result at that width as at the column it was wrapped against.
+    //
+    // A status value substituted here is not the value the layout measured, so
+    // a status longer than the text it replaces may paint past its box. Status
+    // is a lab affordance and its strings are short; a document's own text is
+    // never substituted.
+    let lines = wrap_text(
+        value,
+        text_node.font_size(),
+        bounds.width(),
+        &WindowsTextMeasurer,
     );
+    // Advancing by the measured block height divided by its line count keeps
+    // the run inside the box the layout reserved, instead of accumulating a
+    // per-line rounding difference down a paragraph.
+    let step = (bounds.height() * surface.scale) / lines.len() as f32;
+    let font = surface.font(text_node.font_size());
+    let left = bounds.left * surface.scale;
+    let top = bounds.top * surface.scale;
+    for (index, line) in lines.iter().enumerate() {
+        if line.is_empty() {
+            continue;
+        }
+        text::draw(
+            canvas,
+            &TextSpec::new(*line, font, WEIGHT_REGULAR),
+            point(left, top + step * index as f32),
+            Align::Left,
+            &Paint::solid(color),
+        );
+    }
 }
 
 fn draw_action(

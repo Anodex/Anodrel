@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     Action, Axis, ElementId, Field, Scroll, Stack, Text, UiDocument, UiNode, UiPoint, UiRect,
-    UiScrollState, UiSize,
+    UiScrollState, UiSize, wrap_text, wrapped_height,
 };
 
 /// Horizontal padding applied to every action label, on each side.
@@ -219,10 +219,12 @@ impl UiLayout {
 impl UiDocument {
     /// Lays out this validated document within a host client rectangle.
     ///
-    /// Stacks and actions stretch across the available cross axis. Text uses
-    /// its measured size, bounded by that available area. Every visible output
-    /// item is clipped to each ancestor stack content rectangle and the client
-    /// rectangle. An empty or non-finite client rectangle produces no items.
+    /// Stacks and actions stretch across the available cross axis. Text wraps
+    /// to that available width and takes the measured size of the lines it
+    /// becomes, so a run that reflowed moves what follows it rather than
+    /// overlapping it. Every visible output item is clipped to each ancestor
+    /// stack content rectangle and the client rectangle. An empty or non-finite
+    /// client rectangle produces no items.
     #[must_use]
     pub fn layout(&self, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiLayout {
         self.layout_with_scroll_offsets(client_bounds, measurer, &UiScrollOffsets::new())
@@ -352,7 +354,9 @@ fn layout_stack_children(
         Axis::Vertical => {
             let mut cursor = content.top;
             for child in &stack.children {
-                let intrinsic = intrinsic_size(child, measurer);
+                // The column a child wraps in is the stack's content width, and
+                // it is the same width the child is then laid out in.
+                let intrinsic = intrinsic_size(child, content.width(), measurer);
                 let width = match child {
                     UiNode::Text(_) => intrinsic.width.min(content.width()),
                     UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
@@ -375,7 +379,11 @@ fn layout_stack_children(
         Axis::Horizontal => {
             let mut cursor = content.left;
             for child in &stack.children {
-                let intrinsic = intrinsic_size(child, measurer);
+                // A child of a horizontal stack wraps against the width still
+                // unused on the row, so a run late in the row does not measure
+                // itself against space its siblings already took.
+                let remaining = (content.right - cursor).max(0.0);
+                let intrinsic = intrinsic_size(child, remaining, measurer);
                 let height = match child {
                     UiNode::Text(_) => intrinsic.height.min(content.height()),
                     UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
@@ -406,7 +414,10 @@ fn layout_scroll_child(
     scroll_offsets: &UiScrollOffsets,
     layout: &mut UiLayout,
 ) {
-    let content_height = intrinsic_size(scroll.child(), measurer)
+    // A scroll viewport never widens for its content, so its child wraps
+    // against the viewport width. Content taller than the viewport is the
+    // point; content wider than it would be unreachable.
+    let content_height = intrinsic_size(scroll.child(), viewport_bounds.width(), measurer)
         .height
         .max(viewport_bounds.height());
     let mut state = scroll_offsets.get(scroll.id()).copied().unwrap_or_default();
@@ -432,18 +443,49 @@ fn layout_scroll_child(
     );
 }
 
-fn intrinsic_size(node: &UiNode, measurer: &dyn TextMeasurer) -> UiSize {
+/// Measures a node against the width it will actually be laid out in.
+///
+/// Text is the only kind whose height depends on that width, because it is the
+/// only one that wraps. An action or a field measures its label on one line
+/// whatever the column: a control that reflowed into a paragraph would stop
+/// looking like a control.
+fn intrinsic_size(node: &UiNode, available_width: f32, measurer: &dyn TextMeasurer) -> UiSize {
     match node {
-        UiNode::Text(text) => measured_text(text.value(), text.font_size(), measurer),
+        UiNode::Text(text) => {
+            measured_wrapped_text(text.value(), text.font_size(), available_width, measurer)
+        }
         UiNode::Action(action) => intrinsic_action_size(action, measurer),
         UiNode::Field(field) => intrinsic_field_size(field, measurer),
-        UiNode::Stack(stack) => intrinsic_stack_size(stack, measurer),
-        UiNode::Scroll(scroll) => intrinsic_size(scroll.child(), measurer),
+        UiNode::Stack(stack) => intrinsic_stack_size(stack, available_width, measurer),
+        UiNode::Scroll(scroll) => intrinsic_size(scroll.child(), available_width, measurer),
     }
 }
 
 fn measured_text(value: &str, font_size: u16, measurer: &dyn TextMeasurer) -> UiSize {
     measurer.measure(value, font_size).sanitized()
+}
+
+/// Measures one text value as the block of lines it occupies at this width.
+///
+/// The reported width is the **widest line**, not the width it was wrapped
+/// against, so a short run still reports its natural size and a stack's cross
+/// axis does not inflate to the column. Greedy breaking makes that safe: see
+/// the stability test in [`crate::wrap_text`]'s module, which pins that
+/// re-wrapping at the widest line reproduces the same lines — which is what a
+/// host relies on when it paints from the bounds it was given.
+fn measured_wrapped_text(
+    value: &str,
+    font_size: u16,
+    available_width: f32,
+    measurer: &dyn TextMeasurer,
+) -> UiSize {
+    let line_height = measured_text(value, font_size, measurer).height;
+    let lines = wrap_text(value, font_size, available_width, measurer);
+    let width = lines
+        .iter()
+        .map(|line| measured_text(line, font_size, measurer).width)
+        .fold(0.0_f32, f32::max);
+    UiSize::new(width, wrapped_height(lines.len(), line_height))
 }
 
 fn intrinsic_action_size(action: &Action, measurer: &dyn TextMeasurer) -> UiSize {
@@ -471,11 +513,19 @@ fn intrinsic_field_size(field: &Field, measurer: &dyn TextMeasurer) -> UiSize {
     )
 }
 
-fn intrinsic_stack_size(stack: &Stack, measurer: &dyn TextMeasurer) -> UiSize {
+fn intrinsic_stack_size(
+    stack: &Stack,
+    available_width: f32,
+    measurer: &dyn TextMeasurer,
+) -> UiSize {
+    let horizontal_padding = f32::from(stack.padding.left + stack.padding.right);
+    // Children are measured against the column left after this stack's own
+    // padding, which is the width they will be laid out in.
+    let child_width = (available_width - horizontal_padding).max(0.0);
     let mut primary: f32 = 0.0;
     let mut cross: f32 = 0.0;
     for child in &stack.children {
-        let child_size = intrinsic_size(child, measurer);
+        let child_size = intrinsic_size(child, child_width, measurer);
         let (child_primary, child_cross) = match stack.axis {
             Axis::Vertical => (child_size.height, child_size.width),
             Axis::Horizontal => (child_size.width, child_size.height),
@@ -487,7 +537,6 @@ fn intrinsic_stack_size(stack: &Stack, measurer: &dyn TextMeasurer) -> UiSize {
         cross = cross.max(child_cross);
     }
 
-    let horizontal_padding = f32::from(stack.padding.left + stack.padding.right);
     let vertical_padding = f32::from(stack.padding.top + stack.padding.bottom);
     match stack.axis {
         Axis::Vertical => UiSize::new(cross + horizontal_padding, primary + vertical_padding),
@@ -496,7 +545,12 @@ fn intrinsic_stack_size(stack: &Stack, measurer: &dyn TextMeasurer) -> UiSize {
 }
 
 fn bounded_text_bounds(text: &Text, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiRect {
-    let size = measured_text(text.value(), text.font_size(), measurer);
+    let size = measured_wrapped_text(
+        text.value(),
+        text.font_size(),
+        client_bounds.width(),
+        measurer,
+    );
     UiRect::from_size(
         client_bounds.left,
         client_bounds.top,
@@ -638,6 +692,96 @@ mod tests {
         assert_eq!(
             layout.hit_test(UiPoint::new(20.0, 20.0)),
             Some(UiEvent::ActionInvoked(id("open")))
+        );
+    }
+
+    /// The same document at two widths, which is the whole point of wrapping.
+    ///
+    /// At 400 logical pixels the sentence is one line; at 100 it is two, and the
+    /// action beneath it moves down by exactly the line it gained. Before
+    /// wrapping existed the run stayed one line at both widths and the half past
+    /// the edge was simply cut off.
+    #[test]
+    fn a_text_run_reflows_to_its_column_and_moves_what_follows_it() {
+        let root = stack(
+            "root",
+            Axis::Vertical,
+            Insets::zero(),
+            0,
+            vec![text("body", "one two three four"), action("go", "Go", true)],
+        );
+        let document = UiDocument::new(root).expect("document is valid");
+
+        let wide = document.layout(UiRect::from_size(0.0, 0.0, 400.0, 200.0), &FixedMeasurer);
+        assert_eq!(
+            wide.bounds(&id("body")),
+            Some(UiRect::from_size(0.0, 0.0, 180.0, 10.0))
+        );
+        assert_eq!(wide.bounds(&id("go")).map(|bounds| bounds.top), Some(10.0));
+
+        let narrow = document.layout(UiRect::from_size(0.0, 0.0, 100.0, 200.0), &FixedMeasurer);
+        assert_eq!(
+            narrow.bounds(&id("body")),
+            Some(UiRect::from_size(0.0, 0.0, 100.0, 20.0))
+        );
+        assert_eq!(
+            narrow.bounds(&id("go")).map(|bounds| bounds.top),
+            Some(20.0)
+        );
+    }
+
+    #[test]
+    fn a_wrapped_run_stays_inside_its_stack_padding() {
+        // The column a run wraps against is the content box, not the client
+        // rectangle, so padding is not somewhere text may spill.
+        let root = stack(
+            "root",
+            Axis::Vertical,
+            Insets::all(20).expect("padding is valid"),
+            0,
+            vec![text("body", "alpha beta gamma delta epsilon")],
+        );
+        let document = UiDocument::new(root).expect("document is valid");
+        let layout = document.layout(UiRect::from_size(0.0, 0.0, 140.0, 300.0), &FixedMeasurer);
+
+        let bounds = layout.bounds(&id("body")).expect("the run is laid out");
+        assert!(bounds.left >= 20.0, "{bounds:?} started inside the padding");
+        assert!(bounds.right <= 120.0, "{bounds:?} ran past the content box");
+        // Five words that measure 300 logical pixels on one line cannot be one
+        // line in a 100-pixel column.
+        assert!(bounds.height() > 10.0, "{bounds:?} did not wrap");
+    }
+
+    #[test]
+    fn scrollable_content_wraps_against_the_viewport_and_grows_taller() {
+        // A viewport never widens for its content, so wrapping is what turns a
+        // long run into something scrolling can reach.
+        let root = scroll(
+            "viewport",
+            stack(
+                "content",
+                Axis::Vertical,
+                Insets::zero(),
+                0,
+                vec![text(
+                    "body",
+                    "alpha beta gamma delta epsilon zeta eta theta",
+                )],
+            ),
+        );
+        let document = UiDocument::new(root).expect("document is valid");
+        let layout = document.layout(UiRect::from_size(0.0, 0.0, 100.0, 40.0), &FixedMeasurer);
+
+        let metrics = layout
+            .scroll_metrics()
+            .iter()
+            .find(|metrics| metrics.id() == &id("viewport"))
+            .expect("the viewport reports metrics");
+        assert_eq!(metrics.viewport_height(), 40.0);
+        assert!(
+            metrics.content_height() > 40.0,
+            "wrapped content should exceed the viewport, got {}",
+            metrics.content_height()
         );
     }
 

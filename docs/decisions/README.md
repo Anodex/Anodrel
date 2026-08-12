@@ -13,6 +13,7 @@ Each record should include:
 
 Current records (newest first):
 
+- 0068: The host decides where text breaks.
 - 0067: An application learns a value, never the typing.
 - 0066: An application proposes a window title; the host composes it.
 - 0065: A crash record is host-only, payload-free, and covers the easy case

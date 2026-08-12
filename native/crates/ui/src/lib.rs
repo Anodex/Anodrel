@@ -23,6 +23,7 @@ mod id;
 mod layout;
 mod model;
 mod scroll;
+mod text_wrap;
 
 pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
 pub use appearance::{UiActionTone, UiSurfaceTone, UiTextTone};
@@ -41,3 +42,4 @@ pub use model::{
     UiDocument, UiNode,
 };
 pub use scroll::{DEFAULT_SCROLL_LINE, UiScrollState, UiScrollWheel, WHEEL_DELTA_PER_LINE};
+pub use text_wrap::{MAX_TEXT_LINES, wrap_text, wrapped_height};

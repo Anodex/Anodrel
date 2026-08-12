@@ -52,8 +52,10 @@ patch.
 | `enabled` | A disabled field is announced as unavailable and cannot be focused or typed into. |
 
 Text is validated by the same rule as every other visible string: no control
-characters. A field is one line. Multi-line input is a separate node with its
-own layout and scrolling questions, and is not this.
+characters. A field is one line, and unlike a text run it does not wrap: a
+caret has to sit somewhere definite, and reflowing under someone mid-sentence
+would move it. Multi-line input is a separate node with its own layout,
+scrolling, and caret questions, and is not this.
 
 ### No secret fields in v1
 
