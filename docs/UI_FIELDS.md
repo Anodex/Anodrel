@@ -134,6 +134,18 @@ field's presence and label and **cannot** read its value or move focus into it â
 the same one-directional rule, applied to the node where reading the value would
 matter most.
 
+## Reaching a field
+
+A field takes focus by **click or by Tab**, and both are required: Tab alone is
+not how anyone expects to use a text box. Clicking one moves the caret into it
+and produces no semantic event â€” a click that lands on a field tells an
+application nothing, exactly as tabbing to one does.
+
+Clicking an action both focuses and activates it, because pressing a control is
+also how a person expects to focus it. That is why the host asks two separate
+questions of a click: *what should now have focus*, which a field can answer,
+and *what did this activate*, which only an action can.
+
 ## Verification
 
 Portable unit tests cover the bounds, the control-character rule, layout and hit

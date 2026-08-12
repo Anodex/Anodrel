@@ -181,6 +181,25 @@ impl UiLayout {
             .map(UiLayoutItem::bounds)
     }
 
+    /// Returns the focusable item at a point, in reverse paint order.
+    ///
+    /// Wider than [`hit_test`](Self::hit_test): that answers "what action did
+    /// this activate", and this answers "what should now have focus". A field
+    /// is reachable here and not there, because clicking one must put the caret
+    /// in it without producing a semantic event.
+    #[must_use]
+    pub fn focus_target_at(&self, point: UiPoint) -> Option<&ElementId> {
+        self.items
+            .iter()
+            .rev()
+            .find(|item| {
+                matches!(item.kind, UiLayoutKind::Action | UiLayoutKind::Field)
+                    && item.enabled
+                    && item.bounds.contains(point)
+            })
+            .map(|item| &item.id)
+    }
+
     /// Hit tests enabled visible actions in reverse paint order.
     ///
     /// The result carries no command or native authority. Its receiver must

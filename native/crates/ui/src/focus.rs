@@ -106,6 +106,28 @@ impl UiFocus {
             .map(|item| UiEvent::ActionInvoked(item.id().clone()))
     }
 
+    /// Moves focus to a specific item, if it is focusable in this layout.
+    ///
+    /// Used by pointer input: a person clicking a field expects the caret to
+    /// land in it. The target is revalidated against the current layout rather
+    /// than trusted, so a stale or disabled ID cannot take focus.
+    ///
+    /// Returns whether focus changed.
+    pub fn focus_on(&mut self, layout: &UiLayout, target: &ElementId) -> bool {
+        if self.focused.as_ref() == Some(target) {
+            return false;
+        }
+        let reachable = layout
+            .items()
+            .iter()
+            .any(|item| is_focusable(item) && item.id() == target);
+        if !reachable {
+            return false;
+        }
+        self.focused = Some(target.clone());
+        true
+    }
+
     fn select(&mut self, item: &UiLayoutItem) -> Option<ElementId> {
         let id = item.id().clone();
         self.focused = Some(id.clone());

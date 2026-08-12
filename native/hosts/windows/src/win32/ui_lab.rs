@@ -248,6 +248,22 @@ impl UiLab {
         changed
     }
 
+    /// Moves focus to whatever focusable item is under a pointer position.
+    ///
+    /// Separate from [`invoke`](Self::invoke) because the two answer different
+    /// questions: this one is "what should now have focus", and a field can be
+    /// the answer to it while never being the answer to "what did this
+    /// activate". Returns whether focus changed, so a caller repaints only when
+    /// the ring actually moved.
+    pub(super) fn focus_at(&mut self, width: f32, height: f32, at: Point) -> bool {
+        let surface = Surface::new(width, height);
+        let layout = self.layout(width, height);
+        let Some(target) = layout.focus_target_at(surface.to_ui_point(at)).cloned() else {
+            return false;
+        };
+        self.focus.focus_on(&layout, &target)
+    }
+
     /// Moves focus forward through this view's current visible action layout.
     pub(super) fn focus_next(&mut self, width: f32, height: f32) -> bool {
         self.move_focus(width, height, UiFocus::move_next)
@@ -839,6 +855,97 @@ mod tests {
             lab.focus_next(BASE_WIDTH, BASE_HEIGHT);
         }
         panic!("focus never reached the sample field");
+    }
+
+    #[test]
+    fn an_action_below_fields_is_still_clickable() {
+        // Reproduces the sample's field document: two fields above one action.
+        // A field that mis-measured its height would push the action's real
+        // bounds away from where it is drawn, and the click would land nowhere.
+        let json = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":56,"top":48,"right":56,"bottom":48},"gap":14,"surfaceTone":"plain","children":[{"id":"one","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true},{"id":"two","kind":"field","label":"Note","value":"edit me","maxLength":64,"fontSize":16,"enabled":true},{"id":"submit","kind":"action","label":"Submit field values","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
+        let lab = UiLab::preview(decode(json).expect("test document is valid"));
+
+        let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+        let bounds = layout
+            .bounds(&id("submit"))
+            .expect("the action is laid out and visible");
+        let centre = Point {
+            x: (bounds.left + bounds.right) / 2.0,
+            y: (bounds.top + bounds.bottom) / 2.0,
+        };
+        assert_eq!(
+            lab.action_at(BASE_WIDTH, BASE_HEIGHT, centre),
+            Some(id("submit")),
+            "the action's own centre did not hit it"
+        );
+
+        // A click on a field must not be mistaken for the action.
+        let field_bounds = layout.bounds(&id("one")).expect("the field is laid out");
+        assert_eq!(
+            lab.action_at(
+                BASE_WIDTH,
+                BASE_HEIGHT,
+                Point {
+                    x: (field_bounds.left + field_bounds.right) / 2.0,
+                    y: (field_bounds.top + field_bounds.bottom) / 2.0,
+                }
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn clicking_a_field_focuses_it_so_a_person_can_type_there() {
+        // Without this a field was reachable only by Tab, which is not how
+        // anyone expects to use a text box.
+        let mut lab = UiLab::new();
+        let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+        let bounds = layout
+            .bounds(&id("ui.lab.field"))
+            .expect("the sample field is visible");
+        let centre = Point {
+            x: (bounds.left + bounds.right) / 2.0,
+            y: (bounds.top + bounds.bottom) / 2.0,
+        };
+
+        assert!(lab.focus_at(BASE_WIDTH, BASE_HEIGHT, centre));
+        assert_eq!(lab.focus.focused(), Some(&id("ui.lab.field")));
+        // Focusing a field produces no semantic event, the same as tabbing to
+        // one: a click that lands on a field tells an application nothing.
+        assert_eq!(lab.last_action, None);
+        assert!(lab.type_character(BASE_WIDTH, BASE_HEIGHT, 'x'));
+
+        // Clicking the same field again is not a change, so the caller does not
+        // repaint for it.
+        assert!(!lab.focus_at(BASE_WIDTH, BASE_HEIGHT, centre));
+    }
+
+    #[test]
+    fn clicking_an_action_focuses_it_as_well_as_invoking_it() {
+        let mut lab = UiLab::new();
+        let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+        let bounds = layout
+            .bounds(&id("ui.lab.hit-test"))
+            .expect("the action is visible");
+        let centre = Point {
+            x: (bounds.left + bounds.right) / 2.0,
+            y: (bounds.top + bounds.bottom) / 2.0,
+        };
+
+        assert!(lab.focus_at(BASE_WIDTH, BASE_HEIGHT, centre));
+        assert_eq!(lab.focus.focused(), Some(&id("ui.lab.hit-test")));
+        assert!(lab.invoke(BASE_WIDTH, BASE_HEIGHT, centre));
+        assert_eq!(lab.last_action, Some(id("ui.lab.hit-test")));
+    }
+
+    #[test]
+    fn clicking_empty_space_leaves_focus_where_it_was() {
+        let mut lab = UiLab::new();
+        lab.focus_next(BASE_WIDTH, BASE_HEIGHT);
+        let before = lab.focus.focused().cloned();
+        // Well outside any node, but inside the client area.
+        assert!(!lab.focus_at(BASE_WIDTH, BASE_HEIGHT, Point { x: 4.0, y: 4.0 }));
+        assert_eq!(lab.focus.focused().cloned(), before);
     }
 
     #[test]

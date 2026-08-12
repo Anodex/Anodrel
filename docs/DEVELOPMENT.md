@@ -339,6 +339,16 @@ subscribe to, and the second read only happened because a person activated an
 action. If the client stops at safe stage 26, its first read disagreed with the
 document it had just set.
 
+This check has passed on Windows 11: both fields were reachable by click and by
+Tab, typing and editing worked, and after **Submit field values** the window
+showed each field's exact text under *RECEIVED BY THE APPLICATION*, including an
+edit made to a pre-filled value. The host exited cleanly with no error output.
+
+Note while reading it that a text node is a **single line** and clamps to the
+client width rather than wrapping, so a long sentence is cut off at the edge
+rather than flowing onto a second line. Multi-line and wrapping text are not in
+the model; see `docs/UI.md`.
+
 See `docs/UI_FIELDS.md` for what a read carries and what it deliberately does
 not — no caret, selection, timing, or edited flag.
 

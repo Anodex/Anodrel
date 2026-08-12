@@ -301,6 +301,11 @@ impl UiSessionView {
         self.queue_event(event)
     }
 
+    /// Moves focus to whatever focusable item is under a pointer position.
+    pub(super) fn focus_at(&mut self, width: f32, height: f32, at: Point) -> bool {
+        self.lab.focus_at(width, height, at)
+    }
+
     /// Queues one current focused semantic action candidate.
     pub(super) fn activate_focused(&mut self, width: f32, height: f32) -> bool {
         let Some(event) = self.lab.focused_event(width, height) else {

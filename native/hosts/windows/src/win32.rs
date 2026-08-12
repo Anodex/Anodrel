@@ -2011,12 +2011,15 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         WM_LBUTTONUP => {
             let (x, y) = mouse_position(lparam);
             let rect = client_rect(window);
+            let (width, height) = (rect.width() as f32, rect.height() as f32);
+            let at = point(x as f32, y as f32);
+            // Focus first, then invoke. A click on a field only moves focus,
+            // and a click on an action does both — pressing a control is also
+            // how a person expects to focus it. Treating these as alternatives
+            // is what left a field unreachable by pointer.
             if let Some(changed) = registry::with_ui_lab(window, |lab| {
-                lab.invoke(
-                    rect.width() as f32,
-                    rect.height() as f32,
-                    point(x as f32, y as f32),
-                )
+                let focused = lab.focus_at(width, height, at);
+                lab.invoke(width, height, at) || focused
             })
             .ok()
             .flatten()
@@ -2027,11 +2030,8 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 return 0;
             }
             if let Some(changed) = registry::with_ui_session(window, |session| {
-                session.invoke(
-                    rect.width() as f32,
-                    rect.height() as f32,
-                    point(x as f32, y as f32),
-                )
+                let focused = session.focus_at(width, height, at);
+                session.invoke(width, height, at) || focused
             })
             .ok()
             .flatten()
