@@ -35,6 +35,7 @@ enum SampleDialogRequest {
     Credentials,
     Notification,
     WindowTitle,
+    FieldRead,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -132,6 +133,19 @@ pub fn run_ui_session_with_window_title(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowTitle)
 }
 
+/// Runs the UI session diagnostic with two fields a person can type into.
+///
+/// The client reads the field values twice: once before anyone has typed, and
+/// once after the semantic action. The difference between those two reads is
+/// the whole of what an application learns, and it learns it only because it
+/// asked. See `docs/UI_FIELDS.md` and Decision 0067.
+pub fn run_ui_session_with_field_read(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::FieldRead)
+}
+
 /// The host-owned UI resources one development sample session consumes.
 ///
 /// Named rather than positional. The set had grown to six values passed by
@@ -214,6 +228,7 @@ fn run_with_optional_session_view(
             Capability::CredentialDelete,
             Capability::NotificationShow,
             Capability::WindowTitle,
+            Capability::UiFieldsRead,
         ],
         "anodrel-windows-host",
     )?;
@@ -264,6 +279,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::Credentials => command.arg("--request-credentials")?,
             SampleDialogRequest::Notification => command.arg("--request-notification")?,
             SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
+            SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?

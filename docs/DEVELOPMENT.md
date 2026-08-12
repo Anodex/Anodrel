@@ -319,6 +319,29 @@ sample would be a defect rather than the documented fallback.
 See `docs/WINDOW_TITLE.md` for what this capability deliberately does not do —
 there is no window target, no read, and no other window property.
 
+To exercise text fields and the granted value read, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-fields-client $nodePath $clientPath
+~~~
+
+The client publishes a document with two fields — **Name**, empty, and
+**Note**, pre-filled with `edit me` — then immediately reads them once and
+prints that it got back exactly what it set.
+
+Now type. Tab to **Name** and enter something, Tab to **Note** and change it,
+then activate **Submit field values**. The client reads a second time and prints
+both values.
+
+The gap between those two reads is the whole point: everything you typed
+happened without the application learning anything. There is no change event to
+subscribe to, and the second read only happened because a person activated an
+action. If the client stops at safe stage 26, its first read disagreed with the
+document it had just set.
+
+See `docs/UI_FIELDS.md` for what a read carries and what it deliberately does
+not — no caret, selection, timing, or edited flag.
+
 To exercise a version 2 scroll document through that same session, run:
 
 ~~~powershell

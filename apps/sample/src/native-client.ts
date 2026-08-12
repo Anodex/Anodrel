@@ -5,6 +5,9 @@ import { WindowsNamedPipeTransport, decodeBootstrapInvitation } from "@anodrel/w
 
 import { pollSchedule } from "./poll-schedule.js";
 import {
+  FIELD_SESSION_ACTION,
+  FIELD_SESSION_DOCUMENT,
+  FIELD_SESSION_IDS,
   SCROLL_SESSION_ACTION,
   SCROLL_SESSION_DOCUMENT,
   STANDARD_SESSION_ACTION,
@@ -39,11 +42,29 @@ async function run(): Promise<number> {
       return 13;
     }
     const scrollDiagnostic = process.argv.includes("--request-scroll-document");
-    const update = scrollDiagnostic
-      ? await client.replaceUiDocumentV2(SCROLL_SESSION_DOCUMENT)
-      : await client.replaceUiDocument(STANDARD_SESSION_DOCUMENT);
+    const fieldDiagnostic = process.argv.includes("--request-field-read");
+    let update;
+    if (scrollDiagnostic) {
+      update = await client.replaceUiDocumentV2(SCROLL_SESSION_DOCUMENT);
+    } else if (fieldDiagnostic) {
+      update = await client.replaceUiDocument(FIELD_SESSION_DOCUMENT);
+    } else {
+      update = await client.replaceUiDocument(STANDARD_SESSION_DOCUMENT);
+    }
     if (update.revision !== "1") {
       return 16;
+    }
+
+    if (fieldDiagnostic) {
+      // Read before anyone has had a chance to type. Whatever comes back is
+      // what the document set, which is the point: an application starts a
+      // field and learns nothing more until it asks again.
+      const before = await client.readUiFields();
+      const initial = new Map(before.fields.map((entry) => [entry.id, entry.value]));
+      if (initial.get(FIELD_SESSION_IDS[0]) !== "" || initial.get(FIELD_SESSION_IDS[1]) !== "edit me") {
+        return 26;
+      }
+      console.log("Before typing, the host reports what this application set.");
     }
 
     if (process.argv.includes("--request-open-file")) {
@@ -135,14 +156,30 @@ async function run(): Promise<number> {
     }
 
     if (process.argv.includes("--wait-for-ui-event")) {
-      const eventResult = await waitForSampleAction(
-        client,
-        update.revision,
-        scrollDiagnostic ? SCROLL_SESSION_ACTION : STANDARD_SESSION_ACTION,
-      );
+      let expectedAction = STANDARD_SESSION_ACTION;
+      if (scrollDiagnostic) {
+        expectedAction = SCROLL_SESSION_ACTION;
+      } else if (fieldDiagnostic) {
+        expectedAction = FIELD_SESSION_ACTION;
+      }
+      const eventResult = await waitForSampleAction(client, update.revision, expectedAction);
       if (eventResult !== 0) {
         return eventResult;
       }
+
+      if (fieldDiagnostic) {
+        // Only now, after a deliberate action, does this application learn
+        // anything about what was typed. Everything between the two reads
+        // happened without it.
+        const after = await client.readUiFields();
+        for (const entry of after.fields) {
+          console.log(`  ${entry.id} = ${JSON.stringify(entry.value)}`);
+        }
+        console.log(
+          "Those values arrived once, on request. No keystroke, caret, or timing crossed the boundary.",
+        );
+      }
+
       const close = await client.closeSession();
       return close.status === "accepted" ? 0 : 17;
     }
