@@ -13,6 +13,7 @@
 
 mod error;
 mod event;
+mod field_mailbox;
 mod fields;
 mod input_mailbox;
 mod mailbox;
@@ -22,6 +23,7 @@ mod snapshot;
 
 pub use error::UiSessionError;
 pub use event::UiApplicationEvent;
+pub use field_mailbox::{UI_FIELD_RESPONSE_TIMEOUT, UiFieldMailbox, UiFieldRequest};
 pub use fields::{
     MAX_SNAPSHOT_FIELDS, UiFieldReadError, UiFieldReader, UiFieldSnapshot, UiFieldSnapshotError,
     UiFieldValue,

@@ -55,6 +55,7 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
         // record, never from the child. This is the half of a caption the
         // application cannot influence.
         ui.display_name(),
+        ui.field_mailbox(),
     );
     let finish_result = session.finish();
     window_result?;

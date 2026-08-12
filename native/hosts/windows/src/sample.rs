@@ -149,6 +149,7 @@ struct SampleSessionUi {
     file_text: WindowsFileTextService,
     notifications: anodrel_notifications::NotificationMailbox,
     window_title: anodrel_window::WindowTitleMailbox,
+    fields: anodrel_ui_session::UiFieldMailbox,
 }
 
 /// The name the sample host appends to any title the sample proposes.
@@ -168,6 +169,7 @@ impl SampleSessionUi {
             file_text: WindowsFileTextService::new(),
             notifications: anodrel_notifications::NotificationMailbox::new(),
             window_title: anodrel_window::WindowTitleMailbox::new(),
+            fields: anodrel_ui_session::UiFieldMailbox::new(),
         }
     }
 }
@@ -229,7 +231,8 @@ fn run_with_optional_session_view(
                 .with_diagnostics(sample_diagnostics())
                 .with_credentials(sample_credentials()?)
                 .with_notifications(ui.notifications.clone())
-                .with_window_title(ui.window_title.clone());
+                .with_window_title(ui.window_title.clone())
+                .with_ui_fields(ui.fields.clone());
             WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
                 "sample-session",
@@ -276,6 +279,7 @@ fn run_with_optional_session_view(
             ui.notifications,
             ui.window_title,
             SAMPLE_DISPLAY_NAME,
+            ui.fields,
         )?;
     }
     let exit_code = child.wait_for_exit(SAMPLE_TIMEOUT_MILLISECONDS)?;

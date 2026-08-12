@@ -194,6 +194,29 @@ pub(super) fn complete_window_title_request(
     }
 }
 
+/// Takes one pending field read only from its associated UI session.
+pub(super) fn take_field_read(window: Hwnd) -> io::Result<Option<u64>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_field_read()),
+        _ => Ok(None),
+    }
+}
+
+/// Answers one field read from its owning native UI session.
+///
+/// The snapshot is built while this lock is held, unlike the notification and
+/// title calls that are deliberately released first. It is a copy of a handful
+/// of short strings with no operating-system call in it, so there is nothing
+/// here that a slow system could block every other window behind.
+pub(super) fn complete_field_read(window: Hwnd, request_id: u64) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.complete_field_read(request_id))),
+        _ => Ok(None),
+    }
+}
+
 /// Returns the session-local file registry for the UI thread's capture flow.
 pub(super) fn file_text_service(window: Hwnd) -> io::Result<Option<WindowsFileTextService>> {
     let views = lock_views()?;

@@ -36,6 +36,7 @@ use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
 
 use anodrel_crash::{CrashSite, CrashSurface};
+use anodrel_ui_session::UiFieldMailbox;
 use anodrel_window::WindowTitleMailbox;
 
 use crate::product::PreflightOutcome;
@@ -632,6 +633,7 @@ pub fn run_ui_session(
     notifications: NotificationMailbox,
     window_title: WindowTitleMailbox,
     display_name: &str,
+    field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
     run_authenticated_ui_session(
         "Anodrel UI Session Lab",
@@ -643,6 +645,7 @@ pub fn run_ui_session(
         notifications,
         window_title,
         display_name,
+        field_reads,
     )
 }
 
@@ -668,6 +671,7 @@ pub fn run_authenticated_ui_session(
     notifications: NotificationMailbox,
     window_title: WindowTitleMailbox,
     display_name: &str,
+    field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
     let scale = primary_scale();
     run_windows(
@@ -684,7 +688,8 @@ pub fn run_authenticated_ui_session(
                     file_text,
                     notifications,
                 )
-                .with_window_title(window_title, display_name),
+                .with_window_title(window_title, display_name)
+                .with_field_reads(field_reads),
             ),
         }],
         None,
@@ -1131,6 +1136,18 @@ fn service_notification(window: Hwnd) {
             .is_ok()
     });
     let _ = registry::complete_notification_request(window, request.id(), shown, created);
+}
+
+/// Answers one pending field read for a session window, if it has one.
+///
+/// Runs on the UI thread beside the other session bridges, because the values
+/// belong to the window and a protocol worker never reaches into it. See
+/// `docs/UI_FIELDS.md`.
+fn service_field_read(window: Hwnd) {
+    let Ok(Some(request_id)) = registry::take_field_read(window) else {
+        return;
+    };
+    let _ = registry::complete_field_read(window, request_id);
 }
 
 /// Routes one typed character to whichever view this window carries.
@@ -1663,6 +1680,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             }
             service_notification(window);
             service_window_title(window);
+            service_field_read(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {
                     FileDialogRequestKind::Open => {

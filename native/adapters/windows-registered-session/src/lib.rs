@@ -17,7 +17,7 @@ use anodrel_file_access::SelectionFileDialogMailbox;
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
-use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
+use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
 use anodrel_window::WindowTitleMailbox;
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
@@ -42,6 +42,7 @@ pub struct RegisteredSessionUi {
     file_text: WindowsFileTextService,
     notification_mailbox: NotificationMailbox,
     window_title_mailbox: WindowTitleMailbox,
+    field_mailbox: UiFieldMailbox,
     /// The display name the host appends to any title this session proposes.
     ///
     /// Taken from the identity that matched the machine-validated installed
@@ -61,6 +62,7 @@ impl RegisteredSessionUi {
             file_text: WindowsFileTextService::new(),
             notification_mailbox: NotificationMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
+            field_mailbox: UiFieldMailbox::new(),
             display_name: display_name.into(),
         }
     }
@@ -105,6 +107,12 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn window_title_mailbox(&self) -> WindowTitleMailbox {
         self.window_title_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread field-read mailbox.
+    #[must_use]
+    pub fn field_mailbox(&self) -> UiFieldMailbox {
+        self.field_mailbox.clone()
     }
 
     /// Returns the validated display name the host appends to a proposed title.
@@ -237,7 +245,10 @@ fn registered_interactive_services(
         .with_notifications(ui.notification_mailbox())
         // A window caption reaches User32 the same way, and the UI thread holds
         // the validated display name it composes with.
-        .with_window_title(ui.window_title_mailbox()))
+        .with_window_title(ui.window_title_mailbox())
+        // Field values live with the window that owns them, so a read crosses
+        // to the UI thread the same way. See `docs/UI_FIELDS.md`.
+        .with_ui_fields(ui.field_mailbox()))
 }
 
 /// A safe failure category while creating a registered application session.

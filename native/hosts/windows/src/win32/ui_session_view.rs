@@ -7,7 +7,10 @@ use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
 use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::UiEvent;
-use anodrel_ui_session::{UiDocumentMailbox, UiDocumentRevision, UiInputCandidate, UiInputMailbox};
+use anodrel_ui_session::{
+    UiDocumentMailbox, UiDocumentRevision, UiFieldMailbox, UiFieldRequest, UiInputCandidate,
+    UiInputMailbox,
+};
 use anodrel_window::WindowTitleMailbox;
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
@@ -44,6 +47,12 @@ pub(super) struct UiSessionView {
     /// from the installed record, not from the application, and keeping it on
     /// this side is what makes the suffix impossible to influence.
     display_name: Option<String>,
+    /// This session's field-read bridge, when it has one.
+    ///
+    /// A diagnostic session view holds `None` and answers every read as
+    /// unavailable, which is what an application sees on a host with no surface
+    /// it may read.
+    field_reads: Option<UiFieldMailbox>,
     revision: UiDocumentRevision,
     /// The product session whose resources this view consumes, when the window
     /// owns one.
@@ -77,6 +86,7 @@ impl UiSessionView {
             notification_entry: None,
             window_title: None,
             display_name: None,
+            field_reads: None,
             revision: UiDocumentRevision::INITIAL,
             product_session: None,
         }
@@ -160,7 +170,8 @@ impl UiSessionView {
             ui.file_text_service(),
             ui.notification_mailbox(),
         )
-        .with_window_title(ui.window_title_mailbox(), ui.display_name());
+        .with_window_title(ui.window_title_mailbox(), ui.display_name())
+        .with_field_reads(ui.field_mailbox());
         view.product_session = Some(Arc::new(session));
         view
     }
@@ -220,6 +231,32 @@ impl UiSessionView {
     /// Moves focus backwards through this view's current visible actions.
     pub(super) fn focus_previous(&mut self, width: f32, height: f32) -> bool {
         self.lab.focus_previous(width, height)
+    }
+
+    /// Attaches this session's field-read bridge.
+    #[must_use]
+    pub(super) fn with_field_reads(mut self, mailbox: UiFieldMailbox) -> Self {
+        self.field_reads = Some(mailbox);
+        self
+    }
+
+    /// Takes one pending field read, if this session has a bridge and a read.
+    pub(super) fn take_field_read(&self) -> Option<u64> {
+        self.field_reads.as_ref()?.take().map(UiFieldRequest::id)
+    }
+
+    /// Answers one field read with this view's current values.
+    ///
+    /// A view whose snapshot cannot be built answers unavailable rather than a
+    /// partial one: a read reports the surface as it is or not at all.
+    pub(super) fn complete_field_read(&self, request_id: u64) -> bool {
+        let Some(mailbox) = self.field_reads.as_ref() else {
+            return false;
+        };
+        match self.lab.field_snapshot() {
+            Some(snapshot) => mailbox.complete(request_id, snapshot),
+            None => mailbox.fail(request_id),
+        }
     }
 
     /// Applies one typed character to this view's focused field.
@@ -328,6 +365,9 @@ mod tests {
         assert_eq!(view.poll(), (false, false));
     }
 
+    /// A document holding one enabled field, for the read path.
+    const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.field","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true}}"#;
+
     /// A session view with a title bridge and the given validated name.
     fn view_with_title(display_name: &str) -> (UiSessionView, WindowTitleMailbox) {
         let mailbox = WindowTitleMailbox::new();
@@ -386,6 +426,71 @@ mod tests {
             caption_for(&view, &mailbox, "Report \u{2014} Some Other App")
                 .ends_with(" \u{2014} Anodrel Sample")
         );
+    }
+
+    #[test]
+    fn a_granted_read_returns_the_text_a_person_actually_typed() {
+        // The whole path in one test: a document seeds a field, a person types
+        // into the host's state, and a read crossing the UI-thread bridge
+        // returns exactly that text.
+        let mailbox = anodrel_ui_session::UiFieldMailbox::new();
+        let documents = UiDocumentMailbox::new();
+        let mut view = UiSessionView::new(
+            documents.clone(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_field_reads(mailbox.clone());
+
+        // Delivered the way a real session delivers one, through the mailbox.
+        let mut session = UiDocumentSession::new();
+        session
+            .replace_document(FIELD_DOCUMENT)
+            .expect("document is valid");
+        documents.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(view.poll(), (true, false));
+
+        let width = 920.0;
+        let height = 660.0;
+        view.focus_next(width, height);
+        for character in "Ada".chars() {
+            assert!(view.type_character(width, height, character));
+        }
+
+        let worker = mailbox.clone();
+        let waiting = std::thread::spawn(move || anodrel_ui_session::UiFieldReader::read(&worker));
+        let request_id = loop {
+            if let Some(id) = view.take_field_read() {
+                break id;
+            }
+            std::thread::yield_now();
+        };
+        assert!(view.complete_field_read(request_id));
+
+        let snapshot = waiting
+            .join()
+            .expect("the worker did not panic")
+            .expect("the read succeeded");
+        assert_eq!(snapshot.fields().len(), 1);
+        assert_eq!(snapshot.fields()[0].id().as_str(), "session.field");
+        assert_eq!(snapshot.fields()[0].value(), "Ada");
+    }
+
+    #[test]
+    fn a_session_without_a_field_bridge_answers_nothing_and_completes_nothing() {
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_field_read().is_none());
+        assert!(!view.complete_field_read(1));
     }
 
     #[test]

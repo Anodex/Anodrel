@@ -14,6 +14,7 @@ use anodrel_ui::{
     UiSurfaceTone, UiTextTone,
 };
 use anodrel_ui_document::decode;
+use anodrel_ui_session::UiFieldSnapshot;
 use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
 
 use super::text;
@@ -183,6 +184,14 @@ impl UiLab {
                 true
             }
         }
+    }
+
+    /// Returns every field value on this view, for a granted read.
+    ///
+    /// Built from the host's own state, in element-ID order, carrying values
+    /// only. See `docs/UI_FIELDS.md` and Decision 0067.
+    pub(super) fn field_snapshot(&self) -> Option<UiFieldSnapshot> {
+        UiFieldSnapshot::from_states(&self.fields).ok()
     }
 
     /// Returns the focused field, if focus is on one that is still visible.
