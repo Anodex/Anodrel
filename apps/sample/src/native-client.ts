@@ -8,6 +8,7 @@ import {
   FIELD_SESSION_ACTION,
   FIELD_SESSION_DOCUMENT,
   FIELD_SESSION_IDS,
+  fieldEchoDocument,
   SCROLL_SESSION_ACTION,
   SCROLL_SESSION_DOCUMENT,
   STANDARD_SESSION_ACTION,
@@ -20,6 +21,14 @@ process.on("uncaughtException", () => {
 process.on("unhandledRejection", () => {
   process.exitCode = 15;
 });
+
+/**
+ * How long the field diagnostic leaves its echoed values on screen.
+ *
+ * Long enough to read, short enough that an unattended run still finishes on
+ * its own.
+ */
+const ECHO_VISIBLE_MILLISECONDS = 8_000;
 
 async function run(): Promise<number> {
   let invitation;
@@ -172,12 +181,12 @@ async function run(): Promise<number> {
         // anything about what was typed. Everything between the two reads
         // happened without it.
         const after = await client.readUiFields();
-        for (const entry of after.fields) {
-          console.log(`  ${entry.id} = ${JSON.stringify(entry.value)}`);
-        }
-        console.log(
-          "Those values arrived once, on request. No keystroke, caret, or timing crossed the boundary.",
-        );
+        // Published back into the window rather than logged: the host
+        // suppresses this child's console output on purpose, so a printed
+        // value would be invisible. This also proves the text really reached
+        // the application, on the surface the person is already looking at.
+        await client.replaceUiDocument(fieldEchoDocument(after.fields));
+        await new Promise((resolve) => setTimeout(resolve, ECHO_VISIBLE_MILLISECONDS));
       }
 
       const close = await client.closeSession();

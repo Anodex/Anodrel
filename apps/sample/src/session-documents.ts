@@ -83,6 +83,64 @@ export const FIELD_SESSION_DOCUMENT = JSON.stringify({
   },
 });
 
+/**
+ * Builds the document this application publishes after reading field values.
+ *
+ * The point of echoing them back into the window is that the host suppresses
+ * the sample child's console output on purpose, so a value printed there is
+ * invisible. Publishing it proves the application really received the text,
+ * on the one surface a person is already looking at.
+ *
+ * An empty value is shown as `(empty)` because a text node must carry text —
+ * and because "you left this blank" is itself worth seeing.
+ */
+export function fieldEchoDocument(
+  values: ReadonlyArray<{ readonly id: string; readonly value: string }>,
+): string {
+  return JSON.stringify({
+    format: "anodrel.ui.document.v1",
+    root: {
+      id: "sample.fields.echo.root",
+      kind: "stack",
+      axis: "vertical",
+      padding: { left: 56, top: 48, right: 56, bottom: 48 },
+      gap: 14,
+      surfaceTone: "plain",
+      children: [
+        {
+          id: "sample.fields.echo.eyebrow",
+          kind: "text",
+          value: "RECEIVED BY THE APPLICATION",
+          fontSize: 14,
+          tone: "accent",
+        },
+        {
+          id: "sample.fields.echo.title",
+          kind: "text",
+          value: "This arrived once, because you asked",
+          fontSize: 28,
+          tone: "primary",
+        },
+        ...values.map((entry, index) => ({
+          id: `sample.fields.echo.value.${index}`,
+          kind: "text" as const,
+          value: `${entry.id} = ${entry.value === "" ? "(empty)" : entry.value}`,
+          fontSize: 16,
+          tone: "primary" as const,
+        })),
+        {
+          id: "sample.fields.echo.detail",
+          kind: "text",
+          value:
+            "No keystroke, caret, or timing crossed the boundary. Everything typed before you submitted happened without this application.",
+          fontSize: 16,
+          tone: "secondary",
+        },
+      ],
+    },
+  });
+}
+
 /** The semantic action emitted after the version 2 scroll diagnostic reaches its end. */
 export const SCROLL_SESSION_ACTION = "sample.scroll.complete";
 
