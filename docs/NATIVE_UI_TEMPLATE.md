@@ -49,9 +49,10 @@ The application still explicitly opens the one invited Windows pipe through
 adapter can open only the invitation's exact pipe and owns no host policy or
 window API. See `docs/NATIVE_CLIENT.md`.
 
-The regular template has no `menu.write` grant. The separate planned native
-menu template uses an explicit generator command and host route rather than
-silently broadening this project's authority; see `docs/NATIVE_MENU_TEMPLATE.md`.
+The regular template has no `menu.write` grant. The separately implemented
+typed menu extension is reserved for the native menu template's explicit
+generator command and host route; it does not silently broaden this project's
+authority. See `docs/NATIVE_MENU_TEMPLATE.md`.
 
 ## Generated project contract
 

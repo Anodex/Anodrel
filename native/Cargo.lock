@@ -247,6 +247,7 @@ dependencies = [
  "anodrel-bootstrap",
  "anodrel-client",
  "anodrel-json",
+ "anodrel-menu",
  "anodrel-ui",
  "anodrel-ui-document",
  "anodrel-wire",

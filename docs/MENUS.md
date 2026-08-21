@@ -4,9 +4,10 @@
 mock host, contract tests, shared ordered interaction delivery, and the
 one-request `MenuMailbox` are implemented. The direct Windows UI-thread
 attachment, native adapter, and development diagnostic are implemented; manual
-verification is pending. Decision 0083 now defines the planned constrained
-compiled native menu template that will consume this existing boundary without
-Node.js or an arbitrary capability selector.
+verification is pending. The preview typed native client now also validates and
+uses this boundary; Decision 0083's constrained compiled menu-project
+generator and host route remain to be implemented without Node.js or an
+arbitrary capability selector.
 
 Anodrel's first menu surface will be a host-owned Windows menu bar for one
 authenticated application session. It is a bounded way for an application to

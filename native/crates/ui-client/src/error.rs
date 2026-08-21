@@ -13,6 +13,8 @@ use anodrel_client::ClientError;
 pub enum UiClientError {
     /// The supplied document was not one strict bounded v1 document.
     DocumentInvalid,
+    /// The supplied menu was not one strict bounded complete menu model.
+    MenuInvalid,
     /// The authenticated underlying conversation could not continue.
     Conversation(ClientError),
     /// A response did not match this typed facade's documented shape.
@@ -25,6 +27,7 @@ impl fmt::Display for UiClientError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::DocumentInvalid => "the UI document was invalid",
+            Self::MenuInvalid => "the native menu model was invalid",
             Self::Conversation(_) => "the authenticated UI conversation could not continue",
             Self::ResponseInvalid => "the host returned an invalid UI response",
             Self::RequestIdsExhausted => "the UI request identity space was exhausted",

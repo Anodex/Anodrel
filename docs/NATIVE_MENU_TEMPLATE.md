@@ -1,7 +1,9 @@
 # Anodrel development native menu template
 
-**Status:** Contract accepted; implementation pending. This is a Windows
-development template, not a product packaging or application-identity format.
+**Status:** The portable typed menu facade is implemented and unit verified.
+The constrained generator, fixed Windows host route, generated-child session
+test, and manual menu click remain pending. This is a Windows development
+template, not a product packaging or application-identity format.
 
 ## Purpose
 
@@ -41,7 +43,7 @@ file, environment variable, URL, network connection, or native resource.
 
 ## Typed client contract
 
-`anodrel-ui-client` will extend its preview surface with:
+`anodrel-ui-client` extends its preview surface with:
 
 | Method | Input | Typed result | Protocol | Required grant |
 | --- | --- | --- | --- | --- |
@@ -89,10 +91,11 @@ session.
 ## Compatibility and verification
 
 This work adds no new wire frame or core protocol operation. `menu.replace`
-and `menu.action.invoked` are existing Protocol 1.18 values. The work will add
-typed-facade unit tests for local validation, request versioning, response
-parsing, and both event shapes; a generated-project release build; a real
-authenticated generated-child menu-session test; host fixed-grant tests; and a
+and `menu.action.invoked` are existing Protocol 1.18 values. Typed-facade unit
+tests now prove local menu-model validation, request versioning, revision
+parsing, menu-event parsing, and document-only failure when a menu event
+arrives. Remaining proof is a generated-project release build, a real
+authenticated generated-child menu-session test, host fixed-grant tests, and a
 documented manual click of **Complete menu template session** from the Windows
 menu bar.
 

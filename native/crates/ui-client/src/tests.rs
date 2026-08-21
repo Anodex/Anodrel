@@ -9,21 +9,24 @@ use anodrel_client::Client;
 use anodrel_json::JsonValue;
 use anodrel_wire::{FrameDecoder, encode_json};
 
-use crate::{UiActionBatch, UiClientError, UiSession};
+use crate::{UiActionBatch, UiClientError, UiEvent, UiSession};
 
 const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.ui-client-test";
 const SESSION_ID: &str = "ui-client-test-session";
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"action","label":"Complete","fontSize":16,"enabled":true,"tone":"accent"}}"#;
+const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete menu template session","enabled":true}]}]}"#;
+
+type WriteLog = Arc<Mutex<Vec<Vec<u8>>>>;
 
 #[derive(Debug)]
 struct TestStream {
     reads: VecDeque<Vec<u8>>,
-    written: Arc<Mutex<Vec<u8>>>,
+    written: WriteLog,
 }
 
 impl TestStream {
-    fn new(reads: impl IntoIterator<Item = Vec<u8>>, written: Arc<Mutex<Vec<u8>>>) -> Self {
+    fn new(reads: impl IntoIterator<Item = Vec<u8>>, written: WriteLog) -> Self {
         Self {
             reads: reads.into_iter().collect(),
             written,
@@ -47,7 +50,7 @@ impl Write for TestStream {
         self.written
             .lock()
             .expect("test write log is available")
-            .extend_from_slice(input);
+            .push(input.to_owned());
         Ok(input.len())
     }
 
@@ -119,6 +122,68 @@ fn the_typed_session_uses_only_its_three_documented_operations() {
 }
 
 #[test]
+fn native_menu_session_uses_the_fixed_protocol_1_18_surface() {
+    let (mut session, written) = session_with_responses([
+        response("anodrel-ui-1", r#"{"revision":"1"}"#),
+        response("anodrel-ui-2", r#"{"revision":"1"}"#),
+        response(
+            "anodrel-ui-3",
+            &menu_event_batch("template.menu.complete", "1"),
+        ),
+        response("anodrel-ui-4", r#"{"status":"accepted"}"#),
+    ]);
+
+    assert_eq!(
+        session
+            .replace_document_v1(DOCUMENT)
+            .expect("document is accepted")
+            .value(),
+        1
+    );
+    assert_eq!(
+        session
+            .replace_menu_v1(MENU)
+            .expect("menu is accepted")
+            .value(),
+        1
+    );
+    let batch = session.read_events().expect("menu event batch is typed");
+    assert_eq!(batch.dropped(), 0);
+    assert_eq!(batch.discarded(), 0);
+    let [UiEvent::MenuAction(action)] = batch.events() else {
+        panic!("the fixed native menu event is preserved");
+    };
+    assert_eq!(action.revision().value(), 1);
+    assert_eq!(action.action(), "template.menu.complete");
+    session.close().expect("close is accepted");
+
+    let messages = messages(&written);
+    let minors = messages
+        .iter()
+        .skip(1)
+        .map(|message| request_protocol_minor(message))
+        .collect::<Vec<_>>();
+    assert_eq!(minors, [Some(3), Some(18), Some(18), Some(3)]);
+    let menu_request = JsonValue::parse(&messages[2]).expect("menu request is JSON");
+    assert_eq!(
+        menu_request
+            .as_object()
+            .and_then(|fields| fields.get("payload")),
+        Some(&JsonValue::parse(MENU).expect("fixed menu is JSON"))
+    );
+}
+
+#[test]
+fn document_only_event_reads_fail_closed_when_a_menu_event_arrives() {
+    let (mut session, _) = session_with_responses([response(
+        "anodrel-ui-1",
+        &menu_event_batch("template.menu.complete", "1"),
+    )]);
+
+    assert_eq!(session.read_actions(), Err(UiClientError::ResponseInvalid));
+}
+
+#[test]
 fn unexpected_or_invalid_events_never_become_typed_actions() {
     let malformed = r#"{"events":[{"kind":"event","eventName":"ui.action.invoked","source":"native.ui","protocolVersion":{"major":1,"minor":2},"schemaVersion":{"major":1,"minor":0},"payload":{"revision":"1","action":"not valid"}}],"dropped":0,"discarded":0}"#;
     let (mut session, _) = session_with_responses([response("anodrel-ui-1", malformed)]);
@@ -138,6 +203,32 @@ fn invalid_documents_fail_before_they_can_create_a_protocol_request() {
         messages(&written).len(),
         1,
         "only authentication was written"
+    );
+}
+
+#[test]
+fn invalid_menus_fail_before_they_can_create_a_protocol_request() {
+    let (mut session, written) = session_with_responses([]);
+
+    assert_eq!(
+        session.replace_menu_v1(r#"{"menus":[]}"#),
+        Err(UiClientError::MenuInvalid)
+    );
+    assert_eq!(
+        messages(&written).len(),
+        1,
+        "only authentication was written"
+    );
+}
+
+#[test]
+fn menu_revisions_must_be_nonzero_canonical_decimal_values() {
+    let (mut session, _) =
+        session_with_responses([response("anodrel-ui-1", r#"{"revision":"01"}"#)]);
+
+    assert_eq!(
+        session.replace_menu_v1(MENU),
+        Err(UiClientError::ResponseInvalid)
     );
 }
 
@@ -182,7 +273,7 @@ fn batches_refuse_noncanonical_counts_and_revisions() {
 
 fn session_with_responses(
     responses: impl IntoIterator<Item = String>,
-) -> (UiSession<TestStream>, Arc<Mutex<Vec<u8>>>) {
+) -> (UiSession<TestStream>, WriteLog) {
     let written = Arc::new(Mutex::new(Vec::new()));
     let mut frames = vec![frame(r#"{"kind":"session.authenticated"}"#)];
     frames.extend(responses.into_iter().map(|response| frame(&response)));
@@ -205,15 +296,24 @@ fn event_batch(action: &str, revision: &str) -> String {
     )
 }
 
+fn menu_event_batch(action: &str, revision: &str) -> String {
+    format!(
+        r#"{{"events":[{{"kind":"event","eventName":"menu.action.invoked","source":"native.menu","protocolVersion":{{"major":1,"minor":18}},"schemaVersion":{{"major":1,"minor":18}},"payload":{{"menuRevision":"{revision}","action":"{action}"}}}}],"dropped":0,"discarded":0}}"#
+    )
+}
+
 fn frame(message: &str) -> Vec<u8> {
     encode_json(message).expect("test message frames")
 }
 
-fn messages(written: &Arc<Mutex<Vec<u8>>>) -> Vec<String> {
+fn messages(written: &WriteLog) -> Vec<String> {
     let mut decoder = FrameDecoder::new();
-    decoder
-        .push(&written.lock().expect("test write log is available"))
-        .expect("client writes valid frames")
+    written
+        .lock()
+        .expect("test write log is available")
+        .iter()
+        .flat_map(|frame| decoder.push(frame).expect("client writes valid frames"))
+        .collect()
 }
 
 fn request_field(message: &str, name: &str) -> Option<String> {
@@ -223,4 +323,14 @@ fn request_field(message: &str, name: &str) -> Option<String> {
         .get(name)?
         .as_string()
         .map(str::to_owned)
+}
+
+fn request_protocol_minor(message: &str) -> Option<u16> {
+    JsonValue::parse(message)
+        .ok()?
+        .as_object()?
+        .get("protocolVersion")?
+        .as_object()?
+        .get("minor")?
+        .as_u16()
 }

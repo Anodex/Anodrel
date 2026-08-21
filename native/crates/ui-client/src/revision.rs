@@ -20,15 +20,18 @@ impl DocumentRevision {
     }
 
     pub(crate) fn parse(value: &str) -> Result<Self, UiClientError> {
-        if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(UiClientError::ResponseInvalid);
-        }
-        let parsed = value
-            .parse::<u64>()
-            .ok()
-            .and_then(NonZeroU64::new)
-            .filter(|revision| revision.get().to_string() == value)
-            .ok_or(UiClientError::ResponseInvalid)?;
-        Ok(Self(parsed))
+        Ok(Self(parse_nonzero_decimal(value)?))
     }
+}
+
+pub(crate) fn parse_nonzero_decimal(value: &str) -> Result<NonZeroU64, UiClientError> {
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(UiClientError::ResponseInvalid);
+    }
+    value
+        .parse::<u64>()
+        .ok()
+        .and_then(NonZeroU64::new)
+        .filter(|revision| revision.get().to_string() == value)
+        .ok_or(UiClientError::ResponseInvalid)
 }
