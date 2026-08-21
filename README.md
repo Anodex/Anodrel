@@ -22,9 +22,10 @@ command-line or environment-variable secrets. The Windows host proves the
 native window lifecycle and protocol core without a runtime framework or a
 webview. It also loads a first digest-verified plain-text application
 package into a host-controlled Win32 surface. Development-only samples
-separately exercise the private pipe path end to end: a compiled native probe
-checks bootstrap, authentication, and health without a runtime dependency, and
-the Node sample checks the broader service path. Its host-issued grants include
+separately exercise the private pipe path end to end: compiled native probes
+check bootstrap, authentication, health, and one complete host-owned UI session
+without a runtime dependency, while the Node sample checks the broader service
+path. Its host-issued grants include
 bounded text clipboard, validated HTTPS handoff, and UI-thread-routed open/save
 file pickers. Its Protocol 1.9 diagnostic path can also retain one
 UI-selected Windows file object and consume its bounded text once through a

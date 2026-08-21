@@ -14,17 +14,15 @@
 
 mod document;
 mod stages;
-mod wait;
 
 use std::{io, process::ExitCode, thread};
 
-use anodrel_client::{Client, ProtocolVersion};
+use anodrel_client::{Client, InteractivePollSchedule, ProtocolVersion};
 use anodrel_json::JsonValue;
 use anodrel_windows_client::WindowsClientStream;
 
 use document::{FIXTURE_ACTION, FIXTURE_DOCUMENT};
 use stages::Stage;
-use wait::PollSchedule;
 
 /// The exact grants the fixture's machine record declares, in sorted order.
 ///
@@ -125,12 +123,12 @@ fn delivers_first_document(session: &mut FixtureClient) -> bool {
 
 /// Polls the bounded semantic-input path until the rendered action arrives.
 ///
-/// The wait is paced by [`PollSchedule`], so an immediate click is answered
+/// The wait is paced by [`InteractivePollSchedule`], so an immediate click is answered
 /// within a few tens of milliseconds while an open window costs far fewer idle
 /// round trips than a fixed interval would. Running out of schedule is the
 /// timeout.
 fn wait_for_fixture_action(session: &mut FixtureClient) -> Stage {
-    for interval in PollSchedule::new() {
+    for interval in InteractivePollSchedule::new() {
         let Some(result) = request(
             session,
             "fixture-events",

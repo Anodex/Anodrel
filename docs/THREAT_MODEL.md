@@ -195,11 +195,13 @@ boundary. `docs/LOGGING.md` and Decision 0016 define the catalogue and its
 extension gate.
 
 The development samples exercise this private path with either a
-developer-supplied Node.js executable and Anodrel sample script, or an
-explicitly selected compiled native health probe. Neither has executable
-identity verification and both end with the host process, so neither creates
-production application-launch authority. Their output is intentionally
-discarded; an exit status is the only result used by the host.
+developer-supplied Node.js executable and Anodrel sample script, an explicitly
+selected compiled native health probe, or an explicitly selected compiled native
+UI probe. The UI probe receives only document replacement, semantic-event pull,
+and its own close grant; it does not gain window or operating-system authority.
+None has executable identity verification and all end with the host process, so
+none creates production application-launch authority. Their output is
+intentionally discarded; an exit status is the only result used by the host.
 
 Decision 0017 adds a direct Windows Authenticode verification primitive. It
 returns the leaf signing certificate fingerprint only after Windows accepts the

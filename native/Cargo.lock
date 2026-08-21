@@ -114,6 +114,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-native-ui-client-sample"
+version = "0.1.0"
+dependencies = [
+ "anodrel-client",
+ "anodrel-core",
+ "anodrel-json",
+ "anodrel-protocol",
+ "anodrel-ui",
+ "anodrel-ui-document",
+ "anodrel-ui-session",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-client",
+ "anodrel-windows-pipe",
+]
+
+[[package]]
 name = "anodrel-notifications"
 version = "0.1.0"
 

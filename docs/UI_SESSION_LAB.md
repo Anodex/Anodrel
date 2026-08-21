@@ -6,13 +6,28 @@ window. It is not a product application window or a general session launcher.
 
 ## Run
 
-Build the TypeScript development client first, then pass explicit paths to a
-locally installed Node executable and the compiled client:
+The Node.js development client exercises the broader service path. Build it,
+then pass explicit paths to a locally installed Node executable and the
+compiled client:
 
 ~~~text
 npm run build
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-client path-to-node.exe apps/sample/dist/native-client.js
 ~~~
+
+The compiled native UI diagnostic exercises the foundational interactive path
+without Node.js or development-machine certificate provisioning:
+
+~~~text
+cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-ui-client-sample
+$uiClientPath = (Resolve-Path native/target/release/anodrel-native-ui-client-sample.exe).Path
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --native-ui-sample-client $uiClientPath
+~~~
+
+Activate **Complete native UI diagnostic** in the resulting window. Its child
+submits only one compiled-in document, accepts only its own action at revision
+1, and closes only its own session; it is a diagnostic, not a general native
+application or window API.
 
 To exercise Protocol 1.7's UI-thread-routed open picker in the same
 authenticated session, use `--sample-ui-file-client` in place of
@@ -31,10 +46,10 @@ until **Complete scroll diagnostic** appears, then activate it. The action is
 not initially visible, so the run proves that the host retained and applied a
 local viewport offset before it sent the ordinary revision-bound semantic event.
 
-The window starts with an Anodrel-owned waiting document. The private client
+The window starts with an Anodrel-owned waiting document. Each private client
 receives its one-time invitation through standard input, authenticates to a
-current-session named pipe, checks `platform.health`, then submits one strict
-`anodrel.ui.document.v1` document using `ui.document.replace`, or an exact
+current-session named pipe, then submits one strict `anodrel.ui.document.v1`
+document using `ui.document.replace`, or an exact
 `anodrel.ui.document.v2` document using `ui.document.replace.v2`. The native
 window must replace the waiting screen with that document. The regular and
 scroll diagnostics close only after their expected semantic action has returned
@@ -43,7 +58,8 @@ The development client waits at most two minutes for that action. It paces that
 wait by backoff rather than a fixed interval — 25 ms growing by half to a
 one-second cap — so an immediate click is still answered promptly while an open
 window does not cost a constant stream of `ui.events.read` round trips. The
-native product fixture uses the same schedule.
+compiled native diagnostic and native product fixture use the same first-party
+schedule.
 
 ## Boundary
 

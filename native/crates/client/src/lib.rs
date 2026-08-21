@@ -7,6 +7,8 @@
 //! module emits authentication first and exchanges one ordered request at a
 //! time. See `docs/NATIVE_CLIENT.md`.
 
+mod interactive_poll;
+
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
@@ -16,6 +18,8 @@ use std::{
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_json::JsonValue;
 use anodrel_wire::{FrameDecoder, encode_json};
+
+pub use interactive_poll::InteractivePollSchedule;
 
 /// The fixed stream read buffer for one client receive operation.
 ///

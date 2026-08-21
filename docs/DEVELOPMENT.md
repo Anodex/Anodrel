@@ -233,6 +233,28 @@ exits without opening a window. Its only client dependencies are Anodrel crates,
 the Rust standard library, and direct Windows APIs. A safe nonzero child stage
 does not expose the private invitation, named pipe, token, or native error.
 
+### Compiled native UI-session diagnostic
+
+This development diagnostic extends the compiled health probe through one
+host-owned native window. It uses the same private bootstrap and direct Windows
+pipe adapter, then replaces the waiting document, waits for one semantic
+action, pulls that event, and requests clean close. It needs neither Node.js nor
+development-machine certificate provisioning.
+
+~~~powershell
+cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-ui-client-sample
+$uiClientPath = (Resolve-Path native/target/release/anodrel-native-ui-client-sample.exe).Path
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --native-ui-sample-client $uiClientPath
+~~~
+
+When the Anodrel window appears, activate **Complete native UI diagnostic** by
+clicking it or using Tab then Enter. The window closes only after the child has
+received its own revision-bound action and sent `session.close`; the host then
+prints **Anodrel native UI development probe completed successfully.** Closing
+the window instead is a safe manual abort, not a passing diagnostic. The child
+has one two-minute action wait, while the host stops it after a bounded post-
+window-close wait so a manual abort leaves no child behind.
+
 ### Windows end-to-end Node development sample
 
 After `npm run build`, run this PowerShell command from the repository root:

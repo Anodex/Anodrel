@@ -6,20 +6,19 @@
 use std::{error::Error, io, thread};
 
 use anodrel_application::ApplicationManifest;
-use anodrel_core::{HostPolicy, SessionCloseSignal};
+use anodrel_core::HostPolicy;
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_access::SelectionFileDialogMailbox;
-use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_protocol::Capability;
-use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
-use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_paths::application_directories;
 use anodrel_windows_pipe::WindowsPipeServer;
 use anodrel_windows_storage::WindowsStorageService;
+
+use crate::session_ui::DevelopmentSessionUi;
 
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
 
@@ -182,50 +181,12 @@ pub fn run_ui_session_with_menu(node_path: &str, client_path: &str) -> Result<()
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Menu)
 }
 
-/// The host-owned UI resources one development sample session consumes.
-///
-/// Named rather than positional. The group now crosses several host seams, and
-/// a reader should be able to check each resource by name at its call site.
-///
-/// This is the development path's stand-in for `RegisteredSessionUi`. It is not
-/// a registered session: there is no installed record here, so the display name
-/// below is chosen by the host rather than validated from machine policy.
-struct SampleSessionUi {
-    document: UiDocumentMailbox,
-    input: UiInputMailbox,
-    close: SessionCloseSignal,
-    file_dialog: FileDialogMailbox,
-    file_text: WindowsFileTextService,
-    notifications: anodrel_notifications::NotificationMailbox,
-    menu: anodrel_menu::MenuMailbox,
-    window_title: anodrel_window::WindowTitleMailbox,
-    window_state: anodrel_window::WindowStateMailbox,
-    fields: anodrel_ui_session::UiFieldMailbox,
-}
-
 /// The name the sample host appends to any title the sample proposes.
 ///
 /// Host-chosen, exactly like a registered session's validated display name is
 /// host-held: what matters for the guarantee is that the application cannot
 /// influence it, not where the host got it.
 const SAMPLE_DISPLAY_NAME: &str = "Anodrel Sample";
-
-impl SampleSessionUi {
-    fn new() -> Self {
-        Self {
-            document: UiDocumentMailbox::new(),
-            input: UiInputMailbox::new(),
-            close: SessionCloseSignal::default(),
-            file_dialog: FileDialogMailbox::new(),
-            file_text: WindowsFileTextService::new(),
-            notifications: anodrel_notifications::NotificationMailbox::new(),
-            menu: anodrel_menu::MenuMailbox::new(),
-            window_title: anodrel_window::WindowTitleMailbox::new(),
-            window_state: anodrel_window::WindowStateMailbox::new(),
-            fields: anodrel_ui_session::UiFieldMailbox::new(),
-        }
-    }
-}
 
 fn run_ui_session_with_dialog(
     node_path: &str,
@@ -235,7 +196,7 @@ fn run_ui_session_with_dialog(
     run_with_optional_session_view(
         node_path,
         client_path,
-        Some(SampleSessionUi::new()),
+        Some(DevelopmentSessionUi::new()),
         dialog_request,
     )
 }
@@ -243,7 +204,7 @@ fn run_ui_session_with_dialog(
 fn run_with_optional_session_view(
     node_path: &str,
     client_path: &str,
-    session_ui: Option<SampleSessionUi>,
+    session_ui: Option<DevelopmentSessionUi>,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
     let policy = HostPolicy::new(

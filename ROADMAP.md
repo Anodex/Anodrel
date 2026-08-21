@@ -290,8 +290,10 @@ Windows named-pipe adapter. Decision 0009 adds private one-time invitation
 delivery. Decision 0010 adds a digest-verified, no-script application-package
 text surface. Development-only Node and compiled native samples now prove the
 full bootstrap, authentication, and `platform.health` path over the real pipe;
-the compiled probe uses only Anodrel crates, the Rust standard library, and
-direct Windows APIs.
+the compiled health probe uses only Anodrel crates, the Rust standard library,
+and direct Windows APIs. A separate compiled UI diagnostic now proves one
+document replacement, revision-bound semantic action, and session close through
+the same owned native window path without Node.js or machine-trust setup.
 
 Decision 0061 adds a first-party signed fixture child that runs the verified
 product session end to end: machine policy, locked digest revalidation,
@@ -336,8 +338,10 @@ Status: **First starter-package slice in progress**
   invitation-selected pipe adapter have replaced the product fixture's private
   client implementation, with its real bootstrap-and-pipe test passing. Its
   compiled native development probe now proves bootstrap, authentication, and
-  `platform.health` without Node.js. This is not yet a stable public native SDK
-  or executable template.
+  `platform.health` without Node.js. A separate compiled native UI diagnostic
+  now proves document delivery, semantic input, and clean session close through
+  a host-owned Windows window, still without Node.js or machine-trust setup.
+  This is not yet a stable public native SDK or executable template.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

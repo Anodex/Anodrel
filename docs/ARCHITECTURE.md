@@ -357,9 +357,10 @@ frame/session engine, direct one-client Windows named-pipe adapter, and the
 separate private child-bootstrap format. The bootstrap adapter can launch a
 caller-selected executable but is not integrated with application package trust
 or rendered content. The repository's Node-based development sample and the
-compiled native probe from Decision 0081 exercise a real authenticated health
-request; the latter needs no runtime dependency. Neither is a trusted
-application host. Its
+compiled native probes from Decision 0081 exercise real authenticated paths:
+the health probe has no runtime dependency, and the UI probe carries one fixed
+document, one revision-bound semantic action, and session close through the
+host-owned Windows view. Neither is a trusted application host. Its
 Protocol 1.11 diagnostic read
 projects only the host-supplied closed catalogue through the existing
 `diagnostics.read` grant; no transport layer can manufacture dynamic diagnostic

@@ -2,8 +2,9 @@
 
 **Status:** Implemented and tested: the portable `anodrel-client` core, direct
 `anodrel-windows-client` adapter, migrated product fixture, and compiled native
-development probe. The existing Node.js diagnostic remains separately useful
-for development paths that exercise the broader service set.
+health and UI-session development probes. The existing Node.js diagnostic
+remains separately useful for development paths that exercise the broader
+service set.
 
 ## Purpose
 
@@ -83,9 +84,11 @@ cover UTF-16 conversion and absent-endpoint failure. The migrated product
 fixture covers the joined lifetime: it uses these two modules through the real
 child-only bootstrap channel and authenticated Windows pipe, then proves
 document delivery, semantic input, session close, child exit, and server
-cleanup. The compiled native development probe now exercises bootstrap,
-authentication, `platform.health`, and clean exit without Node.js, both in its
-real-pipe integration test and through the host command below.
+cleanup. The compiled native health probe exercises bootstrap, authentication,
+`platform.health`, and clean exit without Node.js. The separate compiled native
+UI probe exercises the same private child route plus fixed document delivery,
+one revision-bound semantic action, and `session.close` through a host-owned
+Windows view. Both have real-pipe integration coverage.
 
 No test records or prints invitation contents. The direct Windows adapter is
 checked with workspace formatting, tests, linting, and the runnable development
@@ -101,6 +104,20 @@ It prints a safe success line and exits; it opens no window and requires no
 Node.js process. A nonzero probe stage identifies only bootstrap, connection,
 authentication, or health—not an invitation, pipe name, token, or Windows
 error.
+
+The compiled UI diagnostic uses the same owned modules but opens one temporary
+host-controlled window. Build and run it with:
+
+~~~powershell
+cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-ui-client-sample
+$uiClientPath = (Resolve-Path native/target/release/anodrel-native-ui-client-sample.exe).Path
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --native-ui-sample-client $uiClientPath
+~~~
+
+Activate **Complete native UI diagnostic**. The child accepts only that action
+at its own first document revision, then requests `session.close`; the host
+closes that one window and prints a safe success line. This is a development
+test, not a trusted launch, application template, or public native UI API.
 
 ## Compatibility
 
