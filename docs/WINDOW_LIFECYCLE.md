@@ -61,14 +61,16 @@ window to exercise the view registry and final-window shutdown behavior.
 All dimensions and views are created by the host, and no app protocol request
 can create, enumerate, close, focus, or inject into a native window.
 
-Titles are the one exception, and a narrow one. Protocol 1.14 lets an
-authenticated session holding the `window.title` grant **propose** the title of
-the window it already owns; the host validates the proposal and composes the
-displayed caption with an application-name suffix the proposal cannot suppress
-or forge. The request names no window, handle, or target. See
-`docs/WINDOW_TITLE.md` and Decision 0066. Everything else in this document is
-unchanged: the application still does not learn that it has a window, where it
-is, or how large it is.
+There are two narrow public exceptions. Protocol 1.14 lets an authenticated
+session holding the `window.title` grant **propose** the title of the window it
+already owns; the host validates the proposal and composes the displayed caption
+with an application-name suffix the proposal cannot suppress or forge. Protocol
+1.16 lets the separately granted `window.state` capability request only
+minimise, maximise, or restore for that same session-owned window. Neither
+request names a window, handle, target, geometry, focus action, or readback.
+See `docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`, Decisions 0066 and 0072.
+Everything else in this document is unchanged: the application still does not
+learn that it has a window, where it is, or how large it is.
 
 The Window Lab carries no package content, credentials, URLs, command data, or
 privileged service. It is a native lifecycle test surface only. A public

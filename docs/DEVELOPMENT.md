@@ -319,6 +319,23 @@ sample would be a defect rather than the documented fallback.
 See `docs/WINDOW_TITLE.md` for what this capability deliberately does not do —
 there is no window target, no read, and no other window property.
 
+To exercise the separately granted window-state command through the same
+authenticated session, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-state-client $nodePath $clientPath
+~~~
+
+The client requests **minimized**, **maximized**, then **restored**, holding
+each state briefly so it is visible. It receives acceptance only; it never
+learns the window's current state, bounds, monitor, focus, or handle. After the
+window is restored, complete the normal semantic action to close the session.
+No other Anodrel window should change. If the client stops at safe stage 28, one
+of the closed commands was not accepted.
+
+This manual check is not yet recorded as passed. See `docs/WINDOW_STATE.md` for
+the deliberately absent targeting, geometry, focus, and readback APIs.
+
 To exercise text fields and the granted value read, run:
 
 ~~~powershell

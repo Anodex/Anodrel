@@ -37,7 +37,7 @@ use anodrel_windows_instance::PrimaryInstance;
 
 use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
-use anodrel_window::WindowTitleMailbox;
+use anodrel_window::{WindowState, WindowStateMailbox, WindowTitleMailbox};
 
 use crate::product::PreflightOutcome;
 use document::{Body, Document, Section};
@@ -61,7 +61,9 @@ const CS_HREDRAW: Uint = 0x0002;
 const CS_VREDRAW: Uint = 0x0001;
 const WS_OVERLAPPEDWINDOW: Dword = 0x00CF_0000;
 const CW_USEDEFAULT: i32 = 0x8000_0000_u32 as i32;
+const SW_MAXIMIZE: i32 = 3;
 const SW_SHOW: i32 = 5;
+const SW_MINIMIZE: i32 = 6;
 const SW_RESTORE: i32 = 9;
 const WM_DESTROY: Uint = 0x0002;
 const WM_PAINT: Uint = 0x000F;
@@ -632,6 +634,7 @@ pub fn run_ui_session(
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
     window_title: WindowTitleMailbox,
+    window_state: WindowStateMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -644,6 +647,7 @@ pub fn run_ui_session(
         file_text,
         notifications,
         window_title,
+        window_state,
         display_name,
         field_reads,
     )
@@ -660,6 +664,10 @@ pub fn run_ui_session(
 /// `window.title` grant may later propose a replacement, which the host
 /// composes with `display_name` before applying — the application supplies one
 /// half and never the other. See `docs/WINDOW_TITLE.md`.
+///
+/// `window_state` carries only minimise, maximise, and restore requests for
+/// this same host-selected window. It is a closed command bridge, not a native
+/// handle or a window-management API; see `docs/WINDOW_STATE.md`.
 #[allow(clippy::too_many_arguments)]
 pub fn run_authenticated_ui_session(
     title: &str,
@@ -670,6 +678,7 @@ pub fn run_authenticated_ui_session(
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
     window_title: WindowTitleMailbox,
+    window_state: WindowStateMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -689,6 +698,7 @@ pub fn run_authenticated_ui_session(
                     notifications,
                 )
                 .with_window_title(window_title, display_name)
+                .with_window_state(window_state)
                 .with_field_reads(field_reads),
             ),
         }],
@@ -1227,6 +1237,35 @@ fn service_window_title(window: Hwnd) {
     let _ = registry::complete_window_title_request(window, request_id, applied);
 }
 
+/// Applies one pending closed presentation state for a session window.
+///
+/// `ShowWindow` returns the previous visibility, not an error indicator, so a
+/// request that reaches this known UI-thread-owned window is complete after the
+/// call. There is deliberately no state query before or after it: returning
+/// either fact would turn a write-only command into window-state readback.
+fn service_window_state(window: Hwnd) {
+    let Ok(Some((request_id, state))) = registry::take_window_state_request(window) else {
+        return;
+    };
+    let command = presentation_command(state);
+    // SAFETY: this runs on the thread that created `window`, and `command` is
+    // one of the three documented User32 presentation-state values above.
+    unsafe { ShowWindow(window, command) };
+    let _ = registry::complete_window_state_request(window, request_id, true);
+}
+
+/// Converts the portable closed state into its one documented User32 command.
+///
+/// Keeping this conversion separate makes the native boundary exhaustive and
+/// unit-testable without creating a window. No caller can supply the integer.
+const fn presentation_command(state: WindowState) -> i32 {
+    match state {
+        WindowState::Minimized => SW_MINIMIZE,
+        WindowState::Maximized => SW_MAXIMIZE,
+        WindowState::Restored => SW_RESTORE,
+    }
+}
+
 /// Starts one product session for the Startup Lab's launch tile.
 ///
 /// The blocking verification and launch run on a worker; this returns
@@ -1712,6 +1751,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             }
             service_notification(window);
             service_window_title(window);
+            service_window_state(window);
             service_field_read(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {
@@ -2162,8 +2202,8 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
 mod tests {
     use super::{
         Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, PreflightOutcome,
-        StartupLab, action_document, document, mouse_position, startup_lab, startup_log_book,
-        wheel_delta, window_size_for_client,
+        StartupLab, action_document, document, mouse_position, presentation_command, startup_lab,
+        startup_log_book, wheel_delta, window_size_for_client,
     };
     /// Representative surface state, matching the shipped sample package.
     pub(super) fn sample_lab() -> StartupLab {
@@ -2219,6 +2259,22 @@ mod tests {
         let (width, height) = window_size_for_client(MIN_CLIENT_WIDTH, MIN_CLIENT_HEIGHT);
         assert!(width >= MIN_CLIENT_WIDTH);
         assert!(height > MIN_CLIENT_HEIGHT, "a title bar should add height");
+    }
+
+    #[test]
+    fn a_closed_presentation_state_maps_to_only_its_documented_user32_command() {
+        assert_eq!(
+            presentation_command(anodrel_window::WindowState::Minimized),
+            super::SW_MINIMIZE
+        );
+        assert_eq!(
+            presentation_command(anodrel_window::WindowState::Maximized),
+            super::SW_MAXIMIZE
+        );
+        assert_eq!(
+            presentation_command(anodrel_window::WindowState::Restored),
+            super::SW_RESTORE
+        );
     }
 
     #[test]

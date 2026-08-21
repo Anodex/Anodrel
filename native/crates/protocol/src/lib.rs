@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 15;
+pub const PROTOCOL_MINOR: u16 = 16;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -67,6 +67,12 @@ pub enum Capability {
     /// with a validated application-name suffix. There is no read counterpart
     /// and no way to name a window. See `docs/WINDOW_TITLE.md`.
     WindowTitle,
+    /// Request one standard presentation state for the session's own window.
+    ///
+    /// The state is a closed minimise/maximise/restore value. There is no
+    /// target, readback, event, or native command surface. See
+    /// `docs/WINDOW_STATE.md` and Decision 0072.
+    WindowState,
     /// Read every field value on the session's own current surface.
     ///
     /// A snapshot, not a stream. There is no selector and no change event, so
@@ -96,6 +102,7 @@ impl Capability {
             Self::CredentialDelete => "credential.delete",
             Self::NotificationShow => "notification.show",
             Self::WindowTitle => "window.title",
+            Self::WindowState => "window.state",
             Self::UiFieldsRead => "ui.fields.read",
         }
     }

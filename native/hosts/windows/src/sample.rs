@@ -35,6 +35,7 @@ enum SampleDialogRequest {
     Credentials,
     Notification,
     WindowTitle,
+    WindowState,
     FieldRead,
 }
 
@@ -133,6 +134,17 @@ pub fn run_ui_session_with_window_title(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowTitle)
 }
 
+/// Runs the UI-session diagnostic through minimise, maximise, and restore.
+///
+/// The client receives acceptance only; an operator observes the visible state
+/// changes. See `docs/WINDOW_STATE.md`.
+pub fn run_ui_session_with_window_state(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowState)
+}
+
 /// Runs the UI session diagnostic with two fields a person can type into.
 ///
 /// The client reads the field values twice: once before anyone has typed, and
@@ -148,9 +160,8 @@ pub fn run_ui_session_with_field_read(
 
 /// The host-owned UI resources one development sample session consumes.
 ///
-/// Named rather than positional. The set had grown to six values passed by
-/// position, which is past the point where a reader can check a call site, and
-/// the registered-session path already groups the same resources this way.
+/// Named rather than positional. The group now crosses several host seams, and
+/// a reader should be able to check each resource by name at its call site.
 ///
 /// This is the development path's stand-in for `RegisteredSessionUi`. It is not
 /// a registered session: there is no installed record here, so the display name
@@ -163,6 +174,7 @@ struct SampleSessionUi {
     file_text: WindowsFileTextService,
     notifications: anodrel_notifications::NotificationMailbox,
     window_title: anodrel_window::WindowTitleMailbox,
+    window_state: anodrel_window::WindowStateMailbox,
     fields: anodrel_ui_session::UiFieldMailbox,
 }
 
@@ -183,6 +195,7 @@ impl SampleSessionUi {
             file_text: WindowsFileTextService::new(),
             notifications: anodrel_notifications::NotificationMailbox::new(),
             window_title: anodrel_window::WindowTitleMailbox::new(),
+            window_state: anodrel_window::WindowStateMailbox::new(),
             fields: anodrel_ui_session::UiFieldMailbox::new(),
         }
     }
@@ -229,6 +242,7 @@ fn run_with_optional_session_view(
             Capability::NotificationShow,
             Capability::WindowTitle,
             Capability::UiFieldsRead,
+            Capability::WindowState,
         ],
         "anodrel-windows-host",
     )?;
@@ -247,6 +261,7 @@ fn run_with_optional_session_view(
                 .with_credentials(sample_credentials()?)
                 .with_notifications(ui.notifications.clone())
                 .with_window_title(ui.window_title.clone())
+                .with_window_state(ui.window_state.clone())
                 .with_ui_fields(ui.fields.clone());
             WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
@@ -279,6 +294,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::Credentials => command.arg("--request-credentials")?,
             SampleDialogRequest::Notification => command.arg("--request-notification")?,
             SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
+            SampleDialogRequest::WindowState => command.arg("--request-window-state")?,
             SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
         }
     } else {
@@ -294,6 +310,7 @@ fn run_with_optional_session_view(
             ui.file_text,
             ui.notifications,
             ui.window_title,
+            ui.window_state,
             SAMPLE_DISPLAY_NAME,
             ui.fields,
         )?;

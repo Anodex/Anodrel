@@ -41,7 +41,10 @@ use anodrel_ui_session::{
     UiDocumentSession, UiDocumentSnapshot, UiFieldReadError, UiFieldReader, UiFieldSnapshot,
     UiInputMailbox,
 };
-use anodrel_window::{WindowTitleProposal, WindowTitleService, WindowTitleServiceError};
+use anodrel_window::{
+    WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
+    WindowTitleService, WindowTitleServiceError,
+};
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
@@ -121,6 +124,7 @@ pub struct CoreHost {
     external_links: Box<dyn ExternalLinkService>,
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
+    window_state: Box<dyn WindowStateService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
@@ -143,6 +147,7 @@ pub struct HostServices {
     external_links: Box<dyn ExternalLinkService>,
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
+    window_state: Box<dyn WindowStateService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
@@ -198,6 +203,15 @@ struct UnavailableWindowTitle;
 impl WindowTitleService for UnavailableWindowTitle {
     fn set_title(&self, _proposal: &WindowTitleProposal) -> Result<(), WindowTitleServiceError> {
         Err(WindowTitleServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableWindowState;
+
+impl WindowStateService for UnavailableWindowState {
+    fn set_state(&self, _state: WindowState) -> Result<(), WindowStateServiceError> {
+        Err(WindowStateServiceError::Unavailable)
     }
 }
 
@@ -270,6 +284,7 @@ impl HostServices {
             external_links: Box::new(UnavailableExternalLinks),
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
+            window_state: Box::new(UnavailableWindowState),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
             file_selections: Box::new(UnavailableFileSelectionService),
@@ -323,6 +338,17 @@ impl HostServices {
     #[must_use]
     pub fn with_window_title(mut self, service: impl WindowTitleService + 'static) -> Self {
         self.window_title = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed window-state service.
+    ///
+    /// The supplied service must apply only the closed state to the requesting
+    /// session's own window from the host UI thread. It accepts neither a
+    /// target nor a native command value; see `docs/WINDOW_STATE.md`.
+    #[must_use]
+    pub fn with_window_state(mut self, service: impl WindowStateService + 'static) -> Self {
+        self.window_state = Box::new(service);
         self
     }
 
@@ -404,6 +430,7 @@ impl CoreHost {
             external_links: services.external_links,
             notifications: services.notifications,
             window_title: services.window_title,
+            window_state: services.window_state,
             ui_fields: services.ui_fields,
             file_dialogs: services.file_dialogs,
             file_selections: services.file_selections,
@@ -635,6 +662,7 @@ impl CoreHost {
             // exactly as capable as it was, rather than silently widening it.
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
+            window_state: Box::new(UnavailableWindowState),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
@@ -734,6 +762,9 @@ impl CoreHost {
             }
             "ui.fields.read" if request.protocol_version.minor >= 15 => {
                 self.handle_ui_fields_read(request)
+            }
+            "window.state.set" if request.protocol_version.minor >= 16 => {
+                self.handle_window_state_set(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
@@ -1262,6 +1293,45 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::WindowBusy,
                 "a window title change is already pending.",
+                None,
+            ),
+        }
+    }
+
+    /// Applies one closed presentation state to this session's own window.
+    ///
+    /// There is no target and no state readback. The worker gives the portable
+    /// enum to a service that must route it to the owning UI thread; success is
+    /// acceptance only, never an observation about the native window.
+    fn handle_window_state_set(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(state) = window_state_set_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.state.set requires one closed state string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::WindowState) {
+            return self.capability_denied(request.request_id, "window.state.set");
+        }
+
+        match self.window_state.set_state(state) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("applied".to_owned()))]),
+            ),
+            Err(WindowStateServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no session window is available for the requested state.",
+                None,
+            ),
+            Err(WindowStateServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "a window state change is already pending.",
                 None,
             ),
         }
@@ -1847,6 +1917,24 @@ fn window_title_set_payload(value: &JsonValue) -> Option<&str> {
         .and_then(JsonValue::as_string)
 }
 
+/// Reads the exact one-field payload `window.state.set` accepts.
+///
+/// Extra fields are a mismatch rather than a future target, geometry, focus, or
+/// native-command escape hatch. The value itself is a closed portable enum, so
+/// the core never receives an operating-system state code.
+fn window_state_set_payload(value: &JsonValue) -> Option<WindowState> {
+    let fields = value.as_object()?;
+    if fields.len() != 1 {
+        return None;
+    }
+    match fields.get("state")?.as_string()? {
+        "minimized" => Some(WindowState::Minimized),
+        "maximized" => Some(WindowState::Maximized),
+        "restored" => Some(WindowState::Restored),
+        _ => None,
+    }
+}
+
 fn external_open_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -1961,7 +2049,7 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i64, u32, u32) {
 mod tests {
     use std::cell::RefCell;
     use std::collections::BTreeMap;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     use anodrel_clipboard::{
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
@@ -1974,7 +2062,10 @@ mod tests {
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::UiInputCandidate;
-    use anodrel_window::{WindowTitleProposal, WindowTitleService, WindowTitleServiceError};
+    use anodrel_window::{
+        WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
+        WindowTitleService, WindowTitleServiceError,
+    };
 
     use super::*;
 
@@ -2599,6 +2690,174 @@ mod tests {
                 HostServices::unavailable(),
             )
             .handle_json(&request_v1_14("window.title.set", r#"{"title":"Report"}"#)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("window.unavailable")
+        );
+    }
+
+    /// A state service that records only the closed command it was given.
+    #[derive(Debug, Default)]
+    struct RecordingWindowState {
+        applied: Arc<Mutex<Vec<WindowState>>>,
+        result: Option<WindowStateServiceError>,
+    }
+
+    impl WindowStateService for RecordingWindowState {
+        fn set_state(&self, state: WindowState) -> Result<(), WindowStateServiceError> {
+            if let Some(error) = self.result {
+                return Err(error);
+            }
+            self.applied
+                .lock()
+                .expect("the test mutex is usable")
+                .push(state);
+            Ok(())
+        }
+    }
+
+    fn request_v1_16(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":16}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn host_with_window_state(service: impl WindowStateService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::WindowState],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_window_state(service),
+        )
+    }
+
+    #[test]
+    fn every_granted_window_state_reaches_only_the_state_service() {
+        for (payload, expected) in [
+            (r#"{"state":"minimized"}"#, WindowState::Minimized),
+            (r#"{"state":"maximized"}"#, WindowState::Maximized),
+            (r#"{"state":"restored"}"#, WindowState::Restored),
+        ] {
+            let service = RecordingWindowState::default();
+            let applied = Arc::clone(&service.applied);
+            let response = JsonValue::parse(
+                &host_with_window_state(service)
+                    .handle_json(&request_v1_16("window.state.set", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(field(&response, "status").as_string(), Some("success"));
+            assert_eq!(
+                field(field(&response, "result"), "status").as_string(),
+                Some("applied"),
+                "{expected:?} did not report acceptance"
+            );
+            assert_eq!(
+                applied.lock().expect("the test mutex is usable").as_slice(),
+                &[expected]
+            );
+        }
+    }
+
+    #[test]
+    fn window_state_needs_its_own_grant_and_protocol_version() {
+        let payload = r#"{"state":"minimized"}"#;
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowTitle, Capability::UiFieldsRead],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable().with_window_state(RecordingWindowState::default()),
+            )
+            .handle_json(&request_v1_16("window.state.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let unsupported = JsonValue::parse(
+            &host_with_window_state(RecordingWindowState::default())
+                .handle_json(&request_v1_15("window.state.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn window_state_payload_is_exact_and_closed() {
+        for payload in [
+            r#"{}"#,
+            r#"{"state":"fullscreen"}"#,
+            r#"{"state":"minimized","target":"another-window"}"#,
+            r#"{"state":"restored","bounds":{"width":1}}"#,
+            r#"{"state":7}"#,
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_state(RecordingWindowState::default())
+                    .handle_json(&request_v1_16("window.state.set", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn window_state_service_failures_map_to_safe_shared_codes() {
+        for (error, code) in [
+            (WindowStateServiceError::Unavailable, "window.unavailable"),
+            (WindowStateServiceError::Busy, "window.busy"),
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_state(RecordingWindowState {
+                    result: Some(error),
+                    ..RecordingWindowState::default()
+                })
+                .handle_json(&request_v1_16(
+                    "window.state.set",
+                    r#"{"state":"restored"}"#,
+                )),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(code),
+                "{error:?} mapped to the wrong code"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_without_a_window_state_service_reports_unavailable() {
+        let response = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowState],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            )
+            .handle_json(&request_v1_16(
+                "window.state.set",
+                r#"{"state":"maximized"}"#,
+            )),
         )
         .expect("response JSON is valid");
         assert_eq!(

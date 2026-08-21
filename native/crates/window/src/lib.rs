@@ -14,11 +14,16 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-mod mailbox;
+mod bridge;
+mod state;
+mod title;
 
 use std::fmt;
 
-pub use mailbox::{WINDOW_TITLE_RESPONSE_TIMEOUT, WindowTitleMailbox, WindowTitleRequest};
+pub use state::{
+    WINDOW_STATE_RESPONSE_TIMEOUT, WindowStateMailbox, WindowStateRequest, WindowStateService,
+};
+pub use title::{WINDOW_TITLE_RESPONSE_TIMEOUT, WindowTitleMailbox, WindowTitleRequest};
 
 /// Maximum UTF-16 code units an application may propose.
 ///
@@ -109,10 +114,31 @@ pub trait WindowTitleService: fmt::Debug + Send {
     fn set_title(&self, proposal: &WindowTitleProposal) -> Result<(), WindowTitleServiceError>;
 }
 
-/// A safe failure category returned by a portable window-title service.
+/// A portable request to change the session's own window presentation state.
+///
+/// This is a closed set rather than a native command or style value. The host
+/// resolves the window from the authenticated session; applications cannot name
+/// a target, observe the resulting state, or extend the list with another
+/// User32 operation. See `docs/WINDOW_STATE.md` and Decision 0072.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum WindowTitleServiceError {
-    /// This session has no host window to title, or the native call failed.
+pub enum WindowState {
+    /// Put the session's window in the normal Windows minimised state.
+    Minimized,
+    /// Expand the session's window to the normal Windows maximised state.
+    Maximized,
+    /// Return the session's window to its normal restored state.
+    Restored,
+}
+
+/// A safe failure category returned by a session-owned window command.
+///
+/// Both title and state commands use these categories. They deliberately do
+/// not say whether the session lacks a window or a native call failed, because
+/// that distinction would reveal host state the application does not need.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WindowCommandError {
+    /// This session has no host window, its command expired, or the native call
+    /// failed.
     ///
     /// Deliberately does not distinguish the two: which one it is describes
     /// host state an application has no business learning.
@@ -121,17 +147,29 @@ pub enum WindowTitleServiceError {
     Busy,
 }
 
-impl fmt::Display for WindowTitleServiceError {
+impl fmt::Display for WindowCommandError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
-            Self::Unavailable => "no window is available to title",
-            Self::Busy => "a window title change is already pending",
+            Self::Unavailable => "no session window is available",
+            Self::Busy => "a window command is already pending",
         };
         formatter.write_str(message)
     }
 }
 
-impl std::error::Error for WindowTitleServiceError {}
+impl std::error::Error for WindowCommandError {}
+
+/// Failure returned by a portable window-title service.
+///
+/// This alias preserves title-specific source compatibility while sharing the
+/// common session-window failure categories with [`WindowStateService`].
+pub type WindowTitleServiceError = WindowCommandError;
+
+/// Failure returned by a portable window-state service.
+///
+/// State commands use the same unavailable and busy meanings as title
+/// commands; their protocol mapping remains the shared `window.*` codes.
+pub type WindowStateServiceError = WindowCommandError;
 
 /// A stable validation failure raised before any native call.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -162,8 +200,8 @@ impl std::error::Error for WindowTitleInputError {}
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_PROPOSAL_UTF16_UNITS, TITLE_SEPARATOR, WindowTitleInputError, WindowTitleProposal,
-        WindowTitleServiceError, compose,
+        MAX_PROPOSAL_UTF16_UNITS, TITLE_SEPARATOR, WindowCommandError, WindowTitleInputError,
+        WindowTitleProposal, compose,
     };
 
     fn proposal(value: &str) -> WindowTitleProposal {
@@ -288,10 +326,7 @@ mod tests {
     fn service_failures_describe_the_request_rather_than_the_host() {
         // Neither category may reveal whether a window exists, which one, or
         // what the operating system said.
-        for error in [
-            WindowTitleServiceError::Unavailable,
-            WindowTitleServiceError::Busy,
-        ] {
+        for error in [WindowCommandError::Unavailable, WindowCommandError::Busy] {
             let message = error.to_string();
             for leaked in ["handle", "hwnd", "0x", "error code", "user32"] {
                 assert!(

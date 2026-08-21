@@ -178,6 +178,14 @@ ordinary drop paths perform the cleanup. The `--window-lab` diagnostic proves
 this two-window lifecycle without creating a public window-management API. See
 `docs/WINDOW_LIFECYCLE.md`.
 
+The two public session-window commands remain deliberately narrower than that
+private lifecycle: `window.title.set` proposes a title the host composes with a
+validated application name, and `window.state.set` selects one closed minimise,
+maximise, or restore action. Both cross a per-session, one-request bridge to
+the window's owning UI thread; neither exposes a target, handle, geometry,
+current state, focus control, or event. See `docs/WINDOW_TITLE.md`,
+`docs/WINDOW_STATE.md`, Decisions 0066 and 0072.
+
 ## Modularity and performance
 
 The dependency direction is one-way: protocol types sit at the center; SDKs and

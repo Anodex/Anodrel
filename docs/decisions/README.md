@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0072: Session window state is a closed, write-only command.
+
 - 0071: UI Automation field values are read-only host snapshots.
 
 - 0070: UI Automation reports the owned focus snapshot without controlling it.

@@ -59,6 +59,12 @@ input, close, dialog, and retained-file resources that one host-owned native
 application window will consume. This is a verified-launch building block, not
 a public window API or a substitute for signed application provisioning.
 
+Protocol 1.16 adds the second narrow public window capability:
+an authenticated session carrying the separate `window.state` grant can ask the
+host UI thread to minimise, maximise, or restore the one native window it
+already owns. It has no target, handle, geometry, focus, state readback, or
+event surface; see `docs/WINDOW_STATE.md`.
+
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.
 The verified Windows product-session adapter joins that pipe, one locked
@@ -206,6 +212,9 @@ contract.
 authenticated session proposes its own window's title and the host composes the
 displayed caption with an application-name suffix the proposal cannot suppress
 or forge. There is no window target, no read, and no other window property.
+`docs/WINDOW_STATE.md` defines the separately granted minimise, maximise, and
+restore command for that same session-owned window. It is write-only and cannot
+name or inspect any window.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance

@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 15 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 16 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -45,9 +45,13 @@ export type Capability =
   | "credential.delete"
   | "notification.show"
   | "window.title"
-  | "ui.fields.read";
+  | "ui.fields.read"
+  | "window.state";
 
 export type EmptyPayload = Record<string, never>;
+
+/** The complete set of presentation states an application may request. */
+export type WindowState = "minimized" | "maximized" | "restored";
 
 export interface PlatformOperationMap {
   "platform.ping": {
@@ -119,6 +123,17 @@ export interface PlatformOperationMap {
    */
   "window.title.set": {
     readonly payload: { readonly title: string };
+    readonly result: { readonly status: "applied" };
+  };
+  /**
+   * Requests one standard presentation state for this session's own window.
+   *
+   * The host resolves the window from the authenticated session. There is no
+   * target, native handle, geometry, state readback, or change event; success
+   * means only that the host UI thread accepted the closed action.
+   */
+  "window.state.set": {
+    readonly payload: { readonly state: WindowState };
     readonly result: { readonly status: "applied" };
   };
   /**
@@ -579,6 +594,23 @@ export function isWindowTitleSetPayload(
     isRecord(value) &&
     Object.keys(value).length === 1 &&
     isWindowTitleProposal(value.title)
+  );
+}
+
+/**
+ * Returns whether a value is exactly one closed session-window state request.
+ *
+ * An extra field is a mismatch rather than something to ignore, so a future
+ * target, identifier, geometry, focus option, or native command cannot be
+ * smuggled past Protocol 1.16.
+ */
+export function isWindowStateSetPayload(
+  value: unknown,
+): value is PayloadFor<"window.state.set"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    (value.state === "minimized" || value.state === "maximized" || value.state === "restored")
   );
 }
 

@@ -1,11 +1,11 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.12
+**Status:** Foundation contract, version 1.16
 
 This document defines the public, transport-neutral boundary between a Platform
-application SDK and a host. It is intentionally limited to core operations
-that do not expose operating-system authority. New platform services must be
-documented here before their host implementation is added.
+application SDK and a host. Its operations are deliberately bounded and carry
+only explicit, host-issued operating-system authority. New platform services
+must be documented here before their host implementation is added.
 
 ## Boundary and trust
 
@@ -28,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.12 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 12}`.
+the host's. Version 1.16 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 16}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -64,6 +64,10 @@ The current operations are:
 | `credential.read` | `{ "name": string }` | exact secret or not found | `credential.read` |
 | `credential.write` | `{ "name": string, "secret": string }` | written | `credential.write` |
 | `credential.delete` | `{ "name": string }` | deleted or not found | `credential.delete` |
+| `notification.show` | `{ "title": string, "body": string }` | `{ "status": "shown" }` | `notification.show` |
+| `window.title.set` | `{ "title": string }` | `{ "status": "applied" }` | `window.title` |
+| `ui.fields.read` | `{}` | whole-surface current values | `ui.fields.read` |
+| `window.state.set` | `{ "state": "minimized" \| "maximized" \| "restored" }` | `{ "status": "applied" }` | `window.state` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |

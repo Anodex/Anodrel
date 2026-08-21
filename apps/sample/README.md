@@ -24,6 +24,11 @@ host to run the same authenticated session through the real open or save
 picker. These diagnostics prove only user-mediated path selection; they never
 read, create, truncate, or write a selected file.
 
+Use `--sample-ui-window-state-client` to exercise the separately granted
+`window.state.set` command. The development client asks its own session window
+to minimise, maximise, and restore; it never receives a handle, target, or
+state readback. See `docs/WINDOW_STATE.md` and `docs/DEVELOPMENT.md`.
+
 `anodrel.application.json` and `content/main.txt` are a separate static
 application package for the first Windows content surface. The host
 verifies the declared SHA-256 digest and package containment before drawing the

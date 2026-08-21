@@ -83,6 +83,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         return sample::run_ui_session_with_window_title(node_path, client_path);
     }
     if let [command, node_path, client_path] = arguments.as_slice()
+        && command == "--sample-ui-window-state-client"
+    {
+        return sample::run_ui_session_with_window_state(node_path, client_path);
+    }
+    if let [command, node_path, client_path] = arguments.as_slice()
         && command == "--sample-ui-fields-client"
     {
         return sample::run_ui_session_with_field_read(node_path, client_path);

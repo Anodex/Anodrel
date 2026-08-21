@@ -579,6 +579,66 @@ test("a window title cannot be aimed at a window or split across lines", async (
   assert.deepEqual(await client.setWindowTitle("t".repeat(96)), { status: "applied" });
 });
 
+test("a session window state is closed, separately granted, and untargetable", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.state"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  for (const state of ["minimized", "maximized", "restored"] as const) {
+    assert.deepEqual(await client.setWindowState(state), { status: "applied" });
+  }
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.setWindowState("minimized"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "window.state",
+  );
+
+  // No target, geometry, focus request, or native state can ride along. The
+  // mock shares the exact public contract, so this catches a drift between
+  // SDK-facing validation and the host's protocol expectation.
+  const transport = host.createTransport();
+  for (const payload of [
+    { state: "fullscreen" },
+    { state: "minimized", target: "other-window" },
+    { state: "restored", bounds: { width: 1 } },
+    { state: "maximized", focus: true },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: { major: 1, minor: 16 },
+      kind: "request",
+      requestId: `window-state-${JSON.stringify(payload)}`,
+      operation: "window.state.set",
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+
+  const older = await transport.send({
+    protocolVersion: { major: 1, minor: 15 },
+    kind: "request",
+    requestId: "window-state-before-protocol-1.16",
+    operation: "window.state.set",
+    payload: { state: "restored" },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
 test("a field read is a whole-surface snapshot behind its own grant", async () => {
   const host = new MockHost({
     applicationId: "test.application",

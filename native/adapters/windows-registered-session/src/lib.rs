@@ -18,7 +18,7 @@ use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
-use anodrel_window::WindowTitleMailbox;
+use anodrel_window::{WindowStateMailbox, WindowTitleMailbox};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
@@ -42,6 +42,7 @@ pub struct RegisteredSessionUi {
     file_text: WindowsFileTextService,
     notification_mailbox: NotificationMailbox,
     window_title_mailbox: WindowTitleMailbox,
+    window_state_mailbox: WindowStateMailbox,
     field_mailbox: UiFieldMailbox,
     /// The display name the host appends to any title this session proposes.
     ///
@@ -62,6 +63,7 @@ impl RegisteredSessionUi {
             file_text: WindowsFileTextService::new(),
             notification_mailbox: NotificationMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
+            window_state_mailbox: WindowStateMailbox::new(),
             field_mailbox: UiFieldMailbox::new(),
             display_name: display_name.into(),
         }
@@ -107,6 +109,15 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn window_title_mailbox(&self) -> WindowTitleMailbox {
         self.window_title_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread window-state mailbox.
+    ///
+    /// It transfers only the closed minimise, maximise, or restore value. The
+    /// native window remains resolved by the host, never by the application.
+    #[must_use]
+    pub fn window_state_mailbox(&self) -> WindowStateMailbox {
+        self.window_state_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread field-read mailbox.
@@ -246,6 +257,9 @@ fn registered_interactive_services(
         // A window caption reaches User32 the same way, and the UI thread holds
         // the validated display name it composes with.
         .with_window_title(ui.window_title_mailbox())
+        // A presentation state takes the same host-only UI-thread path and is
+        // still resolved from this session rather than a caller-supplied target.
+        .with_window_state(ui.window_state_mailbox())
         // Field values live with the window that owns them, so a read crosses
         // to the UI thread the same way. See `docs/UI_FIELDS.md`.
         .with_ui_fields(ui.field_mailbox()))
@@ -358,6 +372,30 @@ mod tests {
         // other session's bridge knows nothing about it.
         assert!(second.window_title_mailbox().take().is_none());
         assert!(first.window_title_mailbox().fail(1));
+        assert!(waiting.join().expect("the worker did not panic").is_err());
+    }
+
+    #[test]
+    fn each_session_carries_its_own_closed_window_state_bridge() {
+        let first = RegisteredSessionUi::new("First Application");
+        let second = RegisteredSessionUi::new("Second Application");
+        let bridge = first.window_state_mailbox();
+        let waiting = std::thread::spawn(move || {
+            anodrel_window::WindowStateService::set_state(
+                &bridge,
+                anodrel_window::WindowState::Minimized,
+            )
+        });
+
+        while first.window_state_mailbox().take().is_none() {
+            assert!(
+                second.window_state_mailbox().take().is_none(),
+                "a session took another session's presentation command"
+            );
+            std::thread::yield_now();
+        }
+        assert!(second.window_state_mailbox().take().is_none());
+        assert!(first.window_state_mailbox().fail(1));
         assert!(waiting.join().expect("the worker did not panic").is_err());
     }
 }

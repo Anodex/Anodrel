@@ -8,6 +8,7 @@ import {
   type RequestEnvelope,
   type ResponseEnvelope,
   type ResultFor,
+  type WindowState,
 } from "@anodrel/protocol";
 
 export interface RequestIdFactory {
@@ -100,6 +101,17 @@ export class PlatformClient {
    */
   setWindowTitle(title: string): Promise<ResultFor<"window.title.set">> {
     return this.request("window.title.set", { title });
+  }
+
+  /**
+   * Requests a standard presentation state for this session's own window.
+   *
+   * This is deliberately a command, not a window object: there is no target,
+   * native handle, current-state readback, or state-change event. A successful
+   * result means the host UI thread accepted the closed request.
+   */
+  setWindowState(state: WindowState): Promise<ResultFor<"window.state.set">> {
+    return this.request("window.state.set", { state });
   }
 
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {

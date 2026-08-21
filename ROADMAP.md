@@ -69,7 +69,12 @@ Status: **Direct Windows host in progress**
   caption with a display name taken from the machine-validated installed record
   (Decision 0066). The request carries no window target, handle, or identifier,
   there is no read counterpart, and installed record version 1.4 adds the grant
-  as a strict superset of 1.3. Window creation, closing, geometry, enumeration,
+  as a strict superset of 1.3. The second narrow public lifecycle capability is
+  `window.state.set`: Protocol 1.16 and record version 1.6 define separately
+  granted minimise, maximise, and restore requests for a session's own window.
+  The SDK, mock host, policy parser, session-local UI-thread bridge, direct
+  Windows `ShowWindow` adapter, development diagnostic, and contract tests are
+  complete (Decision 0072). Window creation, closing, geometry, enumeration,
   focus, and every other window property remain deferred, each needing its own
   grant, decision, and threat-model entry.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable

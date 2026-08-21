@@ -206,6 +206,35 @@ pub(super) fn complete_window_title_request(
     }
 }
 
+/// Takes one pending state request only from its associated UI session.
+///
+/// The closed portable value returns to the UI thread, where it becomes the
+/// one documented User32 action outside this registry lock.
+pub(super) fn take_window_state_request(
+    window: Hwnd,
+) -> io::Result<Option<(u64, anodrel_window::WindowState)>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_window_state_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one state request from its owning native UI session.
+pub(super) fn complete_window_state_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_window_state_request(request_id, applied),
+        )),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending field read only from its associated UI session.
 pub(super) fn take_field_read(window: Hwnd) -> io::Result<Option<u64>> {
     let views = lock_views()?;

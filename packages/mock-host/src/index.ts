@@ -7,6 +7,7 @@ import {
   isCredentialReadPayload,
   isCredentialWritePayload,
   isNotificationShowPayload,
+  isWindowStateSetPayload,
   isWindowTitleSetPayload,
   isExternalOpenPayload,
   isFileDialogOpenPayload,
@@ -319,6 +320,20 @@ export class MockHost {
         // Acceptance only. A real host composes the caption with its validated
         // application-name suffix and does not report what it became.
         return this.success("window.title.set", request.requestId, { status: "applied" });
+
+      case "window.state.set":
+        if (request.protocolVersion.minor < 16) {
+          return this.failure(request.requestId, "operation.unsupported", "window.state.set requires protocol 1.16 or later.");
+        }
+        if (!isWindowStateSetPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "window.state.set requires one closed state string.");
+        }
+        if (!this.hasCapability(sessionId, "window.state")) {
+          return this.failure(request.requestId, "capability.denied", "window.state.set requires the window.state capability.", { capability: "window.state" });
+        }
+        // The mock deliberately reports acceptance only. It has no native
+        // window and cannot reveal a resulting state, handle, or geometry.
+        return this.success("window.state.set", request.requestId, { status: "applied" });
 
       case "ui.fields.read":
         if (request.protocolVersion.minor < 15) {

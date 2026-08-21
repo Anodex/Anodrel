@@ -11,7 +11,7 @@ use anodrel_ui_session::{
     UiDocumentMailbox, UiDocumentRevision, UiFieldMailbox, UiFieldRequest, UiInputCandidate,
     UiInputMailbox,
 };
-use anodrel_window::WindowTitleMailbox;
+use anodrel_window::{WindowState, WindowStateMailbox, WindowTitleMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
@@ -41,6 +41,11 @@ pub(super) struct UiSessionView {
     /// unavailable, which is the same thing an application would see on a host
     /// with no window to title.
     window_title: Option<WindowTitleMailbox>,
+    /// This session's one-request presentation-state bridge, when it has one.
+    ///
+    /// The value is a closed portable enum. The view supplies no target or
+    /// handle, so the host UI thread can apply it only to its own window.
+    window_state: Option<WindowStateMailbox>,
     /// The validated display name appended to any title this session proposes.
     ///
     /// Held beside the mailbox rather than passed with each request: it comes
@@ -85,6 +90,7 @@ impl UiSessionView {
             notifications,
             notification_entry: None,
             window_title: None,
+            window_state: None,
             display_name: None,
             field_reads: None,
             revision: UiDocumentRevision::INITIAL,
@@ -108,6 +114,13 @@ impl UiSessionView {
         self
     }
 
+    /// Attaches this session's closed presentation-state bridge.
+    #[must_use]
+    pub(super) fn with_window_state(mut self, mailbox: WindowStateMailbox) -> Self {
+        self.window_state = Some(mailbox);
+        self
+    }
+
     /// Takes a pending title proposal and composes the caption to apply.
     ///
     /// Composition happens here, on the side that holds the validated name, so
@@ -121,6 +134,24 @@ impl UiSessionView {
     /// Completes a title proposal after the host UI thread returns from User32.
     pub(super) fn complete_window_title_request(&self, request_id: u64, applied: bool) -> bool {
         let Some(mailbox) = self.window_title.as_ref() else {
+            return false;
+        };
+        if applied {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
+        }
+    }
+
+    /// Takes one closed state command for this window's owning UI thread.
+    pub(super) fn take_window_state_request(&self) -> Option<(u64, WindowState)> {
+        let request = self.window_state.as_ref()?.take()?;
+        Some((request.id(), request.state()))
+    }
+
+    /// Completes a state command after the host UI thread applies it.
+    pub(super) fn complete_window_state_request(&self, request_id: u64, applied: bool) -> bool {
+        let Some(mailbox) = self.window_state.as_ref() else {
             return false;
         };
         if applied {
@@ -171,6 +202,7 @@ impl UiSessionView {
             ui.notification_mailbox(),
         )
         .with_window_title(ui.window_title_mailbox(), ui.display_name())
+        .with_window_state(ui.window_state_mailbox())
         .with_field_reads(ui.field_mailbox());
         view.product_session = Some(Arc::new(session));
         view
@@ -357,7 +389,7 @@ mod tests {
     use anodrel_ui_session::{UiDocumentMailbox, UiDocumentSession, UiInputMailbox};
     use anodrel_windows_file_access::WindowsFileTextService;
 
-    use super::{UiSessionView, WindowTitleMailbox};
+    use super::{UiSessionView, WindowState, WindowStateMailbox, WindowTitleMailbox};
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.action","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
@@ -421,6 +453,21 @@ mod tests {
             NotificationMailbox::new(),
         )
         .with_window_title(mailbox.clone(), display_name);
+        (view, mailbox)
+    }
+
+    /// A session view with its own presentation-state bridge.
+    fn view_with_state() -> (UiSessionView, WindowStateMailbox) {
+        let mailbox = WindowStateMailbox::new();
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_window_state(mailbox.clone());
         (view, mailbox)
     }
 
@@ -548,6 +595,44 @@ mod tests {
         );
         assert!(view.take_window_title_request().is_none());
         assert!(!view.complete_window_title_request(1, true));
+    }
+
+    #[test]
+    fn a_session_without_a_state_bridge_answers_nothing_and_completes_nothing() {
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_window_state_request().is_none());
+        assert!(!view.complete_window_state_request(1, true));
+    }
+
+    #[test]
+    fn one_session_cannot_take_another_sessions_state_command() {
+        let (first, first_mailbox) = view_with_state();
+        let (second, _second_mailbox) = view_with_state();
+        let worker = first_mailbox.clone();
+        let waiting = std::thread::spawn(move || {
+            anodrel_window::WindowStateService::set_state(&worker, WindowState::Maximized)
+        });
+
+        let (request_id, state) = loop {
+            assert!(
+                second.take_window_state_request().is_none(),
+                "a session took another session's state command"
+            );
+            if let Some(request) = first.take_window_state_request() {
+                break request;
+            }
+            std::thread::yield_now();
+        };
+        assert_eq!(state, WindowState::Maximized);
+        assert!(first.complete_window_state_request(request_id, true));
+        assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
     }
 
     #[test]

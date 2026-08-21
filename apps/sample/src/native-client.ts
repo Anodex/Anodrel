@@ -157,6 +157,19 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-window-state")) {
+      // A closed sequence exercises every public state request. The short
+      // pauses make the native transitions visible to an operator; the client
+      // still learns only that the UI thread accepted each command.
+      for (const state of ["minimized", "maximized", "restored"] as const) {
+        const applied = await client.setWindowState(state);
+        if (applied.status !== "applied") {
+          return 28;
+        }
+        await delay(650);
+      }
+    }
+
     if (process.argv.includes("--request-credentials")) {
       const result = await runCredentialDiagnostic(client);
       if (result !== 0) {
