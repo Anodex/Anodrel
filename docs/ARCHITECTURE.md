@@ -384,6 +384,15 @@ identity, endpoint, title, or additional capability. This development path is
 unverified and remains distinct from the signed product-session boundary. See
 `docs/NATIVE_UI_TEMPLATE.md` and Decision 0082.
 
+Decision 0083 adds a separate constrained Windows native-menu template to
+that development path. Its `init-menu` command emits a fixed typed-client
+project, and the explicit `--native-menu-template-client` route grants exactly
+document write, semantic-event read, menu write, and self-close. The ordinary
+template remains three-grant. Neither generated project can select an identity,
+capability, window, native command, shortcut, endpoint, or process; the host
+retains the menu mailbox, User32 mapping, child lifecycle, and window. See
+`docs/NATIVE_MENU_TEMPLATE.md` and Decision 0083.
+
 Every request should have:
 
 - protocol version;

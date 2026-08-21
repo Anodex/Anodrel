@@ -105,6 +105,7 @@ name = "anodrel-native-app-tool"
 version = "0.1.0"
 dependencies = [
  "anodrel-core",
+ "anodrel-menu",
  "anodrel-protocol",
  "anodrel-ui",
  "anodrel-ui-document",

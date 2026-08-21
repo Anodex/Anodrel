@@ -353,9 +353,11 @@ Status: **First starter-package slice in progress**
   Decision 0083's typed menu extension is now implemented and locally
   validated: it uses Protocol 1.18 for a strict complete menu model and a
   bounded mixed event batch, while the regular document-only event method
-  fails closed on a menu event. Its remaining explicit menu generator and
-  fixed four-grant host route will expose that existing bounded session-menu
-  contract without broadening the regular template.
+  fails closed on a menu event. Its explicit `init-menu` generator and fixed
+  four-grant Windows host route now expose that existing bounded session-menu
+  contract without broadening the regular template. A generated child has
+  completed the full authenticated menu sequence in a real pipe test; one
+  manual native-menu click remains the explicit desktop acceptance check.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

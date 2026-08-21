@@ -289,6 +289,9 @@ test.
 template boundary. Its first-party generator creates a typed executable project
 that builds and runs through an explicit fixed-grant development host route
 without opening a product launch path.
+`docs/NATIVE_MENU_TEMPLATE.md` defines the separate development-native menu
+template. Its generator and fixed four-grant Windows route exercise the
+existing bounded menu protocol without changing the regular template's grants.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

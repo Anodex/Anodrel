@@ -13,21 +13,29 @@ mod validation;
 
 use std::env;
 
-use arguments::parse;
-use init::initialize;
+use arguments::{TemplateKind, parse};
+use init::{initialize, initialize_menu};
 
 const USAGE: &str = concat!(
     "usage:\n",
-    "  anodrel-native-app-tool init <destination> <project-slug> <display-label>"
+    "  anodrel-native-app-tool init <destination> <project-slug> <display-label>\n",
+    "  anodrel-native-app-tool init-menu <destination> <project-slug> <display-label>"
 );
 
 fn main() {
     let result = match parse(env::args().skip(1)) {
-        Ok(command) => initialize(
-            &command.destination,
-            &command.project_slug,
-            &command.display_label,
-        )
+        Ok(command) => match command.template_kind {
+            TemplateKind::Ui => initialize(
+                &command.destination,
+                &command.project_slug,
+                &command.display_label,
+            ),
+            TemplateKind::Menu => initialize_menu(
+                &command.destination,
+                &command.project_slug,
+                &command.display_label,
+            ),
+        }
         .map_err(|error| error.to_string()),
         Err(()) => Err(USAGE.to_owned()),
     };

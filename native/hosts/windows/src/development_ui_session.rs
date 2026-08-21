@@ -5,7 +5,7 @@
 
 use std::{error::Error, io, thread};
 
-use anodrel_core::HostPolicy;
+use anodrel_core::{HostPolicy, HostServices};
 use anodrel_protocol::Capability;
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_pipe::WindowsPipeServer;
@@ -20,6 +20,18 @@ const UI_GRANTS: [Capability; 3] = [
     Capability::UiEventsRead,
     Capability::SessionClose,
 ];
+const MENU_GRANTS: [Capability; 4] = [
+    Capability::UiDocumentWrite,
+    Capability::UiEventsRead,
+    Capability::MenuWrite,
+    Capability::SessionClose,
+];
+
+#[derive(Clone, Copy)]
+enum DevelopmentUiSessionKind {
+    Document,
+    Menu,
+}
 
 /// Fixed host facts for one explicitly selected development child route.
 #[derive(Clone, Copy)]
@@ -28,6 +40,7 @@ pub(crate) struct DevelopmentUiSessionConfig {
     session_id: &'static str,
     display_name: &'static str,
     completion_message: &'static str,
+    kind: DevelopmentUiSessionKind,
 }
 
 impl DevelopmentUiSessionConfig {
@@ -44,7 +57,36 @@ impl DevelopmentUiSessionConfig {
             session_id,
             display_name,
             completion_message,
+            kind: DevelopmentUiSessionKind::Document,
         }
+    }
+
+    /// Creates a configuration whose only additional session permission is a
+    /// complete bounded native-menu replacement.
+    pub(crate) const fn with_menu(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::Menu,
+        }
+    }
+
+    const fn grants(self) -> &'static [Capability] {
+        match self.kind {
+            DevelopmentUiSessionKind::Document => &UI_GRANTS,
+            DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
+        }
+    }
+
+    const fn supports_menu(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::Menu)
     }
 }
 
@@ -60,14 +102,25 @@ pub(crate) fn run(
     // process that cannot start.
     let command = BootstrapCommand::new(client_path)?;
     let ui = DevelopmentSessionUi::new();
-    let policy = HostPolicy::new(config.application_id, UI_GRANTS.to_vec(), HOST_NAME)?;
-    let (server, invitation) = WindowsPipeServer::create_with_session_components(
-        policy,
-        config.session_id,
-        ui.document.clone(),
-        ui.input.clone(),
-        ui.close.clone(),
-    )?;
+    let policy = HostPolicy::new(config.application_id, config.grants().to_vec(), HOST_NAME)?;
+    let (server, invitation) = if config.supports_menu() {
+        WindowsPipeServer::create_with_session_components_and_service_bundle(
+            policy,
+            config.session_id,
+            ui.document.clone(),
+            ui.input.clone(),
+            ui.close.clone(),
+            HostServices::unavailable().with_menu(ui.menu.clone()),
+        )?
+    } else {
+        WindowsPipeServer::create_with_session_components(
+            policy,
+            config.session_id,
+            ui.document.clone(),
+            ui.input.clone(),
+            ui.close.clone(),
+        )?
+    };
     let stop = server.stop_signal();
     let bootstrap = invitation.bootstrap_invitation()?;
     let worker = thread::spawn(move || server.serve_one());
@@ -127,25 +180,44 @@ pub(crate) fn run(
 mod tests {
     use anodrel_protocol::Capability;
 
-    use super::{DevelopmentUiSessionConfig, UI_GRANTS};
+    use super::{DevelopmentUiSessionConfig, MENU_GRANTS, UI_GRANTS};
 
     #[test]
-    fn every_development_ui_route_uses_the_same_closed_grant_set() {
-        let config = DevelopmentUiSessionConfig::new(
+    fn development_routes_use_only_their_exact_closed_grant_sets() {
+        let document = DevelopmentUiSessionConfig::new(
             "anodrel.test",
             "test-session",
             "Anodrel Test",
             "completed",
         );
-        assert_eq!(config.application_id, "anodrel.test");
-        assert_eq!(config.session_id, "test-session");
-        assert_eq!(config.display_name, "Anodrel Test");
-        assert_eq!(config.completion_message, "completed");
+        let menu = DevelopmentUiSessionConfig::with_menu(
+            "anodrel.test-menu",
+            "test-menu-session",
+            "Anodrel Menu Test",
+            "completed menu",
+        );
+        assert_eq!(document.application_id, "anodrel.test");
+        assert_eq!(document.session_id, "test-session");
+        assert_eq!(document.display_name, "Anodrel Test");
+        assert_eq!(document.completion_message, "completed");
+        assert_eq!(document.grants(), UI_GRANTS);
+        assert!(!document.supports_menu());
+        assert_eq!(menu.grants(), MENU_GRANTS);
+        assert!(menu.supports_menu());
         assert_eq!(
             UI_GRANTS,
             [
                 Capability::UiDocumentWrite,
                 Capability::UiEventsRead,
+                Capability::SessionClose,
+            ]
+        );
+        assert_eq!(
+            MENU_GRANTS,
+            [
+                Capability::UiDocumentWrite,
+                Capability::UiEventsRead,
+                Capability::MenuWrite,
                 Capability::SessionClose,
             ]
         );

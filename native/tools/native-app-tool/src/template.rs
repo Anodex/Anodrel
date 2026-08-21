@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+mod menu;
+
 pub struct TemplateContext {
     pub project_slug: String,
     pub client_path: PathBuf,
@@ -34,14 +36,22 @@ pub fn readme(context: &TemplateContext) -> String {
     )
 }
 
-fn document_json(display_label: &str) -> String {
+pub fn menu_main_source(display_label: &str) -> String {
+    menu::main_source(display_label)
+}
+
+pub fn menu_readme(context: &TemplateContext) -> String {
+    menu::readme(context)
+}
+
+pub(super) fn document_json(display_label: &str) -> String {
     let label = json_string(display_label);
     format!(
         "{{\"format\":\"anodrel.ui.document.v1\",\"root\":{{\"id\":\"template.root\",\"kind\":\"stack\",\"axis\":\"vertical\",\"padding\":{{\"left\":56,\"top\":56,\"right\":56,\"bottom\":56}},\"gap\":16,\"surfaceTone\":\"plain\",\"children\":[{{\"id\":\"template.eyebrow\",\"kind\":\"text\",\"value\":\"ANODREL NATIVE TEMPLATE\",\"fontSize\":14,\"tone\":\"accent\"}},{{\"id\":\"template.title\",\"kind\":\"text\",\"value\":{label},\"fontSize\":28,\"tone\":\"primary\"}},{{\"id\":\"template.detail\",\"kind\":\"text\",\"value\":\"This host-owned window uses direct Windows APIs and Anodrel's typed native UI client.\",\"fontSize\":16,\"tone\":\"secondary\"}},{{\"id\":\"template.complete\",\"kind\":\"action\",\"label\":\"Complete template session\",\"fontSize\":16,\"enabled\":true,\"tone\":\"accent\"}}]}}}}"
     )
 }
 
-fn quoted(value: &str) -> String {
+pub(super) fn quoted(value: &str) -> String {
     format!("\"{}\"", rust_string(value))
 }
 
@@ -53,11 +63,11 @@ fn cargo_path(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
-fn windows_path(path: &Path) -> String {
+pub(super) fn windows_path(path: &Path) -> String {
     path.to_string_lossy().replace('/', "\\")
 }
 
-fn json_string(value: &str) -> String {
+pub(super) fn json_string(value: &str) -> String {
     let mut escaped = String::from("\"");
     for character in value.chars() {
         match character {
@@ -182,7 +192,7 @@ fn run() -> Stage {
 mod tests {
     use std::path::Path;
 
-    use super::{TemplateContext, cargo_toml, document_json, main_source};
+    use super::{TemplateContext, cargo_toml, document_json, main_source, menu_main_source};
 
     #[test]
     fn generated_manifest_keeps_all_anodrel_dependencies_relative() {
@@ -209,5 +219,14 @@ mod tests {
         assert!(source.contains("template.complete"));
         assert!(!source.contains("const DOCUMENT: &str = r#"));
         assert_eq!(decoded.root().id().as_str(), "template.root");
+    }
+
+    #[test]
+    fn menu_source_is_closed_over_one_fixed_model_and_action() {
+        let source = menu_main_source("Menu \"Template\" \\ App");
+        assert!(source.contains("replace_menu_v1"));
+        assert!(source.contains("read_events"));
+        assert!(source.contains("template.menu.complete"));
+        assert!(!source.contains("template.complete\""));
     }
 }

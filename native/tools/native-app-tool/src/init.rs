@@ -3,8 +3,9 @@
 use std::{error::Error, fmt, fs, path::Path};
 
 use crate::{
+    arguments::TemplateKind,
     paths::{anodrel_root, relative_path, resolve_new_project, write_new_file},
-    template::{TemplateContext, cargo_toml, main_source, readme},
+    template::{TemplateContext, cargo_toml, main_source, menu_main_source, menu_readme, readme},
     validation::{validate_display_label, validate_project_slug},
 };
 
@@ -30,14 +31,41 @@ pub fn initialize(
     project_slug: &str,
     display_label: &str,
 ) -> Result<(), InitError> {
+    initialize_template(TemplateKind::Ui, destination, project_slug, display_label)
+}
+
+pub fn initialize_menu(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(TemplateKind::Menu, destination, project_slug, display_label)
+}
+
+fn initialize_template(
+    template_kind: TemplateKind,
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
     validate_project_slug(project_slug)?;
     validate_display_label(display_label)?;
     let project_directory = resolve_new_project(destination)?;
     let root = anodrel_root()?;
     let context = template_context(&project_directory, &root, project_slug)?;
     let manifest = cargo_toml(&context);
-    let source = main_source(display_label);
-    let project_readme = readme(&context);
+    let (source, project_readme, created_message) = match template_kind {
+        TemplateKind::Ui => (
+            main_source(display_label),
+            readme(&context),
+            "Created Anodrel native UI project.",
+        ),
+        TemplateKind::Menu => (
+            menu_main_source(display_label),
+            menu_readme(&context),
+            "Created Anodrel native menu project.",
+        ),
+    };
 
     fs::create_dir(&project_directory)
         .map_err(|_| InitError::new("could not create project directory"))?;
@@ -48,7 +76,7 @@ pub fn initialize(
     write_new_file(&project_directory.join("README.md"), &project_readme)?;
     write_new_file(&source_directory.join("main.rs"), &source)?;
 
-    println!("Created Anodrel native UI project.");
+    println!("{created_message}");
     Ok(())
 }
 
@@ -77,7 +105,7 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    use super::initialize;
+    use super::{initialize, initialize_menu};
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
 
@@ -150,5 +178,22 @@ mod tests {
             .status()
             .expect("run cargo check for generated project");
         assert!(status.success(), "generated project must compile");
+    }
+
+    #[test]
+    fn menu_project_is_separate_from_the_regular_template() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-menu-app");
+        initialize_menu(&destination, "generated-menu-app", "Generated Menu App")
+            .expect("generate a native menu project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated menu instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated menu source");
+        assert!(readme.contains("--native-menu-template-client"));
+        assert!(source.contains("replace_menu_v1"));
+        assert!(source.contains("template.menu.complete"));
+        assert!(!source.contains("template.complete"));
     }
 }
