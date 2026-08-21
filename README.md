@@ -62,6 +62,13 @@ menu click through the authenticated pull path; its manual verification is the
 remaining acceptance step. An unattached host still returns only
 `menu.unavailable`.
 
+Protocol 1.19 adds one direct, host-authorized HTTPS text-fetch boundary. It
+uses strict URLs, an exact host-selected origin policy, a 32 KiB UTF-8 response
+limit, and WinHTTP without a browser runtime, proxy discovery, cookies,
+redirects, or automatic authentication. A separate compiled Windows diagnostic
+tests only the fixed `example.com:443` origin; templates, product fixtures, and
+installed application sessions still receive no network service.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
@@ -231,8 +238,9 @@ provisioning contract, and host activation routes that exercise it.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.
 `docs/EXTERNAL_LINKS.md` defines the validated HTTPS external-link foundation.
 `docs/NETWORK.md` defines the implemented portable host-authorized HTTPS
-text-fetch contract, SDK, mock-host boundary, and direct WinHTTP adapter. Its
-development route and production origin policy remain unimplemented.
+text-fetch contract, SDK, mock-host boundary, direct WinHTTP adapter, and
+fixed-origin Windows development diagnostic. Its production origin policy
+remains unimplemented.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.

@@ -111,6 +111,7 @@ pub(super) fn fetch_text(url: &NetworkUrl) -> Result<NetworkTextResponse, Window
     configure_session(&session)?;
     let connection = WinHttpHandle::connect(&session, &hostname, url.port())?;
     let request = WinHttpHandle::request(&connection, &verb, &target)?;
+    configure_request(&request)?;
     request.send()?;
     request.receive()?;
     let status_code = request.status_code()?;
@@ -134,9 +135,17 @@ fn configure_session(session: &WinHttpHandle) -> Result<(), WindowsNetworkError>
     if timeouts_set == 0 {
         return Err(WindowsNetworkError::Unavailable);
     }
-    set_dword_option(session, WINHTTP_OPTION_DISABLE_FEATURE, DISABLED_FEATURES)?;
+    Ok(())
+}
+
+fn configure_request(request: &WinHttpHandle) -> Result<(), WindowsNetworkError> {
+    // WinHTTP requires these stateful and TLS features on the request handle,
+    // after `WinHttpOpenRequest` and before `WinHttpSendRequest`. Keeping them
+    // here makes it impossible for a session-level option to silently fail and
+    // leave a request with browser-like behavior.
+    set_dword_option(request, WINHTTP_OPTION_DISABLE_FEATURE, DISABLED_FEATURES)?;
     set_dword_option(
-        session,
+        request,
         WINHTTP_OPTION_ENABLE_FEATURE,
         WINHTTP_ENABLE_SSL_REVOCATION,
     )
@@ -148,9 +157,9 @@ fn set_dword_option(
     mut value: Dword,
 ) -> Result<(), WindowsNetworkError> {
     let configured = unsafe {
-        // SAFETY: handle owns a live WinHTTP session. value is writable
-        // storage for exactly one DWORD, and the two callers use documented
-        // session options with host-fixed feature flags only.
+        // SAFETY: handle owns a live WinHTTP handle. value is writable storage
+        // for exactly one DWORD, and each caller uses a documented host-fixed
+        // feature option at the required handle level.
         WinHttpSetOption(
             handle.handle,
             option,

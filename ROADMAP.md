@@ -164,9 +164,9 @@ Status: **Direct Windows host in progress**
    host-authorized, origin-bound HTTPS text fetch without a browser runtime,
    headers, bodies, redirects, cookies, credentials, or proxy discovery. Its
    **Completed:** its portable Protocol 1.19 core, strict URL and exact-origin
-   policy values, SDK, mock host, contract coverage, and direct WinHTTP
-   adapter. **Pending:** a fixed-origin development diagnostic and a production
-   installed-record origin policy.
+   policy values, SDK, mock host, contract coverage, direct WinHTTP adapter,
+   and a fixed-origin compiled Windows development diagnostic. **Pending:** a
+   production installed-record origin policy.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

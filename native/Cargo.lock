@@ -129,6 +129,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-native-network-client-sample"
+version = "0.1.0"
+dependencies = [
+ "anodrel-client",
+ "anodrel-core",
+ "anodrel-json",
+ "anodrel-network",
+ "anodrel-protocol",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-client",
+ "anodrel-windows-pipe",
+]
+
+[[package]]
 name = "anodrel-native-ui-client-sample"
 version = "0.1.0"
 dependencies = [
@@ -369,6 +383,7 @@ dependencies = [
  "anodrel-file-dialog",
  "anodrel-json",
  "anodrel-menu",
+ "anodrel-network",
  "anodrel-notifications",
  "anodrel-protocol",
  "anodrel-ui",
@@ -386,6 +401,7 @@ dependencies = [
  "anodrel-windows-file-dialog",
  "anodrel-windows-instance",
  "anodrel-windows-launch",
+ "anodrel-windows-network",
  "anodrel-windows-notifications",
  "anodrel-windows-paths",
  "anodrel-windows-pipe",

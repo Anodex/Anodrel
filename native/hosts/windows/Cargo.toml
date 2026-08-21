@@ -16,6 +16,7 @@ anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-menu = { path = "../../crates/menu" }
+anodrel-network = { path = "../../crates/network" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }
@@ -38,5 +39,6 @@ anodrel-windows-storage = { path = "../../adapters/windows-storage" }
 anodrel-notifications = { path = "../../crates/notifications" }
 anodrel-window = { path = "../../crates/window" }
 anodrel-windows-notifications = { path = "../../adapters/windows-notifications" }
+anodrel-windows-network = { path = "../../adapters/windows-network" }
 anodrel-windows-uia = { path = "../../adapters/windows-uia" }
 anodrel-windows-accessibility = { path = "../../adapters/windows-accessibility" }

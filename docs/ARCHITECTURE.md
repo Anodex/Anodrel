@@ -398,9 +398,12 @@ host into a browser runtime. Its host-selected HTTPS origins and bounded
 text-only `GET` result sit behind a separate capability; an application cannot
 choose headers, bodies, cookies, redirects, credentials, proxies, certificates,
 or a native handle. The portable protocol core, strict URL and exact-origin
-values, SDK, and mock host are implemented; its direct WinHTTP adapter and
-direct no-proxy adapter are implemented; a fixed-origin host route and product
-origin policy remain separate work. See `docs/NETWORK.md`.
+values, SDK, and mock host are implemented; its direct no-proxy WinHTTP
+adapter and a separate fixed-origin compiled Windows diagnostic are
+implemented. That diagnostic grants only `network.fetch` and composes only
+`example.com:443` before authentication; it is not a template, fixture, or
+installed-application path. A production installed-record origin policy
+remains separate work. See `docs/NETWORK.md`.
 
 Every request should have:
 

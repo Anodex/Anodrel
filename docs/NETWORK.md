@@ -1,9 +1,9 @@
 # Anodrel HTTPS text fetch
 
 **Status:** The portable Protocol 1.19 core, strict URL and exact-origin
-values, TypeScript SDK, deterministic mock host, and direct WinHTTP adapter
-are implemented. No development route or installed-application policy currently
-attaches the service to a real application session.
+values, TypeScript SDK, deterministic mock host, direct WinHTTP adapter, and a
+fixed-origin compiled Windows development diagnostic are implemented. An
+installed-application origin policy is not implemented.
 
 ## Purpose and boundary
 
@@ -92,13 +92,36 @@ Node.js, WinINet, COM browser component, or third-party network library.
 
 Every session, connection, and request handle has one RAII owner. Parent and
 child handles are closed on every success, rejection, timeout, and failure path.
-Each request creates a fresh direct no-proxy session, then disables cookies,
-redirects, automatic authentication, and keep-alive before it connects. It
-sets every phase timeout to ten seconds, enables Windows certificate-revocation
-checking, and sets no certificate-error-ignore flag. The adapter maps all
-native failure detail to the two stable safe errors above. It does not start a
-callback, background worker, or UI operation; the existing authenticated session
-worker holds the bounded synchronous work.
+Each request creates a fresh direct no-proxy session, sets every phase timeout
+to ten seconds, then disables cookies, redirects, automatic authentication, and
+keep-alive on its request handle before sending. It enables Windows
+certificate-revocation checking on that same handle and sets no
+certificate-error-ignore flag. The adapter maps all native failure detail to
+the two stable safe errors above. It does not start a callback, background
+worker, or UI operation; the existing authenticated session worker holds the
+bounded synchronous work.
+
+## Fixed-origin Windows development diagnostic
+
+The explicit `--native-network-sample-client <native-client.exe>` Windows-host
+route exists only to exercise the complete direct transport boundary. The
+operator names an unverified compiled diagnostic executable; the host supplies
+its one private bootstrap invitation and grants exactly `network.fetch`.
+Before authentication, the host constructs a service with the one compiled
+origin `example.com:443`. The first-party diagnostic child itself requests only
+the compiled URL `https://example.com/`, validates that the protocol response
+contains exactly a representable status and bounded text, then exits without
+printing or retaining the response.
+
+This route does not accept a URL, origin, method, header, body, proxy, timeout,
+or certificate option from its command line or from the diagnostic child. A
+different executable selected by an operator could still request another valid
+path at that one fixed origin, so this is a development diagnostic rather than
+a product launch or template grant. Regular native templates, Node samples,
+the signed development fixture, and installed application sessions do not
+receive this service. The external request needs ordinary outbound Internet
+access; a failure is a safe diagnostic failure rather than evidence that an
+application session has network authority.
 
 ## Deferred work
 

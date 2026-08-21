@@ -233,6 +233,29 @@ exits without opening a window. Its only client dependencies are Anodrel crates,
 the Rust standard library, and direct Windows APIs. A safe nonzero child stage
 does not expose the private invitation, named pipe, token, or native error.
 
+### Compiled native HTTPS diagnostic
+
+This separate no-window diagnostic tests the direct WinHTTP boundary through
+the authenticated protocol. It is not a general network client or product
+launcher: the host grants the selected child only `network.fetch` against its
+compiled `example.com:443` policy, while the first-party child requests only
+`https://example.com/`. It accepts no URL or other network option from the
+command line and never prints or retains the response text.
+
+~~~powershell
+cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-network-client-sample
+$networkClientPath = (Resolve-Path native/target/release/anodrel-native-network-client-sample.exe).Path
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --native-network-sample-client $networkClientPath
+~~~
+
+With ordinary outbound Internet access, it prints **Anodrel native HTTPS
+development diagnostic completed successfully.** and exits without opening a
+window. An unavailable network, TLS failure, blocked endpoint, or invalid
+response causes a safe nonzero diagnostic failure and must not be worked around
+by changing TLS, proxy, redirect, or certificate policy. Regular templates,
+Node samples, the product fixture, and installed sessions receive no network
+service.
+
 ### Compiled native UI-session diagnostic
 
 This development diagnostic extends the compiled health probe through one
