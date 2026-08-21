@@ -50,6 +50,7 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
         ui.file_dialog_mailbox(),
         ui.file_text_service(),
         ui.notification_mailbox(),
+        ui.menu_mailbox(),
         ui.window_title_mailbox(),
         ui.window_state_mailbox(),
         // From the identity that matched the machine-validated installed

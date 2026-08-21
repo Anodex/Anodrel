@@ -15,6 +15,7 @@ use anodrel_application::InstalledApplication;
 use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_file_access::{SaveFileDialogMailbox, SelectionFileDialogMailbox};
 use anodrel_file_dialog::FileDialogMailbox;
+use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
@@ -41,6 +42,7 @@ pub struct RegisteredSessionUi {
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notification_mailbox: NotificationMailbox,
+    menu_mailbox: MenuMailbox,
     window_title_mailbox: WindowTitleMailbox,
     window_state_mailbox: WindowStateMailbox,
     field_mailbox: UiFieldMailbox,
@@ -62,6 +64,7 @@ impl RegisteredSessionUi {
             file_dialog_mailbox: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
             notification_mailbox: NotificationMailbox::new(),
+            menu_mailbox: MenuMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
             window_state_mailbox: WindowStateMailbox::new(),
             field_mailbox: UiFieldMailbox::new(),
@@ -103,6 +106,16 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn notification_mailbox(&self) -> NotificationMailbox {
         self.notification_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread menu mailbox.
+    ///
+    /// It carries only a complete validated semantic model and host-owned
+    /// revision. The UI thread that owns this session's window supplies every
+    /// native menu object and private command identifier.
+    #[must_use]
+    pub fn menu_mailbox(&self) -> MenuMailbox {
+        self.menu_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread window-title mailbox.
@@ -256,6 +269,9 @@ fn registered_interactive_services(
         // Notifications reach Shell32 through the owning UI thread, so the
         // session gets the mailbox rather than the adapter.
         .with_notifications(ui.notification_mailbox())
+        // A complete semantic menu reaches User32 only through this session's
+        // owning UI thread; no pipe worker gains a native menu handle.
+        .with_menu(ui.menu_mailbox())
         // A window caption reaches User32 the same way, and the UI thread holds
         // the validated display name it composes with.
         .with_window_title(ui.window_title_mailbox())

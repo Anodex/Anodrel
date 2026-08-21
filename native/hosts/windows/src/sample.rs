@@ -38,6 +38,7 @@ enum SampleDialogRequest {
     WindowTitle,
     WindowState,
     FieldRead,
+    Menu,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -173,6 +174,14 @@ pub fn run_ui_session_with_field_read(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::FieldRead)
 }
 
+/// Runs the UI session diagnostic through one direct host-owned native menu.
+///
+/// The client publishes one semantic command and exits only after a person
+/// selects it from the real User32 bar and receives the bounded pull event.
+pub fn run_ui_session_with_menu(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::Menu)
+}
+
 /// The host-owned UI resources one development sample session consumes.
 ///
 /// Named rather than positional. The group now crosses several host seams, and
@@ -188,6 +197,7 @@ struct SampleSessionUi {
     file_dialog: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notifications: anodrel_notifications::NotificationMailbox,
+    menu: anodrel_menu::MenuMailbox,
     window_title: anodrel_window::WindowTitleMailbox,
     window_state: anodrel_window::WindowStateMailbox,
     fields: anodrel_ui_session::UiFieldMailbox,
@@ -209,6 +219,7 @@ impl SampleSessionUi {
             file_dialog: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
             notifications: anodrel_notifications::NotificationMailbox::new(),
+            menu: anodrel_menu::MenuMailbox::new(),
             window_title: anodrel_window::WindowTitleMailbox::new(),
             window_state: anodrel_window::WindowStateMailbox::new(),
             fields: anodrel_ui_session::UiFieldMailbox::new(),
@@ -256,6 +267,7 @@ fn run_with_optional_session_view(
             Capability::CredentialWrite,
             Capability::CredentialDelete,
             Capability::NotificationShow,
+            Capability::MenuWrite,
             Capability::WindowTitle,
             Capability::UiFieldsRead,
             Capability::WindowState,
@@ -280,6 +292,7 @@ fn run_with_optional_session_view(
                 .with_diagnostics(sample_diagnostics())
                 .with_credentials(sample_credentials()?)
                 .with_notifications(ui.notifications.clone())
+                .with_menu(ui.menu.clone())
                 .with_window_title(ui.window_title.clone())
                 .with_window_state(ui.window_state.clone())
                 .with_ui_fields(ui.fields.clone());
@@ -319,6 +332,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
             SampleDialogRequest::WindowState => command.arg("--request-window-state")?,
             SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
+            SampleDialogRequest::Menu => command.arg("--request-native-menu")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
@@ -332,6 +346,7 @@ fn run_with_optional_session_view(
             ui.file_dialog,
             ui.file_text,
             ui.notifications,
+            ui.menu,
             ui.window_title,
             ui.window_state,
             SAMPLE_DISPLAY_NAME,

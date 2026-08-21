@@ -14,6 +14,7 @@
 mod appicon;
 mod crash;
 mod document;
+mod menu;
 mod present;
 mod product_tile;
 mod registry;
@@ -29,6 +30,7 @@ use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_core::SessionCloseSignal;
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSelection};
+use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
@@ -51,6 +53,7 @@ type Hbrush = isize;
 type Hcursor = isize;
 pub(super) type Hdc = isize;
 type Hinstance = isize;
+type Hmenu = isize;
 type Hwnd = isize;
 type Lparam = isize;
 type Lresult = isize;
@@ -71,6 +74,7 @@ const WM_ERASEBKGND: Uint = 0x0014;
 const WM_SETTINGCHANGE: Uint = 0x001A;
 const WM_GETMINMAXINFO: Uint = 0x0024;
 const WM_SETICON: Uint = 0x0080;
+const WM_COMMAND: Uint = 0x0111;
 const WM_SETCURSOR: Uint = 0x0020;
 const WM_GETOBJECT: Uint = 0x003D;
 const WM_KEYDOWN: Uint = 0x0100;
@@ -360,6 +364,12 @@ unsafe extern "system" {
     fn UpdateWindow(window: Hwnd) -> Bool;
     fn SetForegroundWindow(window: Hwnd) -> Bool;
     fn DestroyWindow(window: Hwnd) -> Bool;
+    fn CreateMenu() -> Hmenu;
+    fn CreatePopupMenu() -> Hmenu;
+    fn AppendMenuW(menu: Hmenu, flags: Uint, new_item: usize, text: *const u16) -> Bool;
+    fn SetMenu(window: Hwnd, menu: Hmenu) -> Bool;
+    fn DrawMenuBar(window: Hwnd) -> Bool;
+    fn DestroyMenu(menu: Hmenu) -> Bool;
     fn SetWindowTextW(window: Hwnd, text: *const u16) -> Bool;
     fn GetMessageW(message: *mut Msg, window: Hwnd, minimum: Uint, maximum: Uint) -> Bool;
     fn TranslateMessage(message: *const Msg) -> Bool;
@@ -638,6 +648,7 @@ pub fn run_ui_session(
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
+    menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     display_name: &str,
@@ -651,6 +662,7 @@ pub fn run_ui_session(
         file_dialog_mailbox,
         file_text,
         notifications,
+        menu,
         window_title,
         window_state,
         display_name,
@@ -682,6 +694,7 @@ pub fn run_authenticated_ui_session(
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
+    menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     display_name: &str,
@@ -702,6 +715,7 @@ pub fn run_authenticated_ui_session(
                     file_text,
                     notifications,
                 )
+                .with_menu(menu)
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
                 .with_field_reads(field_reads),
@@ -1276,6 +1290,22 @@ fn service_window_state(window: Hwnd) {
     let _ = registry::complete_window_state_request(window, request_id, true);
 }
 
+/// Constructs and attaches one pending session menu on its owning UI thread.
+///
+/// Native construction happens before taking the process-wide view-registry
+/// lock. The short locked attachment either replaces the current bar as one
+/// operation or leaves it untouched; every failure becomes the portable
+/// service's single safe unavailable outcome.
+fn service_menu(window: Hwnd) {
+    let Ok(Some(request)) = registry::take_menu_request(window) else {
+        return;
+    };
+    let applied = menu::UnattachedMenu::build(&request)
+        .and_then(|menu| registry::attach_menu(window, menu).ok().flatten())
+        .unwrap_or(false);
+    let _ = registry::complete_menu_request(window, request.id(), applied);
+}
+
 /// Converts the portable closed state into its one documented User32 command.
 ///
 /// Keeping this conversion separate makes the native boundary exhaustive and
@@ -1769,6 +1799,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 }
             }
             service_notification(window);
+            service_menu(window);
             service_window_title(window);
             service_window_state(window);
             service_field_read(window);
@@ -1853,6 +1884,22 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         WM_ACTIVATE => {
             set_ambient_running(window, (wparam & 0xFFFF) != WA_INACTIVE);
             0
+        }
+        WM_COMMAND => {
+            let handled = registry::offer_menu_command(window, wparam, lparam)
+                .ok()
+                .flatten()
+                .unwrap_or(false);
+            if handled {
+                // A current host-private normal menu command is now a bounded
+                // semantic candidate. The application receives it only through
+                // the authenticated pull path, never this native message.
+                0
+            } else {
+                // SAFETY: unknown commands, accelerators, and controls retain
+                // documented default Win32 handling unchanged.
+                unsafe { DefWindowProcW(window, message, wparam, lparam) }
+            }
         }
         WM_SETTINGCHANGE => {
             // Interactive native UI paints read the small direct Windows

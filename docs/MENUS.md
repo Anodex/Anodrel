@@ -2,8 +2,9 @@
 
 **Status:** Portable model, Protocol 1.18 core, installed-record grant, SDK,
 mock host, contract tests, shared ordered interaction delivery, and the
-one-request `MenuMailbox` are implemented. Direct Windows UI-thread attachment,
-native adapter, and manual verification are pending.
+one-request `MenuMailbox` are implemented. The direct Windows UI-thread
+attachment, native adapter, and development diagnostic are implemented; manual
+verification is pending.
 
 Anodrel's first menu surface will be a host-owned Windows menu bar for one
 authenticated application session. It is a bounded way for an application to
@@ -57,8 +58,8 @@ When a person chooses a current enabled command, the host offers one bounded,
 revision-bound candidate to the same ordered per-session interaction mailbox
 used by authenticated document actions. Protocol `ui.events.read` remains the
 only application delivery route and still requires its existing
-`ui.events.read` grant. Protocol 1.18 implements this event shape; the pending
-direct Windows adapter is its only remaining producer:
+`ui.events.read` grant. Protocol 1.18 implements this event shape, and the
+direct Windows adapter produces it from the host-owned menu bar:
 
 ~~~json
 {
@@ -122,7 +123,9 @@ as a strict superset of version 1.7. The SDK and mock host implement the
 portable contract, while a core without an attached native menu service returns
 `menu.unavailable`. The direct Windows host must not grant `menu.write` until
 its UI-thread bridge, native adapter, activation delivery, and manual
-verification agree.
+verification agree. The development-only menu diagnostic is the explicit
+exception: it grants `menu.write` only to prove that implementation, and its
+real menu-bar check remains a documented operator step.
 
 Submenus, separators, check and radio state, keyboard accelerators, native
 window or system-menu edits, context menus, menu opening callbacks, dynamic

@@ -8,6 +8,8 @@ import {
   FIELD_SESSION_ACTION,
   FIELD_SESSION_DOCUMENT,
   FIELD_SESSION_IDS,
+  MENU_SESSION_ACTION,
+  MENU_SESSION_DOCUMENT,
   fieldEchoDocument,
   SCROLL_SESSION_ACTION,
   SCROLL_SESSION_DOCUMENT,
@@ -52,16 +54,42 @@ async function run(): Promise<number> {
     }
     const scrollDiagnostic = process.argv.includes("--request-scroll-document");
     const fieldDiagnostic = process.argv.includes("--request-field-read");
+    const menuDiagnostic = process.argv.includes("--request-native-menu");
     let update;
     if (scrollDiagnostic) {
       update = await client.replaceUiDocumentV2(SCROLL_SESSION_DOCUMENT);
     } else if (fieldDiagnostic) {
       update = await client.replaceUiDocument(FIELD_SESSION_DOCUMENT);
+    } else if (menuDiagnostic) {
+      update = await client.replaceUiDocument(MENU_SESSION_DOCUMENT);
     } else {
       update = await client.replaceUiDocument(STANDARD_SESSION_DOCUMENT);
     }
     if (update.revision !== "1") {
       return 16;
+    }
+
+    let menuRevision: string | undefined;
+    if (menuDiagnostic) {
+      const replaced = await client.replaceMenu([
+        {
+          // Literal ampersands verify that the Windows adapter escapes User32
+          // mnemonic markers rather than letting application text claim Alt
+          // shortcuts.
+          label: "File & actions",
+          items: [
+            {
+              id: MENU_SESSION_ACTION,
+              label: "Complete & close",
+              enabled: true,
+            },
+          ],
+        },
+      ]);
+      if (replaced.revision !== "1") {
+        return 30;
+      }
+      menuRevision = replaced.revision;
     }
 
     if (fieldDiagnostic) {
@@ -195,6 +223,18 @@ async function run(): Promise<number> {
     }
 
     if (process.argv.includes("--wait-for-ui-event")) {
+      if (menuDiagnostic) {
+        const eventResult = await waitForMenuAction(
+          client,
+          menuRevision ?? "",
+          MENU_SESSION_ACTION,
+        );
+        if (eventResult !== 0) {
+          return eventResult;
+        }
+        const close = await client.closeSession();
+        return close.status === "accepted" ? 0 : 17;
+      }
       let expectedAction = STANDARD_SESSION_ACTION;
       if (scrollDiagnostic) {
         expectedAction = SCROLL_SESSION_ACTION;
@@ -228,6 +268,37 @@ async function run(): Promise<number> {
   } finally {
     await transport.close();
   }
+}
+
+/** Waits specifically for the direct host-owned menu event shape. */
+async function waitForMenuAction(
+  client: PlatformClient,
+  revision: string,
+  expectedAction: string,
+): Promise<number> {
+  for (const interval of pollSchedule()) {
+    const result = await client.readUiEvents();
+    if (result.dropped !== 0 || result.discarded !== 0) {
+      return 17;
+    }
+    if (result.events.length > 0) {
+      const event = result.events[0];
+      if (event === undefined) {
+        return 17;
+      }
+      return event.eventName === "menu.action.invoked" &&
+        event.source === "native.menu" &&
+        event.schemaVersion.major === 1 &&
+        event.schemaVersion.minor === 18 &&
+        event.payload.menuRevision === revision &&
+        event.payload.action === expectedAction
+        ? 0
+        : 17;
+    }
+    await delay(interval);
+  }
+
+  return 17;
 }
 
 /**

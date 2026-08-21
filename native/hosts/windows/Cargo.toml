@@ -15,6 +15,7 @@ anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
 anodrel-json = { path = "../../crates/json" }
+anodrel-menu = { path = "../../crates/menu" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }

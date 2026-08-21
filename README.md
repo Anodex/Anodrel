@@ -41,8 +41,10 @@ reusable filesystem-write API. The legacy save picker remains non-mutating.
 Protocol 1.18 now provides the bounded portable foundation for a native
 session menu: a separately granted complete semantic model, host-owned
 revisions, an installed-record grant, SDK support, and contract coverage. The
-direct Windows UI-thread bridge, native menu bar, and activation delivery are
-the next implementation section; until then an unattached host returns only
+direct Windows UI-thread bridge, User32 menu bar, and bounded activation
+delivery are also implemented. A development diagnostic waits for one real
+menu click through the authenticated pull path; its manual verification is the
+remaining acceptance step. An unattached host still returns only
 `menu.unavailable`.
 
 The authenticated protocol also exposes a bounded read of the host's closed
@@ -220,8 +222,8 @@ boundary.
 text-write boundary implemented in Protocol 1.17 for the direct Windows
 UI-session host; legacy save selection remains non-mutating.
 `docs/MENUS.md` defines the bounded native session-menu contract and records
-which portable Protocol 1.18 pieces are implemented versus the pending direct
-Windows adapter.
+the implemented direct Windows adapter, its explicit ownership boundary, and
+the remaining manual verification.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

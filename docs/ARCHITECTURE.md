@@ -299,8 +299,9 @@ operating-system authority. Its one-request mailbox gives the model to one
 owning UI thread without moving a native resource to the pipe worker.
 `anodrel-core` applies the `menu.write` policy and
 commits that portable state only after the host service accepts the complete
-replacement. The pending Windows adapter will own native menu construction,
-numeric command mapping, and direct UI-thread attachment. See
+replacement. The Windows adapter owns direct native menu construction, numeric
+command mapping, direct UI-thread attachment, and the strict normal-menu
+`WM_COMMAND` filter. See
 `docs/MENUS.md` and Decision 0080.
 
 `anodrel-windows-accessibility` sits directly above that snapshot. It is a pure

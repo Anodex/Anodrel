@@ -5,6 +5,7 @@ use std::sync::Arc;
 use anodrel_canvas::Point;
 use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
+use anodrel_menu::{MenuMailbox, MenuRequest};
 use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{
@@ -16,7 +17,11 @@ use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
 
-use super::ui_lab::{AccessibilityFocusResult, UiLab};
+use super::{
+    Hwnd, Lparam, Wparam,
+    menu::{MenuBar, UnattachedMenu},
+    ui_lab::{AccessibilityFocusResult, UiLab},
+};
 
 /// A native session view with no application input or event delivery.
 #[derive(Clone)]
@@ -28,6 +33,13 @@ pub(super) struct UiSessionView {
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
     notifications: NotificationMailbox,
+    /// This session's one-request menu replacement bridge, when it has one.
+    ///
+    /// It transfers only a validated complete semantic model. The native menu
+    /// objects and their private command IDs stay in this view on the UI thread.
+    menu_mailbox: Option<MenuMailbox>,
+    /// The currently attached native menu and its private command mapping.
+    menu_bar: Option<MenuBar>,
     /// This session's notification-area entry, created the first time it
     /// actually shows something.
     ///
@@ -88,6 +100,8 @@ impl UiSessionView {
             file_dialog_mailbox,
             file_text,
             notifications,
+            menu_mailbox: None,
+            menu_bar: None,
             notification_entry: None,
             window_title: None,
             window_state: None,
@@ -119,6 +133,57 @@ impl UiSessionView {
     pub(super) fn with_window_state(mut self, mailbox: WindowStateMailbox) -> Self {
         self.window_state = Some(mailbox);
         self
+    }
+
+    /// Attaches this session's one-request native-menu bridge.
+    #[must_use]
+    pub(super) fn with_menu(mut self, mailbox: MenuMailbox) -> Self {
+        self.menu_mailbox = Some(mailbox);
+        self
+    }
+
+    /// Takes one pending validated menu replacement for this UI thread.
+    pub(super) fn take_menu_request(&self) -> Option<MenuRequest> {
+        self.menu_mailbox.as_ref()?.take()
+    }
+
+    /// Attaches a fully constructed native menu and retires the prior bar.
+    ///
+    /// Construction occurred before the registry lock was acquired. A failed
+    /// attachment therefore leaves the existing mapping and visible bar intact.
+    pub(super) fn attach_menu(&mut self, window: Hwnd, next: UnattachedMenu) -> bool {
+        let Some(next) = next.attach(window) else {
+            return false;
+        };
+        if let Some(previous) = self.menu_bar.replace(next) {
+            previous.destroy_after_replacement();
+        }
+        true
+    }
+
+    /// Completes one menu replacement after this UI thread applied it.
+    pub(super) fn complete_menu_request(&self, request_id: u64, applied: bool) -> bool {
+        let Some(mailbox) = self.menu_mailbox.as_ref() else {
+            return false;
+        };
+        if applied {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
+        }
+    }
+
+    /// Offers a candidate only for this bar's current private normal-menu ID.
+    pub(super) fn offer_menu_command(&self, wparam: Wparam, lparam: Lparam) -> bool {
+        let Some(candidate) = self
+            .menu_bar
+            .as_ref()
+            .and_then(|bar| bar.candidate_from_command(wparam, lparam))
+        else {
+            return false;
+        };
+        self.input_mailbox.push(candidate);
+        true
     }
 
     /// Takes a pending title proposal and composes the caption to apply.
@@ -202,6 +267,7 @@ impl UiSessionView {
             ui.notification_mailbox(),
         )
         .with_window_title(ui.window_title_mailbox(), ui.display_name())
+        .with_menu(ui.menu_mailbox())
         .with_window_state(ui.window_state_mailbox())
         .with_field_reads(ui.field_mailbox());
         view.product_session = Some(Arc::new(session));
@@ -626,6 +692,21 @@ mod tests {
         );
         assert!(view.take_window_state_request().is_none());
         assert!(!view.complete_window_state_request(1, true));
+    }
+
+    #[test]
+    fn a_session_without_a_menu_bridge_has_no_menu_request_or_command_route() {
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_menu_request().is_none());
+        assert!(!view.complete_menu_request(1, true));
+        assert!(!view.offer_menu_command(0x7000, 0));
     }
 
     #[test]

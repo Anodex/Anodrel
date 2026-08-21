@@ -5,6 +5,19 @@ export const STANDARD_SESSION_ACTION = "sample.session.action";
 export const STANDARD_SESSION_DOCUMENT =
   '{"format":"anodrel.ui.document.v1","root":{"id":"sample.session.root","kind":"stack","axis":"vertical","padding":{"left":56,"top":56,"right":56,"bottom":56},"gap":16,"surfaceTone":"plain","children":[{"id":"sample.session.eyebrow","kind":"text","value":"AUTHENTICATED ANODREL SESSION","fontSize":14,"tone":"accent"},{"id":"sample.session.title","kind":"text","value":"Native document delivered","fontSize":28,"tone":"primary"},{"id":"sample.session.detail","kind":"text","value":"This view came through the private pipe and remains free of native action authority.","fontSize":16,"tone":"secondary"},{"id":"sample.session.action","kind":"action","label":"Visual-only semantic action","fontSize":16,"enabled":true,"tone":"accent"}]}}';
 
+/** The sole semantic command emitted by the native-menu diagnostic. */
+export const MENU_SESSION_ACTION = "sample.menu.complete";
+
+/**
+ * The document used while the menu bar is the only completion surface.
+ *
+ * It intentionally carries no document action. This makes a successful run
+ * prove that the event came from the direct User32 menu path rather than the
+ * existing document input route.
+ */
+export const MENU_SESSION_DOCUMENT =
+  '{"format":"anodrel.ui.document.v1","root":{"id":"sample.menu.root","kind":"stack","axis":"vertical","padding":{"left":56,"top":56,"right":56,"bottom":56},"gap":16,"surfaceTone":"plain","children":[{"id":"sample.menu.eyebrow","kind":"text","value":"AUTHENTICATED ANODREL SESSION","fontSize":14,"tone":"accent"},{"id":"sample.menu.title","kind":"text","value":"Direct native menu","fontSize":28,"tone":"primary"},{"id":"sample.menu.detail","kind":"text","value":"Open File & actions, then choose Complete & close. The host owns the bar and its private command IDs; this application receives only one semantic event.","fontSize":16,"tone":"secondary"}]}}';
+
 /** The semantic action that ends the field diagnostic. */
 export const FIELD_SESSION_ACTION = "sample.fields.submit";
 

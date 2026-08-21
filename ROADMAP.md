@@ -157,9 +157,9 @@ Status: **Direct Windows host in progress**
    model, and delivery through the existing revision-checked interaction path.
    **Completed:** portable model and revision state, Protocol 1.18 core
    boundary, installed-record 1.8 grant, SDK, mock host, contract tests, and
-   the shared interaction mailbox refactor.
-   **Pending:** the UI-thread bridge, direct Windows adapter, development
-   diagnostic, and manual verification.
+   the shared interaction mailbox refactor, one-request UI-thread bridge,
+   direct User32 adapter, private numeric mapping, and development diagnostic.
+   **Pending:** manual verification of the real native menu bar and pull event.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency
@@ -229,8 +229,8 @@ Status: **Direct Windows host in progress**
   now adds separate retained-output capture and bounded one-use text writing
   through `dialog.save_file.v2` and `file.write_text` (Decision 0079), while
   the legacy save picker stays non-mutating. Protocol 1.18 additionally
-  defines the bounded `menu.replace` model behind its separate `menu.write`
-  grant; direct Windows menu attachment and delivery are pending. Signed product launch,
+  implements the bounded `menu.replace` model behind its separate `menu.write`
+  grant through the direct Windows menu attachment and delivery path. Signed product launch,
   atomic replacement, binary output, and non-Windows adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows

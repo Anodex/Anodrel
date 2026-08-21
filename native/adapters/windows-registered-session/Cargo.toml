@@ -9,6 +9,7 @@ anodrel-application = { path = "../../crates/application" }
 anodrel-core = { path = "../../crates/core" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
+anodrel-menu = { path = "../../crates/menu" }
 anodrel-notifications = { path = "../../crates/notifications" }
 anodrel-window = { path = "../../crates/window" }
 anodrel-session-policy = { path = "../../crates/session-policy" }

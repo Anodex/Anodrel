@@ -8,10 +8,12 @@ use std::{
 
 use super::{
     Hwnd, StartupLab, View,
+    menu::UnattachedMenu,
     ui_lab::{AccessibilityFocusResult, UiLab},
 };
 use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
+use anodrel_menu::MenuRequest;
 use anodrel_windows_file_access::WindowsFileTextService;
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
@@ -235,6 +237,58 @@ pub(super) fn complete_window_state_request(
         Some(View::UiSession(session)) => Ok(Some(
             session.complete_window_state_request(request_id, applied),
         )),
+        _ => Ok(None),
+    }
+}
+
+/// Takes one pending menu replacement only from its associated UI session.
+///
+/// The resulting model has no native object yet, so User32 construction can
+/// occur before the view registry is locked again to attach it.
+pub(super) fn take_menu_request(window: Hwnd) -> io::Result<Option<MenuRequest>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_menu_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Attaches one constructed native menu only to its associated UI session.
+pub(super) fn attach_menu(window: Hwnd, menu: UnattachedMenu) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.attach_menu(window, menu))),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one menu replacement only through its associated UI session.
+pub(super) fn complete_menu_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => {
+            Ok(Some(session.complete_menu_request(request_id, applied)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Offers one current private native-menu command to its shared session queue.
+///
+/// A non-menu `WM_COMMAND`, an accelerator, a control notification, or an
+/// unknown/stale numeric ID all answer `false` and retain default processing.
+pub(super) fn offer_menu_command(
+    window: Hwnd,
+    wparam: usize,
+    lparam: isize,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.offer_menu_command(wparam, lparam))),
         _ => Ok(None),
     }
 }
