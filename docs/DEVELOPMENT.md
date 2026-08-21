@@ -242,6 +242,11 @@ compiled `example.com:443` policy, while the first-party child requests only
 `https://example.com/`. It accepts no URL or other network option from the
 command line and never prints or retains the response text.
 
+For the quickest check, double-click `start-network-diagnostic.bat` from the
+repository root. It builds the host and child in release mode, runs the fixed
+route, and pauses with a safe error if the diagnostic cannot complete. It does
+not alter certificate, proxy, or machine-policy settings.
+
 ~~~powershell
 cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-network-client-sample
 $networkClientPath = (Resolve-Path native/target/release/anodrel-native-network-client-sample.exe).Path

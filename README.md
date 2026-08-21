@@ -337,5 +337,10 @@ menu template and open it through its fixed Windows development route. Choose
 typed event delivery, and clean session shutdown without Node.js, a webview, or
 machine policy changes.
 
+Double-click `start-network-diagnostic.bat` to build and run the no-window
+native HTTPS diagnostic. It tests the complete direct WinHTTP path only against
+the compiled `example.com:443` origin; it does not give the sample, templates,
+or product fixture general network access.
+
 The public interface and security baseline are documented in docs/PROTOCOL.md
 and docs/THREAT_MODEL.md.
