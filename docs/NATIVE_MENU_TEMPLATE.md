@@ -89,6 +89,19 @@ worker, and shutdown. The application will not name or inspect a window,
 native menu, command identifier, keyboard state, activation source, or another
 session.
 
+## Quick desktop check
+
+On Windows, double-click `start-menu-template.bat` in the repository root. It
+creates a uniquely named temporary project, builds it from the local checkout,
+and opens the generated executable through the fixed menu-template route. In
+the **Anodrel Native Menu Template** window, choose **File > Complete menu
+template session**. A successful close prints a completion message and leaves
+the disposable source project in the temporary directory it reports.
+
+The helper creates no certificate, package, installer, application record, or
+machine policy. It is a convenience for this one development check; it does not
+run a generated executable directly or turn it into a product application.
+
 ## Compatibility and verification
 
 This work adds no new wire frame or core protocol operation. `menu.replace`

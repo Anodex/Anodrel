@@ -320,5 +320,11 @@ completes a temporary private IPC health loopback before the native visual test
 surface appears. It builds in release: the surface composes every frame in
 software, and an unoptimised build cannot hold its frame rate.
 
+Double-click `start-menu-template.bat` to build a temporary first-party native
+menu template and open it through its fixed Windows development route. Choose
+**File > Complete menu template session** to exercise the direct User32 menu,
+typed event delivery, and clean session shutdown without Node.js, a webview, or
+machine policy changes.
+
 The public interface and security baseline are documented in docs/PROTOCOL.md
 and docs/THREAT_MODEL.md.
