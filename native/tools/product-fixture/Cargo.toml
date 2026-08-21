@@ -9,9 +9,9 @@ name = "anodrel-product-fixture"
 path = "src/main.rs"
 
 [dependencies]
-anodrel-bootstrap = { path = "../../crates/bootstrap" }
+anodrel-client = { path = "../../crates/client" }
 anodrel-json = { path = "../../crates/json" }
-anodrel-wire = { path = "../../crates/wire" }
+anodrel-windows-client = { path = "../../adapters/windows-client" }
 
 [dev-dependencies]
 # Test-only: proves the compiled-in document decodes through the exact codec the

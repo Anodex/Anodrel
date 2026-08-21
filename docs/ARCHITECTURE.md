@@ -249,9 +249,10 @@ worker and only the resulting grouped resources reach a window. See Decisions
 
 `anodrel-product-fixture` and `anodrel-product-provisioning` are development
 tools, not part of the shipped host. The fixture is a first-party child that
-speaks only the authenticated protocol; the provisioning helper is the one
-component that writes machine policy, and it can write exactly one value for one
-compile-time identity after validating the record through the host's own parser.
+speaks only the authenticated protocol through the reusable native-client
+foundation; the provisioning helper is the one component that writes machine
+policy, and it can write exactly one value for one compile-time identity after
+validating the record through the host's own parser.
 Decision 0081 separately establishes the first reusable child-side split:
 portable framed conversation code above a direct Windows pipe-opening adapter.
 That client foundation inherits an invitation from the host; it cannot construct

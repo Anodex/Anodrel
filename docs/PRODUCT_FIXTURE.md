@@ -18,7 +18,8 @@ A fixture closes that gap without inventing a product. It supplies exactly three
 things:
 
 1. a first-party child executable that speaks the existing authenticated
-   protocol and nothing else;
+   protocol and nothing else through `anodrel-client` and the direct
+   `anodrel-windows-client` adapter;
 2. a staged package directory holding that executable and a valid
    `anodrel.application.json`; and
 3. one machine-policy record under the existing

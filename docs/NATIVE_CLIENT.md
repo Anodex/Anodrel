@@ -77,12 +77,14 @@ requirement, not an application permission.
 
 ## Verification
 
-Portable unit tests must cover authentication ordering, fragmented and
-coalesced responses, failure categories, and the bounded decoder. Windows
-adapter tests must cover UTF-16 conversion, absent endpoint failure, and handle
-release. The migrated fixture remains covered by its real authenticated
-pipe/bootstrap integration test. The native development probe must exercise
-bootstrap, authentication, `platform.health`, and clean exit without Node.js.
+Portable unit tests cover authentication ordering, fragmented and coalesced
+responses, failure categories, and the bounded decoder. Windows adapter tests
+cover UTF-16 conversion and absent-endpoint failure. The migrated product
+fixture covers the joined lifetime: it uses these two modules through the real
+child-only bootstrap channel and authenticated Windows pipe, then proves
+document delivery, semantic input, session close, child exit, and server
+cleanup. The native development probe must still exercise bootstrap,
+authentication, `platform.health`, and clean exit without Node.js.
 
 No test records or prints invitation contents. The direct Windows adapter is
 checked with workspace formatting, tests, linting, and the runnable

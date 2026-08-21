@@ -69,6 +69,8 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   it has no endpoint, operating-system, policy, or capability authority.
 - `adapters/windows-client` opens only the exact invitation-selected pipe with
   direct Kernel32 data I/O and owns that client handle through RAII.
+  `anodrel-product-fixture` uses this pair rather than carrying a second client
+  implementation.
 - `adapters/windows-instance` owns the bounded current-session mutex,
   readiness event, and no-data activation request for one package identity.
 - `adapters/windows-policy` reads one bounded installed-application record

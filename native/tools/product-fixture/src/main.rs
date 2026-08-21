@@ -13,18 +13,16 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod document;
-mod pipe;
-mod session;
 mod stages;
 mod wait;
 
 use std::{io, process::ExitCode, thread};
 
-use anodrel_bootstrap::BootstrapInvitation;
+use anodrel_client::{Client, ProtocolVersion};
 use anodrel_json::JsonValue;
+use anodrel_windows_client::WindowsClientStream;
 
 use document::{FIXTURE_ACTION, FIXTURE_DOCUMENT};
-use session::{FixtureSession, field};
 use stages::Stage;
 use wait::PollSchedule;
 
@@ -35,23 +33,30 @@ use wait::PollSchedule;
 /// provisioned with.
 const EXPECTED_GRANTS: [&str; 3] = ["session.close", "ui.document.write", "ui.events.read"];
 
+/// The lowest protocol minor that carries every operation the fixture uses.
+///
+/// `ui.document.replace` needs 1.1, `ui.events.read` needs 1.2, and
+/// `session.close` needs 1.3. Asking for the minimum keeps the fixture from
+/// depending on operations its machine record never granted.
+const FIXTURE_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(3);
+
+/// The fixture is one ordinary consumer of the reusable native-client split.
+type FixtureClient = Client<WindowsClientStream>;
+
 fn main() -> ExitCode {
     ExitCode::from(run().code())
 }
 
 fn run() -> Stage {
-    let Ok(invitation) = BootstrapInvitation::read_from(&mut io::stdin()) else {
+    let Ok(invitation) = FixtureClient::read_invitation(&mut io::stdin()) else {
         return Stage::BootstrapUnreadable;
     };
-    let Some(mut session) = FixtureSession::connect(&invitation) else {
+    let Ok(stream) = WindowsClientStream::connect(&invitation) else {
         return Stage::EndpointUnavailable;
     };
-    if !session.authenticate(&invitation) {
+    let Ok(mut session) = FixtureClient::authenticate(stream, invitation) else {
         return Stage::AuthenticationRejected;
-    }
-    // The invitation has served its only purpose. Dropping it here zeroes the
-    // token well before this process waits on a person.
-    drop(invitation);
+    };
 
     if !has_exactly_its_machine_grants(&mut session) {
         return Stage::GrantsUnexpected;
@@ -75,8 +80,13 @@ fn run() -> Stage {
 /// `platform.capabilities`, which needs no grant of its own, so the fixture can
 /// verify the record's capability array reached the authenticated session
 /// without requesting a diagnostics grant it has no use for.
-fn has_exactly_its_machine_grants(session: &mut FixtureSession) -> bool {
-    let Some(result) = session.request("fixture-grants", "platform.capabilities", "{}") else {
+fn has_exactly_its_machine_grants(session: &mut FixtureClient) -> bool {
+    let Some(result) = request(
+        session,
+        "fixture-grants",
+        "platform.capabilities",
+        JsonValue::Object(Default::default()),
+    ) else {
         return false;
     };
     let Some(JsonValue::Array(granted)) = field(&result, "grantedCapabilities") else {
@@ -94,7 +104,7 @@ fn has_exactly_its_machine_grants(session: &mut FixtureSession) -> bool {
 ///
 /// The first accepted replacement is always revision `1`. Anything else means
 /// this session was not freshly created for this child.
-fn delivers_first_document(session: &mut FixtureSession) -> bool {
+fn delivers_first_document(session: &mut FixtureClient) -> bool {
     let payload = JsonValue::Object(
         [(
             "document".to_owned(),
@@ -102,10 +112,8 @@ fn delivers_first_document(session: &mut FixtureSession) -> bool {
         )]
         .into_iter()
         .collect(),
-    )
-    .to_json();
-    session
-        .request("fixture-document", "ui.document.replace", &payload)
+    );
+    request(session, "fixture-document", "ui.document.replace", payload)
         .and_then(|result| {
             field(&result, "revision")
                 .and_then(JsonValue::as_string)
@@ -121,9 +129,14 @@ fn delivers_first_document(session: &mut FixtureSession) -> bool {
 /// within a few tens of milliseconds while an open window costs far fewer idle
 /// round trips than a fixed interval would. Running out of schedule is the
 /// timeout.
-fn wait_for_fixture_action(session: &mut FixtureSession) -> Stage {
+fn wait_for_fixture_action(session: &mut FixtureClient) -> Stage {
     for interval in PollSchedule::new() {
-        let Some(result) = session.request("fixture-events", "ui.events.read", "{}") else {
+        let Some(result) = request(
+            session,
+            "fixture-events",
+            "ui.events.read",
+            JsonValue::Object(Default::default()),
+        ) else {
             return Stage::EventReadFailed;
         };
         if number(&result, "dropped") != Some(0) || number(&result, "discarded") != Some(0) {
@@ -150,15 +163,19 @@ fn is_fixture_action(event: &JsonValue) -> bool {
         && field(payload, "revision").and_then(JsonValue::as_string) == Some("1")
 }
 
-fn closes_session(session: &mut FixtureSession) -> bool {
-    session
-        .request("fixture-close", "session.close", "{}")
-        .and_then(|result| {
-            field(&result, "status")
-                .and_then(JsonValue::as_string)
-                .map(str::to_owned)
-        })
-        .as_deref()
+fn closes_session(session: &mut FixtureClient) -> bool {
+    request(
+        session,
+        "fixture-close",
+        "session.close",
+        JsonValue::Object(Default::default()),
+    )
+    .and_then(|result| {
+        field(&result, "status")
+            .and_then(JsonValue::as_string)
+            .map(str::to_owned)
+    })
+    .as_deref()
         == Some("accepted")
 }
 
@@ -166,11 +183,36 @@ fn number(value: &JsonValue, name: &str) -> Option<u16> {
     field(value, name).and_then(JsonValue::as_u16)
 }
 
+/// Sends one exact fixture request through the reusable serial conversation.
+///
+/// A client failure never becomes fixture output; each caller maps it to the
+/// stage that owns this fixed part of the product-session proof.
+fn request(
+    session: &mut FixtureClient,
+    request_id: &str,
+    operation: &str,
+    payload: JsonValue,
+) -> Option<JsonValue> {
+    session
+        .request(FIXTURE_PROTOCOL, request_id, operation, payload)
+        .ok()
+}
+
+/// Reads one field from a JSON object, or `None` for every other shape.
+fn field<'a>(value: &'a JsonValue, name: &str) -> Option<&'a JsonValue> {
+    value.as_object()?.get(name)
+}
+
 #[cfg(test)]
 mod tests {
     use anodrel_json::JsonValue;
 
-    use super::{is_fixture_action, number};
+    use super::{FIXTURE_PROTOCOL, is_fixture_action, number};
+
+    #[test]
+    fn the_requested_minor_covers_every_fixture_operation() {
+        assert_eq!(FIXTURE_PROTOCOL.minor(), 3);
+    }
 
     #[test]
     fn accepts_only_the_fixture_action_at_its_own_revision() {
