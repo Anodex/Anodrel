@@ -273,6 +273,9 @@ the first capability-checked authenticated UI document replacement path.
 `docs/UI_PREVIEW.md` defines the bounded Windows developer preview command.
 `docs/UI_SESSION_LAB.md` defines the authenticated native UI delivery smoke
 test.
+`docs/NATIVE_UI_TEMPLATE.md` defines the accepted development-native UI
+template boundary that will make a first typed executable project usable without
+opening a product launch path.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

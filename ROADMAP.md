@@ -341,7 +341,10 @@ Status: **First starter-package slice in progress**
   `platform.health` without Node.js. A separate compiled native UI diagnostic
   now proves document delivery, semantic input, and clean session close through
   a host-owned Windows window, still without Node.js or machine-trust setup.
-  This is not yet a stable public native SDK or executable template.
+  This is not yet a stable public native SDK or executable template. Decision
+  0082 now defines the next development-native UI template boundary: a typed
+  three-operation UI facade, a new-directory generator, and an explicit host
+  route with only document write, action read, and self-close grants.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

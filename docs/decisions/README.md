@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0082: Development native UI templates use a typed constrained client.
+
 - 0081: Native child clients reuse the private transport without a runtime.
 
 - 0080: Native session menus use bounded semantic commands.
