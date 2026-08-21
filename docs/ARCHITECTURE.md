@@ -274,9 +274,10 @@ Windows developer preview can render one bounded operator-selected document.
 `anodrel-ui-session` owns the revision-bound state behind one authenticated
 transport session's capability-checked 24 KiB document replacement operation;
 its single-slot latest-document mailbox can transfer a snapshot to another host
-thread without queueing or I/O, while its separate 32-candidate input mailbox
-keeps host-layout-derived actions bounded until the authenticated
-`ui.events.read` pull validates them. The development-only Windows UI Session
+thread without queueing or I/O, while its shared 32-candidate interaction
+mailbox keeps host-layout-derived document and menu actions in one bounded
+order until the authenticated `ui.events.read` pull revalidates them. The
+development-only Windows UI Session
 Lab consumes both supplied mailboxes in one host-created view. It renders an
 explicit v2 scroll tree with locally retained offsets driven only by native
 wheel and page input; those offsets never enter the protocol. It is not a

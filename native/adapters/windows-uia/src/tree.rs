@@ -392,7 +392,7 @@ fn utf16(value: &str) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use anodrel_ui::{ElementId, UiEvent, UiRect};
-    use anodrel_ui_session::{UiDocumentSession, UiInputMailbox};
+    use anodrel_ui_session::{SessionInteractionCandidate, UiDocumentSession, UiInputMailbox};
     use anodrel_windows_accessibility::{AccessibleElement, ClientOrigin, accessible_elements};
 
     use super::{ROOT_AUTOMATION_ID, Tree, direction};
@@ -748,11 +748,12 @@ mod tests {
         assert_eq!(batch.dropped(), 0);
         let candidates = batch.into_candidates();
         assert_eq!(candidates.len(), 1);
-        let (candidate_revision, event) = candidates
-            .into_iter()
-            .next()
-            .expect("one candidate")
-            .into_parts();
+        let SessionInteractionCandidate::Ui(candidate) =
+            candidates.into_iter().next().expect("one candidate")
+        else {
+            panic!("the invocation must produce a document candidate");
+        };
+        let (candidate_revision, event) = candidate.into_parts();
         assert_eq!(candidate_revision, revision);
         assert_eq!(
             event,

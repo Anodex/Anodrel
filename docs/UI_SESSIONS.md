@@ -94,23 +94,28 @@ launch path. See `docs/UI_SESSION_LAB.md` and Decision 0058.
 
 ## Semantic input delivery
 
-`UiInputMailbox` is a separate per-session queue of at most 32 raw semantic
-input candidates. The native view can add only a revision and an
-`ActionInvoked` element ID that it derived from its own current layout. On
-Windows, an enabled UI Automation button may offer that exact same candidate
-through its bounded Invoke pattern (Decision 0069). It cannot name a different
-session, attach data, run a command, or make an operating-system call.
+`UiInputMailbox` is one shared per-session queue of at most 32 raw semantic
+interaction candidates. A document producer can add only the document revision
+and an `ActionInvoked` element ID that it derived from its own current layout.
+On Windows, an enabled UI Automation button may offer that exact same candidate
+through its bounded Invoke pattern (Decision 0069). A future native menu
+producer can add only its current menu revision and a host-mapped semantic
+action ID. The queue preserves insertion order across both kinds and has no
+window target, native command identifier, data payload, callback, or operating
+system call.
 
 `ui.events.read` drains that queue through the authenticated transport. The
-core reuses `UiDocumentSession::accept_event` to reject stale, removed, or
-disabled actions before returning a typed `ui.action.invoked` protocol event.
-The queue drops newer candidates when full and records the count; a read also
-reports candidates rejected during revision validation. This is a bounded pull
-delivery path, not an event subscription, callback, or background queue.
+core revalidates document candidates through `UiDocumentSession::accept_event`
+and menu candidates through `MenuSession::accept_action`. It returns a typed
+`ui.action.invoked` or `menu.action.invoked` event only after the matching
+current revision and enabled action are confirmed. The queue drops newer
+candidates when full and records the count; a read also reports candidates
+rejected during revision validation. This is a bounded pull delivery path, not
+an event subscription, callback, or background queue.
 
 ## Verification
 
 The crate tests successful replacement, deterministic revisions, failed-update
 state preservation, clear behavior, stale events, removed actions, disabled
-actions, and semantic event identity. It depends only on Anodrel UI crates and
-the Rust standard library.
+actions, semantic event identity, and ordered document/menu queue admission.
+It depends only on Anodrel UI/menu crates and the Rust standard library.

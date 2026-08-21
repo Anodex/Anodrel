@@ -5,35 +5,12 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use anodrel_ui::UiEvent;
-
-use crate::UiDocumentRevision;
+use crate::SessionInteractionCandidate;
 
 /// The fixed maximum number of pending semantic input candidates per session.
 pub const UI_INPUT_QUEUE_CAPACITY: usize = 32;
 
-/// One native-layout-derived semantic input candidate awaiting session validation.
-#[derive(Clone, Debug)]
-pub struct UiInputCandidate {
-    revision: UiDocumentRevision,
-    event: UiEvent,
-}
-
-impl UiInputCandidate {
-    /// Builds one candidate from the revision used by a host layout and event.
-    #[must_use]
-    pub const fn new(revision: UiDocumentRevision, event: UiEvent) -> Self {
-        Self { revision, event }
-    }
-
-    /// Splits this candidate into its revision and semantic event.
-    #[must_use]
-    pub fn into_parts(self) -> (UiDocumentRevision, UiEvent) {
-        (self.revision, self.event)
-    }
-}
-
-/// A bounded per-session queue of native semantic input candidates.
+/// A bounded per-session queue of native semantic interaction candidates.
 ///
 /// New candidates are dropped when the fixed queue is full. A consumer receives
 /// the exact drop count while draining the queue, so input loss is never silent.
@@ -44,7 +21,7 @@ pub struct UiInputMailbox {
 
 #[derive(Debug, Default)]
 struct UiInputMailboxState {
-    pending: VecDeque<UiInputCandidate>,
+    pending: VecDeque<SessionInteractionCandidate>,
     dropped: u32,
 }
 
@@ -62,7 +39,8 @@ impl UiInputMailbox {
     /// best-effort delivery can keep using [`push`](Self::push); a boundary
     /// that has to acknowledge an action to another API can use this result
     /// without inspecting the queue or its other contents.
-    pub fn try_push(&self, candidate: UiInputCandidate) -> bool {
+    pub fn try_push(&self, candidate: impl Into<SessionInteractionCandidate>) -> bool {
+        let candidate = candidate.into();
         let state = &mut *lock(&self.state);
         if state.pending.len() == UI_INPUT_QUEUE_CAPACITY {
             state.dropped = state.dropped.saturating_add(1);
@@ -77,7 +55,7 @@ impl UiInputMailbox {
     ///
     /// This is the best-effort form used by local native input. The dropped
     /// count remains available to the granted consumer on the next drain.
-    pub fn push(&self, candidate: UiInputCandidate) {
+    pub fn push(&self, candidate: impl Into<SessionInteractionCandidate>) {
         let _ = self.try_push(candidate);
     }
 
@@ -98,14 +76,14 @@ impl UiInputMailbox {
 /// One bounded batch taken from a [`UiInputMailbox`].
 #[derive(Debug)]
 pub struct UiInputBatch {
-    candidates: Vec<UiInputCandidate>,
+    candidates: Vec<SessionInteractionCandidate>,
     dropped: u32,
 }
 
 impl UiInputBatch {
     /// Returns candidates in their original native input order.
     #[must_use]
-    pub fn into_candidates(self) -> Vec<UiInputCandidate> {
+    pub fn into_candidates(self) -> Vec<SessionInteractionCandidate> {
         self.candidates
     }
 
@@ -124,10 +102,13 @@ fn lock(value: &Mutex<UiInputMailboxState>) -> MutexGuard<'_, UiInputMailboxStat
 
 #[cfg(test)]
 mod tests {
+    use anodrel_menu::{MenuActionId, MenuRevision};
     use anodrel_ui::{ElementId, UiEvent};
 
-    use super::{UI_INPUT_QUEUE_CAPACITY, UiInputCandidate, UiInputMailbox};
-    use crate::UiDocumentRevision;
+    use super::{UI_INPUT_QUEUE_CAPACITY, UiInputMailbox};
+    use crate::{
+        MenuInputCandidate, SessionInteractionCandidate, UiDocumentRevision, UiInputCandidate,
+    };
 
     fn candidate() -> UiInputCandidate {
         UiInputCandidate::new(
@@ -149,5 +130,41 @@ mod tests {
         let batch = mailbox.drain();
         assert_eq!(batch.dropped(), 1);
         assert_eq!(batch.into_candidates().len(), UI_INPUT_QUEUE_CAPACITY);
+    }
+
+    #[test]
+    fn preserves_document_and_menu_candidates_in_one_ordered_queue() {
+        let mailbox = UiInputMailbox::new();
+        let document_revision = UiDocumentRevision::INITIAL
+            .next()
+            .expect("the first document revision exists");
+        let menu_revision = MenuRevision::INITIAL
+            .next()
+            .expect("the first menu revision exists");
+        mailbox.push(UiInputCandidate::new(
+            document_revision,
+            UiEvent::ActionInvoked(ElementId::new("document.action").expect("test ID is valid")),
+        ));
+        mailbox.push(MenuInputCandidate::new(
+            menu_revision,
+            MenuActionId::new("menu.action").expect("test ID is valid"),
+        ));
+
+        let candidates = mailbox.drain().into_candidates();
+        assert_eq!(candidates.len(), 2);
+        let SessionInteractionCandidate::Ui(document) = &candidates[0] else {
+            panic!("the first candidate is a document action");
+        };
+        assert_eq!(
+            document.clone().into_parts().0,
+            document_revision,
+            "document action order changed"
+        );
+        let SessionInteractionCandidate::Menu(menu) = &candidates[1] else {
+            panic!("the second candidate is a menu action");
+        };
+        let (revision, action) = menu.clone().into_parts();
+        assert_eq!(revision, menu_revision);
+        assert_eq!(action.as_str(), "menu.action");
     }
 }

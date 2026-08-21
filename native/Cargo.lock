@@ -200,6 +200,7 @@ dependencies = [
 name = "anodrel-ui-session"
 version = "0.1.0"
 dependencies = [
+ "anodrel-menu",
  "anodrel-ui",
  "anodrel-ui-document",
 ]

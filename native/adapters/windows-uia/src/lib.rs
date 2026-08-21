@@ -951,7 +951,7 @@ mod tests {
     use std::{ffi::c_void, ptr, sync::Arc};
 
     use anodrel_ui::UiRect;
-    use anodrel_ui_session::{UiDocumentSession, UiInputMailbox};
+    use anodrel_ui_session::{SessionInteractionCandidate, UiDocumentSession, UiInputMailbox};
     use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
 
     use super::{
@@ -1291,11 +1291,12 @@ mod tests {
         assert_eq!(batch.dropped(), 0);
         let candidates = batch.into_candidates();
         assert_eq!(candidates.len(), 1);
-        let (candidate_revision, event) = candidates
-            .into_iter()
-            .next()
-            .expect("one action")
-            .into_parts();
+        let SessionInteractionCandidate::Ui(candidate) =
+            candidates.into_iter().next().expect("one action")
+        else {
+            panic!("Invoke must produce a document candidate");
+        };
+        let (candidate_revision, event) = candidate.into_parts();
         assert_eq!(candidate_revision, revision);
         assert_eq!(
             event,

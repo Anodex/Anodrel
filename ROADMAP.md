@@ -156,9 +156,10 @@ Status: **Direct Windows host in progress**
    0080 and `docs/MENUS.md` define a separate `menu.write` grant, a complete
    model, and delivery through the existing revision-checked interaction path.
    **Completed:** portable model and revision state, Protocol 1.18 core
-   boundary, installed-record 1.8 grant, SDK, mock host, and contract tests.
-   **Pending:** the shared interaction mailbox refactor, UI-thread bridge,
-   direct Windows adapter, development diagnostic, and manual verification.
+   boundary, installed-record 1.8 grant, SDK, mock host, contract tests, and
+   the shared interaction mailbox refactor.
+   **Pending:** the UI-thread bridge, direct Windows adapter, development
+   diagnostic, and manual verification.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

@@ -401,7 +401,9 @@ mod tests {
     use anodrel_file_dialog::FileDialogMailbox;
     use anodrel_notifications::NotificationMailbox;
     use anodrel_ui::UiEvent;
-    use anodrel_ui_session::{UiDocumentMailbox, UiDocumentSession, UiInputMailbox};
+    use anodrel_ui_session::{
+        SessionInteractionCandidate, UiDocumentMailbox, UiDocumentSession, UiInputMailbox,
+    };
     use anodrel_windows_file_access::WindowsFileTextService;
 
     use super::{UiSessionView, WindowState, WindowStateMailbox, WindowTitleMailbox};
@@ -717,11 +719,14 @@ mod tests {
         assert_eq!(batch.dropped(), 0);
         let candidates = batch.into_candidates();
         assert_eq!(candidates.len(), 1);
-        let (revision, UiEvent::ActionInvoked(action)) = candidates
+        let SessionInteractionCandidate::Ui(candidate) = candidates
             .into_iter()
             .next()
             .expect("one action candidate exists")
-            .into_parts();
+        else {
+            panic!("native focus activation must produce a document candidate");
+        };
+        let (revision, UiEvent::ActionInvoked(action)) = candidate.into_parts();
         assert_eq!(revision.value(), 1);
         assert_eq!(action.as_str(), "session.action");
     }

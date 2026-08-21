@@ -1,8 +1,9 @@
 # Native session menus
 
 **Status:** Portable model, Protocol 1.18 core, installed-record grant, SDK,
-mock host, and contract tests are implemented. The Windows UI-thread bridge,
-native adapter, activation delivery, and manual verification are pending.
+mock host, contract tests, and shared ordered interaction delivery are
+implemented. The Windows UI-thread bridge, native adapter, and manual
+verification are pending.
 
 Anodrel's first menu surface will be a host-owned Windows menu bar for one
 authenticated application session. It is a bounded way for an application to
@@ -56,8 +57,8 @@ When a person chooses a current enabled command, the host offers one bounded,
 revision-bound candidate to the same ordered per-session interaction mailbox
 used by authenticated document actions. Protocol `ui.events.read` remains the
 only application delivery route and still requires its existing
-`ui.events.read` grant. Protocol 1.18 reserves this event shape for the
-pending direct Windows adapter:
+`ui.events.read` grant. Protocol 1.18 implements this event shape; the pending
+direct Windows adapter is its only remaining producer:
 
 ~~~json
 {

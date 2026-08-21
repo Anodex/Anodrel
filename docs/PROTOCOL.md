@@ -313,11 +313,13 @@ invalid, and a v2 document passed to `ui.document.replace` is invalid.
 
 ### `ui.events.read`
 
-This operation takes up to **32** queued semantic input candidates from the
-already authenticated session. It requires the host-issued `ui.events.read`
-capability. Before returning a candidate, the host validates its document
-revision and enabled action identity against the current session document. A
-stale, removed, disabled, or missing action is never delivered.
+This operation takes up to **32** queued semantic interaction candidates from
+the already authenticated session. It requires the host-issued `ui.events.read`
+capability. Before returning a document candidate, the host validates its
+document revision and enabled action identity against the current session
+document. Before returning a menu candidate, it validates the menu revision and
+enabled semantic action against the current complete menu. A stale, removed,
+disabled, or missing action is never delivered.
 
 The result is `{ "events": array, "dropped": number, "discarded": number }`.
 `events` contains at most 32 typed event envelopes in input order. `dropped`
@@ -327,9 +329,12 @@ but rejected as stale or unavailable during validation. Both are nonnegative
 safe integers. A caller that observes either nonzero value must treat its UI
 state as potentially out of date and may replace the document again.
 
-Version 1.2 defines the one event envelope below. It is carried in the read
-result because Wire 1.0 has request/response framing; it is not an unsolicited
-pipe write.
+Version 1.2 defines the document event envelope below. Protocol 1.18 also
+defines `menu.action.invoked` with `source: "native.menu"`,
+`schemaVersion: { "major": 1, "minor": 18 }`, and exactly
+`{ "menuRevision": string, "action": string }` as its payload. Both are
+carried in the read result because Wire 1.0 has request/response framing; they
+are not unsolicited pipe writes.
 
 ~~~json
 {

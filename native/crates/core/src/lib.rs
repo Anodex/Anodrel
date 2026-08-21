@@ -44,8 +44,8 @@ use anodrel_protocol::{
 };
 use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
 use anodrel_ui_session::{
-    UiDocumentSession, UiDocumentSnapshot, UiFieldReadError, UiFieldReader, UiFieldSnapshot,
-    UiInputMailbox,
+    SessionInteractionCandidate, UiDocumentSession, UiDocumentSnapshot, UiFieldReadError,
+    UiFieldReader, UiFieldSnapshot, UiInputMailbox,
 };
 use anodrel_window::{
     WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
@@ -63,6 +63,10 @@ pub const MAX_FILE_TEXT_WRITE_BYTES: usize = 8 * 1024;
 /// Maximum encoded JSON bytes in one complete native-menu replacement payload.
 pub const MAX_MENU_REPLACE_REQUEST_BYTES: usize = 16 * 1024;
 pub const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES: usize = 24 * 1024;
+const MENU_ACTION_EVENT_SCHEMA_VERSION: ProtocolVersion = ProtocolVersion {
+    major: 1,
+    minor: 18,
+};
 
 /// One host-created, coalescing request to end an authenticated session.
 ///
@@ -1146,14 +1150,25 @@ impl CoreHost {
         let mut discarded = 0_u32;
         let mut events = Vec::new();
         for candidate in batch.into_candidates() {
-            let (revision, event) = candidate.into_parts();
-            match self
-                .ui_document_session
-                .borrow()
-                .accept_event(revision, event)
-            {
-                Ok(event) => events.push(ui_action_event(event)),
-                Err(_) => discarded = discarded.saturating_add(1),
+            match candidate {
+                SessionInteractionCandidate::Ui(candidate) => {
+                    let (revision, event) = candidate.into_parts();
+                    match self
+                        .ui_document_session
+                        .borrow()
+                        .accept_event(revision, event)
+                    {
+                        Ok(event) => events.push(ui_action_event(event)),
+                        Err(_) => discarded = discarded.saturating_add(1),
+                    }
+                }
+                SessionInteractionCandidate::Menu(candidate) => {
+                    let (revision, action) = candidate.into_parts();
+                    match self.menu_session.borrow().accept_action(revision, action) {
+                        Ok(event) => events.push(menu_action_event(event)),
+                        Err(_) => discarded = discarded.saturating_add(1),
+                    }
+                }
             }
         }
         ResponseEnvelope::success(
@@ -2086,6 +2101,32 @@ fn ui_action_event(event: anodrel_ui_session::UiApplicationEvent) -> JsonValue {
     ])
 }
 
+fn menu_action_event(event: anodrel_menu::MenuActionEvent) -> JsonValue {
+    object([
+        ("protocolVersion", ProtocolVersion::CURRENT.to_json()),
+        ("kind", JsonValue::String("event".to_owned())),
+        (
+            "eventName",
+            JsonValue::String("menu.action.invoked".to_owned()),
+        ),
+        ("source", JsonValue::String("native.menu".to_owned())),
+        ("schemaVersion", MENU_ACTION_EVENT_SCHEMA_VERSION.to_json()),
+        (
+            "payload",
+            object([
+                (
+                    "menuRevision",
+                    JsonValue::String(event.revision().value().to_string()),
+                ),
+                (
+                    "action",
+                    JsonValue::String(event.action().as_str().to_owned()),
+                ),
+            ]),
+        ),
+    ])
+}
+
 fn ui_document_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -2332,7 +2373,7 @@ mod tests {
     use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
-    use anodrel_ui_session::UiInputCandidate;
+    use anodrel_ui_session::{MenuInputCandidate, UiInputCandidate};
     use anodrel_window::{
         WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
         WindowTitleService, WindowTitleServiceError,
@@ -3897,6 +3938,107 @@ mod tests {
         ));
         mailbox.push(UiInputCandidate::new(current, action));
         let stale = JsonValue::parse(&host.handle_json(&request_v1_2("ui.events.read", "{}")))
+            .expect("stale event response is JSON");
+        let JsonValue::Array(events) = field(field(&stale, "result"), "events") else {
+            panic!("events is an array");
+        };
+        assert!(events.is_empty());
+        assert_eq!(
+            field(field(&stale, "result"), "discarded"),
+            &JsonValue::Number("1".to_owned())
+        );
+    }
+
+    #[test]
+    fn menu_and_document_actions_share_ordered_revision_checked_delivery() {
+        let mailbox = UiInputMailbox::new();
+        let host = CoreHost::with_session_components_and_service_bundle(
+            HostPolicy::new(
+                "test.application",
+                vec![
+                    Capability::UiDocumentWrite,
+                    Capability::UiEventsRead,
+                    Capability::MenuWrite,
+                ],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            mailbox.clone(),
+            SessionCloseSignal::default(),
+            HostServices::unavailable().with_menu(RecordingMenu::default()),
+        );
+        let document = valid_ui_document("Continue");
+        let document_response = JsonValue::parse(&host.handle_json(&request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(&document),
+        )))
+        .expect("document response is JSON");
+        assert_eq!(
+            field(field(&document_response, "result"), "revision").as_string(),
+            Some("1")
+        );
+        let document_revision = host
+            .take_ui_document_update()
+            .expect("accepted document is available")
+            .revision();
+
+        let menu_payload = r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":true}]}]}"#;
+        let menu_response =
+            JsonValue::parse(&host.handle_json(&request_v1_18("menu.replace", menu_payload)))
+                .expect("menu response is JSON");
+        assert_eq!(
+            field(field(&menu_response, "result"), "revision").as_string(),
+            Some("1")
+        );
+        let menu_revision = anodrel_menu::MenuRevision::INITIAL
+            .next()
+            .expect("first menu revision exists");
+        let menu_action =
+            anodrel_menu::MenuActionId::new("document.new").expect("test menu action is valid");
+
+        mailbox.push(UiInputCandidate::new(
+            document_revision,
+            UiEvent::ActionInvoked(ElementId::new("root").expect("test ID is valid")),
+        ));
+        mailbox.push(MenuInputCandidate::new(menu_revision, menu_action.clone()));
+        let read = JsonValue::parse(&host.handle_json(&request_v1_18("ui.events.read", "{}")))
+            .expect("event response is JSON");
+        let result = field(&read, "result");
+        assert_eq!(field(result, "dropped"), &JsonValue::Number("0".to_owned()));
+        assert_eq!(
+            field(result, "discarded"),
+            &JsonValue::Number("0".to_owned())
+        );
+        let JsonValue::Array(events) = field(result, "events") else {
+            panic!("events is an array");
+        };
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            field(&events[0], "eventName").as_string(),
+            Some("ui.action.invoked")
+        );
+        assert_eq!(
+            field(&events[1], "eventName").as_string(),
+            Some("menu.action.invoked")
+        );
+        assert_eq!(field(&events[1], "source").as_string(), Some("native.menu"));
+        assert_eq!(
+            field(field(&events[1], "schemaVersion"), "minor"),
+            &JsonValue::Number("18".to_owned())
+        );
+        assert_eq!(
+            field(field(&events[1], "payload"), "menuRevision").as_string(),
+            Some("1")
+        );
+        assert_eq!(
+            field(field(&events[1], "payload"), "action").as_string(),
+            Some("document.new")
+        );
+
+        let disabled = r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":false}]}]}"#;
+        let _ = host.handle_json(&request_v1_18("menu.replace", disabled));
+        mailbox.push(MenuInputCandidate::new(menu_revision, menu_action));
+        let stale = JsonValue::parse(&host.handle_json(&request_v1_18("ui.events.read", "{}")))
             .expect("stale event response is JSON");
         let JsonValue::Array(events) = field(field(&stale, "result"), "events") else {
             panic!("events is an array");

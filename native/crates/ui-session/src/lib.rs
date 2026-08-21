@@ -4,7 +4,8 @@
 //! its monotonic revision, and validates semantic actions against that revision.
 //! It has no application identity, transport, renderer, native host, package,
 //! callback, protocol operation, or operating-system authority. Its bounded
-//! input mailbox stores only native-layout-derived semantic candidates.
+//! input mailbox stores only host-derived document and native-menu semantic
+//! candidates in one ordered bounded queue.
 //!
 //! See `docs/UI_SESSIONS.md` and Decision 0030 for the complete contract.
 
@@ -16,6 +17,7 @@ mod event;
 mod field_mailbox;
 mod fields;
 mod input_mailbox;
+mod interaction;
 mod mailbox;
 mod revision;
 mod session;
@@ -28,7 +30,8 @@ pub use fields::{
     MAX_SNAPSHOT_FIELDS, UiFieldReadError, UiFieldReader, UiFieldSnapshot, UiFieldSnapshotError,
     UiFieldValue,
 };
-pub use input_mailbox::{UI_INPUT_QUEUE_CAPACITY, UiInputBatch, UiInputCandidate, UiInputMailbox};
+pub use input_mailbox::{UI_INPUT_QUEUE_CAPACITY, UiInputBatch, UiInputMailbox};
+pub use interaction::{MenuInputCandidate, SessionInteractionCandidate, UiInputCandidate};
 pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;
 pub use session::UiDocumentSession;
