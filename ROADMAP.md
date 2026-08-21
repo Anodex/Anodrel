@@ -112,9 +112,11 @@ Status: **Direct Windows host in progress**
   technology is present. Both reading-provider slices are built: the window answers
   `WM_GETOBJECT` as a fragment root, and its published elements answer
   `IRawElementProviderFragment` with navigation, runtime identifiers, bounding
-  rectangles, and hit testing. **UI Automation reading is verified:**
-  Narrator reads an Anodrel surface aloud on Windows 11, and an Inspect
-  cross-check of every published property passes with no failures. Reading is
+  rectangles, and hit testing. **The earlier flat UI Automation reading slice
+  is verified:** Narrator reads an Anodrel surface aloud on Windows 11, and an
+  Inspect cross-check of each then-published property passed with no failures.
+  The new hierarchical tree has focused automated coverage and awaits its own
+  manual screen-reader and client check. Reading is
   joined by one bounded action: an enabled button in an authenticated UI session
   exposes `IInvokeProvider`, which queues the same revision-bound semantic
   event as local pointer and keyboard activation (Decision 0069). It has no
@@ -133,8 +135,11 @@ Status: **Direct Windows host in progress**
   events stay absent (Decision 0071). Unit and host checks cover all four
   routes; manual screen-reader activation, focus control and event, and
   field-value verification remain open. Invoke/property/value/text/structure/
-  selection events, live announcements, text patterns and ranges, hierarchical
-  grouping, and non-Windows adapters stay deferred. See
+  selection events, live announcements, text patterns and ranges, labelled-by
+  or described-by relations, and non-Windows adapters stay deferred. The
+  published tree now preserves direct visible parentage, including groups, with
+  immutable parent/child/sibling navigation (Decision 0075); its manual
+  screen-reader and client hierarchy check remains open. See
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`, and
   `docs/UI_AUTOMATION_EVENTS.md`.
 - Establish repeatable native performance measurements. **Completed for the

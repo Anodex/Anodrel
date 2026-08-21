@@ -1,11 +1,12 @@
 # Anodrel Windows accessibility
 
-**Status:** **UI Automation reading is implemented and verified; bounded button
-invocation, focus reporting and control, focus-change events, and read-only
-field values are implemented and awaiting manual screen-reader checks.**
+**Status:** **UI Automation reading is implemented. Narrator and Inspect
+verified the earlier flat semantic surface; manual hierarchy verification, plus
+the existing button invocation, focus, focus-event, and field-value
+screen-reader checks, remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
-mapping table below passes with no failures.
+pre-hierarchy mapping table passed with no failures.
 
 Reading, one bounded action, focus reporting and control, one host-raised
 focus-change event, and read-only field values are the implemented surface.
@@ -14,15 +15,16 @@ value, invoke an enabled button in an authenticated UI session, and move to a
 visible enabled field or button through the host's existing focus state. An
 application cannot edit a field through automation, raise or receive an
 automation event, receive a live announcement, or observe focus. The published
-tree is flat. Anything beyond these routes is deferred and listed at the end of
-this document.
+tree preserves the document's direct visible parent/child structure. Anything
+beyond these routes is deferred and listed at the end of this document.
 
 ## Boundary
 
 Anodrel already derives a bounded, source-ordered accessibility snapshot from a
 validated `UiDocument` and one concrete `UiLayout` (Decision 0026). Each visible
 node carries an element ID, a role, an optional plain-text name, clipped logical
-bounds, and an enabled flag. That snapshot is portable data and performs no
+bounds, an enabled flag, and its direct visible parent's earlier source-order
+index when it has one. That snapshot is portable data and performs no
 operating-system call.
 
 This document defines the layer directly above it: the Windows adapter that
@@ -98,6 +100,29 @@ through the read-only Value pattern defined below. The value is copied from the
 host's field state for this provider snapshot; it is not the document's initial
 value, an application read, or a typing event. See `docs/UI_FIELDS.md` and
 Decision 0071.
+
+### Tree structure
+
+The snapshot is a preorder walk: a node's optional parent index always names
+its direct, earlier visible ancestor. The Windows adapter preserves every mapped
+node, including `Group`, and the provider derives immutable direct parent and
+child lists from those indices. `Parent`, `FirstChild`, `LastChild`,
+`NextSibling`, and `PreviousSibling` therefore describe the rendered document's
+actual visible hierarchy; top-level snapshot nodes belong to the host-owned
+window root.
+
+Groups are structural only. They are not keyboard focusable and expose no
+action, value, or additional pattern. An unnamed group remains unnamed because
+the portable document model has no group-label field. Hit testing returns the
+deepest mapped element containing a point; overlapping siblings follow source
+paint order, with the later sibling winning.
+
+The structure is an immutable provider snapshot. It adds no arbitrary relation,
+live view lookup, structure event, application callback, document field,
+protocol operation, capability, or way for an application to inspect assistive
+technology. A fresh UI Automation query can see a replacement document's new
+snapshot; an older provider never changes underneath a client. Decision 0075
+defines this boundary.
 
 | UIA property | Source |
 | --- | --- |
@@ -267,14 +292,17 @@ static text, disabled elements, clipped elements, stale session providers, and
 unavailable views fail. `GetFocus` remains a snapshot lookup rather than a live
 view query.
 
-The published tree is **flat**, and groups are filtered out of it. A container
-whose children sit beside it rather than inside it would be announced as an
-empty thing to step through, which is worse than not publishing it. Hierarchy,
-and with it meaningful grouping, is deferred.
+The published tree preserves direct visible parentage, including `Group`
+containers. Fragment navigation reports direct parents, children, and siblings
+from that immutable snapshot; it never consults a mutable view or registry.
+Groups remain non-focusable and pattern-free. The existing reading checks prove
+the former flat surface; the manual hierarchy check below remains required for
+this newly structural tree.
 
-**Slice 3 — verification. Done.** Narrator announces the surface's elements with
-their names and roles, and every published property has been cross-checked
-against the table above. See below.
+**Slice 3 — reading verification. Partly complete.** Narrator announced the
+earlier flat surface's elements with their names and roles, and each then-
+published property was cross-checked against the table. The new hierarchy has
+its own manual check below and is not inferred from that result.
 
 **Slice 4 — bounded button invocation. Implemented; manual activation check
 pending.** An enabled authenticated-session button exposes `IInvokeProvider`. Its
@@ -310,8 +338,8 @@ other event kind remain absent.
 
 Also deferred, each needing its own contract and decision: Invoke,
 property/value/text/structure/selection events, live announcements, selection
-and caret reporting, text patterns and ranges, relations between nodes,
-automation editing, and non-Windows accessibility adapters.
+and caret reporting, text patterns and ranges, labelled-by or described-by
+relations, automation editing, and non-Windows accessibility adapters.
 
 ## Verification
 
@@ -321,6 +349,9 @@ scales and origins, an empty rectangle staying empty, and runtime-ID shape and
 uniqueness within a snapshot.
 
 The mapping is pure, so those tests need no window and no assistive technology.
+Hierarchy tests also prove preorder parentage, direct child and sibling
+navigation, top-level root ownership, group pattern/focus refusal, and deepest
+hit testing without COM or a native window.
 
 Provider tests cover the COM object without Windows: the interfaces it answers
 and the ones it refuses, a refused query clearing its output, every method
@@ -335,17 +366,17 @@ expired, busy, unknown, or late-completing route without changing host focus.
 The event adapter separately proves that an empty publication has no event
 source and that a focus event names the currently published focused child.
 
-### Confirmed against real UI Automation
+### Confirmed against real UI Automation before hierarchy
 
-Both slices have been queried by a real UI Automation client —
+The original flat slices were queried by a real UI Automation client —
 `UIAutomationClient` driving `FindFirst` and `FindAll` against a running
 `--ui-lab` window. The window reports `AutomationId = anodrel.surface`, which
 Windows' default window provider leaves empty, so the host's own provider was
 accepted, `QueryInterface` succeeded, and `GetPropertyValue` returned a
 correctly read `BSTR`.
 
-Walking its children returns all eleven published elements with their control
-types, names, automation IDs, enabled and focusable state, and screen
+Walking its children returned all eleven then-published elements with their
+control types, names, automation IDs, enabled and focusable state, and screen
 rectangles:
 
 ~~~text
@@ -371,8 +402,12 @@ something different on each side of the boundary.
 **No automated result substitutes for this.** The question is whether a screen
 reader announces something a person can act on, and only listening answers it.
 
-This has been run and **passed** on Windows 11: Narrator announced each element
-with its name and role. It also earned its keep — see the note after step 7.
+This was run and **passed** on Windows 11 for the pre-hierarchy provider:
+Narrator announced each flat-surface element with its name and role. It also
+earned its keep — see the note after step 7.
+
+The hierarchy-specific check below is still pending; passing the earlier flat
+reading check does not prove grouping is announced or navigated correctly.
 
 To repeat the reading check:
 
@@ -403,10 +438,24 @@ way to separate a provider fault from a Narrator one is to walk the control view
 with `TreeWalker::ControlViewWalker` from a UI Automation client — that is the
 same view Narrator navigates, and it needs no screen reader.
 
-### Inspect cross-check
+### Manual hierarchy verification
 
-Run with the Windows SDK's **Inspect** tool open on a `--ui-lab` window, every
-published element was checked against the mapping table. All eleven passed with
+Run a nested `--ui-lab` document after this slice is available. In Inspect or
+Accessibility Insights, expand the host window and confirm that a visible
+`Group` contains only its direct document children, nested groups contain their
+own children, and a child reports that exact group as `Parent`. Walk with
+Narrator's item navigation and confirm it enters and leaves those groups without
+skipping their children. At a point inside a child, Inspect's highlight and
+`AutomationElement.FromPoint` must choose the child rather than its containing
+group.
+
+This check is **pending**. It validates real client tree navigation and spoken
+grouping; unit tests cannot establish either.
+
+### Inspect cross-check before hierarchy
+
+Before hierarchy, the Windows SDK's **Inspect** tool checked every then-
+published `--ui-lab` element against the mapping table. All eleven passed with
 no failures:
 
 - control types are only `Text` and `Button`, matching their roles;

@@ -25,6 +25,7 @@ pub enum UiAccessibilityRole {
 #[derive(Clone, Debug, PartialEq)]
 pub struct UiAccessibilityNode {
     id: ElementId,
+    parent_index: Option<usize>,
     role: UiAccessibilityRole,
     name: Option<String>,
     bounds: UiRect,
@@ -36,6 +37,16 @@ impl UiAccessibilityNode {
     #[must_use]
     pub fn id(&self) -> &ElementId {
         &self.id
+    }
+
+    /// Returns this node's direct visible parent's source-order index.
+    ///
+    /// `None` means this node belongs directly to the host-owned accessibility
+    /// root. Every parent index is earlier than this node because snapshots are
+    /// emitted as a preorder walk of the validated document.
+    #[must_use]
+    pub const fn parent_index(&self) -> Option<usize> {
+        self.parent_index
     }
 
     /// Returns the node's semantic role.
@@ -66,7 +77,11 @@ impl UiAccessibilityNode {
     }
 }
 
-/// A source-ordered snapshot of the visible UI accessibility semantics.
+/// A source-ordered preorder snapshot of the visible UI accessibility semantics.
+///
+/// Each node carries its direct visible parent's earlier source-order index, so
+/// an operating-system adapter can preserve the document's declared hierarchy
+/// without inspecting pixels or a mutable host view.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UiAccessibilitySnapshot {
     nodes: Vec<UiAccessibilityNode>,
@@ -94,13 +109,14 @@ impl UiDocument {
             .map(|item| (item.id().clone(), item.bounds()))
             .collect::<BTreeMap<_, _>>();
         let mut snapshot = UiAccessibilitySnapshot::default();
-        collect_node(self.root(), &visible_bounds, &mut snapshot.nodes);
+        collect_node(self.root(), None, &visible_bounds, &mut snapshot.nodes);
         snapshot
     }
 }
 
 fn collect_node(
     node: &UiNode,
+    parent_index: Option<usize>,
     visible_bounds: &BTreeMap<ElementId, UiRect>,
     output: &mut Vec<UiAccessibilityNode>,
 ) {
@@ -108,8 +124,10 @@ fn collect_node(
         return;
     };
     let (role, name, enabled) = semantic_fields(node);
+    let index = output.len();
     output.push(UiAccessibilityNode {
         id: node.id().clone(),
+        parent_index,
         role,
         name,
         bounds,
@@ -118,10 +136,12 @@ fn collect_node(
     match node {
         UiNode::Stack(stack) => {
             for child in stack.children() {
-                collect_node(child, visible_bounds, output);
+                collect_node(child, Some(index), visible_bounds, output);
             }
         }
-        UiNode::Scroll(scroll) => collect_node(scroll.child(), visible_bounds, output),
+        UiNode::Scroll(scroll) => {
+            collect_node(scroll.child(), Some(index), visible_bounds, output);
+        }
         UiNode::Text(_) | UiNode::Action(_) | UiNode::Field(_) => {}
     }
 }
@@ -211,13 +231,16 @@ mod tests {
 
         assert_eq!(snapshot.nodes().len(), 3);
         assert_eq!(snapshot.nodes()[0].role(), UiAccessibilityRole::Group);
+        assert_eq!(snapshot.nodes()[0].parent_index(), None);
         assert_eq!(snapshot.nodes()[0].name(), None);
         assert_eq!(snapshot.nodes()[1].id().as_str(), "welcome");
+        assert_eq!(snapshot.nodes()[1].parent_index(), Some(0));
         assert_eq!(snapshot.nodes()[1].role(), UiAccessibilityRole::StaticText);
         assert_eq!(snapshot.nodes()[1].name(), Some("Welcome"));
         assert_eq!(snapshot.nodes()[2].role(), UiAccessibilityRole::Button);
         assert_eq!(snapshot.nodes()[2].name(), Some("Continue"));
         assert!(!snapshot.nodes()[2].enabled());
+        assert_eq!(snapshot.nodes()[2].parent_index(), Some(0));
     }
 
     #[test]

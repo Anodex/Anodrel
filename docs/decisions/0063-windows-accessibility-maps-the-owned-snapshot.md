@@ -1,6 +1,6 @@
 # Decision 0063: Windows accessibility maps the owned snapshot, one direction only
 
-**Status:** Accepted
+**Status:** Accepted; extended by Decision 0075
 
 **Date:** 2026-08-09
 
@@ -40,6 +40,10 @@ and screen-space physical rectangles. It performs no operating-system call,
 holds no lock, and cannot fail. The conversion from clipped logical bounds to
 screen rectangles takes the client origin and scale as arguments rather than
 querying them, so it is a pure function testable at any display density.
+
+Decision 0075 extends the mapping with the snapshot's direct visible parent
+index so the provider can publish immutable parent/child/sibling navigation.
+It adds no application-controlled property, relation, or callback.
 
 The boundary is **one direction only**. Nothing flows from Windows or from
 assistive technology back to an application: no tree read, no focus query, no

@@ -32,6 +32,7 @@ pub use uia::{UIA_APPEND_RUNTIME_ID, control_type, property};
 #[derive(Clone, Debug, PartialEq)]
 pub struct AccessibleElement {
     automation_id: String,
+    parent_index: Option<usize>,
     name: String,
     control_type: i32,
     enabled: bool,
@@ -48,6 +49,17 @@ impl AccessibleElement {
     #[must_use]
     pub fn automation_id(&self) -> &str {
         &self.automation_id
+    }
+
+    /// The direct parent element's source-order position in this mapping.
+    ///
+    /// `None` means this element belongs directly to the host window's UI
+    /// Automation root. The pure mapping preserves the owned snapshot's
+    /// preorder relationship exactly; it does not infer geometry or create an
+    /// application-controlled accessibility relation.
+    #[must_use]
+    pub const fn parent_index(&self) -> Option<usize> {
+        self.parent_index
     }
 
     /// The accessible name, empty where the role has none.
@@ -119,6 +131,7 @@ pub fn accessible_element(
 ) -> AccessibleElement {
     AccessibleElement {
         automation_id: node.id().as_str().to_owned(),
+        parent_index: node.parent_index(),
         // A role with no name reports an empty string rather than nothing:
         // UI Automation has no absent-name representation, and an empty name is
         // what "this element is not named" means there.
@@ -250,6 +263,10 @@ mod tests {
             .map(AccessibleElement::automation_id)
             .collect::<Vec<_>>();
         assert_eq!(ids, ["root", "heading", "go", "blocked"]);
+        assert_eq!(mapped[0].parent_index(), None);
+        assert_eq!(mapped[1].parent_index(), Some(0));
+        assert_eq!(mapped[2].parent_index(), Some(0));
+        assert_eq!(mapped[3].parent_index(), Some(0));
     }
 
     #[test]

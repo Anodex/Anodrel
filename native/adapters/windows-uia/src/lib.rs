@@ -54,7 +54,6 @@ pub use focus::{
     UiAutomationFocusMailbox, UiAutomationFocusRequest, UiAutomationFocusRoute,
     UiAutomationFocusSink,
 };
-pub use tree::publishable;
 
 /// The session-bound semantic route an invokable authenticated button may use.
 ///
@@ -762,9 +761,9 @@ unsafe extern "system" fn navigate(
         // SAFETY: `this` points at the fragment vtable field of a live provider.
         let provider = unsafe { fragment_of(this) };
         // SAFETY: the caller holds a reference; fields are immutable.
-        let (element, count) = unsafe { ((*provider).element, (*provider).tree.len()) };
+        let (element, tree) = unsafe { ((*provider).element, &(*provider).tree) };
 
-        let Some(target) = tree::step(element, towards, count) else {
+        let Some(target) = tree.step(element, towards) else {
             return S_OK;
         };
         // SAFETY: the provider is live and `out` was checked above.
@@ -966,6 +965,7 @@ mod tests {
 
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
     const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true}}"#;
+    const HIERARCHY_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"section","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"detail","kind":"text","value":"Nested","fontSize":16,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]},{"id":"footer","kind":"text","value":"Done","fontSize":16,"tone":"primary"}]}}"#;
 
     struct FixedMeasurer;
 
@@ -1006,10 +1006,10 @@ mod tests {
         let document = anodrel_ui_document::decode(ACTION_DOCUMENT)
             .expect("the fixed action document is valid");
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
-        let elements = super::publishable(accessible_elements(
+        let elements = accessible_elements(
             &document.accessibility_snapshot(&layout),
             ClientOrigin::new(0, 0, 1.0),
-        ));
+        );
         let mut session = UiDocumentSession::new();
         let revision = session
             .replace_document(ACTION_DOCUMENT)
@@ -1039,10 +1039,10 @@ mod tests {
         let document = anodrel_ui_document::decode(ACTION_DOCUMENT)
             .expect("the fixed action document is valid");
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
-        let elements = super::publishable(accessible_elements(
+        let elements = accessible_elements(
             &document.accessibility_snapshot(&layout),
             ClientOrigin::new(0, 0, 1.0),
-        ));
+        );
         Provider::create(
             0,
             None,
@@ -1062,10 +1062,10 @@ mod tests {
         let document = anodrel_ui_document::decode(ACTION_DOCUMENT)
             .expect("the fixed action document is valid");
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
-        let elements = super::publishable(accessible_elements(
+        let elements = accessible_elements(
             &document.accessibility_snapshot(&layout),
             ClientOrigin::new(0, 0, 1.0),
-        ));
+        );
         let mailbox = UiAutomationFocusMailbox::new();
         let route = mailbox.route(None);
         let completing = mailbox.clone();
@@ -1091,10 +1091,10 @@ mod tests {
         let document =
             anodrel_ui_document::decode(FIELD_DOCUMENT).expect("the fixed field document is valid");
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
-        let elements = super::publishable(accessible_elements(
+        let elements = accessible_elements(
             &document.accessibility_snapshot(&layout),
             ClientOrigin::new(0, 0, 1.0),
-        ));
+        );
         Provider::create(
             0,
             Some(0),
@@ -1105,6 +1105,29 @@ mod tests {
                     anodrel_ui::ElementId::new("name").expect("fixed ID is valid"),
                     "Ada".to_owned(),
                 )],
+                None,
+                None,
+                None,
+            )),
+        )
+    }
+
+    /// Builds a nested semantic tree exactly as the host publishes it.
+    fn hierarchy_root() -> *mut Provider {
+        let document = anodrel_ui_document::decode(HIERARCHY_DOCUMENT)
+            .expect("the fixed hierarchy document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        );
+        Provider::create(
+            0,
+            None,
+            Arc::new(Tree::new(
+                Vec::new(),
+                elements,
+                Vec::new(),
                 None,
                 None,
                 None,
@@ -1164,6 +1187,62 @@ mod tests {
         unsafe {
             release_provider(provider);
             release_provider(provider);
+        }
+    }
+
+    #[test]
+    fn fragment_navigation_follows_the_published_hierarchy() {
+        let root = hierarchy_root();
+        let mut group = ptr::null_mut();
+        let mut detail = ptr::null_mut();
+        // SAFETY: each interface belongs to a live provider owned by this test,
+        // and every output slot is writable. Each successful navigation adds a
+        // reference that the matching release below returns.
+        unsafe {
+            let root_fragment = (&raw mut (*root).fragment).cast::<c_void>();
+            assert_eq!(
+                super::navigate(
+                    root_fragment,
+                    super::raw2::direction::FIRST_CHILD,
+                    &mut group
+                ),
+                S_OK
+            );
+            assert_eq!((*super::fragment_of(group)).element, Some(0));
+
+            assert_eq!(
+                super::navigate(group, super::raw2::direction::FIRST_CHILD, &mut detail),
+                S_OK
+            );
+            assert_eq!((*super::fragment_of(detail)).element, Some(1));
+
+            let mut nested_group = ptr::null_mut();
+            assert_eq!(
+                super::navigate(
+                    detail,
+                    super::raw2::direction::NEXT_SIBLING,
+                    &mut nested_group
+                ),
+                S_OK
+            );
+            assert_eq!((*super::fragment_of(nested_group)).element, Some(2));
+
+            let mut nested_child = ptr::null_mut();
+            assert_eq!(
+                super::navigate(
+                    nested_group,
+                    super::raw2::direction::FIRST_CHILD,
+                    &mut nested_child,
+                ),
+                S_OK
+            );
+            assert_eq!((*super::fragment_of(nested_child)).element, Some(3));
+
+            release_provider(super::fragment_of(nested_child));
+            release_provider(super::fragment_of(nested_group));
+            release_provider(super::fragment_of(detail));
+            release_provider(super::fragment_of(group));
+            release_provider(root);
         }
     }
 

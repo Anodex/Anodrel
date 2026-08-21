@@ -1,6 +1,6 @@
 # Decision 0026: Native UI accessibility begins with an owned semantic snapshot
 
-**Status:** Accepted
+**Status:** Accepted; extended by Decision 0075
 
 **Date:** 2026-08-01
 
@@ -20,6 +20,11 @@ validated `UiDocument` and one concrete `UiLayout`. It represents a stack as a
 group, text as static text, and an action as a button. Each visible node carries
 only its existing element ID, clipped bounds, role, enabled state, and plain
 text name where applicable.
+
+Decision 0075 extends each node with its direct visible parent's earlier
+source-order index. That preserves the document's declared hierarchy for native
+adapters without adding application-defined relations, an operating-system
+object, or a mutable view lookup.
 
 The snapshot is portable data. It performs no operating-system call, does not
 accept an application package, cannot focus a control, and cannot invoke an

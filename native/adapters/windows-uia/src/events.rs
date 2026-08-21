@@ -46,7 +46,7 @@ mod tests {
     use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
 
     use super::focus_event_tree;
-    use crate::{UiAutomationPublication, publishable};
+    use crate::UiAutomationPublication;
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
 
@@ -67,10 +67,10 @@ mod tests {
     fn the_published_focus_child_is_the_event_source() {
         let document = decode(DOCUMENT).expect("the fixed document is valid");
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
-        let elements = publishable(accessible_elements(
+        let elements = accessible_elements(
             &document.accessibility_snapshot(&layout),
             ClientOrigin::new(0, 0, 1.0),
-        ));
+        );
         let focus = ElementId::new("continue").expect("fixed ID is valid");
         let (_, element) = focus_event_tree(
             Vec::new(),
@@ -78,6 +78,6 @@ mod tests {
         )
         .expect("the focused action is published");
 
-        assert_eq!(element, 1, "the event source is the focused child");
+        assert_eq!(element, 2, "the event source is the focused child");
     }
 }

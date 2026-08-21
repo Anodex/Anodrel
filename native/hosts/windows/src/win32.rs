@@ -1087,7 +1087,7 @@ fn open_product_session_window(
     Ok(())
 }
 
-/// Maps a window's current layout into publishable accessibility elements.
+/// Maps a window's current layout into hierarchical accessibility elements.
 ///
 /// The semantics come from the same layout the surface draws, so what a screen
 /// reader is told cannot drift from what is on screen. A window with no UI
@@ -1103,10 +1103,10 @@ fn accessible_elements_for(window: Hwnd) -> anodrel_windows_uia::UiAutomationPub
         return anodrel_windows_uia::UiAutomationPublication::empty();
     };
     anodrel_windows_uia::UiAutomationPublication::new(
-        anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
+        anodrel_windows_accessibility::accessible_elements(
             &publication.snapshot,
             client_origin(window),
-        )),
+        ),
         publication.field_values,
         publication.focused,
         publication.action_sink,

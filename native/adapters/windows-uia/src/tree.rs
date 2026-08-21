@@ -20,27 +20,12 @@ use crate::{UiAutomationActionSink, UiAutomationFocusSink};
 /// Host-owned text. An application cannot supply or change it.
 pub const ROOT_AUTOMATION_ID: &str = "anodrel.surface";
 
-/// Selects the elements worth publishing to assistive technology.
-///
-/// The published tree is flat, so a container carries no meaning: a group whose
-/// children sit beside it rather than inside it would be announced as an empty
-/// thing to step through. Only elements that say or do something are kept, and
-/// grouping waits for a hierarchical tree.
-#[must_use]
-pub fn publishable(elements: Vec<AccessibleElement>) -> Vec<AccessibleElement> {
-    elements
-        .into_iter()
-        .filter(|element| {
-            element.control_type() != anodrel_windows_accessibility::control_type::GROUP
-        })
-        .collect()
-}
-
 /// One window's published accessibility tree.
 #[derive(Debug)]
 pub struct Tree {
     title: Vec<u16>,
     elements: Vec<AccessibleElement>,
+    relationships: Relationships,
     field_values: BTreeMap<String, Vec<u16>>,
     /// A provider's initial snapshot, updated only after that same provider's
     /// successful `SetFocus` call. It never observes unrelated live focus.
@@ -49,8 +34,86 @@ pub struct Tree {
     focus_sink: Option<UiAutomationFocusSink>,
 }
 
+/// Immutable direct relationships derived from one mapped semantic snapshot.
+///
+/// The portable model emits preorder data, so a valid parent is earlier than
+/// its child. Rejecting every other value keeps an accidentally malformed
+/// mapping bounded and acyclic; it becomes a top-level child rather than a
+/// relationship the provider cannot safely navigate.
+#[derive(Debug)]
+struct Relationships {
+    parents: Vec<Option<usize>>,
+    children: Vec<Vec<usize>>,
+    root_children: Vec<usize>,
+}
+
+impl Relationships {
+    fn from_elements(elements: &[AccessibleElement]) -> Self {
+        let mut relationships = Self {
+            parents: vec![None; elements.len()],
+            children: (0..elements.len()).map(|_| Vec::new()).collect(),
+            root_children: Vec::new(),
+        };
+
+        for (index, element) in elements.iter().enumerate() {
+            let parent = element
+                .parent_index()
+                .filter(|parent| *parent < index && *parent < elements.len());
+            relationships.parents[index] = parent;
+            match parent {
+                Some(parent) => relationships.children[parent].push(index),
+                None => relationships.root_children.push(index),
+            }
+        }
+        relationships
+    }
+
+    fn step(&self, element: Option<usize>, towards: i32) -> Option<Option<usize>> {
+        match element {
+            // The root's parent belongs to Windows, not to this provider.
+            None => match towards {
+                direction::PARENT => None,
+                direction::FIRST_CHILD => self.root_children.first().copied().map(Some),
+                direction::LAST_CHILD => self.root_children.last().copied().map(Some),
+                _ => None,
+            },
+            Some(index) => {
+                let parent = *self.parents.get(index)?;
+                match towards {
+                    direction::PARENT => Some(parent),
+                    direction::FIRST_CHILD => self.children[index].first().copied().map(Some),
+                    direction::LAST_CHILD => self.children[index].last().copied().map(Some),
+                    direction::NEXT_SIBLING => {
+                        let siblings = self.siblings(index, parent)?;
+                        let position = siblings.iter().position(|sibling| *sibling == index)?;
+                        siblings.get(position + 1).copied().map(Some)
+                    }
+                    direction::PREVIOUS_SIBLING => {
+                        let siblings = self.siblings(index, parent)?;
+                        let position = siblings.iter().position(|sibling| *sibling == index)?;
+                        position
+                            .checked_sub(1)
+                            .and_then(|position| siblings.get(position))
+                            .copied()
+                            .map(Some)
+                    }
+                    _ => None,
+                }
+            }
+        }
+    }
+
+    fn siblings(&self, index: usize, parent: Option<usize>) -> Option<&[usize]> {
+        self.parents.get(index)?;
+        match parent {
+            Some(parent) => self.children.get(parent).map(Vec::as_slice),
+            None => Some(&self.root_children),
+        }
+    }
+}
+
 impl Tree {
-    /// Builds the tree for one window title and its publishable elements.
+    /// Builds the tree for one window title and its mapped semantic elements.
     ///
     /// Focus and field values are reduced to published targets while the tree
     /// is created, so a provider never reads a mutable view. The action sink
@@ -66,6 +129,7 @@ impl Tree {
         focus_sink: Option<UiAutomationFocusSink>,
     ) -> Self {
         let focused = focused.and_then(|id| focus_index(&elements, &id));
+        let relationships = Relationships::from_elements(&elements);
         let field_values = field_values
             .into_iter()
             .map(|(id, value)| (id.as_str().to_owned(), utf16(&value)))
@@ -73,6 +137,7 @@ impl Tree {
         Self {
             title,
             elements,
+            relationships,
             field_values,
             focused: Mutex::new(focused),
             action_sink,
@@ -80,10 +145,14 @@ impl Tree {
         }
     }
 
-    /// Returns how many elements the window publishes.
+    /// Resolves one direct UI Automation navigation step in this snapshot.
+    ///
+    /// `None` names the host-owned window root. A `None` result means that no
+    /// target exists in the requested direction, which the COM layer reports
+    /// as a null provider rather than a failure.
     #[must_use]
-    pub fn len(&self) -> usize {
-        self.elements.len()
+    pub fn step(&self, element: Option<usize>, towards: i32) -> Option<Option<usize>> {
+        self.relationships.step(element, towards)
     }
 
     /// Returns the value for one UI Automation property, if this provider
@@ -292,32 +361,6 @@ fn focus_index(elements: &[AccessibleElement], id: &ElementId) -> Option<usize> 
     })
 }
 
-/// Resolves one navigation step over a flat tree of `count` elements.
-///
-/// `None` as the current element means the window root. A `None` result means
-/// there is nothing in that direction, which UI Automation expects as a null
-/// rather than a failure.
-#[must_use]
-pub fn step(element: Option<usize>, towards: i32, count: usize) -> Option<Option<usize>> {
-    match (element, towards) {
-        // The root's parent belongs to Windows, not to this provider.
-        (None, direction::PARENT) => None,
-        (None, direction::FIRST_CHILD) => (count > 0).then_some(Some(0)),
-        (None, direction::LAST_CHILD) => count.checked_sub(1).map(Some),
-        (None, _) => None,
-
-        (Some(_), direction::PARENT) => Some(None),
-        // A flat tree has no grandchildren.
-        (Some(_), direction::FIRST_CHILD | direction::LAST_CHILD) => None,
-        (Some(index), direction::NEXT_SIBLING) => {
-            let next = index.checked_add(1)?;
-            (next < count).then_some(Some(next))
-        }
-        (Some(index), direction::PREVIOUS_SIBLING) => index.checked_sub(1).map(Some),
-        (Some(_), _) => None,
-    }
-}
-
 fn contains(bounds: ScreenRect, x: f64, y: f64) -> bool {
     bounds.width > 0.0
         && bounds.height > 0.0
@@ -344,15 +387,14 @@ fn utf16(value: &str) -> Vec<u16> {
 mod tests {
     use anodrel_ui::{ElementId, UiEvent, UiRect};
     use anodrel_ui_session::{UiDocumentSession, UiInputMailbox};
-    use anodrel_windows_accessibility::{
-        AccessibleElement, ClientOrigin, accessible_elements, control_type,
-    };
+    use anodrel_windows_accessibility::{AccessibleElement, ClientOrigin, accessible_elements};
 
-    use super::{ROOT_AUTOMATION_ID, Tree, direction, publishable, step};
+    use super::{ROOT_AUTOMATION_ID, Tree, direction};
     use crate::{UiAutomationActionSink, UiAutomationFocusMailbox, raw::VT_EMPTY};
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"},{"id":"blocked","kind":"action","label":"Unavailable","fontSize":16,"enabled":false,"tone":"accent"}]}}"#;
     const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true},{"id":"locked","kind":"field","label":"Locked","value":"","maxLength":64,"fontSize":16,"enabled":false},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
+    const NESTED_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"section","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"detail","kind":"text","value":"Nested","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]},{"id":"footer","kind":"text","value":"Done","fontSize":16,"tone":"primary"}]}}"#;
 
     struct FixedMeasurer;
 
@@ -367,8 +409,11 @@ mod tests {
 
     /// Maps the fixture document exactly as the host would.
     fn mapped() -> Vec<AccessibleElement> {
-        let document =
-            anodrel_ui_document::decode(DOCUMENT).expect("the fixture document is valid");
+        mapped_document(DOCUMENT)
+    }
+
+    fn mapped_document(source: &str) -> Vec<AccessibleElement> {
+        let document = anodrel_ui_document::decode(source).expect("the fixture document is valid");
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
         accessible_elements(
             &document.accessibility_snapshot(&layout),
@@ -377,19 +422,13 @@ mod tests {
     }
 
     fn field_mapped() -> Vec<AccessibleElement> {
-        let document =
-            anodrel_ui_document::decode(FIELD_DOCUMENT).expect("the field fixture is valid");
-        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
-        accessible_elements(
-            &document.accessibility_snapshot(&layout),
-            ClientOrigin::new(0, 0, 1.0),
-        )
+        mapped_document(FIELD_DOCUMENT)
     }
 
     fn tree() -> Tree {
         Tree::new(
             "Window".encode_utf16().collect(),
-            publishable(mapped()),
+            mapped(),
             Vec::new(),
             None,
             None,
@@ -408,7 +447,7 @@ mod tests {
         (
             Tree::new(
                 "Window".encode_utf16().collect(),
-                publishable(mapped()),
+                mapped(),
                 Vec::new(),
                 None,
                 Some(sink),
@@ -430,44 +469,57 @@ mod tests {
     }
 
     #[test]
-    fn a_group_is_not_published_to_a_flat_tree() {
-        // A container whose children sit beside it rather than inside it would
-        // be announced as an empty thing to step through.
-        let all = mapped();
-        assert!(
-            all.iter()
-                .any(|element| element.control_type() == control_type::GROUP),
-            "the fixture must contain a container to filter"
-        );
-
-        let published = publishable(all);
-        assert!(!published.is_empty());
-        assert!(
-            published
-                .iter()
-                .all(|element| element.control_type() != control_type::GROUP)
-        );
+    fn a_visible_group_is_published_with_its_children() {
+        let tree = tree();
+        assert_eq!(tree.step(None, direction::FIRST_CHILD), Some(Some(0)));
+        assert_eq!(tree.step(Some(0), direction::FIRST_CHILD), Some(Some(1)));
+        assert_eq!(tree.step(Some(0), direction::LAST_CHILD), Some(Some(3)));
     }
 
     #[test]
     fn the_root_walks_to_its_first_and_last_child() {
-        assert_eq!(step(None, direction::FIRST_CHILD, 2), Some(Some(0)));
-        assert_eq!(step(None, direction::LAST_CHILD, 2), Some(Some(1)));
-        // A window with nothing to publish has no children at all.
-        assert_eq!(step(None, direction::FIRST_CHILD, 0), None);
+        let tree = tree();
+        assert_eq!(tree.step(None, direction::FIRST_CHILD), Some(Some(0)));
+        assert_eq!(tree.step(None, direction::LAST_CHILD), Some(Some(0)));
+        // A window with no semantic elements has no children at all.
+        let empty = Tree::new(Vec::new(), Vec::new(), Vec::new(), None, None, None);
+        assert_eq!(empty.step(None, direction::FIRST_CHILD), None);
         // The root's parent belongs to Windows, not to this provider.
-        assert_eq!(step(None, direction::PARENT, 2), None);
+        assert_eq!(tree.step(None, direction::PARENT), None);
     }
 
     #[test]
-    fn elements_walk_to_their_siblings_and_stop_at_the_ends() {
-        assert_eq!(step(Some(0), direction::NEXT_SIBLING, 2), Some(Some(1)));
-        assert_eq!(step(Some(1), direction::NEXT_SIBLING, 2), None);
-        assert_eq!(step(Some(1), direction::PREVIOUS_SIBLING, 2), Some(Some(0)));
-        assert_eq!(step(Some(0), direction::PREVIOUS_SIBLING, 2), None);
-        assert_eq!(step(Some(0), direction::PARENT, 2), Some(None));
-        // A flat tree has no grandchildren.
-        assert_eq!(step(Some(0), direction::FIRST_CHILD, 2), None);
+    fn nested_elements_walk_only_their_direct_relationships() {
+        let tree = Tree::new(
+            Vec::new(),
+            mapped_document(NESTED_DOCUMENT),
+            Vec::new(),
+            None,
+            None,
+            None,
+        );
+
+        // root → [heading, section → [detail, go], footer]
+        assert_eq!(tree.step(None, direction::FIRST_CHILD), Some(Some(0)));
+        assert_eq!(tree.step(Some(0), direction::PARENT), Some(None));
+        assert_eq!(tree.step(Some(0), direction::FIRST_CHILD), Some(Some(1)));
+        assert_eq!(tree.step(Some(0), direction::LAST_CHILD), Some(Some(5)));
+        assert_eq!(tree.step(Some(1), direction::NEXT_SIBLING), Some(Some(2)));
+        assert_eq!(
+            tree.step(Some(2), direction::PREVIOUS_SIBLING),
+            Some(Some(1))
+        );
+        assert_eq!(tree.step(Some(2), direction::NEXT_SIBLING), Some(Some(5)));
+        assert_eq!(tree.step(Some(2), direction::PARENT), Some(Some(0)));
+        assert_eq!(tree.step(Some(2), direction::FIRST_CHILD), Some(Some(3)));
+        assert_eq!(tree.step(Some(2), direction::LAST_CHILD), Some(Some(4)));
+        assert_eq!(tree.step(Some(3), direction::PARENT), Some(Some(2)));
+        assert_eq!(tree.step(Some(3), direction::NEXT_SIBLING), Some(Some(4)));
+        assert_eq!(
+            tree.step(Some(4), direction::PREVIOUS_SIBLING),
+            Some(Some(3))
+        );
+        assert_eq!(tree.step(Some(5), direction::NEXT_SIBLING), None);
     }
 
     #[test]
@@ -506,13 +558,13 @@ mod tests {
     }
 
     #[test]
-    fn hit_testing_finds_each_element_within_its_own_reported_bounds() {
+    fn hit_testing_finds_the_deepest_non_container_element_at_its_own_bounds() {
         // Asking with each element's own rectangle keeps the test about hit
         // testing rather than about whatever geometry the layout produced.
-        let published = publishable(mapped());
+        let published = mapped();
         let tree = Tree::new(Vec::new(), published.clone(), Vec::new(), None, None, None);
 
-        for (index, element) in published.iter().enumerate() {
+        for (index, element) in published.iter().enumerate().skip(1) {
             let bounds = element.bounds();
             let x = bounds.left + bounds.width / 2.0;
             let y = bounds.top + bounds.height / 2.0;
@@ -541,7 +593,7 @@ mod tests {
 
     #[test]
     fn focus_reports_only_a_visible_enabled_published_target() {
-        let published = publishable(mapped());
+        let published = mapped();
         let focused = Tree::new(
             Vec::new(),
             published.clone(),
@@ -550,20 +602,17 @@ mod tests {
             None,
             None,
         );
-        // The stack was filtered, leaving text, the enabled action, then the
-        // disabled action. The portable focus target therefore maps directly
-        // to the enabled button's published position.
-        assert_eq!(focused.focused(), Some(1));
+        assert_eq!(focused.focused(), Some(2));
         assert_eq!(
             focused
-                .property(Some(1), crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+                .property(Some(2), crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
                 .expect("the focus property is supplied")
                 .boolean_value(),
             Some(true)
         );
         assert_eq!(
             focused
-                .property(Some(0), crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+                .property(Some(1), crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
                 .expect("the focus property is supplied")
                 .boolean_value(),
             Some(false)
@@ -593,30 +642,30 @@ mod tests {
     fn focus_route_accepts_only_a_visible_enabled_focus_target() {
         let tree = Tree::new(
             Vec::new(),
-            publishable(mapped()),
+            mapped(),
             Vec::new(),
             None,
             None,
             Some(focus_sink()),
         );
 
-        // The stack was filtered, then the text, the enabled action, and the
-        // disabled action remained. Only the enabled action can enter the
-        // route, and success updates this provider's own focus snapshot.
+        // The root group and text remain non-focusable. Only the enabled action
+        // can enter the route, and success updates this provider's own snapshot.
         assert!(!tree.supports_focus(0));
-        assert!(tree.supports_focus(1));
-        assert!(!tree.supports_focus(2));
-        assert!(tree.focus(1));
-        assert_eq!(tree.focused(), Some(1));
-        assert!(!tree.focus(2));
-        assert_eq!(tree.focused(), Some(1));
+        assert!(!tree.supports_focus(1));
+        assert!(tree.supports_focus(2));
+        assert!(!tree.supports_focus(3));
+        assert!(tree.focus(2));
+        assert_eq!(tree.focused(), Some(2));
+        assert!(!tree.focus(3));
+        assert_eq!(tree.focused(), Some(2));
     }
 
     #[test]
     fn field_values_are_visible_only_on_matching_edit_elements() {
         let tree = Tree::new(
             Vec::new(),
-            publishable(field_mapped()),
+            field_mapped(),
             vec![
                 (
                     ElementId::new("name").expect("fixed ID is valid"),
@@ -636,19 +685,19 @@ mod tests {
             None,
         );
 
-        assert!(tree.supports_value(0));
+        assert!(tree.supports_value(1));
         assert!(
-            tree.supports_value(1),
+            tree.supports_value(2),
             "a disabled visible field is readable"
         );
-        assert!(!tree.supports_value(2), "an action never exposes a value");
+        assert!(!tree.supports_value(3), "an action never exposes a value");
         assert_eq!(
-            String::from_utf16(tree.field_value(0).expect("the name value exists"))
+            String::from_utf16(tree.field_value(1).expect("the name value exists"))
                 .expect("the value is valid UTF-16"),
             "Ada"
         );
         let property = tree
-            .property(Some(0), crate::raw5::UIA_VALUE_VALUE_PROPERTY_ID)
+            .property(Some(1), crate::raw5::UIA_VALUE_VALUE_PROPERTY_ID)
             .expect("the value property is supplied");
         // SAFETY: this test owns the BSTR allocated for its Variant result.
         assert_eq!(
@@ -656,13 +705,13 @@ mod tests {
             Some("Ada".to_owned())
         );
         assert_eq!(
-            tree.property(Some(0), crate::raw5::UIA_VALUE_IS_READ_ONLY_PROPERTY_ID)
+            tree.property(Some(1), crate::raw5::UIA_VALUE_IS_READ_ONLY_PROPERTY_ID)
                 .expect("the read-only property is supplied")
                 .boolean_value(),
             Some(true)
         );
         assert!(
-            tree.property(Some(2), crate::raw5::UIA_VALUE_VALUE_PROPERTY_ID)
+            tree.property(Some(3), crate::raw5::UIA_VALUE_VALUE_PROPERTY_ID)
                 .is_none(),
             "a non-field never receives a value property"
         );
@@ -675,17 +724,19 @@ mod tests {
         // action route remains readable but non-invokable.
         assert!(!read_only.supports_invoke(0));
         assert!(!read_only.supports_invoke(1));
+        assert!(!read_only.supports_invoke(2));
 
         let (tree, mailbox, revision) = tree_with_action_sink();
-        assert!(!tree.supports_invoke(0), "text must not expose Invoke");
-        assert!(tree.supports_invoke(1), "the enabled action is invokable");
+        assert!(!tree.supports_invoke(0), "groups must not expose Invoke");
+        assert!(!tree.supports_invoke(1), "text must not expose Invoke");
+        assert!(tree.supports_invoke(2), "the enabled action is invokable");
         assert!(
-            !tree.supports_invoke(2),
+            !tree.supports_invoke(3),
             "a disabled button must not expose Invoke"
         );
         assert!(!tree.invoke(0));
-        assert!(!tree.invoke(2));
-        assert!(tree.invoke(1));
+        assert!(!tree.invoke(3));
+        assert!(tree.invoke(2));
 
         let batch = mailbox.drain();
         assert_eq!(batch.dropped(), 0);
