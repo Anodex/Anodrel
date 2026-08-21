@@ -11,12 +11,14 @@
 #![deny(missing_docs)]
 
 mod error;
+mod mailbox;
 mod model;
 mod revision;
 mod service;
 mod session;
 
 pub use error::MenuError;
+pub use mailbox::{MENU_RESPONSE_TIMEOUT, MenuMailbox, MenuRequest};
 pub use model::{
     MAX_MENU_ITEM_LABEL_BYTES, MAX_MENU_ITEMS, MAX_MENU_LABEL_BYTES, MAX_MENUS, Menu, MenuAction,
     MenuActionId, MenuModel, MenuText,

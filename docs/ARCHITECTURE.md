@@ -295,10 +295,12 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 complete bounded menu model, monotonic revision, and enabled-command
 revalidation. Its one-way service seam transfers only a validated model and
 host-owned revision; it carries no window, native identifier, callback, or
-operating-system authority. `anodrel-core` applies the `menu.write` policy and
+operating-system authority. Its one-request mailbox gives the model to one
+owning UI thread without moving a native resource to the pipe worker.
+`anodrel-core` applies the `menu.write` policy and
 commits that portable state only after the host service accepts the complete
 replacement. The pending Windows adapter will own native menu construction,
-numeric command mapping, and the shared interaction mailbox. See
+numeric command mapping, and direct UI-thread attachment. See
 `docs/MENUS.md` and Decision 0080.
 
 `anodrel-windows-accessibility` sits directly above that snapshot. It is a pure

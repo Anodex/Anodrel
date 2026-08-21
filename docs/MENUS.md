@@ -1,9 +1,9 @@
 # Native session menus
 
 **Status:** Portable model, Protocol 1.18 core, installed-record grant, SDK,
-mock host, contract tests, and shared ordered interaction delivery are
-implemented. The Windows UI-thread bridge, native adapter, and manual
-verification are pending.
+mock host, contract tests, shared ordered interaction delivery, and the
+one-request `MenuMailbox` are implemented. Direct Windows UI-thread attachment,
+native adapter, and manual verification are pending.
 
 Anodrel's first menu surface will be a host-owned Windows menu bar for one
 authenticated application session. It is a bounded way for an application to
@@ -78,6 +78,23 @@ or removed after a person opened it is discarded. Document actions and menu
 actions share one fixed 32-candidate queue, so their delivery order is
 preserved and a menu cannot create an unbounded second event path. The existing
 `dropped` and `discarded` counts cover both kinds of semantic interaction.
+
+## UI-thread replacement bridge
+
+The authenticated pipe worker does not hold a window or call User32. It gives
+one already validated complete model and its host-owned revision to a
+per-session `MenuMailbox`, then waits at most five seconds for the owning UI
+thread. The mailbox holds at most one request, transfers it exactly once, and
+accepts a completion only for that exact taken request. A second request while
+one is pending or being applied, an absent UI thread, a timed-out request, or a
+native replacement failure all answer `menu.unavailable`; the core therefore
+retains its prior portable menu state.
+
+The UI thread creates the next native menu before replacing the window's
+current one. It completes the bridge only after `SetMenu` succeeds, then
+destroys the old menu itself. This preserves the last working menu on every
+failure path. The mailbox carries no window, handle, native command ID,
+callback, or operating-system call.
 
 ## Windows ownership
 
