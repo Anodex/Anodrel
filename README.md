@@ -1,9 +1,21 @@
 # Anodrel
 
-Anodrel is a reusable native desktop application platform. It gives multiple
-applications a shared, security-first foundation: an owned runtime, explicit
-operating-system services, and a versioned communication protocol. It is built
-directly on platform APIs rather than shipping a browser runtime.
+Anodrel is a native-first platform for building secure, modular desktop
+applications. It gives applications a shared foundation of direct
+operating-system services, explicit permissions, and versioned local IPC—without
+shipping a browser runtime.
+
+## What Anodrel is
+
+- A reusable desktop platform, beginning with a direct Windows host.
+- A security-focused boundary between application code and operating-system
+  services: every capability is explicit, bounded, and documented.
+- A modular native foundation built on platform APIs rather than a bundled
+  browser engine, webview, or Node.js runtime.
+
+It is not an application itself, an Anodex source mirror, or a finished
+Electron replacement. Production packaging, signing, installation, updates,
+and macOS/Linux hosts remain planned work.
 
 Anodex will be the first application built on Anodrel. Anodex is not being
 moved into this repository yet; it remains an independent project until the
