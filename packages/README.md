@@ -14,3 +14,5 @@ The initial packages are:
 - `windows-transport/` -- development-only Node-core client for the documented
   Windows bootstrap and named-pipe frames; it is not a shipped runtime or
   content-hosting layer.
+
+`docs/SDK.md` defines the package-root SDK surface and its compatibility rules.

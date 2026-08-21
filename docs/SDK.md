@@ -1,0 +1,95 @@
+# Anodrel application SDK
+
+**Status:** Foundation API in this repository. The TypeScript package is not
+published independently yet, and it is not a packaged application runtime.
+
+`@anodrel/sdk` is the small application-facing layer above Anodrel's versioned
+protocol. It turns a typed method call into one protocol request, verifies that
+the response belongs to that request, and turns a structured host failure into
+a typed error. It does not contain a native host, a browser engine, operating
+system calls, a capability policy, or ambient access to a user's machine.
+
+## Start with the public boundary
+
+The SDK needs a `PlatformTransport`. A host integration owns that transport and
+authenticates the application session before it serves requests. The client
+never supplies an application ID, a session ID, or a capabilities list.
+
+For local development, use the repository's mock host:
+
+~~~ts
+import { MockHost } from "@anodrel/mock-host";
+import { PlatformClient, PlatformRemoteError } from "@anodrel/sdk";
+
+const host = new MockHost({
+  applicationId: "org.example.hello",
+  grantedCapabilities: ["diagnostics.read"],
+});
+const client = new PlatformClient(host.createTransport());
+
+try {
+  const health = await client.getHealth();
+  console.log(health.hostName);
+} catch (error) {
+  if (error instanceof PlatformRemoteError) {
+    console.error(error.code);
+    throw error;
+  }
+  throw error;
+}
+~~~
+
+The mock models the public protocol and capability checks. It is not a native
+security boundary, a package launcher, or evidence that a real operating-system
+adapter permits an operation.
+
+## Public surface
+
+`PlatformClient` provides typed methods for the exact operations defined by
+`docs/PROTOCOL.md`, including health and capability discovery, bounded
+diagnostic reads, UI document replacement and semantic-event reads, session
+close, clipboard, HTTPS handoff, file dialog and retained text read, state,
+credentials, notifications, and the two closed session-window commands. Every
+method takes only the documented payload fields; it cannot accept a native
+handle, arbitrary application identity, capability list, window target,
+filesystem path where the protocol does not allow one, or a callback.
+
+`PlatformTransport` is the narrow host-integration interface. It accepts one
+typed request and optional ordered cancellation record. An application can
+provide a `RequestIdFactory` when deterministic IDs help a test; production
+uses `crypto.randomUUID` and fails closed if the runtime cannot provide it.
+
+Failures have two separate meanings:
+
+- `PlatformRemoteError` is a host response with a stable protocol error code,
+  retryability flag, and only safe documented details.
+- `PlatformProtocolError` means the transport returned an impossible response,
+  such as one with a different request ID, or the local runtime cannot generate
+  a cryptographically strong request ID.
+
+The result and error shapes, field limits, capability requirements, and
+compatibility rules live in `docs/PROTOCOL.md`. A method name is a convenience
+for that contract, not a second policy layer.
+
+## Windows development transport
+
+`@anodrel/windows-transport` is a separate development-only Node-core adapter
+for the direct Windows bootstrap and named-pipe diagnostic path. It is not a
+production content host and is never embedded by the native Windows host. The
+sample's `native-client.ts` demonstrates that path; its launch commands live in
+`docs/DEVELOPMENT.md`.
+
+## Compatibility and boundaries
+
+The SDK is versioned with the protocol. Adding an application-visible method,
+payload field, response field, error, or event requires a documented protocol
+compatibility change and contract tests before the client exposes it. Moving
+the SDK's internal source files cannot change its package-root exports or
+request behavior.
+
+No SDK method grants authority. The native host derives identity and
+capabilities, checks the exact grant immediately before an operation, and owns
+all Windows objects and service calls. A response that says a request was
+accepted is only the evidence that each operation's protocol contract promises;
+for example, notification acceptance does not mean it was seen, and a session
+close acceptance does not mean a window is already destroyed.

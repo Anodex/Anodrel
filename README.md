@@ -180,6 +180,8 @@ Anodrel/
 `docs/APPLICATIONS.md` defines the validated application-package contract.
 `docs/APPLICATION_TEMPLATE.md` shows how to create and run the first strict,
 digest-verified native text package without reaching into host source code.
+`docs/SDK.md` defines the public application client and the boundary between a
+typed request helper and host-owned native authority.
 `docs/RENDERER.md` documents the renderer and brand API.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/CRASH_REPORTS.md` defines the host-only bounded record of a contained

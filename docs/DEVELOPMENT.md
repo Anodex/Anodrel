@@ -36,6 +36,9 @@ The workspace uses TypeScript project references to keep package dependencies
 explicit and build them in dependency order. Generated `dist/` folders are not
 tracked.
 
+`docs/SDK.md` defines the public TypeScript client, the mock-development
+boundary, and the separate Windows named-pipe diagnostic adapter.
+
 ## Direct Windows host
 
 The Rust workspace is under `native/`. It has no third-party runtime

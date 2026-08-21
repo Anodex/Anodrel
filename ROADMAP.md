@@ -305,7 +305,11 @@ with its gate stated, and link it only once its underlying operation is real.
 
 Status: **First starter-package slice in progress**
 
-- Provide a small application SDK.
+- Provide a small application SDK. **Foundation implemented:** the public
+  TypeScript client stays transport-neutral, returns typed protocol results,
+  preserves stable host failures, and exposes no native authority. Its public
+  contract and development boundary are documented in `docs/SDK.md`; a
+  published-package and executable-project template remain later work.
 - Provide development and diagnostic tools. **The first content-package
   generator is available:** it creates only a strict, digest-verified
   `anodrel.text.v1` package in a new directory, never an executable, policy
