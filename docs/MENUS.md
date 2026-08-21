@@ -1,6 +1,8 @@
 # Native session menus
 
-**Status:** Contract accepted; implementation is pending.
+**Status:** Portable model, Protocol 1.18 core, installed-record grant, SDK,
+mock host, and contract tests are implemented. The Windows UI-thread bridge,
+native adapter, activation delivery, and manual verification are pending.
 
 Anodrel's first menu surface will be a host-owned Windows menu bar for one
 authenticated application session. It is a bounded way for an application to
@@ -9,7 +11,7 @@ editor, shortcut registrar, or native handle bridge.
 
 ## Public boundary
 
-Protocol 1.18 will add `menu.replace`. It requires a separate host-issued
+Protocol 1.18 adds `menu.replace`. It requires a separate host-issued
 `menu.write` capability and accepts exactly one complete model:
 
 ~~~json
@@ -54,7 +56,8 @@ When a person chooses a current enabled command, the host offers one bounded,
 revision-bound candidate to the same ordered per-session interaction mailbox
 used by authenticated document actions. Protocol `ui.events.read` remains the
 only application delivery route and still requires its existing
-`ui.events.read` grant. Version 1.18 adds this event shape to that result:
+`ui.events.read` grant. Protocol 1.18 reserves this event shape for the
+pending direct Windows adapter:
 
 ~~~json
 {
@@ -62,6 +65,11 @@ only application delivery route and still requires its existing
   "payload": { "menuRevision": "1", "action": "document.new" }
 }
 ~~~
+
+Its complete event envelope uses `source: "native.menu"` and
+`schemaVersion: { "major": 1, "minor": 18 }`. It has no window identifier,
+menu identifier, position, timing, keyboard state, or evidence that a person
+saw a command.
 
 Before delivery, the core confirms that the candidate's menu revision is still
 current and the matching command remains enabled. A menu replaced, disabled,
@@ -91,10 +99,12 @@ selection, dismissal, shortcut handling, or whether a person saw a command.
 ## Compatibility and deferred work
 
 `menu.replace` is additive in Protocol 1.18. Earlier clients and installed
-records cannot name `menu.write`; record version 1.8 will add that optional
-grant as a strict superset of version 1.7. A host must not expose this surface
-until its protocol, core session state, UI-thread bridge, Windows adapter, SDK,
-mock host, contract tests, and manual verification all agree.
+records cannot name `menu.write`; record version 1.8 adds that optional grant
+as a strict superset of version 1.7. The SDK and mock host implement the
+portable contract, while a core without an attached native menu service returns
+`menu.unavailable`. The direct Windows host must not grant `menu.write` until
+its UI-thread bridge, native adapter, activation delivery, and manual
+verification agree.
 
 Submenus, separators, check and radio state, keyboard accelerators, native
 window or system-menu edits, context menus, menu opening callbacks, dynamic

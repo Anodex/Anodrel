@@ -30,6 +30,10 @@ use anodrel_file_access::{
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
+use anodrel_menu::{
+    Menu, MenuAction, MenuActionId, MenuModel, MenuService, MenuSession, MenuText,
+    UnavailableMenuService,
+};
 use anodrel_notifications::{
     Notification, NotificationBody, NotificationService, NotificationServiceError,
     NotificationTitle,
@@ -56,6 +60,8 @@ pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
 pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
 pub const MAX_FILE_TEXT_WRITE_BYTES: usize = 8 * 1024;
+/// Maximum encoded JSON bytes in one complete native-menu replacement payload.
+pub const MAX_MENU_REPLACE_REQUEST_BYTES: usize = 16 * 1024;
 pub const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES: usize = 24 * 1024;
 
 /// One host-created, coalescing request to end an authenticated session.
@@ -120,6 +126,7 @@ impl HostPolicy {
 pub struct CoreHost {
     policy: HostPolicy,
     ui_document_session: RefCell<UiDocumentSession>,
+    menu_session: RefCell<MenuSession>,
     ui_input_mailbox: UiInputMailbox,
     session_close_signal: SessionCloseSignal,
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
@@ -128,6 +135,7 @@ pub struct CoreHost {
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
+    menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
@@ -153,6 +161,7 @@ pub struct HostServices {
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
+    menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
@@ -292,6 +301,7 @@ impl HostServices {
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
+            menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
             file_selections: Box::new(UnavailableFileSelectionService),
@@ -358,6 +368,17 @@ impl HostServices {
     #[must_use]
     pub fn with_window_state(mut self, service: impl WindowStateService + 'static) -> Self {
         self.window_state = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed native-menu service.
+    ///
+    /// The service owns all native command identifiers and must route every
+    /// operation through this session's UI thread. It receives only a complete
+    /// validated semantic model and its host revision.
+    #[must_use]
+    pub fn with_menu(mut self, service: impl MenuService + 'static) -> Self {
+        self.menu = Box::new(service);
         self
     }
 
@@ -449,6 +470,7 @@ impl CoreHost {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
+            menu_session: RefCell::new(MenuSession::new()),
             ui_input_mailbox,
             session_close_signal,
             pending_ui_document_update: RefCell::new(None),
@@ -457,6 +479,7 @@ impl CoreHost {
             notifications: services.notifications,
             window_title: services.window_title,
             window_state: services.window_state,
+            menu: services.menu,
             ui_fields: services.ui_fields,
             file_dialogs: services.file_dialogs,
             file_selections: services.file_selections,
@@ -680,6 +703,7 @@ impl CoreHost {
         Self {
             policy,
             ui_document_session: RefCell::new(UiDocumentSession::new()),
+            menu_session: RefCell::new(MenuSession::new()),
             ui_input_mailbox,
             session_close_signal,
             pending_ui_document_update: RefCell::new(None),
@@ -691,6 +715,7 @@ impl CoreHost {
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
+            menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
@@ -795,6 +820,9 @@ impl CoreHost {
             }
             "window.state.set" if request.protocol_version.minor >= 16 => {
                 self.handle_window_state_set(request)
+            }
+            "menu.replace" if request.protocol_version.minor >= 18 => {
+                self.handle_menu_replace(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, false)
@@ -1037,6 +1065,59 @@ impl CoreHost {
             &self.policy.host_name,
             object([("revision", JsonValue::String(revision.value().to_string()))]),
         )
+    }
+
+    fn handle_menu_replace(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(model) = menu_replace_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "menu.replace requires one exact bounded complete menu model.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::MenuWrite) {
+            return self.capability_denied(request.request_id, "menu.write");
+        }
+
+        let revision = match self.menu_session.borrow().next_revision() {
+            Ok(revision) => revision,
+            Err(_) => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::MenuUnavailable,
+                    "the session menu is unavailable.",
+                    None,
+                );
+            }
+        };
+        if self.menu.replace(revision, model.clone()).is_err() {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::MenuUnavailable,
+                "the session menu is unavailable.",
+                None,
+            );
+        }
+        match self.menu_session.borrow_mut().replace(model) {
+            Ok(committed_revision) => {
+                debug_assert_eq!(committed_revision, revision);
+                ResponseEnvelope::success(
+                    request.request_id,
+                    &self.policy.host_name,
+                    object([(
+                        "revision",
+                        JsonValue::String(committed_revision.value().to_string()),
+                    )]),
+                )
+            }
+            Err(_) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::MenuUnavailable,
+                "the session menu is unavailable.",
+                None,
+            ),
+        }
     }
 
     fn handle_ui_events_read(&self, request: RequestEnvelope) -> JsonValue {
@@ -2124,6 +2205,49 @@ fn file_text_write_payload(value: &JsonValue) -> Option<(SaveReference, &str)> {
     Some((reference, text))
 }
 
+fn menu_replace_payload(value: &JsonValue) -> Option<MenuModel> {
+    if value.to_json().len() > MAX_MENU_REPLACE_REQUEST_BYTES {
+        return None;
+    }
+    let fields = value.as_object()?;
+    if fields.len() != 1 {
+        return None;
+    }
+    let JsonValue::Array(menus) = fields.get("menus")? else {
+        return None;
+    };
+    let menus = menus
+        .iter()
+        .map(|menu| {
+            let fields = menu.as_object()?;
+            if fields.len() != 2 {
+                return None;
+            }
+            let label = MenuText::new(fields.get("label")?.as_string()?.to_owned()).ok()?;
+            let JsonValue::Array(items) = fields.get("items")? else {
+                return None;
+            };
+            let items = items
+                .iter()
+                .map(|item| {
+                    let fields = item.as_object()?;
+                    if fields.len() != 3 {
+                        return None;
+                    }
+                    let id = MenuActionId::new(fields.get("id")?.as_string()?.to_owned()).ok()?;
+                    let label = MenuText::new(fields.get("label")?.as_string()?.to_owned()).ok()?;
+                    let JsonValue::Bool(enabled) = fields.get("enabled")? else {
+                        return None;
+                    };
+                    Some(MenuAction::new(id, label, *enabled))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Menu::new(label, items).ok()
+        })
+        .collect::<Option<Vec<_>>>()?;
+    MenuModel::new(menus).ok()
+}
+
 fn storage_replace_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -2204,6 +2328,7 @@ mod tests {
         SaveSelectionService, SaveSelectionServiceError,
     };
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
+    use anodrel_menu::{MenuModel, MenuRevision, MenuService, MenuServiceError};
     use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
@@ -2397,6 +2522,46 @@ mod tests {
                 .lock()
                 .expect("write recorder lock is available")
                 .push(text.to_owned());
+            self.result
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct RecordingMenu {
+        replacements: Arc<Mutex<Vec<(MenuRevision, MenuModel)>>>,
+        result: Result<(), MenuServiceError>,
+    }
+
+    impl Default for RecordingMenu {
+        fn default() -> Self {
+            Self {
+                replacements: Arc::new(Mutex::new(Vec::new())),
+                result: Ok(()),
+            }
+        }
+    }
+
+    impl RecordingMenu {
+        fn unavailable() -> Self {
+            Self {
+                replacements: Arc::new(Mutex::new(Vec::new())),
+                result: Err(MenuServiceError::Unavailable),
+            }
+        }
+    }
+
+    impl MenuService for RecordingMenu {
+        fn replace(
+            &self,
+            revision: MenuRevision,
+            model: MenuModel,
+        ) -> Result<(), MenuServiceError> {
+            if self.result.is_ok() {
+                self.replacements
+                    .lock()
+                    .expect("menu recorder lock is available")
+                    .push((revision, model));
+            }
             self.result
         }
     }
@@ -2942,6 +3107,20 @@ mod tests {
         )
     }
 
+    fn request_v1_18(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":18}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn host_with_menu(service: impl MenuService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new("test.application", vec![Capability::MenuWrite], "test-host")
+                .expect("test policy is valid"),
+            HostServices::unavailable().with_menu(service),
+        )
+    }
+
     fn host_with_window_state(service: impl WindowStateService + 'static) -> CoreHost {
         CoreHost::with_services(
             HostPolicy::new(
@@ -3081,6 +3260,135 @@ mod tests {
         assert_eq!(
             field(field(&response, "error"), "code").as_string(),
             Some("window.unavailable")
+        );
+    }
+
+    #[test]
+    fn a_granted_complete_menu_reaches_only_the_menu_service() {
+        let service = RecordingMenu::default();
+        let replacements = Arc::clone(&service.replacements);
+        let host = host_with_menu(service);
+        let first_payload = r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":true}]}]}"#;
+        let first =
+            JsonValue::parse(&host.handle_json(&request_v1_18("menu.replace", first_payload)))
+                .expect("response JSON is valid");
+        assert_eq!(field(&first, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&first, "result"), "revision").as_string(),
+            Some("1")
+        );
+
+        let second = JsonValue::parse(&host.handle_json(&request_v1_18(
+            "menu.replace",
+            r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":false}]}]}"#,
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&second, "result"), "revision").as_string(),
+            Some("2")
+        );
+
+        let replacements = replacements
+            .lock()
+            .expect("menu recorder lock is available");
+        assert_eq!(replacements.len(), 2);
+        assert_eq!(replacements[0].0.value(), 1);
+        assert_eq!(replacements[0].1.menus()[0].label().as_str(), "File");
+        assert!(replacements[0].1.menus()[0].items()[0].enabled());
+        assert_eq!(replacements[1].0.value(), 2);
+        assert!(!replacements[1].1.menus()[0].items()[0].enabled());
+    }
+
+    #[test]
+    fn a_menu_needs_its_own_grant_protocol_version_and_host_surface() {
+        let payload = r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":true}]}]}"#;
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowState],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable().with_menu(RecordingMenu::default()),
+            )
+            .handle_json(&request_v1_18("menu.replace", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let unsupported = JsonValue::parse(
+            &host_with_menu(RecordingMenu::default())
+                .handle_json(&request_v1_17("menu.replace", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+
+        let unavailable = JsonValue::parse(
+            &host_with_menu(RecordingMenu::unavailable())
+                .handle_json(&request_v1_18("menu.replace", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unavailable, "error"), "code").as_string(),
+            Some("menu.unavailable")
+        );
+    }
+
+    #[test]
+    fn a_menu_payload_is_exact_bounded_and_cannot_name_native_behavior() {
+        let service = RecordingMenu::default();
+        let replacements = Arc::clone(&service.replacements);
+        let host = host_with_menu(service);
+        for payload in [
+            r#"{}"#,
+            r#"{"menus":[]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":"true"}]}]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"document.new","label":"New document","enabled":true,"nativeId":1}]}]}"#,
+            r#"{"menus":[{"label":"File\nOpen","items":[{"id":"document.new","label":"New document","enabled":true}]}]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"native command","label":"New document","enabled":true}]}]}"#,
+        ] {
+            let response =
+                JsonValue::parse(&host.handle_json(&request_v1_18("menu.replace", payload)))
+                    .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+
+        let items = (0..16)
+            .map(|item| {
+                format!(
+                    r#"{{"id":"command{item}","label":"{}","enabled":true}}"#,
+                    "x".repeat(96)
+                )
+            })
+            .collect::<Vec<_>>();
+        let menus = (0..8)
+            .map(|menu| format!(r#"{{"label":"Menu{menu}","items":[{}]}}"#, items.join(",")))
+            .collect::<Vec<_>>();
+        let oversized = format!(r#"{{"menus":[{}]}}"#, menus.join(","));
+        assert!(oversized.len() > MAX_MENU_REPLACE_REQUEST_BYTES);
+        let response =
+            JsonValue::parse(&host.handle_json(&request_v1_18("menu.replace", &oversized)))
+                .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+        assert!(
+            replacements
+                .lock()
+                .expect("menu recorder lock is available")
+                .is_empty()
         );
     }
 

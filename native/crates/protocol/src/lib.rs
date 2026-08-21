@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 17;
+pub const PROTOCOL_MINOR: u16 = 18;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -80,6 +80,12 @@ pub enum Capability {
     /// this grant cannot be used to reconstruct what someone is typing. See
     /// `docs/UI_FIELDS.md` and Decision 0067.
     UiFieldsRead,
+    /// Replace the complete native menu for this authenticated session.
+    ///
+    /// The application supplies semantic labels and enabled command IDs only.
+    /// A host owns native identifiers, window attachment, and activation
+    /// routing; see `docs/MENUS.md`.
+    MenuWrite,
 }
 
 impl Capability {
@@ -106,6 +112,7 @@ impl Capability {
             Self::WindowTitle => "window.title",
             Self::WindowState => "window.state",
             Self::UiFieldsRead => "ui.fields.read",
+            Self::MenuWrite => "menu.write",
         }
     }
 }
@@ -157,6 +164,11 @@ pub enum ProtocolErrorCode {
     /// from "the host was busy" would report state that, read repeatedly,
     /// describes what the person is doing.
     UiFieldsUnavailable,
+    /// The host has no session-owned native menu, or could not update it.
+    ///
+    /// This intentionally does not distinguish absent UI state, a busy UI
+    /// thread, or an operating-system failure.
+    MenuUnavailable,
 }
 
 impl ProtocolErrorCode {
@@ -190,6 +202,7 @@ impl ProtocolErrorCode {
             Self::WindowBusy => "window.busy",
             Self::WindowTitleInvalid => "window.title_invalid",
             Self::UiFieldsUnavailable => "ui.fields.unavailable",
+            Self::MenuUnavailable => "menu.unavailable",
         }
     }
 }

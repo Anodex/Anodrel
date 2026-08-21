@@ -6,6 +6,7 @@ import {
   type PlatformOperation,
   type RequestEnvelope,
   type ResultFor,
+  type NativeSessionMenu,
   type WindowState,
 } from "@anodrel/protocol";
 
@@ -83,6 +84,19 @@ export class PlatformClient {
    */
   setWindowState(state: WindowState): Promise<ResultFor<"window.state.set">> {
     return this.request("window.state.set", { state });
+  }
+
+  /**
+   * Replaces this session's complete native menu bar.
+   *
+   * Items are semantic display commands only. The host owns every native menu
+   * identifier and accepts no accelerator, callback, target, handle, or
+   * command payload through this method.
+   */
+  replaceMenu(
+    menus: readonly NativeSessionMenu[],
+  ): Promise<ResultFor<"menu.replace">> {
+    return this.request("menu.replace", { menus });
   }
 
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {

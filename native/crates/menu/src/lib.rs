@@ -1,8 +1,10 @@
 //! Bounded semantic native-menu state for one authenticated session.
 //!
 //! This crate validates the portable menu model and its revision-bound command
-//! state. It has no protocol, queue, renderer, operating-system call, native
-//! handle, callback, or application identity. A host owns all of those seams.
+//! state. It also defines the narrow one-way host service seam used to apply a
+//! validated whole-model replacement. It has no protocol, queue, renderer,
+//! operating-system call, native handle, callback, or application identity. A
+//! host owns all of those seams.
 //! See `docs/MENUS.md` and Decision 0080.
 
 #![forbid(unsafe_code)]
@@ -11,6 +13,7 @@
 mod error;
 mod model;
 mod revision;
+mod service;
 mod session;
 
 pub use error::MenuError;
@@ -19,4 +22,5 @@ pub use model::{
     MenuActionId, MenuModel, MenuText,
 };
 pub use revision::MenuRevision;
+pub use service::{MenuService, MenuServiceError, UnavailableMenuService};
 pub use session::{MenuActionEvent, MenuSession};

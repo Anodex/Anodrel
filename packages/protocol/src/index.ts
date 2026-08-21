@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 17 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 18 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -14,6 +14,13 @@ export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_FILTERS = 8;
 export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
 export const MAX_FILE_TEXT_WRITE_BYTES = 8 * 1024;
+/** Maximum encoded JSON bytes in one complete native-menu replacement payload. */
+export const MAX_MENU_REPLACE_REQUEST_BYTES = 16 * 1024;
+export const MAX_MENUS = 8;
+export const MAX_MENU_ITEMS = 16;
+export const MAX_MENU_LABEL_BYTES = 32;
+export const MAX_MENU_ITEM_LABEL_BYTES = 96;
+export const MAX_MENU_ACTION_ID_BYTES = 64;
 export const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES = 24 * 1024;
 export const SELECTION_REFERENCE_BYTES = 22;
 /** Exact characters in a host-created save reference. */
@@ -50,12 +57,26 @@ export type Capability =
   | "notification.show"
   | "window.title"
   | "ui.fields.read"
-  | "window.state";
+  | "window.state"
+  | "menu.write";
 
 export type EmptyPayload = Record<string, never>;
 
 /** The complete set of presentation states an application may request. */
 export type WindowState = "minimized" | "maximized" | "restored";
+
+/** One enabled or disabled semantic command in a native session menu. */
+export interface NativeMenuItem {
+  readonly id: string;
+  readonly label: string;
+  readonly enabled: boolean;
+}
+
+/** One top-level native session menu with its complete ordered item set. */
+export interface NativeSessionMenu {
+  readonly label: string;
+  readonly items: readonly NativeMenuItem[];
+}
 
 export interface PlatformOperationMap {
   "platform.ping": {
@@ -141,6 +162,16 @@ export interface PlatformOperationMap {
     readonly result: { readonly status: "applied" };
   };
   /**
+   * Replaces this authenticated session's complete native menu model.
+   *
+   * There is no native command number, accelerator, target, callback, or
+   * handle. A successful revision is host-owned and opaque to the SDK.
+   */
+  "menu.replace": {
+    readonly payload: { readonly menus: readonly NativeSessionMenu[] };
+    readonly result: { readonly revision: string };
+  };
+  /**
    * Reads every field value on this session's own current surface.
    *
    * A snapshot, not a stream. The payload is empty and there is no selector:
@@ -168,7 +199,7 @@ export interface PlatformOperationMap {
   "ui.events.read": {
     readonly payload: EmptyPayload;
     readonly result: {
-      readonly events: readonly UiActionInvokedEvent[];
+      readonly events: readonly UiInteractionEvent[];
       readonly dropped: number;
       readonly discarded: number;
     };
@@ -330,7 +361,8 @@ export type ProtocolErrorCode =
   | "window.unavailable"
   | "window.busy"
   | "window.title_invalid"
-  | "ui.fields.unavailable";
+  | "ui.fields.unavailable"
+  | "menu.unavailable";
 
 export interface ProtocolError {
   readonly code: ProtocolErrorCode;
@@ -613,6 +645,17 @@ export function isWindowTitleSetPayload(
   );
 }
 
+/** One current enabled semantic command selected from a native session menu. */
+export interface MenuActionInvokedEvent
+  extends EventEnvelope<{ readonly menuRevision: string; readonly action: string }> {
+  readonly eventName: "menu.action.invoked";
+  readonly source: "native.menu";
+  readonly schemaVersion: { readonly major: 1; readonly minor: 18 };
+}
+
+/** A semantic interaction delivered by the bounded `ui.events.read` result. */
+export type UiInteractionEvent = UiActionInvokedEvent | MenuActionInvokedEvent;
+
 /** Validates one exact opaque save reference and bounded UTF-8 output text. */
 export function isFileTextWritePayload(
   value: unknown,
@@ -626,6 +669,107 @@ export function isFileTextWritePayload(
     typeof value.text === "string" &&
     new TextEncoder().encode(value.text).byteLength <= MAX_FILE_TEXT_WRITE_BYTES
   );
+}
+
+/** Validates one exact bounded native-session menu replacement. */
+export function isMenuReplacePayload(
+  value: unknown,
+): value is PayloadFor<"menu.replace"> {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 1 ||
+    !Array.isArray(value.menus) ||
+    value.menus.length === 0 ||
+    value.menus.length > MAX_MENUS ||
+    !hasAtMostEncodedJsonBytes(value, MAX_MENU_REPLACE_REQUEST_BYTES)
+  ) {
+    return false;
+  }
+
+  const actionIds = new Set<string>();
+  return value.menus.every((menu) => isNativeSessionMenu(menu, actionIds));
+}
+
+function isNativeSessionMenu(value: unknown, actionIds: Set<string>): boolean {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
+    !isMenuText(value.label, MAX_MENU_LABEL_BYTES) ||
+    !Array.isArray(value.items) ||
+    value.items.length === 0 ||
+    value.items.length > MAX_MENU_ITEMS
+  ) {
+    return false;
+  }
+
+  for (const item of value.items) {
+    if (
+      !isRecord(item) ||
+      Object.keys(item).length !== 3 ||
+      !isMenuActionId(item.id) ||
+      !isMenuText(item.label, MAX_MENU_ITEM_LABEL_BYTES) ||
+      typeof item.enabled !== "boolean" ||
+      actionIds.has(item.id)
+    ) {
+      return false;
+    }
+    actionIds.add(item.id);
+  }
+  return true;
+}
+
+function isMenuActionId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_MENU_ACTION_ID_BYTES &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(value)
+  );
+}
+
+function isMenuText(value: unknown, maximumBytes: number): value is string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    !isWellFormedUnicode(value) ||
+    new TextEncoder().encode(value).byteLength > maximumBytes
+  ) {
+    return false;
+  }
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isWellFormedUnicode(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      if (index + 1 >= value.length) {
+        return false;
+      }
+      const next = value.charCodeAt(index + 1);
+      if (next < 0xdc00 || next > 0xdfff) {
+        return false;
+      }
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function hasAtMostEncodedJsonBytes(value: unknown, maximumBytes: number): boolean {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength <= maximumBytes;
+  } catch {
+    return false;
+  }
 }
 
 /**

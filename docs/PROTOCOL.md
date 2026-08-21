@@ -1,6 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.17.
+**Status:** Implemented through version 1.18. The direct Windows menu adapter
+and its interaction delivery path remain pending.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -28,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.17 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 17}`.
+the host's. Version 1.18 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 18}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -68,6 +69,7 @@ The implemented operations are:
 | `window.title.set` | `{ "title": string }` | `{ "status": "applied" }` | `window.title` |
 | `ui.fields.read` | `{}` | whole-surface current values | `ui.fields.read` |
 | `window.state.set` | `{ "state": "minimized" \| "maximized" \| "restored" }` | `{ "status": "applied" }` | `window.state` |
+| `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
@@ -85,15 +87,13 @@ The implemented operations are:
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
 
-### Accepted additions not yet implemented
+### Native session menus
 
-| Operation | Payload | Result | Capability |
-| --- | --- | --- | --- |
-| `menu.replace` *(1.18 planned)* | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
-
-`docs/MENUS.md` defines the exact bounded model, menu-action event, and
-Windows ownership rule. It is documented before implementation; version 1.17
-hosts must continue to reject this operation.
+Protocol 1.18 implements the strict portable `menu.replace` boundary and its
+separate `menu.write` grant. A core with no attached native menu service returns
+only `menu.unavailable`; the direct Windows UI-thread bridge and interactive
+delivery remain pending. `docs/MENUS.md` defines the exact model, menu-action
+event, and Windows ownership rule.
 
 ### Diagnostic entries
 
@@ -423,8 +423,8 @@ Protocol 1.9 adds `file.unavailable`, `file.text_invalid`, and
 `file.text_too_large`.
 Protocol 1.17 reuses `file.unavailable` and `file.text_too_large` for the
 separate retained-output-object text-write boundary; it adds no new error code.
-Protocol 1.18 will add `menu.unavailable` for a host that cannot attach or
-update its own native session menu.
+Protocol 1.18 adds `menu.unavailable` for a host that cannot attach or update
+its own native session menu.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 
@@ -440,8 +440,10 @@ Events are opt-in. Every event must include `protocolVersion`, `kind: "event"`,
 `eventName`, `source`, `schemaVersion`, and a typed payload. Version 1.2
 implements `ui.action.invoked` only through `ui.events.read`; it does not yet
 provide subscriptions, unsolicited delivery, acknowledgements, or cancellation.
-Protocol 1.18 will add `menu.action.invoked` to the same bounded pull result;
-it carries only a host-validated menu revision and semantic action ID.
+Protocol 1.18 reserves `menu.action.invoked` in the same bounded pull result;
+the direct Windows adapter will publish it only after the common interaction
+mailbox implementation is complete. It carries only a host-validated menu
+revision and semantic action ID.
 
 ## Security rules
 

@@ -50,9 +50,17 @@ impl MenuSession {
         self.model.as_ref().map(|model| (model, self.revision))
     }
 
+    /// Returns the next nonzero revision without changing the current model.
+    ///
+    /// A host can use this to apply a native replacement first, then commit the
+    /// matching portable model only after that replacement succeeds.
+    pub fn next_revision(&self) -> Result<MenuRevision, MenuError> {
+        self.revision.next().ok_or(MenuError::RevisionExhausted)
+    }
+
     /// Replaces the complete model and advances the revision without wrapping.
     pub fn replace(&mut self, model: MenuModel) -> Result<MenuRevision, MenuError> {
-        let revision = self.revision.next().ok_or(MenuError::RevisionExhausted)?;
+        let revision = self.next_revision()?;
         self.model = Some(model);
         self.revision = revision;
         Ok(revision)
@@ -148,6 +156,10 @@ mod tests {
     #[test]
     fn replaces_and_revalidates_only_current_enabled_actions() {
         let mut session = MenuSession::new();
+        assert_eq!(
+            session.next_revision(),
+            Ok(MenuRevision::INITIAL.next().expect("first revision exists"))
+        );
         let first = session.replace(model(true)).expect("first menu is valid");
         assert_eq!(first.value(), 1);
         let action = MenuActionId::new("document.new").expect("test ID is valid");

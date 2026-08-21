@@ -6,6 +6,7 @@ import {
   isClipboardWritePayload,
   isCredentialReadPayload,
   isCredentialWritePayload,
+  isMenuReplacePayload,
   isNotificationShowPayload,
   isWindowStateSetPayload,
   isWindowTitleSetPayload,
@@ -107,12 +108,13 @@ export class MockHost {
   createTransport(sessionId = `mock-session-${++this.sessionCount}`): MockHostTransport {
     const cancelled = new Set<string>();
     const uiDocument = { revision: 0 };
+    const menu = { revision: 0 };
 
     return {
       send: async <TOperation extends PlatformOperation>(
         request: RequestEnvelope<TOperation>,
       ) =>
-        this.handle(request, sessionId, cancelled, uiDocument) as Promise<ResponseEnvelope<TOperation>>,
+        this.handle(request, sessionId, cancelled, uiDocument, menu) as Promise<ResponseEnvelope<TOperation>>,
       cancel: async (cancellation: CancellationEnvelope) => {
         if (!isCancellationEnvelope(cancellation)) {
           throw new Error("MockHost received an invalid cancellation envelope.");
@@ -132,6 +134,7 @@ export class MockHost {
     sessionId = `direct-session-${++this.sessionCount}`,
     cancelled: ReadonlySet<string> = new Set(),
     uiDocument: UiDocumentState = { revision: 0 },
+    menu: MenuState = { revision: 0 },
   ): Promise<ResponseEnvelope> {
     const requestId = extractRequestId(request);
 
@@ -155,13 +158,14 @@ export class MockHost {
       );
     }
 
-    return this.dispatch(request, sessionId, uiDocument);
+    return this.dispatch(request, sessionId, uiDocument, menu);
   }
 
   private dispatch(
     request: WireRequestEnvelope,
     sessionId: string,
     uiDocument: UiDocumentState,
+    menu: MenuState,
   ): ResponseEnvelope {
     switch (request.operation) {
       case "platform.ping":
@@ -335,6 +339,34 @@ export class MockHost {
         // The mock deliberately reports acceptance only. It has no native
         // window and cannot reveal a resulting state, handle, or geometry.
         return this.success("window.state.set", request.requestId, { status: "applied" });
+
+      case "menu.replace":
+        if (request.protocolVersion.minor < 18) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "menu.replace requires protocol 1.18 or later.",
+          );
+        }
+        if (!isMenuReplacePayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "menu.replace requires one exact bounded complete menu model.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "menu.write")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "menu.replace requires the menu.write capability.",
+            { capability: "menu.write" },
+          );
+        }
+        menu.revision += 1;
+        return this.success("menu.replace", request.requestId, {
+          revision: menu.revision.toString(),
+        });
 
       case "ui.fields.read":
         if (request.protocolVersion.minor < 15) {
@@ -766,6 +798,10 @@ export class MockHost {
 }
 
 interface UiDocumentState {
+  revision: number;
+}
+
+interface MenuState {
   revision: number;
 }
 

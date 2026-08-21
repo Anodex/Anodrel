@@ -289,6 +289,7 @@ enum RecordVersion {
     V1_5,
     V1_6,
     V1_7,
+    V1_8,
 }
 
 impl RecordVersion {
@@ -299,7 +300,13 @@ impl RecordVersion {
     const fn accepts_v1_2_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_2 | Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7
+            Self::V1_2
+                | Self::V1_3
+                | Self::V1_4
+                | Self::V1_5
+                | Self::V1_6
+                | Self::V1_7
+                | Self::V1_8
         )
     }
 
@@ -307,18 +314,21 @@ impl RecordVersion {
     const fn accepts_v1_3_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7
+            Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8
         )
     }
 
     /// Whether this version accepts the grant version 1.4 introduced.
     const fn accepts_v1_4_grants(self) -> bool {
-        matches!(self, Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7)
+        matches!(
+            self,
+            Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8
+        )
     }
 
     /// Whether this version accepts the grant version 1.5 introduced.
     const fn accepts_v1_5_grants(self) -> bool {
-        matches!(self, Self::V1_5 | Self::V1_6 | Self::V1_7)
+        matches!(self, Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8)
     }
 }
 
@@ -434,10 +444,18 @@ fn capability_for_record_version(
         "notification.show" if version.accepts_v1_3_grants() => Some(Capability::NotificationShow),
         "window.title" if version.accepts_v1_4_grants() => Some(Capability::WindowTitle),
         "ui.fields.read" if version.accepts_v1_5_grants() => Some(Capability::UiFieldsRead),
-        "window.state" if matches!(version, RecordVersion::V1_6 | RecordVersion::V1_7) => {
+        "window.state"
+            if matches!(
+                version,
+                RecordVersion::V1_6 | RecordVersion::V1_7 | RecordVersion::V1_8
+            ) =>
+        {
             Some(Capability::WindowState)
         }
-        "file.write_text" if version == RecordVersion::V1_7 => Some(Capability::FileWriteText),
+        "file.write_text" if matches!(version, RecordVersion::V1_7 | RecordVersion::V1_8) => {
+            Some(Capability::FileWriteText)
+        }
+        "menu.write" if version == RecordVersion::V1_8 => Some(Capability::MenuWrite),
         _ => None,
     }
 }
@@ -545,6 +563,7 @@ fn validate_version(
         (1, 5) => Ok(RecordVersion::V1_5),
         (1, 6) => Ok(RecordVersion::V1_6),
         (1, 7) => Ok(RecordVersion::V1_7),
+        (1, 8) => Ok(RecordVersion::V1_8),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -982,6 +1001,58 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_8_adds_menu_write_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 8")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"clipboard.read\", \"file.write_text\", \"menu.write\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.8 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::ClipboardRead,
+                anodrel_protocol::Capability::FileWriteText,
+                anodrel_protocol::Capability::MenuWrite,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_menu_write_grant() {
+        // Version 1.7 is the newest record before this grant. Keeping it
+        // invalid prevents a provisioning tool from widening a verified
+        // application before the new menu authority is intentionally granted.
+        for minor in ["5", "6", "7"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"menu.write\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.8 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

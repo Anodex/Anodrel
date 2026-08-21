@@ -290,6 +290,16 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`,
 `docs/SCROLLING.md`, and Decisions 0025 through 0039.
 
+`anodrel-menu` is a separate portable module for one authenticated session's
+complete bounded menu model, monotonic revision, and enabled-command
+revalidation. Its one-way service seam transfers only a validated model and
+host-owned revision; it carries no window, native identifier, callback, or
+operating-system authority. `anodrel-core` applies the `menu.write` policy and
+commits that portable state only after the host service accepts the complete
+replacement. The pending Windows adapter will own native menu construction,
+numeric command mapping, and the shared interaction mailbox. See
+`docs/MENUS.md` and Decision 0080.
+
 `anodrel-windows-accessibility` sits directly above that snapshot. It is a pure
 mapping from one visible snapshot to the values Microsoft UI Automation asks
 for: control types, property values, runtime IDs, and screen-space rectangles.

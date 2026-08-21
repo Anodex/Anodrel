@@ -5,6 +5,7 @@ import {
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   MAX_EXTERNAL_LINK_REQUEST_BYTES,
   MAX_FILE_TEXT_WRITE_BYTES,
+  MAX_MENU_REPLACE_REQUEST_BYTES,
   PROTOCOL_VERSION,
   createRequest,
   isWireRequestEnvelope,
@@ -675,6 +676,124 @@ test("a session window state is closed, separately granted, and untargetable", a
     requestId: "window-state-before-protocol-1.16",
     operation: "window.state.set",
     payload: { state: "restored" },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
+test("a native session menu is complete, separately granted, and untargetable", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["menu.write"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+  const menu = [
+    {
+      label: "File",
+      items: [{ id: "document.new", label: "New document", enabled: true }],
+    },
+  ] as const;
+
+  assert.deepEqual(await client.replaceMenu(menu), { revision: "1" });
+  assert.deepEqual(await client.replaceMenu(menu), { revision: "2" });
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.replaceMenu(menu),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "menu.write",
+  );
+
+  const transport = host.createTransport();
+  for (const payload of [
+    { menus: [] },
+    {
+      menus: [
+        {
+          label: "File",
+          items: [{ id: "document.new", label: "New document", enabled: true, nativeId: 1 }],
+        },
+      ],
+    },
+    {
+      menus: [
+        {
+          label: "File",
+          items: [
+            { id: "document.new", label: "New document", enabled: true },
+            { id: "document.new", label: "Duplicate", enabled: true },
+          ],
+        },
+      ],
+    },
+    {
+      menus: [
+        {
+          label: "File",
+          items: [{ id: "system command", label: "New document", enabled: true }],
+        },
+      ],
+    },
+    {
+      menus: [
+        {
+          label: "\uD800",
+          items: [{ id: "document.new", label: "New document", enabled: true }],
+        },
+      ],
+    },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: PROTOCOL_VERSION,
+      kind: "request",
+      requestId: `menu-${JSON.stringify(payload)}`,
+      operation: "menu.replace",
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+
+  const items = Array.from({ length: 16 }, (_, item) => ({
+    id: `command${item}`,
+    label: "x".repeat(96),
+    enabled: true,
+  }));
+  const oversizedPayload = {
+    menus: Array.from({ length: 8 }, (_, menuIndex) => ({
+      label: `Menu${menuIndex}`,
+      items: items.map((item) => ({ ...item, id: `${item.id}-${menuIndex}` })),
+    })),
+  };
+  assert.ok(JSON.stringify(oversizedPayload).length > MAX_MENU_REPLACE_REQUEST_BYTES);
+  const oversized = await transport.send({
+    protocolVersion: PROTOCOL_VERSION,
+    kind: "request",
+    requestId: "menu-oversized",
+    operation: "menu.replace",
+    payload: oversizedPayload as never,
+  });
+  assert.equal(
+    oversized.status === "failure" ? oversized.error.code : undefined,
+    "request.payload_invalid",
+  );
+
+  const older = await transport.send({
+    protocolVersion: { major: 1, minor: 17 },
+    kind: "request",
+    requestId: "menu-before-protocol-1.18",
+    operation: "menu.replace",
+    payload: { menus: menu } as never,
   });
   assert.equal(
     older.status === "failure" ? older.error.code : undefined,

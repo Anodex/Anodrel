@@ -44,6 +44,7 @@ dependencies = [
  "anodrel-external-links",
  "anodrel-file-access",
  "anodrel-file-dialog",
+ "anodrel-menu",
  "anodrel-notifications",
  "anodrel-protocol",
  "anodrel-storage",
