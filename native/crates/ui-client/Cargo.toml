@@ -1,0 +1,15 @@
+[package]
+name = "anodrel-ui-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-client = { path = "../client" }
+anodrel-json = { path = "../json" }
+anodrel-ui = { path = "../ui" }
+anodrel-ui-document = { path = "../ui-document" }
+
+[dev-dependencies]
+anodrel-bootstrap = { path = "../bootstrap" }
+anodrel-wire = { path = "../wire" }

@@ -122,6 +122,7 @@ dependencies = [
  "anodrel-json",
  "anodrel-protocol",
  "anodrel-ui",
+ "anodrel-ui-client",
  "anodrel-ui-document",
  "anodrel-ui-session",
  "anodrel-windows-bootstrap",
@@ -225,6 +226,18 @@ dependencies = [
 [[package]]
 name = "anodrel-ui"
 version = "0.1.0"
+
+[[package]]
+name = "anodrel-ui-client"
+version = "0.1.0"
+dependencies = [
+ "anodrel-bootstrap",
+ "anodrel-client",
+ "anodrel-json",
+ "anodrel-ui",
+ "anodrel-ui-document",
+ "anodrel-wire",
+]
 
 [[package]]
 name = "anodrel-ui-document"

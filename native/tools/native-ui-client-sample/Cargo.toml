@@ -10,11 +10,12 @@ path = "src/main.rs"
 
 [dependencies]
 anodrel-client = { path = "../../crates/client" }
-anodrel-json = { path = "../../crates/json" }
+anodrel-ui-client = { path = "../../crates/ui-client" }
 anodrel-windows-client = { path = "../../adapters/windows-client" }
 
 [dev-dependencies]
 anodrel-core = { path = "../../crates/core" }
+anodrel-json = { path = "../../crates/json" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }

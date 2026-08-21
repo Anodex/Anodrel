@@ -125,6 +125,7 @@ This contract adds no protocol version and no wire format. `ANBI` bootstrap v1
 and `ANDR` wire v1 remain the existing host contracts in `docs/TRANSPORT.md`.
 The native-client modules are not a published stable application SDK yet;
 their public API may evolve while the repository retains the fixture and probe
-checks described above. Decision 0082 now defines the next, deliberately
-smaller typed native UI facade and development-template boundary before its
-implementation. Publishing a stable API still requires a separate decision.
+checks described above. Decision 0082's deliberately smaller typed
+`anodrel-ui-client` facade is now implemented and consumed by the compiled UI
+diagnostic; its generator and explicit host route remain separate work.
+Publishing a stable API still requires a separate decision.

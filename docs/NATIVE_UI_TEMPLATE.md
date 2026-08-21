@@ -1,7 +1,9 @@
 # Anodrel development native UI template
 
-**Status:** Accepted contract; implementation is next. This is a Windows
-development template, not a product packaging or application-identity format.
+**Status:** The portable typed client is implemented and covered by unit plus
+real-pipe tests. The generator and explicit development host route remain next.
+This is a Windows development template, not a product packaging or
+application-identity format.
 
 ## Purpose
 
@@ -19,7 +21,7 @@ path in `docs/PRODUCT_SESSIONS.md`.
 ## Typed client contract
 
 `anodrel-ui-client` wraps one already-authenticated `anodrel-client` session.
-Its initial Protocol 1.3 surface is exactly this:
+Its implemented initial Protocol 1.3 surface is exactly this:
 
 | Operation | Input | Typed result | Required host grant |
 | --- | --- | --- | --- |
@@ -72,7 +74,7 @@ publisher name, a host window title, or a machine-policy value.
 
 ## Development host session
 
-The future `--native-template-client <client.exe>` host command will create one
+The planned `--native-template-client <client.exe>` host command will create one
 host-owned native window and grant its one authenticated session only:
 
 - `ui.document.write`;
@@ -89,6 +91,8 @@ bounded lifecycle; it cannot leave a worker or child running in the background.
 This template introduces no protocol version or wire format. It uses existing
 Protocol 1.3 `ui.document.replace`, `ui.events.read`, and `session.close`
 operations, and existing `ANBI` bootstrap v1 plus `ANDR` wire v1. Its proof will
-include typed-client tests, a real Windows pipe test, an isolated generated
-project build/run test, host lifecycle tests, and the documented manual native
-window action. See Decision 0082.
+includes typed-client tests and a real Windows pipe test: the existing compiled
+native UI diagnostic now consumes this facade in its end-to-end test. The
+remaining generator and host route will add an isolated generated-project
+build/run test, host lifecycle tests, and the documented manual native window
+action. See Decision 0082.
