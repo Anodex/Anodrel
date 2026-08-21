@@ -5,8 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+anodrel-ui = { path = "../../crates/ui" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
 anodrel-windows-accessibility = { path = "../windows-accessibility" }
 
 [dev-dependencies]
-anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }

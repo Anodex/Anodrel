@@ -1077,18 +1077,27 @@ fn open_product_session_window(
 /// The semantics come from the same layout the surface draws, so what a screen
 /// reader is told cannot drift from what is on screen. A window with no UI
 /// document publishes nothing, which is the honest answer for a document or
-/// Startup Lab surface.
-fn accessible_elements_for(window: Hwnd) -> Vec<anodrel_windows_accessibility::AccessibleElement> {
+/// Startup Lab surface. Only a current authenticated UI session adds the bounded
+/// action sink used by an enabled button's Invoke pattern.
+fn accessible_elements_for(
+    window: Hwnd,
+) -> (
+    Vec<anodrel_windows_accessibility::AccessibleElement>,
+    Option<anodrel_windows_uia::UiAutomationActionSink>,
+) {
     let rect = client_rect(window);
-    let Ok(Some(snapshot)) =
+    let Ok(Some((snapshot, action_sink))) =
         registry::accessibility_snapshot(window, rect.width() as f32, rect.height() as f32)
     else {
-        return Vec::new();
+        return (Vec::new(), None);
     };
-    anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
-        &snapshot,
-        client_origin(window),
-    ))
+    (
+        anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
+            &snapshot,
+            client_origin(window),
+        )),
+        action_sink,
+    )
 }
 
 /// Locates a window's client area on screen, with its current density.
@@ -1561,15 +1570,16 @@ unsafe extern "system" fn window_proc(
 
 unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult {
     // Answered before the match below so an unrelated object request still
-    // reaches the default procedure. The provider is read-only: it publishes
-    // semantics outward and accepts nothing from Windows or an application.
+    // reaches the default procedure. It publishes semantics outward and only an
+    // enabled authenticated-session button can offer its existing revision-bound
+    // action mailbox; it has no native-input or application callback route.
     if message == WM_GETOBJECT {
-        let elements = accessible_elements_for(window);
+        let (elements, action_sink) = accessible_elements_for(window);
         // SAFETY: this window belongs to the current thread's message queue,
         // which is the only thread that dispatches to this procedure.
-        if let Some(result) =
-            unsafe { anodrel_windows_uia::answer_get_object(window, wparam, lparam, elements) }
-        {
+        if let Some(result) = unsafe {
+            anodrel_windows_uia::answer_get_object(window, wparam, lparam, elements, action_sink)
+        } {
             return result;
         }
     }

@@ -1,19 +1,21 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![deny(missing_docs)]
 
-//! The read-only UI Automation provider for one Anodrel window.
+//! The UI Automation provider for one Anodrel window.
 //!
 //! The window answers as an automation root, and the semantic elements the
 //! host mapped from its current layout answer as its children. See
 //! `docs/ACCESSIBILITY.md`.
 //!
-//! The provider is read-only and host-owned. It supplies no pattern, so nothing
-//! can be invoked, toggled, scrolled, or edited through it, and it refuses to
-//! move focus. Nothing flows back to an application: it accepts no input, and
-//! whether assistive technology is listening never leaves this crate.
+//! The provider is host-owned. It supplies Invoke only for an enabled button in
+//! a current authenticated UI session, and routes that action through the session's
+//! existing bounded semantic mailbox. It supplies no other pattern and refuses
+//! to move focus. Nothing tells an application that assistive technology is
+//! listening. See Decision 0069.
 
 mod raw;
 mod raw2;
+mod raw3;
 mod tree;
 
 use std::{
@@ -26,6 +28,8 @@ use std::{
     },
 };
 
+use anodrel_ui::{ElementId, UiEvent};
+use anodrel_ui_session::{UiDocumentRevision, UiInputCandidate, UiInputMailbox};
 use anodrel_windows_accessibility::AccessibleElement;
 use raw::{
     E_FAIL, E_NOINTERFACE, E_POINTER, Guid, Handle, Hresult, IID_IRAW_ELEMENT_PROVIDER_SIMPLE,
@@ -35,9 +39,47 @@ use raw2::{
     IID_IRAW_ELEMENT_PROVIDER_FRAGMENT, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT,
     UIA_E_NOTSUPPORTED, UiaRect,
 };
+use raw3::{IID_IINVOKE_PROVIDER, UIA_INVOKE_PATTERN_ID};
 use tree::Tree;
 
 pub use tree::publishable;
+
+/// The session-bound semantic route an invokable authenticated button may use.
+///
+/// This type deliberately holds no window handle, provider pointer, native
+/// object, application callback, or mutable view. It is constructed only for a
+/// non-initial authenticated-session revision and gives UI Automation exactly the
+/// same bounded candidate route as local semantic input.
+#[derive(Clone, Debug)]
+pub struct UiAutomationActionSink {
+    revision: UiDocumentRevision,
+    mailbox: UiInputMailbox,
+}
+
+impl UiAutomationActionSink {
+    /// Builds the route for an authenticated session that has accepted a document.
+    ///
+    /// The initial revision has no document or layout to bind an action to, so
+    /// it intentionally has no UI Automation action route.
+    #[must_use]
+    pub fn for_current_session(
+        revision: UiDocumentRevision,
+        mailbox: UiInputMailbox,
+    ) -> Option<Self> {
+        (revision != UiDocumentRevision::INITIAL).then_some(Self { revision, mailbox })
+    }
+
+    /// Offers one semantic button action to the existing bounded session queue.
+    ///
+    /// `false` means the fixed queue was full. The queue records that overflow
+    /// for the granted protocol consumer; this API exposes no queue state.
+    fn offer(&self, id: ElementId) -> bool {
+        self.mailbox.try_push(UiInputCandidate::new(
+            self.revision,
+            UiEvent::ActionInvoked(id),
+        ))
+    }
+}
 
 /// Answers `WM_GETOBJECT` for one host window.
 ///
@@ -56,6 +98,7 @@ pub unsafe fn answer_get_object(
     wparam: usize,
     lparam: isize,
     elements: Vec<AccessibleElement>,
+    action_sink: Option<UiAutomationActionSink>,
 ) -> Option<Lresult> {
     if lparam != UIA_ROOT_OBJECT_ID {
         return None;
@@ -67,7 +110,7 @@ pub unsafe fn answer_get_object(
     // requests with nothing, and was resolved to the default window provider
     // instead. Attaching a screen reader afterwards then found no semantics.
 
-    let tree = Arc::new(Tree::new(window_title(window), elements));
+    let tree = Arc::new(Tree::new(window_title(window), elements, action_sink));
     let provider = Provider::create(window, None, tree);
     // SAFETY: `provider` is live with one reference held here, and
     // UiaReturnRawElementProvider takes its own before returning.
@@ -121,6 +164,16 @@ struct FragmentRootVtbl {
     get_focus: unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> Hresult,
 }
 
+/// `IInvokeProvider`.
+#[repr(C)]
+struct InvokeVtbl {
+    query_interface:
+        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
+    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
+    release: unsafe extern "system" fn(*mut c_void) -> u32,
+    invoke: unsafe extern "system" fn(*mut c_void) -> Hresult,
+}
+
 static SIMPLE_VTBL: SimpleVtbl = SimpleVtbl {
     query_interface: simple_query_interface,
     add_ref: simple_add_ref,
@@ -151,6 +204,13 @@ static FRAGMENT_ROOT_VTBL: FragmentRootVtbl = FragmentRootVtbl {
     get_focus,
 };
 
+static INVOKE_VTBL: InvokeVtbl = InvokeVtbl {
+    query_interface: invoke_query_interface,
+    add_ref: invoke_add_ref,
+    release: invoke_release,
+    invoke,
+};
+
 /// One reference-counted provider for the window root or one of its elements.
 ///
 /// COM reaches an object through the vtable pointer for the interface being
@@ -161,6 +221,7 @@ struct Provider {
     simple: *const SimpleVtbl,
     fragment: *const FragmentVtbl,
     fragment_root: *const FragmentRootVtbl,
+    invoke: *const InvokeVtbl,
     references: AtomicU32,
     window: Handle,
     /// `None` for the window root, otherwise the element's position.
@@ -174,6 +235,7 @@ impl Provider {
             simple: &raw const SIMPLE_VTBL,
             fragment: &raw const FRAGMENT_VTBL,
             fragment_root: &raw const FRAGMENT_ROOT_VTBL,
+            invoke: &raw const INVOKE_VTBL,
             references: AtomicU32::new(1),
             window,
             element,
@@ -207,6 +269,10 @@ unsafe fn root_of(this: *mut c_void) -> *mut Provider {
     unsafe { provider_from(this, offset_of!(Provider, fragment_root)) }
 }
 
+unsafe fn invoke_of(this: *mut c_void) -> *mut Provider {
+    unsafe { provider_from(this, offset_of!(Provider, invoke)) }
+}
+
 /// Runs one COM method body, converting a panic into a failure code.
 ///
 /// These are `extern "system"` and do not unwind, so an escaping panic would
@@ -232,7 +298,16 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
     // SAFETY: COM guarantees one readable GUID.
     let requested = unsafe { *requested };
     // SAFETY: the caller holds a reference, so the object is live.
-    let is_root = unsafe { (*provider).is_root() };
+    let (is_root, element, supports_invoke) = unsafe {
+        let provider = &*provider;
+        (
+            provider.is_root(),
+            provider.element,
+            provider
+                .element
+                .is_some_and(|index| provider.tree.supports_invoke(index)),
+        )
+    };
 
     let interface = if requested == IID_IUNKNOWN || requested == IID_IRAW_ELEMENT_PROVIDER_SIMPLE {
         // SAFETY: taking the address of a field of a live object.
@@ -244,6 +319,12 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
         // Only the window is a fragment root; an element must not claim to be.
         // SAFETY: as above.
         unsafe { (&raw mut (*provider).fragment_root).cast::<c_void>() }
+    } else if requested == IID_IINVOKE_PROVIDER && element.is_some() && supports_invoke {
+        // An Invoke interface exists only for an enabled authenticated-session
+        // button. Every other provider denies it rather than exposing a method
+        // that could act on a stale or diagnostic surface.
+        // SAFETY: as above.
+        unsafe { (&raw mut (*provider).invoke).cast::<c_void>() }
     } else {
         return E_NOINTERFACE;
     };
@@ -347,6 +428,12 @@ forward_unknown!(
     fragment_of
 );
 forward_unknown!(root_query_interface, root_add_ref, root_release, root_of);
+forward_unknown!(
+    invoke_query_interface,
+    invoke_add_ref,
+    invoke_release,
+    invoke_of
+);
 
 unsafe extern "system" fn get_provider_options(_this: *mut c_void, options: *mut i32) -> Hresult {
     contain(|| {
@@ -360,19 +447,54 @@ unsafe extern "system" fn get_provider_options(_this: *mut c_void, options: *mut
 }
 
 unsafe extern "system" fn get_pattern_provider(
-    _this: *mut c_void,
-    _pattern: i32,
+    this: *mut c_void,
+    pattern: i32,
     out: *mut *mut c_void,
 ) -> Hresult {
     contain(|| {
         if out.is_null() {
             return E_POINTER;
         }
-        // Read-only: no pattern is supplied, so nothing can be invoked,
-        // toggled, scrolled, or edited through this provider.
         // SAFETY: checked above.
         unsafe { *out = ptr::null_mut() };
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: `this` points at the simple vtable field of a live provider.
+        let provider = unsafe { simple_of(this) };
+        // SAFETY: the caller holds a reference; immutable tree state makes the
+        // pattern decision stable for this provider's published layout.
+        let supported = unsafe {
+            (*provider)
+                .element
+                .is_some_and(|index| (*provider).tree.supports_invoke(index))
+        };
+        if pattern != UIA_INVOKE_PATTERN_ID || !supported {
+            return S_OK;
+        }
+        // SAFETY: the provider is live and the new interface gains a reference.
+        unsafe {
+            increment(provider);
+            *out = (&raw mut (*provider).invoke).cast::<c_void>();
+        }
         S_OK
+    })
+}
+
+unsafe extern "system" fn invoke(this: *mut c_void) -> Hresult {
+    contain(|| {
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: `this` points at the Invoke vtable field of a live provider.
+        let provider = unsafe { invoke_of(this) };
+        // SAFETY: the caller holds a reference; both fields are immutable.
+        let accepted = unsafe {
+            (*provider)
+                .element
+                .is_some_and(|index| (*provider).tree.invoke(index))
+        };
+        if accepted { S_OK } else { E_FAIL }
     })
 }
 
@@ -611,14 +733,32 @@ fn window_title(window: Handle) -> Vec<u16> {
 mod tests {
     use std::{ffi::c_void, ptr, sync::Arc};
 
+    use anodrel_ui::UiRect;
+    use anodrel_ui_session::{UiDocumentSession, UiInputMailbox};
+    use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
+
     use super::{
-        E_NOINTERFACE, E_POINTER, Guid, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT,
+        E_NOINTERFACE, E_POINTER, Guid, IID_IINVOKE_PROVIDER, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT,
         IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN,
-        Provider, S_OK, Tree, UIA_E_NOTSUPPORTED, contain, increment, release_provider, set_focus,
+        InvokeVtbl, Provider, S_OK, Tree, UIA_E_NOTSUPPORTED, UIA_INVOKE_PATTERN_ID,
+        UiAutomationActionSink, contain, increment, release_provider, set_focus,
     };
 
+    const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
+
+    struct FixedMeasurer;
+
+    impl anodrel_ui::TextMeasurer for FixedMeasurer {
+        fn measure(&self, text: &str, font_size: u16) -> anodrel_ui::UiSize {
+            anodrel_ui::UiSize::new(
+                text.chars().count() as f32 * f32::from(font_size) * 0.5,
+                f32::from(font_size),
+            )
+        }
+    }
+
     fn tree() -> Arc<Tree> {
-        Arc::new(Tree::new(Vec::new(), Vec::new()))
+        Arc::new(Tree::new(Vec::new(), Vec::new(), None))
     }
 
     fn root() -> *mut Provider {
@@ -627,6 +767,37 @@ mod tests {
 
     fn child() -> *mut Provider {
         Provider::create(0, Some(0), tree())
+    }
+
+    /// Builds one enabled authenticated button exactly as the host publishes it.
+    fn invokable_child() -> (
+        *mut Provider,
+        UiInputMailbox,
+        anodrel_ui_session::UiDocumentRevision,
+    ) {
+        let document = anodrel_ui_document::decode(ACTION_DOCUMENT)
+            .expect("the fixed action document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = super::publishable(accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        ));
+        let mut session = UiDocumentSession::new();
+        let revision = session
+            .replace_document(ACTION_DOCUMENT)
+            .expect("the fixed action document is valid");
+        let mailbox = UiInputMailbox::new();
+        let sink = UiAutomationActionSink::for_current_session(revision, mailbox.clone())
+            .expect("an accepted document has an action route");
+        (
+            Provider::create(
+                0,
+                Some(0),
+                Arc::new(Tree::new(Vec::new(), elements, Some(sink))),
+            ),
+            mailbox,
+            revision,
+        )
     }
 
     /// Queries an interface through the object's simple vtable pointer.
@@ -702,6 +873,48 @@ mod tests {
     }
 
     #[test]
+    fn an_enabled_authenticated_button_exposes_and_queues_only_invoke() {
+        let (provider, mailbox, revision) = invokable_child();
+        // SAFETY: this test owns one live provider and writable output slots.
+        unsafe {
+            let (result, queried) = query_simple(provider, &IID_IINVOKE_PROVIDER);
+            assert_eq!(result, S_OK);
+            assert!(!queried.is_null());
+            release_provider(provider);
+
+            let simple = (&raw mut (*provider).simple).cast::<c_void>();
+            let mut pattern = ptr::null_mut();
+            assert_eq!(
+                super::get_pattern_provider(simple, UIA_INVOKE_PATTERN_ID, &mut pattern),
+                S_OK
+            );
+            assert!(!pattern.is_null());
+
+            let vtable = *pattern.cast::<*const InvokeVtbl>();
+            assert_eq!(((*vtable).invoke)(pattern), S_OK);
+            release_provider(provider);
+            release_provider(provider);
+        }
+
+        let batch = mailbox.drain();
+        assert_eq!(batch.dropped(), 0);
+        let candidates = batch.into_candidates();
+        assert_eq!(candidates.len(), 1);
+        let (candidate_revision, event) = candidates
+            .into_iter()
+            .next()
+            .expect("one action")
+            .into_parts();
+        assert_eq!(candidate_revision, revision);
+        assert_eq!(
+            event,
+            anodrel_ui::UiEvent::ActionInvoked(
+                anodrel_ui::ElementId::new("continue").expect("fixed ID is valid")
+            )
+        );
+    }
+
+    #[test]
     fn reference_counting_frees_the_object_exactly_once() {
         let provider = root();
         // SAFETY: a live provider held by this test.
@@ -737,6 +950,14 @@ mod tests {
         // SAFETY: a live provider with deliberately null output slots.
         unsafe {
             assert_eq!(super::navigate(fragment, 3, ptr::null_mut()), E_POINTER);
+            assert_eq!(
+                super::get_pattern_provider(
+                    (&raw mut (*provider).simple).cast::<c_void>(),
+                    UIA_INVOKE_PATTERN_ID,
+                    ptr::null_mut(),
+                ),
+                E_POINTER
+            );
             assert_eq!(super::get_runtime_id(fragment, ptr::null_mut()), E_POINTER);
             assert_eq!(
                 super::get_bounding_rectangle(fragment, ptr::null_mut()),

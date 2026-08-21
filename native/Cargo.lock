@@ -415,6 +415,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-ui",
  "anodrel-ui-document",
+ "anodrel-ui-session",
  "anodrel-windows-accessibility",
 ]
 

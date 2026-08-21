@@ -283,12 +283,16 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 mapping from one visible snapshot to the values Microsoft UI Automation asks
 for: control types, property values, runtime IDs, and screen-space rectangles.
 It performs no operating-system call and cannot fail. `anodrel-windows-uia`
-publishes that mapping through a read-only Windows UI Automation provider:
-`WM_GETOBJECT`, root and flat child navigation, properties, hit testing, and no
-patterns. The boundary runs one way — nothing reads the tree back, reports
-focus, or reveals that assistive technology is present. Narrator and an Inspect
-cross-check verified the provider on Windows 11. See `docs/ACCESSIBILITY.md`
-and Decision 0063.
+publishes that mapping through `WM_GETOBJECT`, a root, flat child navigation,
+properties, and hit testing. An enabled button in a current authenticated UI session
+also exposes the one `Invoke` pattern: it offers the exact revision-bound
+semantic action candidate to the existing session mailbox, with no native input
+message, application callback, focus movement, or accessibility-specific queue
+(Decision 0069). No other pattern is supplied. The boundary does not read the
+tree back, report focus, or reveal that assistive technology is present.
+Narrator and an Inspect cross-check verified the read provider on Windows 11;
+manual screen-reader activation verification of Invoke remains open. See
+`docs/ACCESSIBILITY.md`, Decisions 0063 and 0069.
 
 ## Communication model
 

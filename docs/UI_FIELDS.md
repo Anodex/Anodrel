@@ -130,7 +130,7 @@ Installed record version **1.5** adds `ui.fields.read` as a strict superset of
 ## Accessibility
 
 A field publishes as an `Edit` control with its label as its name, so
-`docs/ACCESSIBILITY.md`'s read-only UI Automation support announces it like any
+`docs/ACCESSIBILITY.md`'s UI Automation support announces it like any
 other element. Consistent with that contract, assistive technology can read a
 field's presence and label and **cannot** read its value or move focus into it —
 the same one-directional rule, applied to the node where reading the value would

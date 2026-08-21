@@ -324,6 +324,20 @@ impl UiSessionView {
         &self.lab
     }
 
+    /// Returns the bounded semantic action route for the current document.
+    ///
+    /// UI Automation receives only this small immutable route, never this
+    /// view, the window registry, or a native handle. An initial session has no
+    /// document revision to bind an action to and therefore supplies none.
+    pub(super) fn accessibility_action_sink(
+        &self,
+    ) -> Option<anodrel_windows_uia::UiAutomationActionSink> {
+        anodrel_windows_uia::UiAutomationActionSink::for_current_session(
+            self.revision,
+            self.input_mailbox.clone(),
+        )
+    }
+
     fn queue_event(&self, event: UiEvent) -> bool {
         if self.revision == UiDocumentRevision::INITIAL {
             return false;
@@ -368,6 +382,28 @@ mod tests {
 
         assert_eq!(view.poll(), (true, false));
         assert_eq!(view.poll(), (false, false));
+    }
+
+    #[test]
+    fn accessibility_has_no_action_route_before_a_document_and_one_after() {
+        let documents = UiDocumentMailbox::new();
+        let mut view = UiSessionView::new(
+            documents.clone(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.accessibility_action_sink().is_none());
+
+        let mut session = UiDocumentSession::new();
+        session
+            .replace_document(ACTION_DOCUMENT)
+            .expect("document is valid");
+        documents.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(view.poll(), (true, false));
+        assert!(view.accessibility_action_sink().is_some());
     }
 
     /// A document holding one enabled field, for the read path.

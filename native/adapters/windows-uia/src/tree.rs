@@ -4,8 +4,10 @@
 //! layer holds only pointers and reference counts, and every rule about what a
 //! client can see is testable without Windows.
 
-use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, property};
+use anodrel_ui::ElementId;
+use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, control_type, property};
 
+use crate::UiAutomationActionSink;
 use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
 use crate::raw2::{UiaRect, direction};
 
@@ -35,13 +37,26 @@ pub fn publishable(elements: Vec<AccessibleElement>) -> Vec<AccessibleElement> {
 pub struct Tree {
     title: Vec<u16>,
     elements: Vec<AccessibleElement>,
+    action_sink: Option<UiAutomationActionSink>,
 }
 
 impl Tree {
     /// Builds the tree for one window title and its publishable elements.
+    ///
+    /// A sink exists only for a current authenticated UI session. It is still gated
+    /// per element below, so a diagnostic surface cannot become invokable just
+    /// because it has the same visual role as an application button.
     #[must_use]
-    pub fn new(title: Vec<u16>, elements: Vec<AccessibleElement>) -> Self {
-        Self { title, elements }
+    pub fn new(
+        title: Vec<u16>,
+        elements: Vec<AccessibleElement>,
+        action_sink: Option<UiAutomationActionSink>,
+    ) -> Self {
+        Self {
+            title,
+            elements,
+            action_sink,
+        }
     }
 
     /// Returns how many elements the window publishes.
@@ -123,6 +138,38 @@ impl Tree {
             .find(|(_, element)| contains(element.bounds(), x, y))
             .map(|(index, _)| index)
     }
+
+    /// Whether one published element supports the bounded Invoke pattern.
+    ///
+    /// The control type, enabled state, current authenticated-session sink, and
+    /// semantic ID are all required. A malformed value is not an action merely
+    /// because it was labelled a button in an externally constructed tree.
+    #[must_use]
+    pub fn supports_invoke(&self, index: usize) -> bool {
+        self.invocation_id(index).is_some() && self.action_sink.is_some()
+    }
+
+    /// Offers exactly one revision-bound semantic button action to the session.
+    ///
+    /// `false` covers every refusal: no current session, a role that does not
+    /// invoke, a disabled button, an invalid ID, or a full bounded mailbox.
+    /// None of those paths can perform a native action or call an application.
+    pub fn invoke(&self, index: usize) -> bool {
+        let Some(id) = self.invocation_id(index) else {
+            return false;
+        };
+        let Some(sink) = &self.action_sink else {
+            return false;
+        };
+        sink.offer(id)
+    }
+
+    fn invocation_id(&self, index: usize) -> Option<ElementId> {
+        let element = self.elements.get(index)?;
+        (element.control_type() == control_type::BUTTON && element.enabled())
+            .then(|| ElementId::new(element.automation_id()).ok())
+            .flatten()
+    }
 }
 
 /// Resolves one navigation step over a flat tree of `count` elements.
@@ -175,15 +222,16 @@ fn utf16(value: &str) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use anodrel_ui::UiRect;
+    use anodrel_ui::{ElementId, UiEvent, UiRect};
+    use anodrel_ui_session::{UiDocumentSession, UiInputMailbox};
     use anodrel_windows_accessibility::{
         AccessibleElement, ClientOrigin, accessible_elements, control_type,
     };
 
     use super::{ROOT_AUTOMATION_ID, Tree, direction, publishable, step};
-    use crate::raw::VT_EMPTY;
+    use crate::{UiAutomationActionSink, raw::VT_EMPTY};
 
-    const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
+    const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"},{"id":"blocked","kind":"action","label":"Unavailable","fontSize":16,"enabled":false,"tone":"accent"}]}}"#;
 
     struct FixedMeasurer;
 
@@ -208,7 +256,30 @@ mod tests {
     }
 
     fn tree() -> Tree {
-        Tree::new("Window".encode_utf16().collect(), publishable(mapped()))
+        Tree::new(
+            "Window".encode_utf16().collect(),
+            publishable(mapped()),
+            None,
+        )
+    }
+
+    fn tree_with_action_sink() -> (Tree, UiInputMailbox, anodrel_ui_session::UiDocumentRevision) {
+        let mut session = UiDocumentSession::new();
+        let revision = session
+            .replace_document(DOCUMENT)
+            .expect("the fixture document is valid");
+        let mailbox = UiInputMailbox::new();
+        let sink = UiAutomationActionSink::for_current_session(revision, mailbox.clone())
+            .expect("an accepted document has an action route");
+        (
+            Tree::new(
+                "Window".encode_utf16().collect(),
+                publishable(mapped()),
+                Some(sink),
+            ),
+            mailbox,
+            revision,
+        )
     }
 
     #[test]
@@ -292,7 +363,7 @@ mod tests {
         // Asking with each element's own rectangle keeps the test about hit
         // testing rather than about whatever geometry the layout produced.
         let published = publishable(mapped());
-        let tree = Tree::new(Vec::new(), published.clone());
+        let tree = Tree::new(Vec::new(), published.clone(), None);
 
         for (index, element) in published.iter().enumerate() {
             let bounds = element.bounds();
@@ -319,5 +390,40 @@ mod tests {
     fn a_point_outside_every_element_reports_nothing() {
         assert_eq!(tree().element_at(-50.0, -50.0), None);
         assert_eq!(tree().element_at(100_000.0, 100_000.0), None);
+    }
+
+    #[test]
+    fn invoke_is_limited_to_an_enabled_authenticated_session_button() {
+        let read_only = tree();
+        // Text cannot invoke, and a product-looking button without a session
+        // action route remains readable but non-invokable.
+        assert!(!read_only.supports_invoke(0));
+        assert!(!read_only.supports_invoke(1));
+
+        let (tree, mailbox, revision) = tree_with_action_sink();
+        assert!(!tree.supports_invoke(0), "text must not expose Invoke");
+        assert!(tree.supports_invoke(1), "the enabled action is invokable");
+        assert!(
+            !tree.supports_invoke(2),
+            "a disabled button must not expose Invoke"
+        );
+        assert!(!tree.invoke(0));
+        assert!(!tree.invoke(2));
+        assert!(tree.invoke(1));
+
+        let batch = mailbox.drain();
+        assert_eq!(batch.dropped(), 0);
+        let candidates = batch.into_candidates();
+        assert_eq!(candidates.len(), 1);
+        let (candidate_revision, event) = candidates
+            .into_iter()
+            .next()
+            .expect("one candidate")
+            .into_parts();
+        assert_eq!(candidate_revision, revision);
+        assert_eq!(
+            event,
+            UiEvent::ActionInvoked(ElementId::new("go").expect("fixed ID is valid"))
+        );
     }
 }

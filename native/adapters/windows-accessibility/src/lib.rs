@@ -12,8 +12,9 @@
 //! technology is present — an application supplies a UI document and learns
 //! nothing in return. See `docs/ACCESSIBILITY.md` and Decision 0063.
 //!
-//! The UI Automation provider that publishes this mapping to Windows is not
-//! implemented yet, so no assistive technology reads an Anodrel surface today.
+//! `anodrel-windows-uia` publishes this mapping to Windows. It keeps the
+//! mapping pure; its separately bounded Invoke implementation is defined by
+//! Decision 0069.
 
 mod geometry;
 mod uia;
@@ -159,8 +160,9 @@ pub fn is_enabled(node: &UiAccessibilityNode) -> bool {
 /// This matches the portable focus traversal exactly: an action and a field
 /// take focus, so assistive technology and the keyboard agree on what is
 /// reachable. Reporting a field as unfocusable would be a plain lie to a screen
-/// reader — the one-directional rule of `docs/ACCESSIBILITY.md` is about this
-/// provider accepting no commands, not about misdescribing the surface.
+/// reader — the pure mapping's one-directional rule is about publishing
+/// semantics, not about misdescribing the surface. UI Automation invocation is
+/// separately bounded by Decision 0069.
 #[must_use]
 pub const fn keyboard_focusable(role: UiAccessibilityRole) -> bool {
     matches!(

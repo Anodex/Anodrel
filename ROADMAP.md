@@ -104,16 +104,21 @@ Status: **Direct Windows host in progress**
   UI Automation and turns the owned semantic snapshot into control types,
   property values, runtime IDs, and screen rectangles, one direction only — an
   application cannot read the tree, learn about focus, or detect that assistive
-  technology is present. Both provider slices are built: the window answers
-  `WM_GETOBJECT` as a read-only fragment root, and its published elements answer
+  technology is present. Both reading-provider slices are built: the window answers
+  `WM_GETOBJECT` as a fragment root, and its published elements answer
   `IRawElementProviderFragment` with navigation, runtime identifiers, bounding
-  rectangles, and hit testing. **Read-only UI Automation support is verified:**
+  rectangles, and hit testing. **UI Automation reading is verified:**
   Narrator reads an Anodrel surface aloud on Windows 11, and an Inspect
   cross-check of every published property passes with no failures. Reading is
-  the whole of it — no pattern is supplied, focus cannot be moved, and the
-  published tree is flat. Automation events, live announcements, focus
-  reporting, invocation, hierarchical grouping, and non-Windows adapters stay
-  deferred. See `docs/ACCESSIBILITY.md`.
+  joined by one bounded action: an enabled button in an authenticated UI session
+  exposes `IInvokeProvider`, which queues the same revision-bound semantic
+  event as local pointer and keyboard activation (Decision 0069). It has no
+  native-input shortcut, focus movement, accessibility callback, or
+  application-specific queue; the diagnostic UI Lab remains readable but
+  non-invokable. Unit and host checks cover that route; manual screen-reader
+  activation verification remains open. Automation events, live announcements,
+  focus reporting, text patterns and ranges, hierarchical grouping, and
+  non-Windows adapters stay deferred. See `docs/ACCESSIBILITY.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

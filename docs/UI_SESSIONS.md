@@ -96,9 +96,10 @@ launch path. See `docs/UI_SESSION_LAB.md` and Decision 0058.
 
 `UiInputMailbox` is a separate per-session queue of at most 32 raw semantic
 input candidates. The native view can add only a revision and an
-`ActionInvoked` element ID that it derived from its own current layout. It
-cannot name a different session, attach data, run a command, or make an
-operating-system call.
+`ActionInvoked` element ID that it derived from its own current layout. On
+Windows, an enabled UI Automation button may offer that exact same candidate
+through its bounded Invoke pattern (Decision 0069). It cannot name a different
+session, attach data, run a command, or make an operating-system call.
 
 `ui.events.read` drains that queue through the authenticated transport. The
 core reuses `UiDocumentSession::accept_event` to reject stale, removed, or

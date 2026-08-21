@@ -112,11 +112,13 @@ does not attach that visual state to any window.
 
 A caller may also supply one `UiInputMailbox` for that same session. A native
 view may add at most 32 layout-derived revision-and-action candidates to it;
-the transport does not push them across the pipe. The authenticated
-`ui.events.read` operation drains and revalidates them through the core before
-returning event envelopes, dropped-input count, and discarded-stale count.
-The mailbox has no pointer coordinates, renderer work, callback, pipe I/O, or
-native authority.
+on Windows, the bounded UI Automation Invoke pattern may offer the same kind of
+candidate for an enabled semantic button (Decision 0069). The transport does
+not push either input source across the pipe. The authenticated `ui.events.read`
+operation drains and revalidates candidates through the core before returning
+event envelopes, dropped-input count, and discarded-stale count. The mailbox
+has no pointer coordinates, renderer work, callback, pipe I/O, or native
+authority.
 
 For a host that chooses to support caller-initiated session termination, the
 transport can also receive one host-owned `SessionCloseSignal`. A successful,

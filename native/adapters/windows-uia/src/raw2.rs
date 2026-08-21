@@ -24,7 +24,7 @@ pub const IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT: Guid = Guid {
 
 /// `UIA_E_NOTSUPPORTED`.
 ///
-/// The honest answer from a read-only provider asked to do something.
+/// The honest answer from a provider that does not offer the requested action.
 pub const UIA_E_NOTSUPPORTED: Hresult = -2_147_220_992;
 
 /// `NavigateDirection` values.

@@ -56,13 +56,29 @@ impl UiInputMailbox {
     }
 
     /// Adds one candidate or records an overflow when the queue is full.
-    pub fn push(&self, candidate: UiInputCandidate) {
+    ///
+    /// The return value tells a native boundary whether this particular
+    /// candidate entered the queue. Existing callers that only need bounded
+    /// best-effort delivery can keep using [`push`](Self::push); a boundary
+    /// that has to acknowledge an action to another API can use this result
+    /// without inspecting the queue or its other contents.
+    pub fn try_push(&self, candidate: UiInputCandidate) -> bool {
         let state = &mut *lock(&self.state);
         if state.pending.len() == UI_INPUT_QUEUE_CAPACITY {
             state.dropped = state.dropped.saturating_add(1);
+            false
         } else {
             state.pending.push_back(candidate);
+            true
         }
+    }
+
+    /// Adds one candidate or records an overflow when the queue is full.
+    ///
+    /// This is the best-effort form used by local native input. The dropped
+    /// count remains available to the granted consumer on the next drain.
+    pub fn push(&self, candidate: UiInputCandidate) {
+        let _ = self.try_push(candidate);
     }
 
     /// Takes all pending candidates with the exact overflow count since the
@@ -104,4 +120,34 @@ fn lock(value: &Mutex<UiInputMailboxState>) -> MutexGuard<'_, UiInputMailboxStat
     value
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+#[cfg(test)]
+mod tests {
+    use anodrel_ui::{ElementId, UiEvent};
+
+    use super::{UI_INPUT_QUEUE_CAPACITY, UiInputCandidate, UiInputMailbox};
+    use crate::UiDocumentRevision;
+
+    fn candidate() -> UiInputCandidate {
+        UiInputCandidate::new(
+            UiDocumentRevision::INITIAL
+                .next()
+                .expect("the first revision exists"),
+            UiEvent::ActionInvoked(ElementId::new("action").expect("fixed ID is valid")),
+        )
+    }
+
+    #[test]
+    fn try_push_reports_admission_without_changing_overflow_accounting() {
+        let mailbox = UiInputMailbox::new();
+        for _ in 0..UI_INPUT_QUEUE_CAPACITY {
+            assert!(mailbox.try_push(candidate()));
+        }
+        assert!(!mailbox.try_push(candidate()));
+
+        let batch = mailbox.drain();
+        assert_eq!(batch.dropped(), 1);
+        assert_eq!(batch.into_candidates().len(), UI_INPUT_QUEUE_CAPACITY);
+    }
 }

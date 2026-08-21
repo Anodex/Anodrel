@@ -1,14 +1,18 @@
 # Anodrel Windows accessibility
 
-**Status:** **Read-only UI Automation support is implemented and verified.**
+**Status:** **UI Automation reading is implemented and verified; bounded button
+invocation is implemented and awaiting a manual screen-reader activation
+check.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 mapping table below passes with no failures.
 
-Read-only is the whole of it. Assistive technology can read this surface; it
-cannot act on it. No pattern is supplied, focus cannot be moved, no automation
-event or live announcement is raised, and the published tree is flat. Anything
-beyond reading is deferred and listed at the end of this document.
+Reading and one bounded action are the whole of it. Assistive technology can
+read this surface and invoke an enabled button in an authenticated UI session; it
+cannot move focus, edit a field, read a field value, raise an automation event,
+or receive a live announcement. The published tree is flat. Anything beyond
+reading and button invocation is deferred and listed at the end of this
+document.
 
 ## Boundary
 
@@ -34,17 +38,20 @@ UiAccessibilitySnapshot        (portable semantics, no OS call)
         ▼
 UIA control types, property values, runtime IDs, screen rectangles
         │
-        │ anodrel-windows-uia (read-only provider)
+        │ anodrel-windows-uia (provider and bounded button invocation)
         ▼
 Windows, and any assistive technology it serves
 ~~~
 
-**Nothing flows back.** An application cannot read the accessibility tree,
-learn that assistive technology is present, discover which node is focused, be
-notified that something was read aloud, or receive any event originating from a
-screen reader. Whether a user relies on assistive technology is not observable
-through this boundary, for the same reason a notification cannot report that it
-was seen.
+The semantics themselves flow one way: an application cannot read the
+accessibility tree, learn that assistive technology is present, discover which
+node is focused, or be notified that something was read aloud. Whether a user
+relies on assistive technology is not observable through this boundary, for the
+same reason a notification cannot report that it was seen. The one exception is
+an enabled button's ordinary semantic action: it travels through the same
+revision-bound `ui.events.read` mailbox as a local click, not through an
+accessibility-specific callback or observation channel. Decision 0069 defines
+that narrow route.
 
 ## What an application never touches
 
@@ -74,9 +81,9 @@ The adapter is a pure function from one snapshot node to Windows values.
 
 An `Edit` reports as keyboard focusable because Tab really does reach it. This
 table matches the portable focus traversal exactly, and reporting a field as
-unreachable would be a plain lie to a screen reader; the one-directional rule
-below is about this provider accepting no commands, not about misdescribing the
-surface.
+unreachable would be a plain lie to a screen reader; the outbound semantics
+rule below is about keeping the mapping truthful without creating an
+accessibility-specific callback or observation channel.
 
 What an `Edit` does not report is its **value**. It is named by its label, and
 its text leaves the host only through the granted snapshot of Decision 0067 —
@@ -111,8 +118,29 @@ one. It is not a path, handle, or secret.
 
 Anything not in this table is deliberately absent. In particular there is no
 `HelpText`, `AcceleratorKey`, `AccessKey`, `LocalizedControlType`, or pattern
-provider: each would be a new promise to keep, and none has a source in the
-current model.
+provider except the one bounded pattern below: each would be a new promise to
+keep, and none has a source in the current model.
+
+### Button invocation
+
+An enabled `Button` in an authenticated UI session exposes `Invoke` (10000) through
+`IInvokeProvider`. No other role, disabled button, window root, or diagnostic
+surface exposes it.
+
+`Invoke` offers exactly one `ActionInvoked(element_id)` candidate, bound to the
+revision whose layout produced the provider, to the session's existing bounded
+input mailbox. It neither synthesizes a native click nor calls application code.
+The existing `ui.events.read` validation decides whether an application may
+receive it, so a provider held across document replacement cannot activate a
+stale, removed, or disabled action. A full mailbox returns a generic failure and
+does not create another queue or disclose capacity through UI Automation.
+This adds no protocol field, grant, operation, or version: it is one more
+host-owned producer for the existing revalidated semantic-action route.
+
+The UI Lab is a host diagnostic: its action tiles are local and it has no
+application-session mailbox. It therefore remains readable but has no Invoke
+pattern. This is intentional; a diagnostic must not quietly become a second
+application action route.
 
 ### Bounding rectangles
 
@@ -164,10 +192,10 @@ reference-counted `IRawElementProviderSimple`. It reports the window's name,
 `Window` control type, a fixed host-owned automation ID, and its enabled and
 element flags, and defers everything else to the host provider Windows supplies.
 
-It is **read-only**: `GetPatternProvider` returns nothing for every pattern, so
-no element can be invoked, toggled, scrolled, or edited through it. Each COM
-method contains panics and converts one into a failure code, because these are
-`extern "system"` and an escaping panic would abort the host.
+The root is **read-only**: `GetPatternProvider` returns nothing for every
+pattern, so the window itself cannot be invoked, toggled, scrolled, or edited.
+Each COM method contains panics and converts one into a failure code, because
+these are `extern "system"` and an escaping panic would abort the host.
 
 The provider is returned **whenever the root object is asked for**, without
 first checking whether a client is listening. `UiaClientsAreListening` answers
@@ -194,10 +222,19 @@ and with it meaningful grouping, is deferred.
 their names and roles, and every published property has been cross-checked
 against the table above. See below.
 
+**Slice 4 — bounded button invocation. Implemented; manual activation check
+pending.** An enabled authenticated-session button exposes `IInvokeProvider`. Its
+`Invoke` implementation writes only a revision-bound semantic candidate into
+the same bounded mailbox as native pointer and keyboard activation (Decision
+0069). It does not move focus, synthesize a Windows input message, or call an
+application. A full mailbox fails without adding a queue. The unit and host
+tests prove the role/enabled/session gates and the exact candidate route; the
+manual check below must still prove Narrator can activate a button.
+
 Also deferred, each needing its own contract and decision: automation events and
-live announcements, focus changes reported to assistive technology, action
-invocation through the `Invoke` pattern, text patterns and ranges, relations
-between nodes, and non-Windows accessibility adapters.
+live announcements, focus changes reported to assistive technology, text
+patterns and ranges, relations between nodes, and non-Windows accessibility
+adapters.
 
 ## Verification
 
@@ -209,10 +246,11 @@ uniqueness within a snapshot.
 The mapping is pure, so those tests need no window and no assistive technology.
 
 Provider tests cover the COM object without Windows: the interfaces it answers
-and the one it refuses, a refused query clearing its output, every method
+and the ones it refuses, a refused query clearing its output, every method
 rejecting a null output rather than writing through it, reference counting
 freeing the object exactly once, a panicking body returning a failure code
-instead of unwinding, and the read-only promise that no pattern is supplied.
+instead of unwinding, and the Invoke gate admitting only an enabled
+authenticated-session button to the revision-bound mailbox.
 
 ### Confirmed against real UI Automation
 
@@ -253,7 +291,7 @@ reader announces something a person can act on, and only listening answers it.
 This has been run and **passed** on Windows 11: Narrator announced each element
 with its name and role. It also earned its keep — see the note after step 7.
 
-To repeat it:
+To repeat the reading check:
 
 1. Open a native UI surface, for example
    `cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --ui-lab`.
@@ -297,13 +335,14 @@ no failures:
   that same element — eleven of eleven, which exercises hit testing;
 - runtime identifiers are unique across the tree;
 - `HelpText` and `AcceleratorKey` are absent, as the table promises; and
-- **no element supplies any pattern**, which is what read-only means at the
-  client boundary.
+- **no element supplied a pattern on that UI Lab run**, which is correct because
+  the Lab has no authenticated event mailbox.
 
 The window root reports two patterns, `Window` and `Transform`. Those come from
 the host provider Windows supplies for the `HWND` itself — minimising, moving,
 and resizing a top-level window are the system's business, not this provider's.
-Anodrel's own provider supplies no pattern anywhere, root included.
+Anodrel's own window root supplies no pattern. Its enabled authenticated-session
+buttons may supply only Invoke, as the contract above defines.
 
 One incidental confirmation: the window under test sat on a monitor left of the
 primary one, so its rectangle had negative screen coordinates throughout. The
@@ -324,5 +363,24 @@ plumbing, and only a screen reader proved the sequence.
 
 Report a mismatch between what Inspect shows and what this document promises as
 a defect in the adapter, not in the document: the table above is the contract.
+
+### Manual Invoke verification
+
+The reading check uses `--ui-lab`, which is deliberately a local diagnostic and
+has no authenticated event mailbox. Use the development UI Session Lab instead:
+
+1. Run `npm run build` and then the `--sample-ui-client` command in
+   `docs/DEVELOPMENT.md`.
+2. Wait for the sample's authenticated document to replace the waiting screen,
+   then start Narrator and move to its **Continue** button.
+3. Activate it with Narrator's normal activation command. The sample must
+   complete its `ui.events.read` round trip and close the session window, just
+   as it does after a local click or Tab+Enter.
+4. Repeat against a disabled button when one is present: it must be announced
+   as unavailable and must expose no Invoke pattern in Inspect.
+
+This check is currently **pending**. A passing result proves that a person can
+activate a published button; it must not be inferred from the unit tests or a
+client merely seeing the pattern.
 
 See `docs/UI.md`, Decision 0026, and Decision 0063.

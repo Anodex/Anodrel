@@ -13,6 +13,9 @@ Each record should include:
 
 Current records (newest first):
 
+- 0069: UI Automation button invocation uses the existing semantic action
+  path.
+
 - 0068: The host decides where text breaks.
 - 0067: An application learns a value, never the typing.
 - 0066: An application proposes a window title; the host composes it.

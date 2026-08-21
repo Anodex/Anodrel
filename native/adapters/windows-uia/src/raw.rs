@@ -1,6 +1,6 @@
 //! Narrow direct bindings for the UI Automation provider surface.
 //!
-//! Only the entry points and value shapes the read-only provider needs appear
+//! Only the entry points and value shapes the semantic provider needs appear
 //! here. There is no client-side UI Automation binding: this host publishes
 //! accessibility outward and never reads a tree back.
 

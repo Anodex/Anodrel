@@ -247,11 +247,22 @@ pub(super) fn accessibility_snapshot(
     window: Hwnd,
     width: f32,
     height: f32,
-) -> io::Result<Option<anodrel_ui::UiAccessibilitySnapshot>> {
+) -> io::Result<
+    Option<(
+        anodrel_ui::UiAccessibilitySnapshot,
+        Option<anodrel_windows_uia::UiAutomationActionSink>,
+    )>,
+> {
     let views = lock_views()?;
     Ok(match views.get(&window) {
-        Some(View::UiLab(lab)) => Some(lab.accessibility_snapshot(width, height)),
-        Some(View::UiSession(session)) => Some(session.lab().accessibility_snapshot(width, height)),
+        // A UI Lab is host-owned diagnostic state. Its local action tiles have
+        // no authenticated-session mailbox, so they are readable but
+        // intentionally expose no UI Automation Invoke pattern.
+        Some(View::UiLab(lab)) => Some((lab.accessibility_snapshot(width, height), None)),
+        Some(View::UiSession(session)) => Some((
+            session.lab().accessibility_snapshot(width, height),
+            session.accessibility_action_sink(),
+        )),
         _ => None,
     })
 }
