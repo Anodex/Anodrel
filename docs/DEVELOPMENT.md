@@ -215,7 +215,25 @@ user runs can be asked to fault. Neither route is part of `cargo test`, and no
 automated test writes to the real record location. See `docs/CRASH_REPORTS.md`
 for what a record may contain and what this deliberately does not catch.
 
-### Windows end-to-end development sample
+### Compiled native development probe
+
+This is the smallest real child path with no Node.js process. It is a
+development diagnostic, not a product launcher: you explicitly name the
+executable, the host does not verify it, and the probe has exactly one fixed
+behaviour (`platform.health`). From the repository root:
+
+~~~powershell
+cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-client-sample
+$clientPath = (Resolve-Path native/target/release/anodrel-native-client-sample.exe).Path
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --native-sample-client $clientPath
+~~~
+
+It prints **Anodrel native development probe completed successfully.** and
+exits without opening a window. Its only client dependencies are Anodrel crates,
+the Rust standard library, and direct Windows APIs. A safe nonzero child stage
+does not expose the private invitation, named pipe, token, or native error.
+
+### Windows end-to-end Node development sample
 
 After `npm run build`, run this PowerShell command from the repository root:
 

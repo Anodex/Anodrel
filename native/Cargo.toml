@@ -52,6 +52,7 @@ members = [
   "tools/package-tool",
   "tools/product-fixture",
   "tools/product-provisioning",
+  "tools/native-client-sample",
 ]
 resolver = "2"
 

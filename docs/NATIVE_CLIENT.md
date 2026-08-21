@@ -1,9 +1,9 @@
 # Anodrel native child client
 
-**Status:** The portable `anodrel-client` core and direct
-`anodrel-windows-client` adapter are implemented and tested. The native
-development probe remains next; until it lands, the existing Node.js diagnostic
-remains the documented runnable probe.
+**Status:** Implemented and tested: the portable `anodrel-client` core, direct
+`anodrel-windows-client` adapter, migrated product fixture, and compiled native
+development probe. The existing Node.js diagnostic remains separately useful
+for development paths that exercise the broader service set.
 
 ## Purpose
 
@@ -83,12 +83,24 @@ cover UTF-16 conversion and absent-endpoint failure. The migrated product
 fixture covers the joined lifetime: it uses these two modules through the real
 child-only bootstrap channel and authenticated Windows pipe, then proves
 document delivery, semantic input, session close, child exit, and server
-cleanup. The native development probe must still exercise bootstrap,
-authentication, `platform.health`, and clean exit without Node.js.
+cleanup. The compiled native development probe now exercises bootstrap,
+authentication, `platform.health`, and clean exit without Node.js, both in its
+real-pipe integration test and through the host command below.
 
 No test records or prints invitation contents. The direct Windows adapter is
-checked with workspace formatting, tests, linting, and the runnable
-development diagnostic before it is described as implemented.
+checked with workspace formatting, tests, linting, and the runnable development
+diagnostic:
+
+~~~powershell
+cargo build --release --manifest-path native/Cargo.toml -p anodrel-native-client-sample
+$clientPath = (Resolve-Path native/target/release/anodrel-native-client-sample.exe).Path
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --native-sample-client $clientPath
+~~~
+
+It prints a safe success line and exits; it opens no window and requires no
+Node.js process. A nonzero probe stage identifies only bootstrap, connection,
+authentication, or health—not an invitation, pipe name, token, or Windows
+error.
 
 ## Compatibility
 

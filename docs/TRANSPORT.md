@@ -234,11 +234,14 @@ product application is launched by the Windows host.
 
 ## Development sample path
 
-The repository includes a Windows-only development probe that proves the full
+The repository includes two Windows-only development probes that prove the full
 private path: the direct host creates a real pipe session, launches the sample
 with an `ANBI` invitation, and the sample authenticates before issuing one
-`platform.health` request. Its client adapter uses only Node.js built-in stream
-and named-pipe APIs; it adds no shipped native runtime dependency.
+`platform.health` request. The existing Node probe uses built-in stream and
+named-pipe APIs for the broader development diagnostics. The compiled
+`anodrel-native-client-sample` proves the same health path through
+`anodrel-client` and direct Kernel32 pipe I/O, with no Node.js process or other
+runtime dependency.
 
 This is a protocol and lifecycle demonstration, not controlled application
 content hosting. The sample executable is supplied explicitly by the developer,

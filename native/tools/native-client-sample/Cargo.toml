@@ -1,0 +1,20 @@
+[package]
+name = "anodrel-native-client-sample"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-native-client-sample"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-client = { path = "../../crates/client" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-windows-client = { path = "../../adapters/windows-client" }
+
+[dev-dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
+anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

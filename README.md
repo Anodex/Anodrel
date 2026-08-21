@@ -21,10 +21,12 @@ host-to-child bootstrap adapter for delivering a named-pipe invitation without
 command-line or environment-variable secrets. The Windows host proves the
 native window lifecycle and protocol core without a runtime framework or a
 webview. It also loads a first digest-verified plain-text application
-package into a host-controlled Win32 surface. A development-only Node sample
-separately exercises the private pipe path end to end; its host-issued grants
-include bounded text clipboard, validated HTTPS handoff, and UI-thread-routed
-open/save file pickers. Its Protocol 1.9 diagnostic path can also retain one
+package into a host-controlled Win32 surface. Development-only samples
+separately exercise the private pipe path end to end: a compiled native probe
+checks bootstrap, authentication, and health without a runtime dependency, and
+the Node sample checks the broader service path. Its host-issued grants include
+bounded text clipboard, validated HTTPS handoff, and UI-thread-routed open/save
+file pickers. Its Protocol 1.9 diagnostic path can also retain one
 UI-selected Windows file object and consume its bounded text once through a
 separate grant, alongside UI-session test grants. The development client can
 also deliver a version 2 scroll tree and complete an action only after it is

@@ -356,10 +356,10 @@ native transport implementation. `docs/TRANSPORT.md` defines the bounded
 frame/session engine, direct one-client Windows named-pipe adapter, and the
 separate private child-bootstrap format. The bootstrap adapter can launch a
 caller-selected executable but is not integrated with application package trust
-or rendered content. The repository's Node-based development sample currently
-uses this path to exercise a real authenticated health request; the native
-child-client foundation in Decision 0081 will provide an equivalent compiled
-probe without a runtime dependency. Neither is a trusted application host. Its
+or rendered content. The repository's Node-based development sample and the
+compiled native probe from Decision 0081 exercise a real authenticated health
+request; the latter needs no runtime dependency. Neither is a trusted
+application host. Its
 Protocol 1.11 diagnostic read
 projects only the host-supplied closed catalogue through the existing
 `diagnostics.read` grant; no transport layer can manufacture dynamic diagnostic

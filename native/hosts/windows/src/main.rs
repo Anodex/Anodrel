@@ -1,5 +1,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod native_probe;
 mod product;
 mod sample;
 mod win32;
@@ -27,6 +28,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // display's real pixel density instead of being scaled up by the system.
     win32::enable_dpi_awareness();
     let arguments = env::args().skip(1).collect::<Vec<_>>();
+    if let [command, client_path] = arguments.as_slice()
+        && command == "--native-sample-client"
+    {
+        return native_probe::run(client_path);
+    }
     if let [command, node_path, client_path] = arguments.as_slice()
         && command == "--sample-client"
     {
@@ -145,7 +151,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --startup-report <anodrel.application.json> | --crash-report-selftest | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-file-write-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js> | --sample-ui-window-state-client <node.exe> <native-client.js> | --sample-ui-fields-client <node.exe> <native-client.js> | --sample-ui-menu-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --startup-report <anodrel.application.json> | --crash-report-selftest | --window-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --native-sample-client <native-client.exe> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-file-write-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js> | --sample-ui-window-state-client <node.exe> <native-client.js> | --sample-ui-fields-client <node.exe> <native-client.js> | --sample-ui-menu-client <node.exe> <native-client.js>]",
         )
         .into());
     }

@@ -71,6 +71,9 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   direct Kernel32 data I/O and owns that client handle through RAII.
   `anodrel-product-fixture` uses this pair rather than carrying a second client
   implementation.
+- `tools/native-client-sample` is a fixed compiled development probe: it reads
+  one invitation, authenticates, validates `platform.health`, and exits. It is
+  neither a public SDK template nor a product application.
 - `adapters/windows-instance` owns the bounded current-session mutex,
   readiness event, and no-data activation request for one package identity.
 - `adapters/windows-policy` reads one bounded installed-application record
@@ -133,8 +136,9 @@ The initial window displays a host-created `platform.health` response. With
 plain-text application package. It has no webview, script runtime, navigation,
 or general native bridge. Its named-pipe adapter and bootstrap launcher can
 deliver a private invitation to a child process. The Windows host's
-development-only sample launches the compiled Node client to prove the real
-authenticated health path and bounded clipboard/external-link service seams.
+development-only diagnostics launch both the compiled native health probe and
+the Node client: the former proves private bootstrap and authentication without
+a runtime dependency, and the latter exercises the bounded service seams.
 Publisher trust, executable launch, and a product capability bridge still
 require separate threat-model work. The
 host-only registered launch service is separate from the visual surface until

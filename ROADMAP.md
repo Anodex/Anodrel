@@ -288,8 +288,10 @@ validates the core protocol shape under Decision 0006. Decision 0007 adds the
 bounded framing and session engine. Decision 0008 adds the authenticated direct
 Windows named-pipe adapter. Decision 0009 adds private one-time invitation
 delivery. Decision 0010 adds a digest-verified, no-script application-package
-text surface. A development-only Node sample now proves the full bootstrap,
-authentication, and `platform.health` path over the real pipe.
+text surface. Development-only Node and compiled native samples now prove the
+full bootstrap, authentication, and `platform.health` path over the real pipe;
+the compiled probe uses only Anodrel crates, the Rust standard library, and
+direct Windows APIs.
 
 Decision 0061 adds a first-party signed fixture child that runs the verified
 product session end to end: machine policy, locked digest revalidation,
@@ -332,9 +334,10 @@ Status: **First starter-package slice in progress**
   first-party native child-client foundation is now specified in Decision 0081:
   its portable bootstrap/authenticated-framing core and direct Windows
   invitation-selected pipe adapter have replaced the product fixture's private
-  client implementation, with its real bootstrap-and-pipe test passing. An
-  equivalent compiled development probe remains next; this is not yet a stable
-  public native SDK or executable template.
+  client implementation, with its real bootstrap-and-pipe test passing. Its
+  compiled native development probe now proves bootstrap, authentication, and
+  `platform.health` without Node.js. This is not yet a stable public native SDK
+  or executable template.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an
