@@ -32,6 +32,12 @@ revealed by host-retained native scrolling. The first branded Startup Lab turns
 those foundation checks, including a temporary private IPC health loopback,
 into a direct native visual smoke test.
 
+Protocol 1.17 also provides a separately granted, selection-scoped text-write
+path in the direct Windows UI-session host. A host-owned save picker captures
+one native output object under a one-use opaque reference; the application can
+write at most 8 KiB of text through that reference and never receives a
+reusable filesystem-write API. The legacy save picker remains non-mutating.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
