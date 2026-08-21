@@ -28,6 +28,7 @@ members = [
   "crates/file-access",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
+  "adapters/windows-client",
   "adapters/windows-instance",
   "adapters/windows-signature",
   "adapters/windows-policy",

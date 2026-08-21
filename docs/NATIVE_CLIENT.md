@@ -1,9 +1,9 @@
 # Anodrel native child client
 
-**Status:** The portable `anodrel-client` core is implemented and tested. The
-direct Windows adapter and native development probe remain next; until the
-probe lands, the existing Node.js diagnostic remains the documented runnable
-probe.
+**Status:** The portable `anodrel-client` core and direct
+`anodrel-windows-client` adapter are implemented and tested. The native
+development probe remains next; until it lands, the existing Node.js diagnostic
+remains the documented runnable probe.
 
 ## Purpose
 

@@ -254,9 +254,9 @@ component that writes machine policy, and it can write exactly one value for one
 compile-time identity after validating the record through the host's own parser.
 Decision 0081 separately establishes the first reusable child-side split:
 portable framed conversation code above a direct Windows pipe-opening adapter.
-That planned client foundation inherits an invitation from the host; it cannot
-construct an endpoint, inspect policy, or turn the fixture into a public
-application runtime.
+That client foundation inherits an invitation from the host; it cannot construct
+an endpoint, inspect policy, or turn the fixture into a public application
+runtime.
 See `docs/PRODUCT_FIXTURE.md`.
 
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It

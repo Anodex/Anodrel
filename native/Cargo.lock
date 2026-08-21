@@ -241,6 +241,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-client"
+version = "0.1.0"
+dependencies = [
+ "anodrel-bootstrap",
+]
+
+[[package]]
 name = "anodrel-windows-clipboard"
 version = "0.1.0"
 dependencies = [

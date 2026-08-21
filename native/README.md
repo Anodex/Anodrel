@@ -14,6 +14,9 @@ anodrel-json -> anodrel-protocol -> anodrel-core -> anodrel-windows-host
                                       anodrel-windows-pipe -> Win32 / CNG |
                                                           anodrel-windows-bootstrap -> Kernel32
 
+anodrel-client -> anodrel-bootstrap / anodrel-wire / anodrel-json
+anodrel-windows-client -> anodrel-bootstrap / Kernel32
+
 anodrel-windows-instance -> Kernel32 / User32
 
 anodrel-windows-policy -> anodrel-application
@@ -62,6 +65,10 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   inherited handle list, provides the bootstrap record on standard input, then
   closes the parent endpoint. Its test fixture is test-only source, not a
   shipped runtime component.
+- `crates/client` owns one portable authenticated framed child conversation;
+  it has no endpoint, operating-system, policy, or capability authority.
+- `adapters/windows-client` opens only the exact invitation-selected pipe with
+  direct Kernel32 data I/O and owns that client handle through RAII.
 - `adapters/windows-instance` owns the bounded current-session mutex,
   readiness event, and no-data activation request for one package identity.
 - `adapters/windows-policy` reads one bounded installed-application record
