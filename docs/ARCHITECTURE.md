@@ -282,10 +282,13 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 `anodrel-windows-accessibility` sits directly above that snapshot. It is a pure
 mapping from one visible snapshot to the values Microsoft UI Automation asks
 for: control types, property values, runtime IDs, and screen-space rectangles.
-It performs no operating-system call and cannot fail, and the boundary runs one
-way — nothing reads the tree back, reports focus, or reveals that assistive
-technology is present. The UI Automation provider that would publish it to
-Windows is not implemented. See `docs/ACCESSIBILITY.md` and Decision 0063.
+It performs no operating-system call and cannot fail. `anodrel-windows-uia`
+publishes that mapping through a read-only Windows UI Automation provider:
+`WM_GETOBJECT`, root and flat child navigation, properties, hit testing, and no
+patterns. The boundary runs one way — nothing reads the tree back, reports
+focus, or reveals that assistive technology is present. Narrator and an Inspect
+cross-check verified the provider on Windows 11. See `docs/ACCESSIBILITY.md`
+and Decision 0063.
 
 ## Communication model
 

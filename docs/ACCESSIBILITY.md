@@ -34,7 +34,7 @@ UiAccessibilitySnapshot        (portable semantics, no OS call)
         ▼
 UIA control types, property values, runtime IDs, screen rectangles
         │
-        │ (not implemented yet) UI Automation provider
+        │ anodrel-windows-uia (read-only provider)
         ▼
 Windows, and any assistive technology it serves
 ~~~
