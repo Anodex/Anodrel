@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0077: Starter packages preserve the verified content boundary.
+
 - 0076: UI Automation structure events follow accepted document replacement.
 
 - 0075: UI Automation hierarchy preserves owned semantic parentage.

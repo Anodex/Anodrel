@@ -303,15 +303,21 @@ with its gate stated, and link it only once its underlying operation is real.
 
 ## Phase 3 — Reusable SDK and tooling
 
-Status: **Planned**
+Status: **First starter-package slice in progress**
 
 - Provide a small application SDK.
-- Provide development and diagnostic tools.
+- Provide development and diagnostic tools. **The first content-package
+  generator is available:** it creates only a strict, digest-verified
+  `anodrel.text.v1` package in a new directory, never an executable, policy
+  record, capability, or signed product (Decision 0077). See
+  `docs/APPLICATION_TEMPLATE.md`.
 - Document packaging, signing, updates, and compatibility.
 - Add examples for a desktop application and a command-line application.
 
-Acceptance gate: a new project can be created from the documented template and
-run without knowing the internals of the native host.
+Acceptance gate: a new project can be created from a documented template and
+run without knowing the internals of the native host. The first template covers
+only the current static content-package boundary; a public executable SDK
+template remains required.
 
 ## Phase 4 — Anodex adapter
 

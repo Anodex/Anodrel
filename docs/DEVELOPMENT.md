@@ -112,6 +112,25 @@ user-facing packaged process launcher: the host-only registered launch service
 is deliberately separate from this display path until a signed application and
 machine policy record are provisioned.
 
+### Create a first content package
+
+The first starter tool creates a new strict plain-text package without copying
+host code or generating an executable. From the repository root, run:
+
+~~~powershell
+.\scripts\new-application.ps1 `
+  -Destination .\out\hello-anodrel `
+  -ApplicationId org.example.hello `
+  -DisplayName 'Hello Anodrel' `
+  -Content 'Hello from a native Anodrel package.'
+~~~
+
+It writes the exact manifest and content format that the host verifies, but it
+does not sign, install, launch, or grant anything. Use the `--application`
+command above with the new manifest path to open it. See
+`docs/APPLICATION_TEMPLATE.md` for its limits, safe failure behaviour, and
+focused verification command.
+
 While that window is open, run the same command a second time. It must not
 create another application window; it waits at most one second for the primary
 window and requests that Windows restore and foreground it. The second process
