@@ -132,16 +132,20 @@ Status: **Direct Windows host in progress**
   provider (Decision 0074); it has no listener, callback, or application
   surface. A visible field now exposes only its copied current text through a
   read-only `IValueProvider`; `SetValue`, selection, caret data, and value
-  events stay absent (Decision 0071). Unit and host checks cover all four
-  routes; manual screen-reader activation, focus control and event, and
-  field-value verification remain open. Invoke/property/value/text/structure/
+  events stay absent (Decision 0071). After the UI thread accepts and applies
+  a strictly newer session document, its root raises one host-only
+  `ChildrenInvalidated` structure event; it has no listener, callback, or
+  application surface (Decision 0076). Unit and host checks cover all five
+  routes; manual screen-reader activation, focus control and event, field-value,
+  and structure-event verification remain open. Invoke/property/value/text/
   selection events, live announcements, text patterns and ranges, labelled-by
   or described-by relations, and non-Windows adapters stay deferred. The
   published tree now preserves direct visible parentage, including groups, with
   immutable parent/child/sibling navigation (Decision 0075); its manual
   screen-reader and client hierarchy check remains open. See
-  `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`, and
-  `docs/UI_AUTOMATION_EVENTS.md`.
+  `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
+  `docs/UI_AUTOMATION_EVENTS.md`, and
+  `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

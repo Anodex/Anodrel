@@ -307,15 +307,19 @@ and 0073). After a real focus move, the host raises one best-effort focus-change
 event on a fresh provider without checking for or recording listeners
 (Decision 0074). A matching visible field separately exposes only a copied
 current host value through a read-only `IValueProvider`; it has no automation
-write, caret, selection, text range, or value event route (Decision 0071). No
-other pattern or event is supplied. The boundary does not read the tree back or
+write, caret, selection, text range, or value event route (Decision 0071).
+After the UI thread accepts and applies a strictly newer session document, the
+window root raises one best-effort `ChildrenInvalidated` structure event from a
+fresh provider; it keeps no listener, callback, application, or protocol
+surface (Decision 0076). No other pattern or event is supplied. The boundary
+does not read the tree back or
 reveal that assistive technology is present. Narrator and an Inspect
 cross-check verified the earlier flat read provider on Windows 11; the new
 hierarchy, manual screen-reader activation, focus control and event, and
-field-value verification remain open.
+field-value and structure-event verification remain open.
 See `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
-`docs/UI_AUTOMATION_EVENTS.md`, and Decisions 0063, 0069 through 0071, 0073,
-and 0074.
+`docs/UI_AUTOMATION_EVENTS.md`, `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`, and
+Decisions 0063, 0069 through 0071, 0073 through 0076.
 
 ## Communication model
 

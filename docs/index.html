@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Anodrel is a native desktop application platform.">
+    <meta name="description" content="Anodrel is a modular, security-first native desktop platform with an owned runtime, explicit OS services, and versioned IPC.">
     <title>Anodrel — Native application platform</title>
     <link rel="stylesheet" href="site.css">
   </head>
@@ -13,8 +13,9 @@
         <p class="eyebrow">Native desktop platform</p>
         <h1>Anodrel</h1>
         <p class="lede">
-          A modular, security-first foundation for desktop applications built
-          directly on operating-system APIs.
+          A modular, security-first foundation for desktop applications: an
+          owned native runtime, explicit operating-system services, and
+          versioned IPC built directly on platform APIs.
         </p>
         <a class="button" href="https://github.com/Anodex/Anodrel">View the project</a>
       </header>
@@ -42,10 +43,11 @@
         <p class="eyebrow">Current foundation</p>
         <h2 id="status-title">Windows host, private transport, and controlled content.</h2>
         <p>
-          Anodrel currently includes a direct Win32 host, protocol and JSON layers,
-          bounded framing, and an authenticated named-pipe adapter limited to the current
-          Windows logon session. Its first controlled application surface verifies a
-          bounded manifest and content digest before direct Win32 text rendering.
+          Anodrel is shared infrastructure, not a single application. Today it
+          includes a direct Win32 host, a versioned protocol, bounded framing,
+          authenticated local IPC, and controlled native UI surfaces. Future
+          applications can use the same documented security and platform-service
+          boundaries without embedding a browser engine.
         </p>
       </section>
 

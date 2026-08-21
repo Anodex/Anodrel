@@ -2,14 +2,15 @@
 
 **Status:** **UI Automation reading is implemented. Narrator and Inspect
 verified the earlier flat semantic surface; manual hierarchy verification, plus
-the existing button invocation, focus, focus-event, and field-value
-screen-reader checks, remain open.**
+the existing button invocation, focus, focus-event, field-value, and
+structure-event screen-reader checks, remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 pre-hierarchy mapping table passed with no failures.
 
 Reading, one bounded action, focus reporting and control, one host-raised
-focus-change event, and read-only field values are the implemented surface.
+focus-change event, one host-raised document-replacement structure event, and
+read-only field values are the implemented surface.
 Assistive technology can read this surface, obtain a visible field's current
 value, invoke an enabled button in an authenticated UI session, and move to a
 visible enabled field or button through the host's existing focus state. An
@@ -336,8 +337,17 @@ host raises `UIA_AutomationFocusChangedEventId` for a fresh immutable provider
 of the new target (Decision 0074). A no-op, refusal, stale request, and any
 other event kind remain absent.
 
+**Slice 9 — host-only structure-change event. Implemented; manual event check
+pending.** After the UI thread accepts and applies a strictly newer
+authenticated session document, the window root raises one
+`ChildrenInvalidated` event from a fresh provider (Decision 0076). It does not
+name a listener, retain a subscription, or expose an application callback.
+Stale or absent documents, layout, resize, typing, field changes, focus,
+actions, dialogs, notifications, and closure raise nothing. See
+`docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
+
 Also deferred, each needing its own contract and decision: Invoke,
-property/value/text/structure/selection events, live announcements, selection
+property/value/text/selection events, live announcements, selection
 and caret reporting, text patterns and ranges, labelled-by or described-by
 relations, automation editing, and non-Windows accessibility adapters.
 
