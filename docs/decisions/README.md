@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0076: UI Automation structure events follow accepted document replacement.
+
 - 0075: UI Automation hierarchy preserves owned semantic parentage.
 
 - 0074: UI Automation focus events stay host-only.

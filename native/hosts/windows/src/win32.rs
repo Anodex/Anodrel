@@ -1125,6 +1125,11 @@ fn raise_accessibility_focus_changed(window: Hwnd) {
     anodrel_windows_uia::raise_focus_changed(window, accessible_elements_for(window));
 }
 
+/// Raises one best-effort subtree invalidation after accepted document replacement.
+fn raise_accessibility_structure_changed(window: Hwnd) {
+    anodrel_windows_uia::raise_structure_changed(window, accessible_elements_for(window));
+}
+
 /// Applies a pending host-only UI Automation focus request and repaints only
 /// when a current validated target became focused.
 fn service_accessibility_focus(window: Hwnd) {
@@ -1760,6 +1765,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 }
                 if changed {
                     invalidate(window);
+                    raise_accessibility_structure_changed(window);
                 }
             }
             service_notification(window);

@@ -30,6 +30,8 @@ pub const CONTROL_TYPE_WINDOW: i32 = 50_032;
 
 /// `UIA_AutomationFocusChangedEventId`.
 pub const UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID: i32 = 20_005;
+/// A whole child subtree was replaced and must be refreshed.
+pub const STRUCTURE_CHANGE_CHILDREN_INVALIDATED: i32 = 2;
 
 pub const VT_EMPTY: u16 = 0;
 pub const VT_I4: u16 = 3;
@@ -217,6 +219,14 @@ unsafe extern "system" {
     /// Raises one standard UI Automation event from a provider element.
     pub fn UiaRaiseAutomationEvent(provider: *mut c_void, id: i32) -> Hresult;
 
+    /// Raises one structural invalidation from a provider element.
+    pub fn UiaRaiseStructureChangedEvent(
+        provider: *mut c_void,
+        change_type: i32,
+        runtime_id: *const i32,
+        runtime_id_len: i32,
+    ) -> Hresult;
+
 }
 
 #[link(name = "user32")]
@@ -228,7 +238,8 @@ unsafe extern "system" {
 mod tests {
     use super::{
         E_FAIL, E_NOINTERFACE, E_POINTER, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, S_OK,
-        UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, VARIANT_TRUE, VT_BOOL, VT_EMPTY, VT_I4, Variant,
+        STRUCTURE_CHANGE_CHILDREN_INVALIDATED, UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, VARIANT_TRUE,
+        VT_BOOL, VT_EMPTY, VT_I4, Variant,
     };
 
     #[test]
@@ -277,5 +288,10 @@ mod tests {
     #[test]
     fn focus_change_event_identifier_matches_ui_automation() {
         assert_eq!(UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, 20_005);
+    }
+
+    #[test]
+    fn children_invalidated_matches_ui_automation() {
+        assert_eq!(STRUCTURE_CHANGE_CHILDREN_INVALIDATED, 2);
     }
 }

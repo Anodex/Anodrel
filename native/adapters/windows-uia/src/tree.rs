@@ -155,6 +155,12 @@ impl Tree {
         self.relationships.step(element, towards)
     }
 
+    /// Whether this immutable publication has any semantic children.
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
     /// Returns the value for one UI Automation property, if this provider
     /// supplies it.
     ///

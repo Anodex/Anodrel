@@ -49,7 +49,7 @@ use raw3::{IID_IINVOKE_PROVIDER, UIA_INVOKE_PATTERN_ID};
 use raw5::{IID_IVALUE_PROVIDER, UIA_VALUE_PATTERN_ID};
 use tree::Tree;
 
-pub use events::raise_focus_changed;
+pub use events::{raise_focus_changed, raise_structure_changed};
 pub use focus::{
     UiAutomationFocusMailbox, UiAutomationFocusRequest, UiAutomationFocusRoute,
     UiAutomationFocusSink,

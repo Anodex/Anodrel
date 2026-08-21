@@ -30,6 +30,29 @@ pub fn raise_focus_changed(window: raw::Handle, publication: UiAutomationPublica
     }
 }
 
+/// Raises one root `ChildrenInvalidated` event after document replacement.
+///
+/// The caller has already accepted a newer authenticated document and released
+/// its view lock. This function has no listener state or result surface.
+pub fn raise_structure_changed(window: raw::Handle, publication: UiAutomationPublication) {
+    let Some(tree) = structure_event_tree(window_title(window), publication) else {
+        return;
+    };
+    let provider = Provider::create(window, None, tree);
+    // SAFETY: this fresh root provider owns the creation reference. Windows may
+    // retain its own reference while it delivers the best-effort notification.
+    unsafe {
+        let simple = (&raw mut (*provider).simple).cast::<c_void>();
+        let _ = raw::UiaRaiseStructureChangedEvent(
+            simple,
+            raw::STRUCTURE_CHANGE_CHILDREN_INVALIDATED,
+            std::ptr::null(),
+            0,
+        );
+        release_provider(provider);
+    }
+}
+
 fn focus_event_tree(
     title: Vec<u16>,
     publication: UiAutomationPublication,
@@ -39,13 +62,21 @@ fn focus_event_tree(
     Some((tree, element))
 }
 
+fn structure_event_tree(
+    title: Vec<u16>,
+    publication: UiAutomationPublication,
+) -> Option<Arc<Tree>> {
+    let tree = publication.into_tree(title);
+    (!tree.is_empty()).then_some(tree)
+}
+
 #[cfg(test)]
 mod tests {
     use anodrel_ui::{ElementId, UiRect};
     use anodrel_ui_document::decode;
     use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
 
-    use super::focus_event_tree;
+    use super::{focus_event_tree, structure_event_tree};
     use crate::UiAutomationPublication;
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
@@ -61,6 +92,7 @@ mod tests {
     #[test]
     fn an_empty_publication_never_creates_an_event_source() {
         assert!(focus_event_tree(Vec::new(), UiAutomationPublication::empty()).is_none());
+        assert!(structure_event_tree(Vec::new(), UiAutomationPublication::empty()).is_none());
     }
 
     #[test]
@@ -79,5 +111,22 @@ mod tests {
         .expect("the focused action is published");
 
         assert_eq!(element, 2, "the event source is the focused child");
+    }
+
+    #[test]
+    fn a_populated_publication_builds_a_root_structure_event_source() {
+        let document = decode(DOCUMENT).expect("the fixed document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        );
+        assert!(
+            structure_event_tree(
+                Vec::new(),
+                UiAutomationPublication::new(elements, Vec::new(), None, None, None),
+            )
+            .is_some()
+        );
     }
 }
