@@ -1,17 +1,18 @@
 # Anodrel Windows accessibility
 
 **Status:** **UI Automation reading is implemented and verified; bounded button
-invocation is implemented and awaiting a manual screen-reader activation
-check.**
+invocation and focus reporting are implemented and awaiting manual screen-reader
+checks.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 mapping table below passes with no failures.
 
 Reading and one bounded action are the whole of it. Assistive technology can
 read this surface and invoke an enabled button in an authenticated UI session; it
-cannot move focus, edit a field, read a field value, raise an automation event,
-or receive a live announcement. The published tree is flat. Anything beyond
-reading and button invocation is deferred and listed at the end of this
+reports the host's current keyboard focus but cannot move it, edit a field, read
+a field value, raise an automation event, or receive a live announcement. The
+published tree is flat. Anything beyond reading, button invocation, and focus
+reporting is deferred and listed at the end of this
 document.
 
 ## Boundary
@@ -100,6 +101,7 @@ loosening of this one. See `docs/UI_FIELDS.md`.
 | `IsEnabled` (30010) | The node's enabled flag **for a button or a field**; always true for text and groups. |
 | `AutomationId` (30011) | The document element ID. |
 | `IsKeyboardFocusable` (30009) | The table above. |
+| `HasKeyboardFocus` (30008) | The host-owned focus snapshot, true only for its current published focus target. |
 | `IsControlElement` (30016) | Always true; every node in the snapshot is visible. |
 | `IsContentElement` (30017) | Always true, for the same reason. |
 | `BoundingRectangle` (30001) | Converted as below. |
@@ -141,6 +143,20 @@ The UI Lab is a host diagnostic: its action tiles are local and it has no
 application-session mailbox. It therefore remains readable but has no Invoke
 pattern. This is intentional; a diagnostic must not quietly become a second
 application action route.
+
+### Focus reporting
+
+The provider receives the existing host-owned `UiFocus` alongside the document
+layout it publishes. `GetFocus` returns that one matching child and
+`HasKeyboardFocus` is true only on that child. A missing, clipped, disabled,
+non-focusable, or non-published ID produces no focused element instead of a
+guess.
+
+This is an immutable provider snapshot. A new UI Automation query observes a
+later keyboard or pointer focus change; an older provider does not read the
+live view or registry to chase it. There is no `SetFocus`, focus-change event,
+window activation, application callback, protocol field, or capability grant.
+Decision 0070 defines this boundary.
 
 ### Bounding rectangles
 
@@ -210,8 +226,8 @@ element answers `IRawElementProviderFragment`: navigation, `GetRuntimeId` as a
 safe array, `get_BoundingRectangle`, and hit testing from a screen point.
 
 `SetFocus` returns `UIA_E_NOTSUPPORTED`. Moving focus is an action, and this
-provider performs none. `GetFocus` returns nothing, because reporting focus to
-assistive technology is its own slice and guessing would be worse than silence.
+provider performs none. `GetFocus` is added separately in Slice 5, using the
+host's copied focus snapshot rather than guessing or reading live view state.
 
 The published tree is **flat**, and groups are filtered out of it. A container
 whose children sit beside it rather than inside it would be announced as an
@@ -231,10 +247,16 @@ application. A full mailbox fails without adding a queue. The unit and host
 tests prove the role/enabled/session gates and the exact candidate route; the
 manual check below must still prove Narrator can activate a button.
 
+**Slice 5 — focus reporting. Implemented; manual focus check pending.** The
+provider returns the matching child from `GetFocus` and sets
+`HasKeyboardFocus` only on that element, using one immutable snapshot of the
+host's existing layout-validated focus (Decision 0070). It does not implement
+`SetFocus` or send focus-change events.
+
 Also deferred, each needing its own contract and decision: automation events and
-live announcements, focus changes reported to assistive technology, text
-patterns and ranges, relations between nodes, and non-Windows accessibility
-adapters.
+live announcements, focus changes **raised** to assistive technology, focus
+control, text patterns and ranges, relations between nodes, and non-Windows
+accessibility adapters.
 
 ## Verification
 
@@ -382,5 +404,19 @@ has no authenticated event mailbox. Use the development UI Session Lab instead:
 This check is currently **pending**. A passing result proves that a person can
 activate a published button; it must not be inferred from the unit tests or a
 client merely seeing the pattern.
+
+### Manual focus verification
+
+On the same development UI Session Lab surface, use Tab to reach a visible
+field or button. Inspect must show that element's `HasKeyboardFocus` as true
+and `GetFocus` must return that same element. Move focus with Tab again and ask
+Inspect to refresh: the new provider snapshot must name the new target. The
+previous provider is allowed to retain its old snapshot, because this slice
+does not raise focus-change events. Confirm that a UI Automation client cannot
+move focus through `SetFocus`.
+
+This check is currently **pending**. It proves the screen-reader-visible focus
+matches the host focus ring; it does not turn UI Automation into a focus-control
+path.
 
 See `docs/UI.md`, Decision 0026, and Decision 0063.

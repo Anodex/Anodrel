@@ -131,6 +131,16 @@ impl Variant {
         variant.value[0] = allocated as usize as u64;
         variant
     }
+
+    /// Returns a boolean value for internal tests without exposing the VARIANT
+    /// union layout to the provider's other modules.
+    #[cfg(test)]
+    pub(crate) const fn boolean_value(&self) -> Option<bool> {
+        if self.vt != VT_BOOL {
+            return None;
+        }
+        Some((self.value[0] as u16 as i16) == VARIANT_TRUE)
+    }
 }
 
 #[link(name = "oleaut32")]
@@ -178,6 +188,8 @@ mod tests {
         assert_eq!(Variant::empty().vt, VT_EMPTY);
         assert_eq!(Variant::int(50_032).vt, VT_I4);
         assert_eq!(Variant::boolean(true).vt, VT_BOOL);
+        assert_eq!(Variant::boolean(true).boolean_value(), Some(true));
+        assert_eq!(Variant::boolean(false).boolean_value(), Some(false));
         // A COM boolean is all-bits-set, not one; reporting 1 makes some
         // clients read the value as false.
         assert_eq!(VARIANT_TRUE, -1);

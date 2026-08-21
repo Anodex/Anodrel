@@ -13,6 +13,17 @@ use anodrel_windows_file_access::WindowsFileTextService;
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 
+/// The immutable accessibility data published for one window-message query.
+///
+/// The focus identifier belongs to the same current UI Lab state as the
+/// snapshot. The UI Automation adapter filters it against the resulting
+/// visible, enabled element tree before it reports any focus to Windows.
+pub(super) type AccessibilityPublication = (
+    anodrel_ui::UiAccessibilitySnapshot,
+    Option<anodrel_windows_uia::UiAutomationActionSink>,
+    Option<anodrel_ui::ElementId>,
+);
+
 pub(super) fn insert(window: Hwnd, view: View) -> io::Result<()> {
     let mut views = lock_views()?;
     if views.insert(window, view).is_some() {
@@ -247,21 +258,21 @@ pub(super) fn accessibility_snapshot(
     window: Hwnd,
     width: f32,
     height: f32,
-) -> io::Result<
-    Option<(
-        anodrel_ui::UiAccessibilitySnapshot,
-        Option<anodrel_windows_uia::UiAutomationActionSink>,
-    )>,
-> {
+) -> io::Result<Option<AccessibilityPublication>> {
     let views = lock_views()?;
     Ok(match views.get(&window) {
         // A UI Lab is host-owned diagnostic state. Its local action tiles have
         // no authenticated-session mailbox, so they are readable but
         // intentionally expose no UI Automation Invoke pattern.
-        Some(View::UiLab(lab)) => Some((lab.accessibility_snapshot(width, height), None)),
+        Some(View::UiLab(lab)) => Some((
+            lab.accessibility_snapshot(width, height),
+            None,
+            lab.accessibility_focus(),
+        )),
         Some(View::UiSession(session)) => Some((
             session.lab().accessibility_snapshot(width, height),
             session.accessibility_action_sink(),
+            session.lab().accessibility_focus(),
         )),
         _ => None,
     })

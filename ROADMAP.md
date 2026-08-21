@@ -115,10 +115,12 @@ Status: **Direct Windows host in progress**
   event as local pointer and keyboard activation (Decision 0069). It has no
   native-input shortcut, focus movement, accessibility callback, or
   application-specific queue; the diagnostic UI Lab remains readable but
-  non-invokable. Unit and host checks cover that route; manual screen-reader
-  activation verification remains open. Automation events, live announcements,
-  focus reporting, text patterns and ranges, hierarchical grouping, and
-  non-Windows adapters stay deferred. See `docs/ACCESSIBILITY.md`.
+  non-invokable. `GetFocus` and `HasKeyboardFocus` now report a copied current
+  host-focus snapshot with no `SetFocus`, focus event, or live-state lookup
+  (Decision 0070). Unit and host checks cover both routes; manual screen-reader
+  activation and focus verification remain open. Automation events, live
+  announcements, focus control, text patterns and ranges, hierarchical grouping,
+  and non-Windows adapters stay deferred. See `docs/ACCESSIBILITY.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

@@ -1077,25 +1077,28 @@ fn open_product_session_window(
 /// The semantics come from the same layout the surface draws, so what a screen
 /// reader is told cannot drift from what is on screen. A window with no UI
 /// document publishes nothing, which is the honest answer for a document or
-/// Startup Lab surface. Only a current authenticated UI session adds the bounded
+/// Startup Lab surface. It also carries the current host-owned focus alongside
+/// the same layout, while only an authenticated UI session adds the bounded
 /// action sink used by an enabled button's Invoke pattern.
 fn accessible_elements_for(
     window: Hwnd,
 ) -> (
     Vec<anodrel_windows_accessibility::AccessibleElement>,
+    Option<anodrel_ui::ElementId>,
     Option<anodrel_windows_uia::UiAutomationActionSink>,
 ) {
     let rect = client_rect(window);
-    let Ok(Some((snapshot, action_sink))) =
+    let Ok(Some((snapshot, action_sink, focused))) =
         registry::accessibility_snapshot(window, rect.width() as f32, rect.height() as f32)
     else {
-        return (Vec::new(), None);
+        return (Vec::new(), None, None);
     };
     (
         anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
             &snapshot,
             client_origin(window),
         )),
+        focused,
         action_sink,
     )
 }
@@ -1572,13 +1575,21 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
     // Answered before the match below so an unrelated object request still
     // reaches the default procedure. It publishes semantics outward and only an
     // enabled authenticated-session button can offer its existing revision-bound
-    // action mailbox; it has no native-input or application callback route.
+    // action mailbox. Focus reporting is a copied layout snapshot; neither
+    // feature has a native-input or application callback route.
     if message == WM_GETOBJECT {
-        let (elements, action_sink) = accessible_elements_for(window);
+        let (elements, focused, action_sink) = accessible_elements_for(window);
         // SAFETY: this window belongs to the current thread's message queue,
         // which is the only thread that dispatches to this procedure.
         if let Some(result) = unsafe {
-            anodrel_windows_uia::answer_get_object(window, wparam, lparam, elements, action_sink)
+            anodrel_windows_uia::answer_get_object(
+                window,
+                wparam,
+                lparam,
+                elements,
+                focused,
+                action_sink,
+            )
         } {
             return result;
         }

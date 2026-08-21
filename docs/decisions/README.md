@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0070: UI Automation reports the owned focus snapshot without controlling it.
+
 - 0069: UI Automation button invocation uses the existing semantic action
   path.
 

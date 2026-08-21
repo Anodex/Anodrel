@@ -382,6 +382,16 @@ impl UiLab {
             .accessibility_snapshot(&self.layout(width, height))
     }
 
+    /// Returns the host-owned keyboard focus to publish with a matching
+    /// accessibility snapshot.
+    ///
+    /// The caller owns the layout-specific validation: a provider filters this
+    /// ID against the same visible mapped tree it publishes, so a stale or
+    /// clipped target becomes no reported focus rather than a guess.
+    pub(super) fn accessibility_focus(&self) -> Option<ElementId> {
+        self.focus.focused().cloned()
+    }
+
     fn layout(&self, width: f32, height: f32) -> UiLayout {
         let surface = Surface::new(width, height);
         self.document.layout_with_scroll_offsets(
@@ -937,6 +947,7 @@ mod tests {
 
         assert!(lab.focus_at(BASE_WIDTH, BASE_HEIGHT, centre));
         assert_eq!(lab.focus.focused(), Some(&id("ui.lab.field")));
+        assert_eq!(lab.accessibility_focus(), Some(id("ui.lab.field")));
         // Focusing a field produces no semantic event, the same as tabbing to
         // one: a click that lands on a field tells an application nothing.
         assert_eq!(lab.last_action, None);
@@ -1138,6 +1149,7 @@ mod tests {
 
         assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
         assert_eq!(lab.focus.focused(), Some(&id("ui.lab.inspect")));
+        assert_eq!(lab.accessibility_focus(), Some(id("ui.lab.inspect")));
         assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
         assert_eq!(lab.focus.focused(), Some(&id("ui.lab.hit-test")));
         assert!(lab.activate_focused(BASE_WIDTH, BASE_HEIGHT));

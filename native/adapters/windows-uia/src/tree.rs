@@ -10,6 +10,7 @@ use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, control_type,
 use crate::UiAutomationActionSink;
 use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
 use crate::raw2::{UiaRect, direction};
+use crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID;
 
 /// The fixed automation identifier for an Anodrel surface's root.
 ///
@@ -37,24 +38,30 @@ pub fn publishable(elements: Vec<AccessibleElement>) -> Vec<AccessibleElement> {
 pub struct Tree {
     title: Vec<u16>,
     elements: Vec<AccessibleElement>,
+    focused: Option<usize>,
     action_sink: Option<UiAutomationActionSink>,
 }
 
 impl Tree {
     /// Builds the tree for one window title and its publishable elements.
     ///
-    /// A sink exists only for a current authenticated UI session. It is still gated
-    /// per element below, so a diagnostic surface cannot become invokable just
-    /// because it has the same visual role as an application button.
+    /// Focus is reduced to a published target while the tree is created, so a
+    /// provider never reads a mutable view. A sink exists only for a current
+    /// authenticated UI session. It is still gated per element below, so a
+    /// diagnostic surface cannot become invokable just because it has the same
+    /// visual role as an application button.
     #[must_use]
     pub fn new(
         title: Vec<u16>,
         elements: Vec<AccessibleElement>,
+        focused: Option<ElementId>,
         action_sink: Option<UiAutomationActionSink>,
     ) -> Self {
+        let focused = focused.and_then(|id| focus_index(&elements, &id));
         Self {
             title,
             elements,
+            focused,
             action_sink,
         }
     }
@@ -89,6 +96,7 @@ impl Tree {
             property::IS_ENABLED => Some(Variant::boolean(true)),
             // The window is a container, not a target.
             property::IS_KEYBOARD_FOCUSABLE => Some(Variant::boolean(false)),
+            UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => Some(Variant::boolean(false)),
             _ => None,
         }
     }
@@ -101,6 +109,9 @@ impl Tree {
             property::AUTOMATION_ID => Some(Variant::string(&utf16(element.automation_id()))),
             property::IS_ENABLED => Some(Variant::boolean(element.enabled())),
             property::IS_KEYBOARD_FOCUSABLE => Some(Variant::boolean(element.keyboard_focusable())),
+            UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => {
+                Some(Variant::boolean(self.focused == Some(index)))
+            }
             property::IS_CONTROL_ELEMENT | property::IS_CONTENT_ELEMENT => {
                 Some(Variant::boolean(true))
             }
@@ -139,6 +150,15 @@ impl Tree {
             .map(|(index, _)| index)
     }
 
+    /// Returns the position of this immutable tree's focused child, if any.
+    ///
+    /// A missing, clipped, disabled, non-focusable, or filtered ID is reduced
+    /// to no focus at construction time. See Decision 0070.
+    #[must_use]
+    pub const fn focused(&self) -> Option<usize> {
+        self.focused
+    }
+
     /// Whether one published element supports the bounded Invoke pattern.
     ///
     /// The control type, enabled state, current authenticated-session sink, and
@@ -170,6 +190,16 @@ impl Tree {
             .then(|| ElementId::new(element.automation_id()).ok())
             .flatten()
     }
+}
+
+fn focus_index(elements: &[AccessibleElement], id: &ElementId) -> Option<usize> {
+    elements.iter().position(|element| {
+        element.automation_id() == id.as_str()
+            && element.enabled()
+            && element.keyboard_focusable()
+            && element.bounds().width > 0.0
+            && element.bounds().height > 0.0
+    })
 }
 
 /// Resolves one navigation step over a flat tree of `count` elements.
@@ -260,6 +290,7 @@ mod tests {
             "Window".encode_utf16().collect(),
             publishable(mapped()),
             None,
+            None,
         )
     }
 
@@ -275,6 +306,7 @@ mod tests {
             Tree::new(
                 "Window".encode_utf16().collect(),
                 publishable(mapped()),
+                None,
                 Some(sink),
             ),
             mailbox,
@@ -363,7 +395,7 @@ mod tests {
         // Asking with each element's own rectangle keeps the test about hit
         // testing rather than about whatever geometry the layout produced.
         let published = publishable(mapped());
-        let tree = Tree::new(Vec::new(), published.clone(), None);
+        let tree = Tree::new(Vec::new(), published.clone(), None, None);
 
         for (index, element) in published.iter().enumerate() {
             let bounds = element.bounds();
@@ -390,6 +422,52 @@ mod tests {
     fn a_point_outside_every_element_reports_nothing() {
         assert_eq!(tree().element_at(-50.0, -50.0), None);
         assert_eq!(tree().element_at(100_000.0, 100_000.0), None);
+    }
+
+    #[test]
+    fn focus_reports_only_a_visible_enabled_published_target() {
+        let published = publishable(mapped());
+        let focused = Tree::new(
+            Vec::new(),
+            published.clone(),
+            Some(ElementId::new("go").expect("fixed ID is valid")),
+            None,
+        );
+        // The stack was filtered, leaving text, the enabled action, then the
+        // disabled action. The portable focus target therefore maps directly
+        // to the enabled button's published position.
+        assert_eq!(focused.focused(), Some(1));
+        assert_eq!(
+            focused
+                .property(Some(1), crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+                .expect("the focus property is supplied")
+                .boolean_value(),
+            Some(true)
+        );
+        assert_eq!(
+            focused
+                .property(Some(0), crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+                .expect("the focus property is supplied")
+                .boolean_value(),
+            Some(false)
+        );
+        assert_eq!(
+            focused
+                .property(None, crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+                .expect("the root focus property is supplied")
+                .boolean_value(),
+            Some(false)
+        );
+
+        for id in ["heading", "blocked", "missing"] {
+            let tree = Tree::new(
+                Vec::new(),
+                published.clone(),
+                Some(ElementId::new(id).expect("fixed ID is valid")),
+                None,
+            );
+            assert_eq!(tree.focused(), None, "{id} must not report focus");
+        }
     }
 
     #[test]

@@ -16,6 +16,7 @@
 mod raw;
 mod raw2;
 mod raw3;
+mod raw4;
 mod tree;
 
 use std::{
@@ -85,6 +86,8 @@ impl UiAutomationActionSink {
 ///
 /// `elements` are the semantic elements the host mapped from the window's
 /// current layout; an empty list publishes a window with no children.
+/// `focused` is the host-owned focus ID from that same layout, if there is one;
+/// the tree filters it to a visible, enabled, focusable published element.
 ///
 /// Returns `None` when the message is not asking for the UI Automation root, so
 /// the caller falls through to the default window procedure.
@@ -98,6 +101,7 @@ pub unsafe fn answer_get_object(
     wparam: usize,
     lparam: isize,
     elements: Vec<AccessibleElement>,
+    focused: Option<ElementId>,
     action_sink: Option<UiAutomationActionSink>,
 ) -> Option<Lresult> {
     if lparam != UIA_ROOT_OBJECT_ID {
@@ -110,7 +114,12 @@ pub unsafe fn answer_get_object(
     // requests with nothing, and was resolved to the default window provider
     // instead. Attaching a screen reader afterwards then found no semantics.
 
-    let tree = Arc::new(Tree::new(window_title(window), elements, action_sink));
+    let tree = Arc::new(Tree::new(
+        window_title(window),
+        elements,
+        focused,
+        action_sink,
+    ));
     let provider = Provider::create(window, None, tree);
     // SAFETY: `provider` is live with one reference held here, and
     // UiaReturnRawElementProvider takes its own before returning.
@@ -704,16 +713,26 @@ unsafe extern "system" fn element_provider_from_point(
     })
 }
 
-unsafe extern "system" fn get_focus(_this: *mut c_void, out: *mut *mut c_void) -> Hresult {
+unsafe extern "system" fn get_focus(this: *mut c_void, out: *mut *mut c_void) -> Hresult {
     contain(|| {
         if out.is_null() {
             return E_POINTER;
         }
-        // Focus is not reported to assistive technology yet; that is its own
-        // slice, and claiming a focused element here would be a guess.
         // SAFETY: checked above.
         unsafe { *out = ptr::null_mut() };
-        S_OK
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: `this` points at the root vtable field of a live provider.
+        let provider = unsafe { root_of(this) };
+        // SAFETY: the caller holds a reference; the immutable tree contains
+        // only the focus snapshot that was valid when it was published.
+        let focused = unsafe { (*provider).tree.focused() };
+        let Some(focused) = focused else {
+            return S_OK;
+        };
+        // SAFETY: the provider is live and `out` was checked above.
+        unsafe { emit(provider, Some(focused), out) }
     })
 }
 
@@ -758,7 +777,7 @@ mod tests {
     }
 
     fn tree() -> Arc<Tree> {
-        Arc::new(Tree::new(Vec::new(), Vec::new(), None))
+        Arc::new(Tree::new(Vec::new(), Vec::new(), None, None))
     }
 
     fn root() -> *mut Provider {
@@ -793,10 +812,30 @@ mod tests {
             Provider::create(
                 0,
                 Some(0),
-                Arc::new(Tree::new(Vec::new(), elements, Some(sink))),
+                Arc::new(Tree::new(Vec::new(), elements, None, Some(sink))),
             ),
             mailbox,
             revision,
+        )
+    }
+
+    fn focused_root() -> *mut Provider {
+        let document = anodrel_ui_document::decode(ACTION_DOCUMENT)
+            .expect("the fixed action document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = super::publishable(accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        ));
+        Provider::create(
+            0,
+            None,
+            Arc::new(Tree::new(
+                Vec::new(),
+                elements,
+                Some(anodrel_ui::ElementId::new("continue").expect("fixed ID is valid")),
+                None,
+            )),
         )
     }
 
@@ -934,6 +973,34 @@ mod tests {
     }
 
     #[test]
+    fn the_root_returns_only_its_published_focus_snapshot() {
+        let provider = focused_root();
+        let mut focused = ptr::null_mut();
+        // SAFETY: this test owns a live root provider and a writable output
+        // slot. The returned fragment owns a separate reference.
+        unsafe {
+            let root = (&raw mut (*provider).fragment_root).cast::<c_void>();
+            assert_eq!(super::get_focus(root, &mut focused), S_OK);
+            assert!(!focused.is_null());
+            let focused_provider = super::fragment_of(focused);
+            assert_eq!((*focused_provider).element, Some(0));
+            release_provider(focused_provider);
+            release_provider(provider);
+        }
+
+        let provider = root();
+        let mut focused = ptr::dangling_mut::<c_void>();
+        // SAFETY: the empty tree has no focused child and the output is
+        // writable, so the method must clear it rather than preserve a value.
+        unsafe {
+            let root = (&raw mut (*provider).fragment_root).cast::<c_void>();
+            assert_eq!(super::get_focus(root, &mut focused), S_OK);
+            assert!(focused.is_null());
+            release_provider(provider);
+        }
+    }
+
+    #[test]
     fn a_panicking_method_body_fails_instead_of_aborting() {
         let previous = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
@@ -961,6 +1028,13 @@ mod tests {
             assert_eq!(super::get_runtime_id(fragment, ptr::null_mut()), E_POINTER);
             assert_eq!(
                 super::get_bounding_rectangle(fragment, ptr::null_mut()),
+                E_POINTER
+            );
+            assert_eq!(
+                super::get_focus(
+                    (&raw mut (*provider).fragment_root).cast::<c_void>(),
+                    ptr::null_mut(),
+                ),
                 E_POINTER
             );
             release_provider(provider);
