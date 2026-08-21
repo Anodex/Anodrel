@@ -160,6 +160,11 @@ Status: **Direct Windows host in progress**
    the shared interaction mailbox refactor, one-request UI-thread bridge,
    direct User32 adapter, private numeric mapping, and development diagnostic.
    **Pending:** manual verification of the real native menu bar and pull event.
+   Decision 0084 now defines the next direct data-egress boundary: one
+   host-authorized, origin-bound HTTPS text fetch without a browser runtime,
+   headers, bodies, redirects, cookies, credentials, or proxy discovery. Its
+   Protocol 1.19 core, direct WinHTTP adapter, and production origin policy
+   remain to be implemented.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

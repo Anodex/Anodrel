@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0084: HTTPS text fetch is host-authorized, origin-bound, and direct.
+
 - 0083: Development native menu templates add one fixed menu grant.
 
 - 0082: Development native UI templates use a typed constrained client.

@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.18. The direct Windows menu adapter
-and its interaction delivery path remain pending.
+**Status:** Implemented through version 1.18. Protocol 1.19's host-authorized
+HTTPS text-fetch contract is accepted but not yet implemented.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -30,7 +30,8 @@ of this protocol.
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
 the host's. Version 1.18 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 18}`.
+`{"major": 1, "minor": 18}`. Version 1.19 is reserved for the accepted
+HTTPS text-fetch contract and must not be requested until a host implements it.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -87,13 +88,32 @@ The implemented operations are:
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
 
+The accepted but not yet implemented Protocol 1.19 operation is:
+
+| Operation | Payload | Result | Capability |
+| --- | --- | --- | --- |
+| `network.fetch_text` | `{ "url": string }` | bounded UTF-8 text plus HTTP status | `network.fetch` |
+
+### HTTPS text fetch
+
+Protocol 1.19 reserves `network.fetch_text` for one host-authorized HTTPS
+`GET` request. The payload accepts exactly one bounded URL. The result contains
+only `statusCode` (100 through 599) and at most 32 KiB of UTF-8 `text`; no
+headers, redirects, address, certificate, timing, proxy, or native status is
+observable. A host-selected exact-origin policy decides whether the service may
+attempt the URL. Missing service, rejected origin, timeout, and native failure
+all return `network.unavailable`; an oversized, non-UTF-8, or otherwise
+unrepresentable response returns `network.response_invalid`. See
+`docs/NETWORK.md` and Decision 0084.
+
 ### Native session menus
 
 Protocol 1.18 implements the strict portable `menu.replace` boundary and its
 separate `menu.write` grant. A core with no attached native menu service returns
 only `menu.unavailable`; the direct Windows UI-thread bridge and interactive
-delivery remain pending. `docs/MENUS.md` defines the exact model, menu-action
-event, and Windows ownership rule.
+delivery are implemented. The development template's remaining check is a real
+desktop menu click. `docs/MENUS.md` defines the exact model, menu-action event,
+and Windows ownership rule.
 
 ### Diagnostic entries
 
@@ -430,6 +450,8 @@ Protocol 1.17 reuses `file.unavailable` and `file.text_too_large` for the
 separate retained-output-object text-write boundary; it adds no new error code.
 Protocol 1.18 adds `menu.unavailable` for a host that cannot attach or update
 its own native session menu.
+Protocol 1.19 reserves `network.unavailable` and `network.response_invalid`
+for its accepted HTTPS text-fetch boundary.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 
@@ -446,8 +468,8 @@ Events are opt-in. Every event must include `protocolVersion`, `kind: "event"`,
 implements `ui.action.invoked` only through `ui.events.read`; it does not yet
 provide subscriptions, unsolicited delivery, acknowledgements, or cancellation.
 Protocol 1.18 reserves `menu.action.invoked` in the same bounded pull result;
-the direct Windows adapter will publish it only after the common interaction
-mailbox implementation is complete. It carries only a host-validated menu
+the direct Windows adapter publishes it only after the common interaction
+mailbox accepts its current command. It carries only a host-validated menu
 revision and semantic action ID.
 
 ## Security rules

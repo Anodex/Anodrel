@@ -393,6 +393,13 @@ capability, window, native command, shortcut, endpoint, or process; the host
 retains the menu mailbox, User32 mapping, child lifecycle, and window. See
 `docs/NATIVE_MENU_TEMPLATE.md` and Decision 0083.
 
+Decision 0084 reserves the first direct network data seam without turning the
+host into a browser runtime. Its host-selected HTTPS origins and bounded
+text-only `GET` result sit behind a separate capability; an application cannot
+choose headers, bodies, cookies, redirects, credentials, proxies, certificates,
+or a native handle. The portable contract is accepted before its direct WinHTTP
+adapter or product origin policy is implemented. See `docs/NETWORK.md`.
+
 Every request should have:
 
 - protocol version;
