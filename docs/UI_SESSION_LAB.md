@@ -29,6 +29,13 @@ submits only one compiled-in document, accepts only its own action at revision
 1, and closes only its own session; it is a diagnostic, not a general native
 application or window API.
 
+The constrained generated native template uses the same host-controlled UI-session
+mechanics, but is created in a new directory by `anodrel-native-app-tool`.
+Follow `docs/NATIVE_UI_TEMPLATE.md` to create, build, and run it through
+`--native-template-client`. That explicit route is also development-only: it
+accepts an operator-selected executable and grants exactly document replacement,
+semantic-action reading, and self-close.
+
 To exercise Protocol 1.7's UI-thread-routed open picker in the same
 authenticated session, use `--sample-ui-file-client` in place of
 `--sample-ui-client`. Select a `.txt`, `.json`, or `.md` file or cancel the

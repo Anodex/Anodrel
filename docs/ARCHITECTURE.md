@@ -373,6 +373,17 @@ a matching request. It retains no more than 32 unresolved opaque IDs, sends no
 control response, and cannot interrupt work already begun. See
 `docs/TRANSPORT.md` and Decision 0054.
 
+Decision 0082 adds a constrained Windows development-native UI path without
+turning the host into a general launcher. The first-party generator writes a
+new Rust project with only checkout-relative Anodrel dependencies; its fixed
+child uses the typed UI client rather than raw bootstrap or protocol code. An
+operator selects that executable explicitly for the `--native-template-client`
+route. The host creates a fresh session with only document replacement,
+semantic-action read, and self-close grants; the project cannot name a window,
+identity, endpoint, title, or additional capability. This development path is
+unverified and remains distinct from the signed product-session boundary. See
+`docs/NATIVE_UI_TEMPLATE.md` and Decision 0082.
+
 Every request should have:
 
 - protocol version;

@@ -287,8 +287,8 @@ the first capability-checked authenticated UI document replacement path.
 test.
 `docs/NATIVE_UI_TEMPLATE.md` defines the accepted development-native UI
 template boundary. Its first-party generator creates a typed executable project
-that builds without opening a product launch path; the explicit development
-host route remains the next slice.
+that builds and runs through an explicit fixed-grant development host route
+without opening a product launch path.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

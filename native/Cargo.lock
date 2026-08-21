@@ -104,7 +104,13 @@ version = "0.1.0"
 name = "anodrel-native-app-tool"
 version = "0.1.0"
 dependencies = [
+ "anodrel-core",
+ "anodrel-protocol",
+ "anodrel-ui",
  "anodrel-ui-document",
+ "anodrel-ui-session",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-pipe",
 ]
 
 [[package]]

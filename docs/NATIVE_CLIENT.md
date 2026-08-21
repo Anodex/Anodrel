@@ -127,5 +127,8 @@ The native-client modules are not a published stable application SDK yet;
 their public API may evolve while the repository retains the fixture and probe
 checks described above. Decision 0082's deliberately smaller typed
 `anodrel-ui-client` facade is now implemented and consumed by the compiled UI
-diagnostic; its generator and explicit host route remain separate work.
-Publishing a stable API still requires a separate decision.
+diagnostic and by the constrained generated native template. That template has
+a first-party new-directory generator and runs only through the explicit
+fixed-grant `--native-template-client` development route; see
+`docs/NATIVE_UI_TEMPLATE.md`. Publishing a stable API still requires a separate
+decision.

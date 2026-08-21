@@ -9,4 +9,10 @@ name = "anodrel-native-app-tool"
 path = "src/main.rs"
 
 [dev-dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
+anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
+anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

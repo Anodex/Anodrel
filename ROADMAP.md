@@ -346,8 +346,10 @@ Status: **First starter-package slice in progress**
   three-operation `anodrel-ui-client` facade is implemented and exercised by
   the compiled native UI diagnostic. The new-directory generator now writes a
   constrained Rust project with only checkout-relative first-party paths and
-  proves it through an isolated build. Its explicit host route with only
-  document write, action read, and self-close grants remains next.
+  proves it through an isolated build plus a real authenticated child session.
+  Its explicit Windows host route is also implemented: it grants exactly
+  document write, action read, and self-close to an operator-selected
+  development executable and shares the compiled probe's bounded lifecycle.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an
@@ -362,9 +364,11 @@ Status: **First starter-package slice in progress**
   boundary. Neither claims to be a packaged executable application.
 
 Acceptance gate: a new project can be created from a documented template and
-run without knowing the internals of the native host. The first template covers
-only the current static content-package boundary; a public executable SDK
-template remains required.
+run without knowing the internals of the native host. **Met for the constrained
+Windows development template:** the generator, typed client, fixed-grant host
+route, isolated release build, and real child-session test are implemented.
+Manual window-action verification, production executable identity, a published
+stable SDK, packaging, and non-Windows hosts remain separate work.
 
 ## Phase 4 — Anodex adapter
 

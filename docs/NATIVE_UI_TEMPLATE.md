@@ -1,16 +1,16 @@
 # Anodrel development native UI template
 
-**Status:** The portable typed client and the first-party new-directory
-generator are implemented. The generator's isolated generated-project build
-test passes. The explicit development host route remains next. This is a
-Windows development template, not a product packaging or application-identity
-format.
+**Status:** The portable typed client, first-party new-directory generator, and
+explicit fixed-grant Windows development host route are implemented. The
+generator's isolated build and real authenticated generated-child session tests
+pass. Manual native-window action verification remains open. This is a Windows
+development template, not a product packaging or application-identity format.
 
 ## Purpose
 
-The template will let a new Rust executable render one strict Anodrel UI
+The template lets a new Rust executable render one strict Anodrel UI
 document, receive semantic actions from that document, and request that its own
-host-owned session close. It removes private bootstrap records, wire frames,
+host-controlled session close. It removes private bootstrap records, wire frames,
 raw request JSON, and host orchestration from project source while preserving
 the platform's explicit capability boundary.
 
@@ -78,23 +78,22 @@ cargo run --release --manifest-path native\Cargo.toml -p anodrel-native-app-tool
 ~~~
 
 The generated project compiles in isolation with `cargo build --release`. Its
-README records the checkout-relative host manifest location, but it does not
-yet offer a runnable host command because the explicit template host route is
-still pending.
+README gives the exact checkout-relative host command to open it in a
+development session.
 
 The display label is project text only. It is not an application ID, a trusted
 publisher name, a host window title, or a machine-policy value.
 
 ## Development host session
 
-The pending `--native-template-client <client.exe>` host command will create one
-host-owned native window and grant its one authenticated session only:
+`--native-template-client <client.exe>` creates one host-controlled native window
+and grants its one authenticated session only:
 
 - `ui.document.write`;
 - `ui.events.read`; and
 - `session.close`.
 
-It will never accept project-supplied grants. The host owns the window title,
+It never accepts project-supplied grants. The host owns the window title,
 mailboxes, semantic hit testing, process handle, pipe worker, and cleanup. A
 child exits early, closes its session, or times out only through the host's
 bounded lifecycle; it cannot leave a worker or child running in the background.
@@ -109,5 +108,8 @@ native UI diagnostic now consumes this facade in its end-to-end test. The
 generator's test creates a new project, checks that its dependency paths remain
 relative, and runs an isolated release `cargo build` against the generated
 manifest.
-The remaining host route will add host lifecycle tests and the documented
-manual native-window action. See Decision 0082.
+The generator's real-pipe integration test builds a generated executable,
+delivers an invitation, verifies its first document, supplies only its fixed
+semantic action, then verifies self-close and clean exit. The Windows host's
+shared fixed-grant lifecycle has a unit test. The remaining verification is the
+documented manual native-window action. See Decision 0082.

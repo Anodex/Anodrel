@@ -135,7 +135,9 @@ mod tests {
             fs::read_to_string(destination.join("Cargo.toml")).expect("read generated manifest");
         let root = crate::paths::anodrel_root().expect("locate checkout");
         assert!(!manifest.contains(&root.to_string_lossy().to_string()));
-        assert!(destination.join("README.md").is_file());
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated project instructions");
+        assert!(readme.contains("--native-template-client"));
         assert!(destination.join("src/main.rs").is_file());
 
         let status = Command::new(env!("CARGO"))
