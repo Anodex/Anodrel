@@ -286,8 +286,9 @@ the first capability-checked authenticated UI document replacement path.
 `docs/UI_SESSION_LAB.md` defines the authenticated native UI delivery smoke
 test.
 `docs/NATIVE_UI_TEMPLATE.md` defines the accepted development-native UI
-template boundary that will make a first typed executable project usable without
-opening a product launch path.
+template boundary. Its first-party generator creates a typed executable project
+that builds without opening a product launch path; the explicit development
+host route remains the next slice.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

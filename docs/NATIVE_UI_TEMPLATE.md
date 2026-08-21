@@ -1,9 +1,10 @@
 # Anodrel development native UI template
 
-**Status:** The portable typed client is implemented and covered by unit plus
-real-pipe tests. The generator and explicit development host route remain next.
-This is a Windows development template, not a product packaging or
-application-identity format.
+**Status:** The portable typed client and the first-party new-directory
+generator are implemented. The generator's isolated generated-project build
+test passes. The explicit development host route remains next. This is a
+Windows development template, not a product packaging or application-identity
+format.
 
 ## Purpose
 
@@ -50,9 +51,9 @@ window API. See `docs/NATIVE_CLIENT.md`.
 
 ## Generated project contract
 
-`anodrel-native-app-tool init` will accept a destination, a Cargo-compatible
-project slug, and a display label. It will refuse an existing destination and
-write only a new project directory containing:
+`anodrel-native-app-tool init` accepts a destination, a Cargo-compatible
+project slug, and a display label. It refuses an existing destination and
+writes only a new project directory containing:
 
 ~~~text
 my-native-app/
@@ -63,18 +64,30 @@ my-native-app/
 ~~~
 
 Every Anodrel dependency path is relative to the local checkout from which the
-tool was run. The tool writes no absolute path, machine setting, certificate,
-installed record, signature, capability declaration, package, or generated
-secret. The example program has one compiled-in v1 document and one action. It
-does not load application code, content, configuration, or a document from a
-path, URL, environment variable, or command argument.
+tool was run. The destination's parent directory must already exist. The tool
+writes no absolute path, machine setting, certificate, installed record,
+signature, capability declaration, package, or generated secret. The example
+program has one compiled-in v1 document and one action. It does not load
+application code, content, configuration, or a document from a path, URL,
+environment variable, or command argument.
+
+From the Anodrel checkout, create a project with:
+
+~~~powershell
+cargo run --release --manifest-path native\Cargo.toml -p anodrel-native-app-tool -- init .\my-native-app my-native-app "My Native App"
+~~~
+
+The generated project compiles in isolation with `cargo build --release`. Its
+README records the checkout-relative host manifest location, but it does not
+yet offer a runnable host command because the explicit template host route is
+still pending.
 
 The display label is project text only. It is not an application ID, a trusted
 publisher name, a host window title, or a machine-policy value.
 
 ## Development host session
 
-The planned `--native-template-client <client.exe>` host command will create one
+The pending `--native-template-client <client.exe>` host command will create one
 host-owned native window and grant its one authenticated session only:
 
 - `ui.document.write`;
@@ -90,9 +103,11 @@ bounded lifecycle; it cannot leave a worker or child running in the background.
 
 This template introduces no protocol version or wire format. It uses existing
 Protocol 1.3 `ui.document.replace`, `ui.events.read`, and `session.close`
-operations, and existing `ANBI` bootstrap v1 plus `ANDR` wire v1. Its proof will
+operations, and existing `ANBI` bootstrap v1 plus `ANDR` wire v1. Its proof
 includes typed-client tests and a real Windows pipe test: the existing compiled
 native UI diagnostic now consumes this facade in its end-to-end test. The
-remaining generator and host route will add an isolated generated-project
-build/run test, host lifecycle tests, and the documented manual native window
-action. See Decision 0082.
+generator's test creates a new project, checks that its dependency paths remain
+relative, and runs an isolated release `cargo build` against the generated
+manifest.
+The remaining host route will add host lifecycle tests and the documented
+manual native-window action. See Decision 0082.

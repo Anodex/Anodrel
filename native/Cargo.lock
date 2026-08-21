@@ -101,6 +101,13 @@ name = "anodrel-menu"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-native-app-tool"
+version = "0.1.0"
+dependencies = [
+ "anodrel-ui-document",
+]
+
+[[package]]
 name = "anodrel-native-client-sample"
 version = "0.1.0"
 dependencies = [

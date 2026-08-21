@@ -344,9 +344,10 @@ Status: **First starter-package slice in progress**
   This is not yet a stable public native SDK or executable template. Decision
   0082 now defines the next development-native UI template boundary. Its typed
   three-operation `anodrel-ui-client` facade is implemented and exercised by
-  the compiled native UI diagnostic; its new-directory generator and explicit
-  host route with only document write, action read, and self-close grants remain
-  next.
+  the compiled native UI diagnostic. The new-directory generator now writes a
+  constrained Rust project with only checkout-relative first-party paths and
+  proves it through an isolated build. Its explicit host route with only
+  document write, action read, and self-close grants remains next.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

@@ -51,6 +51,7 @@ members = [
   "hosts/windows",
   "tools/perf-lab",
   "tools/package-tool",
+  "tools/native-app-tool",
   "tools/product-fixture",
   "tools/product-provisioning",
   "tools/native-client-sample",
