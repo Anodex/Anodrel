@@ -3,13 +3,15 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 18 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 19 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
 export const MAX_UI_DOCUMENT_REQUEST_BYTES = 24 * 1024;
 export const MAX_CLIPBOARD_TEXT_REQUEST_BYTES = 24 * 1024;
 export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
+/** Maximum UTF-8 bytes in the exact HTTPS text-fetch URL payload. */
+export const MAX_NETWORK_FETCH_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_FILTERS = 8;
 export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
@@ -44,6 +46,7 @@ export type Capability =
   | "clipboard.read"
   | "clipboard.write"
   | "external.open"
+  | "network.fetch"
   | "dialog.open_file"
   | "dialog.save_file"
   | "file.read_text"
@@ -222,6 +225,18 @@ export interface PlatformOperationMap {
     readonly payload: { readonly url: string };
     readonly result: { readonly status: "opened" };
   };
+  /**
+   * Fetches one bounded UTF-8 response from a host-authorized HTTPS origin.
+   *
+   * There is deliberately no method, body, header, cookie, credential,
+   * redirect, proxy, timeout, client-certificate, callback, or native-handle
+   * field. A non-2xx status remains a successful protocol result when its
+   * bounded text body is representable.
+   */
+  "network.fetch_text": {
+    readonly payload: { readonly url: string };
+    readonly result: { readonly statusCode: number; readonly text: string };
+  };
   "dialog.open_file": {
     readonly payload: {
       readonly filters: readonly { readonly label: string; readonly extensions: readonly string[] }[];
@@ -344,6 +359,8 @@ export type ProtocolErrorCode =
   | "clipboard.text_invalid"
   | "clipboard.text_too_large"
   | "external.unavailable"
+  | "network.unavailable"
+  | "network.response_invalid"
   | "dialog.unavailable"
   | "file.unavailable"
   | "file.text_invalid"
@@ -645,6 +662,19 @@ export function isWindowTitleSetPayload(
   );
 }
 
+/** Validates the exact bounded HTTPS text-fetch payload for Protocol 1.19. */
+export function isNetworkFetchTextPayload(
+  value: unknown,
+): value is PayloadFor<"network.fetch_text"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.url === "string" &&
+    new TextEncoder().encode(value.url).byteLength <= MAX_NETWORK_FETCH_REQUEST_BYTES &&
+    isValidatedHttpsTextFetchUrl(value.url)
+  );
+}
+
 /** One current enabled semantic command selected from a native session menu. */
 export interface MenuActionInvokedEvent
   extends EventEnvelope<{ readonly menuRevision: string; readonly action: string }> {
@@ -871,6 +901,43 @@ function isValidatedHttpsUrl(value: string): boolean {
     return false;
   }
   return true;
+}
+
+function isValidatedHttpsTextFetchUrl(value: string): boolean {
+  if (
+    value.length === 0 ||
+    !/^[A-Za-z0-9\-._~:/?@!$&'()*+,;=%]+$/.test(value) ||
+    value.includes("\\") ||
+    value.includes("#") ||
+    !value.startsWith("https://") ||
+    /%(?![0-9A-Fa-f]{2})/.test(value)
+  ) {
+    return false;
+  }
+  const match = /^https:\/\/([^/?]+)(?:[/?].*)?$/.exec(value);
+  if (match === null) {
+    return false;
+  }
+  const authority = match[1];
+  if (authority === undefined || authority.includes("@")) {
+    return false;
+  }
+  const separator = authority.lastIndexOf(":");
+  const host = separator === -1 ? authority : authority.slice(0, separator);
+  const port = separator === -1 ? undefined : authority.slice(separator + 1);
+  return (
+    isDnsStyleHost(host) &&
+    !isIpv4Literal(host) &&
+    (port === undefined || (/^\d+$/.test(port) && Number(port) >= 1 && Number(port) <= 65_535))
+  );
+}
+
+function isIpv4Literal(value: string): boolean {
+  const labels = value.split(".");
+  return (
+    labels.length === 4 &&
+    labels.every((label) => /^\d+$/.test(label) && Number(label) >= 0 && Number(label) <= 255)
+  );
 }
 
 function isDnsStyleHost(value: string): boolean {

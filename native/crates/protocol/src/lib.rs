@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 18;
+pub const PROTOCOL_MINOR: u16 = 19;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -49,6 +49,12 @@ pub enum Capability {
     ClipboardRead,
     ClipboardWrite,
     ExternalOpen,
+    /// Fetch bounded text from one host-authorized HTTPS origin.
+    ///
+    /// The separate host service owns exact origin policy, direct network
+    /// calls, and all native state. This capability accepts no method, body,
+    /// header, cookie, credential, proxy, or connection handle.
+    NetworkFetch,
     DialogOpenFile,
     DialogSaveFile,
     FileReadText,
@@ -98,6 +104,7 @@ impl Capability {
             Self::ClipboardRead => "clipboard.read",
             Self::ClipboardWrite => "clipboard.write",
             Self::ExternalOpen => "external.open",
+            Self::NetworkFetch => "network.fetch",
             Self::DialogOpenFile => "dialog.open_file",
             Self::DialogSaveFile => "dialog.save_file",
             Self::FileReadText => "file.read_text",
@@ -129,6 +136,12 @@ pub enum ProtocolErrorCode {
     ClipboardTextInvalid,
     ClipboardTextTooLarge,
     ExternalUnavailable,
+    /// The host has no authorized text-fetch service, the origin is not
+    /// allowed, or the direct native request could not complete.
+    NetworkUnavailable,
+    /// A native response could not be represented as the bounded public
+    /// status-and-UTF-8-text value.
+    NetworkResponseInvalid,
     DialogUnavailable,
     FileUnavailable,
     FileTextInvalid,
@@ -184,6 +197,8 @@ impl ProtocolErrorCode {
             Self::ClipboardTextInvalid => "clipboard.text_invalid",
             Self::ClipboardTextTooLarge => "clipboard.text_too_large",
             Self::ExternalUnavailable => "external.unavailable",
+            Self::NetworkUnavailable => "network.unavailable",
+            Self::NetworkResponseInvalid => "network.response_invalid",
             Self::DialogUnavailable => "dialog.unavailable",
             Self::FileUnavailable => "file.unavailable",
             Self::FileTextInvalid => "file.text_invalid",

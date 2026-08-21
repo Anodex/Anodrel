@@ -139,6 +139,18 @@ export class PlatformClient {
     return this.request("external.open", { url });
   }
 
+  /**
+   * Fetches bounded UTF-8 text from one host-authorized HTTPS origin.
+   *
+   * This accepts only the URL. There are no options for methods, headers,
+   * request bodies, cookies, credentials, redirects, proxies, timeouts, or
+   * TLS. A non-2xx HTTP status is still a successful protocol result when the
+   * host can represent its bounded text response.
+   */
+  fetchHttpsText(url: string): Promise<ResultFor<"network.fetch_text">> {
+    return this.request("network.fetch_text", { url });
+  }
+
   openFileDialog(
     filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
   ): Promise<ResultFor<"dialog.open_file">> {

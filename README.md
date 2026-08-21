@@ -230,9 +230,9 @@ provisioning contract, and host activation routes that exercise it.
 `docs/CREDENTIALS.md` defines the host-only Windows credential-store boundary.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.
 `docs/EXTERNAL_LINKS.md` defines the validated HTTPS external-link foundation.
-`docs/NETWORK.md` defines the accepted host-authorized HTTPS text-fetch
-contract. Its direct Windows adapter and production origin policy remain
-unimplemented.
+`docs/NETWORK.md` defines the implemented portable host-authorized HTTPS
+text-fetch contract, SDK, and mock-host boundary. Its direct Windows adapter,
+development route, and production origin policy remain unimplemented.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.

@@ -11,6 +11,7 @@ import {
   isWindowStateSetPayload,
   isWindowTitleSetPayload,
   isExternalOpenPayload,
+  isNetworkFetchTextPayload,
   isFileDialogOpenPayload,
   isFileTextReadPayload,
   isFileTextWritePayload,
@@ -44,6 +45,8 @@ export interface MockHostOptions {
   readonly storageSnapshot?: string;
   /** Initial exact credentials, keyed by the documented credential-name grammar. */
   readonly credentials?: Readonly<Record<string, string>>;
+  /** Fixed protocol-safe response for a granted HTTPS text-fetch test. */
+  readonly networkTextResponse?: Readonly<{ statusCode: number; text: string }>;
 }
 
 /**
@@ -72,6 +75,7 @@ export class MockHost {
   private clipboardText: string | undefined;
   private storageSnapshot: string | undefined;
   private readonly credentials = new Map<string, string>();
+  private readonly networkTextResponse: Readonly<{ statusCode: number; text: string }> | undefined;
   private sessionCount = 0;
 
   constructor(options: MockHostOptions) {
@@ -96,6 +100,16 @@ export class MockHost {
       }
       this.credentials.set(name, secret);
     }
+    if (
+      options.networkTextResponse !== undefined &&
+      (!Number.isInteger(options.networkTextResponse.statusCode) ||
+        options.networkTextResponse.statusCode < 100 ||
+        options.networkTextResponse.statusCode > 599 ||
+        !isWellFormedUnicode(options.networkTextResponse.text) ||
+        new TextEncoder().encode(options.networkTextResponse.text).byteLength > 32 * 1024)
+    ) {
+      throw new Error("MockHost network text response must be protocol-representable.");
+    }
 
     this.applicationId = options.applicationId;
     this.grantedCapabilities = [...(options.grantedCapabilities ?? [])];
@@ -103,6 +117,7 @@ export class MockHost {
     this.now = options.now ?? (() => new Date());
     this.clipboardText = options.clipboardText;
     this.storageSnapshot = options.storageSnapshot;
+    this.networkTextResponse = options.networkTextResponse;
   }
 
   createTransport(sessionId = `mock-session-${++this.sessionCount}`): MockHostTransport {
@@ -550,6 +565,38 @@ export class MockHost {
         }
         return this.success("external.open", request.requestId, { status: "opened" });
 
+      case "network.fetch_text":
+        if (request.protocolVersion.minor < 19) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "network.fetch_text requires protocol 1.19 or later.",
+          );
+        }
+        if (!isNetworkFetchTextPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "network.fetch_text requires one exact bounded HTTPS URL.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "network.fetch")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "network.fetch_text requires the network.fetch capability.",
+            { capability: "network.fetch" },
+          );
+        }
+        if (this.networkTextResponse === undefined) {
+          return this.failure(
+            request.requestId,
+            "network.unavailable",
+            "network text fetch is unavailable.",
+          );
+        }
+        return this.success("network.fetch_text", request.requestId, this.networkTextResponse);
+
       case "dialog.open_file":
         if (request.protocolVersion.minor < 7) {
           return this.failure(
@@ -803,6 +850,25 @@ interface UiDocumentState {
 
 interface MenuState {
   revision: number;
+}
+
+function isWellFormedUnicode(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      if (index + 1 >= value.length) {
+        return false;
+      }
+      const next = value.charCodeAt(index + 1);
+      if (next < 0xdc00 || next > 0xdfff) {
+        return false;
+      }
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function extractRequestId(value: unknown): string {

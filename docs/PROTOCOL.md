@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.18. Protocol 1.19's host-authorized
-HTTPS text-fetch contract is accepted but not yet implemented.
+**Status:** Implemented through version 1.19. A host without an attached
+text-fetch service remains safely unavailable for that operation.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,9 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.18 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 18}`. Version 1.19 is reserved for the accepted
-HTTPS text-fetch contract and must not be requested until a host implements it.
+the host's. Version 1.19 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 19}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -78,6 +77,7 @@ The implemented operations are:
 | `clipboard.read` | `{}` | bounded Unicode text or no text | `clipboard.read` |
 | `clipboard.write` | `{ "text": string }` | accepted write | `clipboard.write` |
 | `external.open` | `{ "url": string }` | accepted operating-system handoff | `external.open` |
+| `network.fetch_text` | `{ "url": string }` | bounded UTF-8 text plus HTTP status | `network.fetch` |
 | `dialog.open_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path or cancellation | `dialog.open_file` |
 | `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
 | `dialog.open_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus selection reference, or cancellation | `dialog.open_file` |
@@ -88,15 +88,9 @@ The implemented operations are:
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
 
-The accepted but not yet implemented Protocol 1.19 operation is:
-
-| Operation | Payload | Result | Capability |
-| --- | --- | --- | --- |
-| `network.fetch_text` | `{ "url": string }` | bounded UTF-8 text plus HTTP status | `network.fetch` |
-
 ### HTTPS text fetch
 
-Protocol 1.19 reserves `network.fetch_text` for one host-authorized HTTPS
+Protocol 1.19 implements `network.fetch_text` as one host-authorized HTTPS
 `GET` request. The payload accepts exactly one bounded URL. The result contains
 only `statusCode` (100 through 599) and at most 32 KiB of UTF-8 `text`; no
 headers, redirects, address, certificate, timing, proxy, or native status is
@@ -450,8 +444,8 @@ Protocol 1.17 reuses `file.unavailable` and `file.text_too_large` for the
 separate retained-output-object text-write boundary; it adds no new error code.
 Protocol 1.18 adds `menu.unavailable` for a host that cannot attach or update
 its own native session menu.
-Protocol 1.19 reserves `network.unavailable` and `network.response_invalid`
-for its accepted HTTPS text-fetch boundary.
+Protocol 1.19 adds `network.unavailable` and `network.response_invalid` for
+its HTTPS text-fetch boundary.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 

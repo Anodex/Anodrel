@@ -1,8 +1,9 @@
 # Anodrel HTTPS text fetch
 
-**Status:** Protocol contract accepted for 1.19. No protocol core, SDK, direct
+**Status:** The portable Protocol 1.19 core, strict URL and exact-origin
+values, TypeScript SDK, and deterministic mock host are implemented. No direct
 Windows adapter, development route, or installed-application policy currently
-implements it.
+attaches the service to a real application session.
 
 ## Purpose and boundary
 
@@ -84,7 +85,7 @@ one successful protocol result.
 
 ## Windows mapping
 
-The planned adapter uses direct WinHTTP: `WinHttpOpen`, `WinHttpConnect`,
+The planned adapter will use direct WinHTTP: `WinHttpOpen`, `WinHttpConnect`,
 `WinHttpOpenRequest`, `WinHttpSendRequest`, `WinHttpReceiveResponse`, status
 query, bounded reads, and `WinHttpCloseHandle`. It uses no browser, webview,
 Node.js, WinINet, COM browser component, or third-party network library.

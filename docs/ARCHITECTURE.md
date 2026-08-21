@@ -397,8 +397,9 @@ Decision 0084 reserves the first direct network data seam without turning the
 host into a browser runtime. Its host-selected HTTPS origins and bounded
 text-only `GET` result sit behind a separate capability; an application cannot
 choose headers, bodies, cookies, redirects, credentials, proxies, certificates,
-or a native handle. The portable contract is accepted before its direct WinHTTP
-adapter or product origin policy is implemented. See `docs/NETWORK.md`.
+or a native handle. The portable protocol core, strict URL and exact-origin
+values, SDK, and mock host are implemented; its direct WinHTTP adapter and
+product origin policy remain separate host work. See `docs/NETWORK.md`.
 
 Every request should have:
 

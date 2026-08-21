@@ -4,6 +4,7 @@ import { MockHost } from "@anodrel/mock-host";
 import {
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   MAX_EXTERNAL_LINK_REQUEST_BYTES,
+  MAX_NETWORK_FETCH_REQUEST_BYTES,
   MAX_FILE_TEXT_WRITE_BYTES,
   MAX_MENU_REPLACE_REQUEST_BYTES,
   PROTOCOL_VERSION,
@@ -335,6 +336,79 @@ test("selection-scoped file text keeps selection and reading separately granted"
     () => readClient.readSelectedFileText("C:/private.txt"),
     (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
   );
+});
+
+test("SDK and host agree on one separately granted bounded HTTPS text fetch", async () => {
+  const client = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["network.fetch"],
+      networkTextResponse: { statusCode: 200, text: "healthy" },
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+
+  assert.deepEqual(await client.fetchHttpsText("https://api.example.test/status?format=text"), {
+    statusCode: 200,
+    text: "healthy",
+  });
+});
+
+test("HTTPS text fetch checks its protocol version, exact payload, and host grant", async () => {
+  const denied = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      networkTextResponse: { statusCode: 200, text: "healthy" },
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => denied.fetchHttpsText("https://api.example.test/status"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "network.fetch",
+  );
+
+  const granted = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["network.fetch"],
+      networkTextResponse: { statusCode: 200, text: "healthy" },
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  for (const url of [
+    "https://127.0.0.1/status",
+    "https://api.example.test/status#fragment",
+    "https://api.example.test/status%1",
+    "x".repeat(MAX_NETWORK_FETCH_REQUEST_BYTES + 1),
+  ]) {
+    await assert.rejects(
+      () => granted.fetchHttpsText(url),
+      (error: unknown) =>
+        error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+      `${url} was accepted`,
+    );
+  }
+
+  const older = await new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["network.fetch"],
+    networkTextResponse: { statusCode: 200, text: "healthy" },
+  })
+    .createTransport()
+    .send({
+      protocolVersion: { major: 1, minor: 18 },
+      kind: "request",
+      requestId: "network-before-protocol-1.19",
+      operation: "network.fetch_text",
+      payload: { url: "https://api.example.test/status" },
+    });
+  assert.equal(older.status, "failure");
+  if (older.status === "failure") {
+    assert.equal(older.error.code, "operation.unsupported");
+  }
 });
 
 test("selection-scoped file writing keeps save selection and writing separately granted", async () => {

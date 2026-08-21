@@ -54,6 +54,7 @@ dependencies = [
  "anodrel-file-access",
  "anodrel-file-dialog",
  "anodrel-menu",
+ "anodrel-network",
  "anodrel-notifications",
  "anodrel-protocol",
  "anodrel-storage",
@@ -143,6 +144,10 @@ dependencies = [
  "anodrel-windows-client",
  "anodrel-windows-pipe",
 ]
+
+[[package]]
+name = "anodrel-network"
+version = "0.1.0"
 
 [[package]]
 name = "anodrel-notifications"

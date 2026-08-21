@@ -163,8 +163,10 @@ Status: **Direct Windows host in progress**
    Decision 0084 now defines the next direct data-egress boundary: one
    host-authorized, origin-bound HTTPS text fetch without a browser runtime,
    headers, bodies, redirects, cookies, credentials, or proxy discovery. Its
-   Protocol 1.19 core, direct WinHTTP adapter, and production origin policy
-   remain to be implemented.
+   **Completed:** its portable Protocol 1.19 core, strict URL and exact-origin
+   policy values, SDK, mock host, and contract coverage. **Pending:** the
+   direct WinHTTP adapter, a fixed-origin development diagnostic, and a
+   production installed-record origin policy.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

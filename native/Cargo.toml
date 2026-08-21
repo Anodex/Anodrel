@@ -25,6 +25,7 @@ members = [
   "crates/window",
   "crates/menu",
   "crates/external-links",
+  "crates/network",
   "crates/file-dialog",
   "crates/file-access",
   "adapters/windows-pipe",

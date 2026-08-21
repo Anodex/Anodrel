@@ -87,7 +87,7 @@ mod tests {
         assert!(validates_health(&ready));
 
         let compatible_newer_minor = JsonValue::parse(
-            r#"{"status":"ready","hostName":"test-host","protocolVersion":{"major":1,"minor":18}}"#,
+            r#"{"status":"ready","hostName":"test-host","protocolVersion":{"major":1,"minor":19}}"#,
         )
         .expect("fixture is JSON");
         assert!(validates_health(&compatible_newer_minor));

@@ -54,7 +54,8 @@ command or a replacement for a real authenticated native session.
 `docs/PROTOCOL.md`, including health and capability discovery, bounded
 diagnostic reads, UI document replacement and semantic-event reads, session
 close, clipboard, HTTPS handoff, file dialog plus retained text read and write, state,
-credentials, notifications, and the two closed session-window commands. Every
+credentials, notifications, host-authorized HTTPS text fetches, and the two
+closed session-window commands. Every
 method takes only the documented payload fields; it cannot accept a native
 handle, arbitrary application identity, capability list, window target,
 filesystem path where the protocol does not allow one, or a callback.
@@ -75,6 +76,18 @@ Failures have two separate meanings:
 The result and error shapes, field limits, capability requirements, and
 compatibility rules live in `docs/PROTOCOL.md`. A method name is a convenience
 for that contract, not a second policy layer.
+
+### Host-authorized HTTPS text fetch
+
+Protocol 1.19 adds `fetchHttpsText(url)`. It sends exactly the supplied
+validated HTTPS URL and returns only the response's `statusCode` and bounded
+UTF-8 `text`. It does not accept a method, body, header, cookie, credential,
+redirect, proxy, timeout, client certificate, callback, or network handle.
+The host must have issued the separate `network.fetch` capability and attached
+a service whose own host-selected exact-origin policy allows the URL. A
+successful result, including a non-2xx HTTP status, says only that the bounded
+HTTP response was represented; it is not an application-level success or a
+claim about a user's network state. See `docs/NETWORK.md`.
 
 ## Windows development transport
 

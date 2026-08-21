@@ -34,6 +34,7 @@ use anodrel_menu::{
     Menu, MenuAction, MenuActionId, MenuModel, MenuService, MenuSession, MenuText,
     UnavailableMenuService,
 };
+use anodrel_network::{NetworkTextService, NetworkTextServiceError, NetworkUrl};
 use anodrel_notifications::{
     Notification, NotificationBody, NotificationService, NotificationServiceError,
     NotificationTitle,
@@ -56,6 +57,8 @@ pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
 pub const MAX_UI_DOCUMENT_REQUEST_BYTES: usize = 24 * 1024;
 pub const MAX_CLIPBOARD_TEXT_REQUEST_BYTES: usize = 24 * 1024;
 pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
+/// Maximum bytes in the exact `network.fetch_text` URL payload.
+pub const MAX_NETWORK_FETCH_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
 pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
@@ -136,6 +139,7 @@ pub struct CoreHost {
     pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
+    network: Box<dyn NetworkTextService>,
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
@@ -162,6 +166,7 @@ pub struct CoreHost {
 pub struct HostServices {
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
+    network: Box<dyn NetworkTextService>,
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
@@ -196,6 +201,18 @@ struct UnavailableExternalLinks;
 impl ExternalLinkService for UnavailableExternalLinks {
     fn open(&self, _link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
         Err(ExternalLinkOpenError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+struct UnavailableNetwork;
+
+impl NetworkTextService for UnavailableNetwork {
+    fn fetch_text(
+        &self,
+        _url: &NetworkUrl,
+    ) -> Result<anodrel_network::NetworkTextResponse, NetworkTextServiceError> {
+        Err(NetworkTextServiceError::Unavailable)
     }
 }
 
@@ -302,6 +319,7 @@ impl HostServices {
         Self {
             clipboard: Box::new(UnavailableClipboard),
             external_links: Box::new(UnavailableExternalLinks),
+            network: Box::new(UnavailableNetwork),
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
@@ -329,6 +347,17 @@ impl HostServices {
     #[must_use]
     pub fn with_external_links(mut self, service: impl ExternalLinkService + 'static) -> Self {
         self.external_links = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-authorized HTTPS text-fetch service.
+    ///
+    /// The supplied service owns its exact origin policy and every native
+    /// network decision. It receives only a previously validated URL and
+    /// exposes no headers, cookies, credentials, or native handles.
+    #[must_use]
+    pub fn with_network(mut self, service: impl NetworkTextService + 'static) -> Self {
+        self.network = Box::new(service);
         self
     }
 
@@ -480,6 +509,7 @@ impl CoreHost {
             pending_ui_document_update: RefCell::new(None),
             clipboard: services.clipboard,
             external_links: services.external_links,
+            network: services.network,
             notifications: services.notifications,
             window_title: services.window_title,
             window_state: services.window_state,
@@ -713,6 +743,7 @@ impl CoreHost {
             pending_ui_document_update: RefCell::new(None),
             clipboard: Box::new(clipboard),
             external_links: Box::new(external_links),
+            network: Box::new(UnavailableNetwork),
             // This constructor names each service explicitly and predates
             // notifications. Leaving it unavailable keeps every existing caller
             // exactly as capable as it was, rather than silently widening it.
@@ -848,6 +879,9 @@ impl CoreHost {
             }
             "external.open" if request.protocol_version.minor >= 6 => {
                 self.handle_external_open(request)
+            }
+            "network.fetch_text" if request.protocol_version.minor >= 19 => {
+                self.handle_network_fetch_text(request)
             }
             "dialog.open_file" if request.protocol_version.minor >= 7 => {
                 self.handle_file_dialog_open(request)
@@ -1322,6 +1356,69 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::ExternalUnavailable,
                 "external link handler is unavailable.",
+                None,
+            ),
+        }
+    }
+
+    /// Performs one host-authorized, bounded HTTPS text fetch.
+    ///
+    /// The core validates only the protocol URL and grant. The injected native
+    /// service owns exact-origin policy and returns only public-safe result
+    /// categories, so this layer cannot expose network diagnostics.
+    fn handle_network_fetch_text(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(url) = network_fetch_text_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "network.fetch_text requires one bounded URL string.",
+                None,
+            );
+        };
+        if url.len() > MAX_NETWORK_FETCH_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "network.fetch_text URL exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::NetworkFetch) {
+            return self.capability_denied(request.request_id, "network.fetch");
+        }
+        let url = match NetworkUrl::parse(url) {
+            Ok(url) => url,
+            Err(_) => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::RequestPayloadInvalid,
+                    "network.fetch_text URL is invalid.",
+                    None,
+                );
+            }
+        };
+        match self.network.fetch_text(&url) {
+            Ok(response) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    (
+                        "statusCode",
+                        JsonValue::Number(response.status_code().to_string()),
+                    ),
+                    ("text", JsonValue::String(response.text().to_owned())),
+                ]),
+            ),
+            Err(NetworkTextServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::NetworkUnavailable,
+                "network text fetch is unavailable.",
+                None,
+            ),
+            Err(NetworkTextServiceError::ResponseInvalid) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::NetworkResponseInvalid,
+                "network text response is invalid.",
                 None,
             ),
         }
@@ -2196,6 +2293,19 @@ fn external_open_payload(value: &JsonValue) -> Option<&str> {
         .and_then(JsonValue::as_string)
 }
 
+/// Reads the exact one-field payload `network.fetch_text` accepts.
+///
+/// Extra fields are a mismatch rather than a future method, body, header,
+/// cookie, credential, proxy, redirect, timeout, or native-handle escape
+/// hatch. That absence keeps the service a bounded data seam.
+fn network_fetch_text_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("url"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
 fn file_dialog_open_payload(value: &JsonValue) -> Option<Vec<FileDialogFilter>> {
     let fields = value.as_object()?;
     if fields.len() != 1 {
@@ -2370,6 +2480,9 @@ mod tests {
     };
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
     use anodrel_menu::{MenuModel, MenuRevision, MenuService, MenuServiceError};
+    use anodrel_network::{
+        NetworkTextResponse, NetworkTextService, NetworkTextServiceError, NetworkUrl,
+    };
     use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
@@ -2447,6 +2560,42 @@ mod tests {
     impl ExternalLinkService for FailingExternalLinks {
         fn open(&self, _link: &ExternalLink) -> Result<(), ExternalLinkOpenError> {
             Err(ExternalLinkOpenError::Unavailable)
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct RecordingNetwork {
+        requested: Arc<Mutex<Vec<NetworkUrl>>>,
+        result: Result<NetworkTextResponse, NetworkTextServiceError>,
+    }
+
+    impl RecordingNetwork {
+        fn responding(status_code: u16, text: &str) -> Self {
+            Self {
+                requested: Arc::new(Mutex::new(Vec::new())),
+                result: Ok(NetworkTextResponse::new(status_code, text)
+                    .expect("network fixture response is valid")),
+            }
+        }
+
+        fn failing(error: NetworkTextServiceError) -> Self {
+            Self {
+                requested: Arc::new(Mutex::new(Vec::new())),
+                result: Err(error),
+            }
+        }
+    }
+
+    impl NetworkTextService for RecordingNetwork {
+        fn fetch_text(
+            &self,
+            url: &NetworkUrl,
+        ) -> Result<NetworkTextResponse, NetworkTextServiceError> {
+            self.requested
+                .lock()
+                .expect("network recorder lock is available")
+                .push(url.clone());
+            self.result.clone()
         }
     }
 
@@ -2691,6 +2840,16 @@ mod tests {
             SessionCloseSignal::default(),
             MemoryClipboard::with_text(None),
             external_links,
+        )
+    }
+
+    fn network_host(
+        grants: Vec<Capability>,
+        network: impl NetworkTextService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            HostServices::unavailable().with_network(network),
         )
     }
 
@@ -3151,6 +3310,12 @@ mod tests {
     fn request_v1_18(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":18}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_19(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":19}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -3651,6 +3816,7 @@ mod tests {
             Capability::ClipboardRead,
             Capability::ClipboardWrite,
             Capability::ExternalOpen,
+            Capability::NetworkFetch,
             Capability::DialogOpenFile,
             Capability::DialogSaveFile,
             Capability::FileReadText,
@@ -4225,6 +4391,147 @@ mod tests {
                 .as_string()
                 .is_some_and(|message| !message.contains("private"))
         );
+    }
+
+    #[test]
+    fn network_text_fetch_is_separately_granted_and_returns_only_status_and_text() {
+        let service = RecordingNetwork::responding(201, "created");
+        let requested = Arc::clone(&service.requested);
+        let host = network_host(vec![Capability::NetworkFetch], service);
+        let response = JsonValue::parse(&host.handle_json(&request_v1_19(
+            "network.fetch_text",
+            r#"{"url":"https://Api.Example.test:8443/v1/status?format=text"}"#,
+        )))
+        .expect("network response is JSON");
+        assert_eq!(field(&response, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&response, "result"), "statusCode"),
+            &JsonValue::Number("201".to_owned())
+        );
+        assert_eq!(
+            field(field(&response, "result"), "text").as_string(),
+            Some("created")
+        );
+        let requested = requested
+            .lock()
+            .expect("network recorder lock is available");
+        assert_eq!(requested.len(), 1);
+        assert_eq!(
+            requested[0].as_str(),
+            "https://Api.Example.test:8443/v1/status?format=text"
+        );
+        assert_eq!(requested[0].hostname(), "api.example.test");
+        assert_eq!(requested[0].port(), 8443);
+    }
+
+    #[test]
+    fn network_text_fetch_requires_its_protocol_version_grant_and_host_service() {
+        let payload = r#"{"url":"https://api.example.test/status"}"#;
+        let denied = JsonValue::parse(
+            &network_host(vec![], RecordingNetwork::responding(200, "healthy"))
+                .handle_json(&request_v1_19("network.fetch_text", payload)),
+        )
+        .expect("denied network response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+        assert_eq!(
+            field(field(&denied, "error"), "details")
+                .as_object()
+                .and_then(|details| details.get("capability"))
+                .and_then(JsonValue::as_string),
+            Some("network.fetch")
+        );
+
+        let unsupported = JsonValue::parse(
+            &network_host(
+                vec![Capability::NetworkFetch],
+                RecordingNetwork::responding(200, "healthy"),
+            )
+            .handle_json(&request_v1_18("network.fetch_text", payload)),
+        )
+        .expect("old-version network response is JSON");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+
+        let unavailable = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::NetworkFetch],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            )
+            .handle_json(&request_v1_19("network.fetch_text", payload)),
+        )
+        .expect("unavailable network response is JSON");
+        assert_eq!(
+            field(field(&unavailable, "error"), "code").as_string(),
+            Some("network.unavailable")
+        );
+    }
+
+    #[test]
+    fn network_text_fetch_rejects_unrepresentable_values_and_never_echoes_them() {
+        let service = RecordingNetwork::responding(200, "healthy");
+        let requested = Arc::clone(&service.requested);
+        let host = network_host(vec![Capability::NetworkFetch], service);
+        let marker = "PrivateNetworkMarker";
+        for payload in [
+            r#"{}"#,
+            r#"{"url":"https://api.example.test/status","header":"secret"}"#,
+            r#"{"url":"https://127.0.0.1/status"}"#,
+            &format!(r#"{{"url":"https://api.example.test/{marker}%1"}}"#),
+        ] {
+            let response = host.handle_json(&request_v1_19("network.fetch_text", payload));
+            let parsed = JsonValue::parse(&response).expect("invalid network response is JSON");
+            assert_eq!(
+                field(field(&parsed, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+            assert!(
+                !response.contains(marker),
+                "refused URL leaked into the response"
+            );
+        }
+        assert!(
+            requested
+                .lock()
+                .expect("network recorder lock is available")
+                .is_empty(),
+            "a rejected request reached the service"
+        );
+
+        for (error, code) in [
+            (NetworkTextServiceError::Unavailable, "network.unavailable"),
+            (
+                NetworkTextServiceError::ResponseInvalid,
+                "network.response_invalid",
+            ),
+        ] {
+            let response = JsonValue::parse(
+                &network_host(
+                    vec![Capability::NetworkFetch],
+                    RecordingNetwork::failing(error),
+                )
+                .handle_json(&request_v1_19(
+                    "network.fetch_text",
+                    r#"{"url":"https://api.example.test/status"}"#,
+                )),
+            )
+            .expect("failed network response is JSON");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(code),
+                "{error:?} mapped to the wrong protocol error"
+            );
+        }
     }
 
     #[test]
