@@ -19,7 +19,7 @@ use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
-use anodrel_window::{WindowStateMailbox, WindowTitleMailbox};
+use anodrel_window::{WindowFocusMailbox, WindowStateMailbox, WindowTitleMailbox};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
@@ -45,6 +45,7 @@ pub struct RegisteredSessionUi {
     menu_mailbox: MenuMailbox,
     window_title_mailbox: WindowTitleMailbox,
     window_state_mailbox: WindowStateMailbox,
+    window_focus_mailbox: WindowFocusMailbox,
     field_mailbox: UiFieldMailbox,
     /// The display name the host appends to any title this session proposes.
     ///
@@ -67,6 +68,7 @@ impl RegisteredSessionUi {
             menu_mailbox: MenuMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
             window_state_mailbox: WindowStateMailbox::new(),
+            window_focus_mailbox: WindowFocusMailbox::new(),
             field_mailbox: UiFieldMailbox::new(),
             display_name: display_name.into(),
         }
@@ -131,6 +133,16 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn window_state_mailbox(&self) -> WindowStateMailbox {
         self.window_state_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread window-focus mailbox.
+    ///
+    /// It carries no target, native handle, retry policy, or focus readback.
+    /// The owning UI thread resolves the one session window; see
+    /// `docs/WINDOW_FOCUS.md`.
+    #[must_use]
+    pub fn window_focus_mailbox(&self) -> WindowFocusMailbox {
+        self.window_focus_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread field-read mailbox.
@@ -278,6 +290,9 @@ fn registered_interactive_services(
         // A presentation state takes the same host-only UI-thread path and is
         // still resolved from this session rather than a caller-supplied target.
         .with_window_state(ui.window_state_mailbox())
+        // Foregrounding stays in the same session-owned UI-thread boundary.
+        // The policy parser admits this mailbox only for record version 1.9.
+        .with_window_focus(ui.window_focus_mailbox())
         // Field values live with the window that owns them, so a read crosses
         // to the UI thread the same way. See `docs/UI_FIELDS.md`.
         .with_ui_fields(ui.field_mailbox()))
@@ -414,6 +429,26 @@ mod tests {
         }
         assert!(second.window_state_mailbox().take().is_none());
         assert!(first.window_state_mailbox().fail(1));
+        assert!(waiting.join().expect("the worker did not panic").is_err());
+    }
+
+    #[test]
+    fn each_session_carries_its_own_window_focus_bridge() {
+        let first = RegisteredSessionUi::new("First Application");
+        let second = RegisteredSessionUi::new("Second Application");
+        let bridge = first.window_focus_mailbox();
+        let waiting =
+            std::thread::spawn(move || anodrel_window::WindowFocusService::request_focus(&bridge));
+
+        while first.window_focus_mailbox().take().is_none() {
+            assert!(
+                second.window_focus_mailbox().take().is_none(),
+                "a session took another session's focus request"
+            );
+            std::thread::yield_now();
+        }
+        assert!(second.window_focus_mailbox().take().is_none());
+        assert!(first.window_focus_mailbox().fail(1));
         assert!(waiting.join().expect("the worker did not panic").is_err());
     }
 }

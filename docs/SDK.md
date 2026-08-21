@@ -54,8 +54,8 @@ command or a replacement for a real authenticated native session.
 `docs/PROTOCOL.md`, including health and capability discovery, bounded
 diagnostic reads, UI document replacement and semantic-event reads, session
 close, clipboard, HTTPS handoff, file dialog plus retained text read and write, state,
-credentials, notifications, host-authorized HTTPS text fetches, and the two
-closed session-window commands. Every
+credentials, notifications, host-authorized HTTPS text fetches, and the three
+narrow session-window commands. Every
 method takes only the documented payload fields; it cannot accept a native
 handle, arbitrary application identity, capability list, window target,
 filesystem path where the protocol does not allow one, or a callback.
@@ -88,6 +88,17 @@ a service whose own host-selected exact-origin policy allows the URL. A
 successful result, including a non-2xx HTTP status, says only that the bounded
 HTTP response was represented; it is not an application-level success or a
 claim about a user's network state. See `docs/NETWORK.md`.
+
+### Session-window foreground request
+
+Protocol 1.20 adds `requestWindowFocus()`. It takes no argument and requests
+attention for the one host window already bound to the authenticated session.
+It requires the separate `window.focus` grant and returns only
+`{ status: "requested" }`: this means Windows accepted the host's foreground
+request, never that a person saw or used the window. It cannot target a window,
+provide a native handle, change retry
+policy, inject input, return focus state, or subscribe to a change. See
+`docs/WINDOW_FOCUS.md`.
 
 ## Windows development transport
 

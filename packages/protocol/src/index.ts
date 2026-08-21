@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 19 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 20 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -61,6 +61,7 @@ export type Capability =
   | "window.title"
   | "ui.fields.read"
   | "window.state"
+  | "window.focus"
   | "menu.write";
 
 export type EmptyPayload = Record<string, never>;
@@ -163,6 +164,17 @@ export interface PlatformOperationMap {
   "window.state.set": {
     readonly payload: { readonly state: WindowState };
     readonly result: { readonly status: "applied" };
+  };
+  /**
+   * Asks Windows to foreground this session's one host-owned window.
+   *
+   * It has no target, native handle, retry policy, focus readback, or event.
+   * Windows decides whether the request is accepted; success reports only that
+   * Windows accepted it, not what a person saw or used afterward.
+   */
+  "window.focus.request": {
+    readonly payload: EmptyPayload;
+    readonly result: { readonly status: "requested" };
   };
   /**
    * Replaces this authenticated session's complete native menu model.

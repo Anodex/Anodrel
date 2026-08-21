@@ -12,7 +12,7 @@ use anodrel_ui_session::{
     UiDocumentMailbox, UiDocumentRevision, UiFieldMailbox, UiFieldRequest, UiInputCandidate,
     UiInputMailbox,
 };
-use anodrel_window::{WindowState, WindowStateMailbox, WindowTitleMailbox};
+use anodrel_window::{WindowFocusMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
@@ -58,6 +58,11 @@ pub(super) struct UiSessionView {
     /// The value is a closed portable enum. The view supplies no target or
     /// handle, so the host UI thread can apply it only to its own window.
     window_state: Option<WindowStateMailbox>,
+    /// This session's one-request foreground bridge, when it has one.
+    ///
+    /// The view supplies no target or native handle. Its owning UI thread can
+    /// ask Windows to foreground only the window that owns this view.
+    window_focus: Option<WindowFocusMailbox>,
     /// The validated display name appended to any title this session proposes.
     ///
     /// Held beside the mailbox rather than passed with each request: it comes
@@ -105,6 +110,7 @@ impl UiSessionView {
             notification_entry: None,
             window_title: None,
             window_state: None,
+            window_focus: None,
             display_name: None,
             field_reads: None,
             revision: UiDocumentRevision::INITIAL,
@@ -132,6 +138,13 @@ impl UiSessionView {
     #[must_use]
     pub(super) fn with_window_state(mut self, mailbox: WindowStateMailbox) -> Self {
         self.window_state = Some(mailbox);
+        self
+    }
+
+    /// Attaches this session's guarded foreground-request bridge.
+    #[must_use]
+    pub(super) fn with_window_focus(mut self, mailbox: WindowFocusMailbox) -> Self {
+        self.window_focus = Some(mailbox);
         self
     }
 
@@ -226,6 +239,23 @@ impl UiSessionView {
         }
     }
 
+    /// Takes one pending foreground request for this window's owning UI thread.
+    pub(super) fn take_window_focus_request(&self) -> Option<u64> {
+        Some(self.window_focus.as_ref()?.take()?.id())
+    }
+
+    /// Completes a foreground request after the host UI thread asks Windows.
+    pub(super) fn complete_window_focus_request(&self, request_id: u64, requested: bool) -> bool {
+        let Some(mailbox) = self.window_focus.as_ref() else {
+            return false;
+        };
+        if requested {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
+        }
+    }
+
     /// Takes a pending notification for the host UI thread.
     ///
     /// The entry is returned alongside so the Shell32 call happens outside the
@@ -269,6 +299,7 @@ impl UiSessionView {
         .with_window_title(ui.window_title_mailbox(), ui.display_name())
         .with_menu(ui.menu_mailbox())
         .with_window_state(ui.window_state_mailbox())
+        .with_window_focus(ui.window_focus_mailbox())
         .with_field_reads(ui.field_mailbox());
         view.product_session = Some(Arc::new(session));
         view
@@ -472,7 +503,9 @@ mod tests {
     };
     use anodrel_windows_file_access::WindowsFileTextService;
 
-    use super::{UiSessionView, WindowState, WindowStateMailbox, WindowTitleMailbox};
+    use super::{
+        UiSessionView, WindowFocusMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox,
+    };
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.action","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
@@ -551,6 +584,21 @@ mod tests {
             NotificationMailbox::new(),
         )
         .with_window_state(mailbox.clone());
+        (view, mailbox)
+    }
+
+    /// A session view with its own guarded foreground-request bridge.
+    fn view_with_focus() -> (UiSessionView, WindowFocusMailbox) {
+        let mailbox = WindowFocusMailbox::new();
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_window_focus(mailbox.clone());
         (view, mailbox)
     }
 
@@ -695,6 +743,20 @@ mod tests {
     }
 
     #[test]
+    fn a_session_without_a_focus_bridge_answers_nothing_and_completes_nothing() {
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_window_focus_request().is_none());
+        assert!(!view.complete_window_focus_request(1, true));
+    }
+
+    #[test]
     fn a_session_without_a_menu_bridge_has_no_menu_request_or_command_route() {
         let view = UiSessionView::new(
             UiDocumentMailbox::new(),
@@ -730,6 +792,28 @@ mod tests {
         };
         assert_eq!(state, WindowState::Maximized);
         assert!(first.complete_window_state_request(request_id, true));
+        assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
+    }
+
+    #[test]
+    fn one_session_cannot_take_another_sessions_focus_request() {
+        let (first, first_mailbox) = view_with_focus();
+        let (second, _second_mailbox) = view_with_focus();
+        let worker = first_mailbox.clone();
+        let waiting =
+            std::thread::spawn(move || anodrel_window::WindowFocusService::request_focus(&worker));
+
+        let request_id = loop {
+            assert!(
+                second.take_window_focus_request().is_none(),
+                "a session took another session's focus request"
+            );
+            if let Some(request_id) = first.take_window_focus_request() {
+                break request_id;
+            }
+            std::thread::yield_now();
+        };
+        assert!(first.complete_window_focus_request(request_id, true));
         assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
     }
 

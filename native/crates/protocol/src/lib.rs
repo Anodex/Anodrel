@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 19;
+pub const PROTOCOL_MINOR: u16 = 20;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -80,6 +80,11 @@ pub enum Capability {
     /// target, readback, event, or native command surface. See
     /// `docs/WINDOW_STATE.md` and Decision 0072.
     WindowState,
+    /// Ask Windows to foreground the session's own host window.
+    ///
+    /// The request has no target or focus-state readback. Windows may refuse
+    /// it under its foreground rules; see `docs/WINDOW_FOCUS.md`.
+    WindowFocus,
     /// Read every field value on the session's own current surface.
     ///
     /// A snapshot, not a stream. There is no selector and no change event, so
@@ -118,6 +123,7 @@ impl Capability {
             Self::NotificationShow => "notification.show",
             Self::WindowTitle => "window.title",
             Self::WindowState => "window.state",
+            Self::WindowFocus => "window.focus",
             Self::UiFieldsRead => "ui.fields.read",
             Self::MenuWrite => "menu.write",
         }

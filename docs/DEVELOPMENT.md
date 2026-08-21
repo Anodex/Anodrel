@@ -457,6 +457,24 @@ of the closed commands was not accepted.
 This manual check is not yet recorded as passed. See `docs/WINDOW_STATE.md` for
 the deliberately absent targeting, geometry, focus, and readback APIs.
 
+To exercise the separately granted session-window foreground request, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-focus-client $nodePath $clientPath
+~~~
+
+The client gives you about 1.5 seconds to bring another application to the
+foreground, then sends exactly one `window.focus.request`. Observe what Windows
+does: it may foreground the Anodrel window or flash its taskbar instead. Either
+is a valid operating-system policy outcome, and the client must not learn which
+one occurred. Complete the normal semantic action to close the session. If the
+client stops at safe stage 29, Windows refused the request or the UI session was
+unavailable; the host deliberately does not distinguish them.
+
+This manual check is not yet recorded as passed. See `docs/WINDOW_FOCUS.md` for
+the deliberately absent target, focus readback, input, retry, and foreground
+policy bypass APIs.
+
 To exercise text fields and the granted value read, run:
 
 ~~~powershell

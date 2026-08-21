@@ -215,6 +215,17 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-window-focus")) {
+      // Give an operator a short window to bring another application forward.
+      // The result still says only that Anodrel asked Windows; Windows may
+      // foreground the session window or flash its taskbar under its own rules.
+      await delay(1_500);
+      const requested = await client.requestWindowFocus();
+      if (requested.status !== "requested") {
+        return 29;
+      }
+    }
+
     if (process.argv.includes("--request-credentials")) {
       const result = await runCredentialDiagnostic(client);
       if (result !== 0) {

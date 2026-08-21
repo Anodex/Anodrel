@@ -49,8 +49,8 @@ use anodrel_ui_session::{
     UiFieldReader, UiFieldSnapshot, UiInputMailbox,
 };
 use anodrel_window::{
-    WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
-    WindowTitleService, WindowTitleServiceError,
+    WindowFocusService, WindowFocusServiceError, WindowState, WindowStateService,
+    WindowStateServiceError, WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
 };
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -143,6 +143,7 @@ pub struct CoreHost {
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
+    window_focus: Box<dyn WindowFocusService>,
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
@@ -170,6 +171,7 @@ pub struct HostServices {
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
+    window_focus: Box<dyn WindowFocusService>,
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
@@ -253,6 +255,15 @@ impl WindowStateService for UnavailableWindowState {
 }
 
 #[derive(Debug)]
+struct UnavailableWindowFocus;
+
+impl WindowFocusService for UnavailableWindowFocus {
+    fn request_focus(&self) -> Result<(), WindowFocusServiceError> {
+        Err(WindowFocusServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
 struct UnavailableFileDialogs;
 
 impl FileDialogService for UnavailableFileDialogs {
@@ -323,6 +334,7 @@ impl HostServices {
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
+            window_focus: Box::new(UnavailableWindowFocus),
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
@@ -401,6 +413,17 @@ impl HostServices {
     #[must_use]
     pub fn with_window_state(mut self, service: impl WindowStateService + 'static) -> Self {
         self.window_state = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed window-focus service.
+    ///
+    /// The supplied service must ask Windows to foreground only the requesting
+    /// session's own window from the host UI thread. It accepts no target and
+    /// exposes no foreground or activation state; see `docs/WINDOW_FOCUS.md`.
+    #[must_use]
+    pub fn with_window_focus(mut self, service: impl WindowFocusService + 'static) -> Self {
+        self.window_focus = Box::new(service);
         self
     }
 
@@ -513,6 +536,7 @@ impl CoreHost {
             notifications: services.notifications,
             window_title: services.window_title,
             window_state: services.window_state,
+            window_focus: services.window_focus,
             menu: services.menu,
             ui_fields: services.ui_fields,
             file_dialogs: services.file_dialogs,
@@ -750,6 +774,7 @@ impl CoreHost {
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
+            window_focus: Box::new(UnavailableWindowFocus),
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(file_dialogs),
@@ -855,6 +880,9 @@ impl CoreHost {
             }
             "window.state.set" if request.protocol_version.minor >= 16 => {
                 self.handle_window_state_set(request)
+            }
+            "window.focus.request" if request.protocol_version.minor >= 20 => {
+                self.handle_window_focus_request(request)
             }
             "menu.replace" if request.protocol_version.minor >= 18 => {
                 self.handle_menu_replace(request)
@@ -1561,6 +1589,46 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::WindowBusy,
                 "a window state change is already pending.",
+                None,
+            ),
+        }
+    }
+
+    /// Asks Windows to foreground this session's own window.
+    ///
+    /// The payload is exactly `{}` because a target, retry option, native
+    /// handle, or input action would turn this narrow request into a general
+    /// window or desktop-control surface. The result is only that the host
+    /// asked Windows; it deliberately contains no focus or activation state.
+    fn handle_window_focus_request(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.focus.request accepts no payload fields.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::WindowFocus) {
+            return self.capability_denied(request.request_id, "window.focus.request");
+        }
+
+        match self.window_focus.request_focus() {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("requested".to_owned()))]),
+            ),
+            Err(WindowFocusServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no session window is available for a foreground request.",
+                None,
+            ),
+            Err(WindowFocusServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "a window focus request is already pending.",
                 None,
             ),
         }
@@ -2488,8 +2556,8 @@ mod tests {
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::{MenuInputCandidate, UiInputCandidate};
     use anodrel_window::{
-        WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
-        WindowTitleService, WindowTitleServiceError,
+        WindowFocusService, WindowFocusServiceError, WindowState, WindowStateService,
+        WindowStateServiceError, WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
     };
 
     use super::*;
@@ -3319,6 +3387,12 @@ mod tests {
         )
     }
 
+    fn request_v1_20(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":20}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
     fn host_with_menu(service: impl MenuService + 'static) -> CoreHost {
         CoreHost::with_services(
             HostPolicy::new("test.application", vec![Capability::MenuWrite], "test-host")
@@ -3336,6 +3410,35 @@ mod tests {
             )
             .expect("test policy is valid"),
             HostServices::unavailable().with_window_state(service),
+        )
+    }
+
+    #[derive(Debug, Default)]
+    struct RecordingWindowFocus {
+        requested: Arc<Mutex<u8>>,
+        result: Option<WindowFocusServiceError>,
+    }
+
+    impl WindowFocusService for RecordingWindowFocus {
+        fn request_focus(&self) -> Result<(), WindowFocusServiceError> {
+            if let Some(error) = self.result {
+                return Err(error);
+            }
+            let requested = &mut *self.requested.lock().expect("the test mutex is usable");
+            *requested = requested.saturating_add(1);
+            Ok(())
+        }
+    }
+
+    fn host_with_window_focus(service: impl WindowFocusService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::WindowFocus],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_window_focus(service),
         )
     }
 
@@ -3461,6 +3564,120 @@ mod tests {
                 "window.state.set",
                 r#"{"state":"maximized"}"#,
             )),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("window.unavailable")
+        );
+    }
+
+    #[test]
+    fn a_granted_window_focus_request_reaches_only_the_focus_service() {
+        let service = RecordingWindowFocus::default();
+        let requested = Arc::clone(&service.requested);
+        let response = JsonValue::parse(
+            &host_with_window_focus(service)
+                .handle_json(&request_v1_20("window.focus.request", r#"{}"#)),
+        )
+        .expect("response JSON is valid");
+
+        assert_eq!(field(&response, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&response, "result"), "status").as_string(),
+            Some("requested")
+        );
+        assert_eq!(*requested.lock().expect("the test mutex is usable"), 1);
+    }
+
+    #[test]
+    fn window_focus_needs_its_own_grant_and_protocol_version() {
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowState, Capability::WindowTitle],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable().with_window_focus(RecordingWindowFocus::default()),
+            )
+            .handle_json(&request_v1_20("window.focus.request", r#"{}"#)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let unsupported = JsonValue::parse(
+            &host_with_window_focus(RecordingWindowFocus::default())
+                .handle_json(&request_v1_19("window.focus.request", r#"{}"#)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn window_focus_payload_is_exact_and_untargetable() {
+        for payload in [
+            r#"null"#,
+            r#"{"target":"another-window"}"#,
+            r#"{"handle":7}"#,
+            r#"{"retry":true}"#,
+            r#"{"input":"click"}"#,
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_focus(RecordingWindowFocus::default())
+                    .handle_json(&request_v1_20("window.focus.request", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn window_focus_service_failures_map_to_safe_shared_codes() {
+        for (error, code) in [
+            (WindowFocusServiceError::Unavailable, "window.unavailable"),
+            (WindowFocusServiceError::Busy, "window.busy"),
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_focus(RecordingWindowFocus {
+                    result: Some(error),
+                    ..RecordingWindowFocus::default()
+                })
+                .handle_json(&request_v1_20("window.focus.request", r#"{}"#)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(code),
+                "{error:?} mapped to the wrong code"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_without_a_window_focus_service_reports_unavailable() {
+        let response = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowFocus],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            )
+            .handle_json(&request_v1_20("window.focus.request", r#"{}"#)),
         )
         .expect("response JSON is valid");
         assert_eq!(

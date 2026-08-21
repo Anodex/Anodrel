@@ -355,6 +355,20 @@ export class MockHost {
         // window and cannot reveal a resulting state, handle, or geometry.
         return this.success("window.state.set", request.requestId, { status: "applied" });
 
+      case "window.focus.request":
+        if (request.protocolVersion.minor < 20) {
+          return this.failure(request.requestId, "operation.unsupported", "window.focus.request requires protocol 1.20 or later.");
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(request.requestId, "request.payload_invalid", "window.focus.request accepts no payload fields.");
+        }
+        if (!this.hasCapability(sessionId, "window.focus")) {
+          return this.failure(request.requestId, "capability.denied", "window.focus.request requires the window.focus capability.", { capability: "window.focus" });
+        }
+        // The mock has no native focus state. It reports only that the host
+        // accepted the request, matching the intentionally one-way contract.
+        return this.success("window.focus.request", request.requestId, { status: "requested" });
+
       case "menu.replace":
         if (request.protocolVersion.minor < 18) {
           return this.failure(

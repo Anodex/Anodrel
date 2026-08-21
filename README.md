@@ -69,6 +69,15 @@ redirects, or automatic authentication. A separate compiled Windows diagnostic
 tests only the fixed `example.com:443` origin; templates, product fixtures, and
 installed application sessions still receive no network service.
 
+Protocol 1.20 adds a deliberately narrow session-window attention request. An
+authenticated session carrying the separate `window.focus` grant can ask the
+host UI thread to call Windows for its own window only. There is no target,
+handle, focus readback, retry, input, or cross-window route; Windows remains
+free to decline or flash the taskbar instead. The typed SDK, mock host,
+installed-record version 1.9 policy, direct User32 adapter, and development
+diagnostic are implemented; its desktop foreground-policy check remains a
+manual verification. See `docs/WINDOW_FOCUS.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
@@ -267,6 +276,9 @@ or forge. There is no window target, no read, and no other window property.
 `docs/WINDOW_STATE.md` defines the separately granted minimise, maximise, and
 restore command for that same session-owned window. It is write-only and cannot
 name or inspect any window.
+`docs/WINDOW_FOCUS.md` defines the separately granted request for Windows to
+foreground that same session-owned window, without exposing focus state or
+desktop-control authority.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance

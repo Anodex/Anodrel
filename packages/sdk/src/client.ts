@@ -87,6 +87,17 @@ export class PlatformClient {
   }
 
   /**
+   * Asks Windows to foreground this session's own host window.
+   *
+   * There is no window argument, focus result, prior-foreground observation,
+   * retry, or callback. A successful result means only that the host submitted
+   * this narrow request to Windows; system foreground policy remains in charge.
+   */
+  requestWindowFocus(): Promise<ResultFor<"window.focus.request">> {
+    return this.request("window.focus.request", {});
+  }
+
+  /**
    * Replaces this session's complete native menu bar.
    *
    * Items are semantic display commands only. The host owns every native menu

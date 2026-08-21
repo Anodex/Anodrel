@@ -15,11 +15,15 @@
 #![deny(missing_docs)]
 
 mod bridge;
+mod focus;
 mod state;
 mod title;
 
 use std::fmt;
 
+pub use focus::{
+    WINDOW_FOCUS_RESPONSE_TIMEOUT, WindowFocusMailbox, WindowFocusRequest, WindowFocusService,
+};
 pub use state::{
     WINDOW_STATE_RESPONSE_TIMEOUT, WindowStateMailbox, WindowStateRequest, WindowStateService,
 };
@@ -170,6 +174,9 @@ pub type WindowTitleServiceError = WindowCommandError;
 /// State commands use the same unavailable and busy meanings as title
 /// commands; their protocol mapping remains the shared `window.*` codes.
 pub type WindowStateServiceError = WindowCommandError;
+
+/// Errors shared by the focused session-window service and its host bridge.
+pub type WindowFocusServiceError = WindowCommandError;
 
 /// A stable validation failure raised before any native call.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.19. A host without an attached
-text-fetch service remains safely unavailable for that operation.
+**Status:** Implemented through version 1.20, including the separately granted
+session-window focus request documented in `docs/WINDOW_FOCUS.md`.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.19 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 19}`.
+the host's. Version 1.20 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 20}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -69,6 +69,7 @@ The implemented operations are:
 | `window.title.set` | `{ "title": string }` | `{ "status": "applied" }` | `window.title` |
 | `ui.fields.read` | `{}` | whole-surface current values | `ui.fields.read` |
 | `window.state.set` | `{ "state": "minimized" \| "maximized" \| "restored" }` | `{ "status": "applied" }` | `window.state` |
+| `window.focus.request` | `{}` | `{ "status": "requested" }` | `window.focus` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
@@ -99,6 +100,22 @@ attempt the URL. Missing service, rejected origin, timeout, and native failure
 all return `network.unavailable`; an oversized, non-UTF-8, or otherwise
 unrepresentable response returns `network.response_invalid`. See
 `docs/NETWORK.md` and Decision 0084.
+
+### Session-window foreground request
+
+Protocol 1.20 implements `window.focus.request` behind its separate
+`window.focus` grant. It accepts exactly `{}` and returns exactly
+`{ "status": "requested" }` when Windows accepts the owning host UI thread's
+foreground request for that authenticated session's own window. The operation
+cannot name a target, window handle, process, coordinate, monitor, input,
+retry policy, callback, or accessibility element.
+
+Windows may decline a foreground request under its own user-protection policy.
+`window.unavailable` deliberately covers a missing session window, an expired
+UI bridge, and such a refusal without revealing which occurred. The response
+does not state whether the window became foreground, received keyboard focus,
+moved in z-order, or was noticed by a person. A concurrent request returns
+`window.busy`. See `docs/WINDOW_FOCUS.md` and Decision 0085.
 
 ### Native session menus
 
@@ -446,6 +463,8 @@ Protocol 1.18 adds `menu.unavailable` for a host that cannot attach or update
 its own native session menu.
 Protocol 1.19 adds `network.unavailable` and `network.response_invalid` for
 its HTTPS text-fetch boundary.
+Protocol 1.20 adds no error code; its window-focus request reuses the existing
+safe `window.unavailable` and `window.busy` categories.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 

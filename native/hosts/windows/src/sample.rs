@@ -36,6 +36,7 @@ enum SampleDialogRequest {
     Notification,
     WindowTitle,
     WindowState,
+    WindowFocus,
     FieldRead,
     Menu,
 }
@@ -160,6 +161,18 @@ pub fn run_ui_session_with_window_state(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowState)
 }
 
+/// Runs the UI-session diagnostic through one guarded foreground request.
+///
+/// An operator brings another application forward during the short client
+/// delay, then observes Windows' own foreground-policy outcome. See
+/// `docs/WINDOW_FOCUS.md`.
+pub fn run_ui_session_with_window_focus(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowFocus)
+}
+
 /// Runs the UI session diagnostic with two fields a person can type into.
 ///
 /// The client reads the field values twice: once before anyone has typed, and
@@ -207,34 +220,36 @@ fn run_with_optional_session_view(
     session_ui: Option<DevelopmentSessionUi>,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
-    let policy = HostPolicy::new(
-        "anodrel.sample",
-        vec![
-            Capability::DiagnosticsRead,
-            Capability::UiDocumentWrite,
-            Capability::UiEventsRead,
-            Capability::SessionClose,
-            Capability::ClipboardRead,
-            Capability::ClipboardWrite,
-            Capability::ExternalOpen,
-            Capability::DialogOpenFile,
-            Capability::DialogSaveFile,
-            Capability::FileReadText,
-            Capability::FileWriteText,
-            Capability::StorageStateRead,
-            Capability::StorageStateReplace,
-            Capability::StorageStateClear,
-            Capability::CredentialRead,
-            Capability::CredentialWrite,
-            Capability::CredentialDelete,
-            Capability::NotificationShow,
-            Capability::MenuWrite,
-            Capability::WindowTitle,
-            Capability::UiFieldsRead,
-            Capability::WindowState,
-        ],
-        "anodrel-windows-host",
-    )?;
+    let mut capabilities = vec![
+        Capability::DiagnosticsRead,
+        Capability::UiDocumentWrite,
+        Capability::UiEventsRead,
+        Capability::SessionClose,
+        Capability::ClipboardRead,
+        Capability::ClipboardWrite,
+        Capability::ExternalOpen,
+        Capability::DialogOpenFile,
+        Capability::DialogSaveFile,
+        Capability::FileReadText,
+        Capability::FileWriteText,
+        Capability::StorageStateRead,
+        Capability::StorageStateReplace,
+        Capability::StorageStateClear,
+        Capability::CredentialRead,
+        Capability::CredentialWrite,
+        Capability::CredentialDelete,
+        Capability::NotificationShow,
+        Capability::MenuWrite,
+        Capability::WindowTitle,
+        Capability::UiFieldsRead,
+        Capability::WindowState,
+    ];
+    // New authority is never silently added to an older broad diagnostic. The
+    // focus route is explicit so its manual check proves the exact grant too.
+    if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
+        capabilities.push(Capability::WindowFocus);
+    }
+    let policy = HostPolicy::new("anodrel.sample", capabilities, "anodrel-windows-host")?;
     let (server, invitation) = match session_ui.as_ref() {
         Some(ui) => {
             // Composing the bundle keeps every service named at its own call
@@ -256,6 +271,7 @@ fn run_with_optional_session_view(
                 .with_menu(ui.menu.clone())
                 .with_window_title(ui.window_title.clone())
                 .with_window_state(ui.window_state.clone())
+                .with_window_focus(ui.window_focus.clone())
                 .with_ui_fields(ui.fields.clone());
             WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
@@ -292,6 +308,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::Notification => command.arg("--request-notification")?,
             SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
             SampleDialogRequest::WindowState => command.arg("--request-window-state")?,
+            SampleDialogRequest::WindowFocus => command.arg("--request-window-focus")?,
             SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
             SampleDialogRequest::Menu => command.arg("--request-native-menu")?,
         }
@@ -310,6 +327,7 @@ fn run_with_optional_session_view(
             ui.menu,
             ui.window_title,
             ui.window_state,
+            ui.window_focus,
             SAMPLE_DISPLAY_NAME,
             ui.fields,
         )?;

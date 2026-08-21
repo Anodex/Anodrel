@@ -97,7 +97,9 @@ other host window may change. `docs/DEVELOPMENT.md` gives the exact command.
 ## Compatibility
 
 This capability is complete as specified. Reading state, setting bounds,
-focusing, creating another window, targeting a window, and lifecycle events are
-each separate capabilities with their own protocol version, grant, decision,
-and threat-model entry. The private multi-window host foundation in
+foregrounding, creating another window, targeting a window, and lifecycle
+events are each separate capabilities with their own protocol version, grant,
+decision, and threat-model entry. The separate `window.focus.request` contract
+now covers only an authenticated session asking Windows to foreground its own
+window; it does not expand this state command. The private multi-window host foundation in
 `docs/WINDOW_LIFECYCLE.md` remains private; this contract does not expose it.

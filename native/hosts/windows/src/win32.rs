@@ -39,7 +39,7 @@ use anodrel_windows_instance::PrimaryInstance;
 
 use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
-use anodrel_window::{WindowState, WindowStateMailbox, WindowTitleMailbox};
+use anodrel_window::{WindowFocusMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox};
 
 use crate::product::PreflightOutcome;
 use document::{Body, Document, Section};
@@ -651,6 +651,7 @@ pub fn run_ui_session(
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
+    window_focus: WindowFocusMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -665,6 +666,7 @@ pub fn run_ui_session(
         menu,
         window_title,
         window_state,
+        window_focus,
         display_name,
         field_reads,
     )
@@ -685,6 +687,10 @@ pub fn run_ui_session(
 /// `window_state` carries only minimise, maximise, and restore requests for
 /// this same host-selected window. It is a closed command bridge, not a native
 /// handle or a window-management API; see `docs/WINDOW_STATE.md`.
+///
+/// `window_focus` carries only a request to foreground this same host-selected
+/// window. It exposes no target, input, retry, or observed focus state; see
+/// `docs/WINDOW_FOCUS.md`.
 #[allow(clippy::too_many_arguments)]
 pub fn run_authenticated_ui_session(
     title: &str,
@@ -697,6 +703,7 @@ pub fn run_authenticated_ui_session(
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
+    window_focus: WindowFocusMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -718,6 +725,7 @@ pub fn run_authenticated_ui_session(
                 .with_menu(menu)
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
+                .with_window_focus(window_focus)
                 .with_field_reads(field_reads),
             ),
         }],
@@ -1290,6 +1298,22 @@ fn service_window_state(window: Hwnd) {
     let _ = registry::complete_window_state_request(window, request_id, true);
 }
 
+/// Asks Windows to foreground this session window for one pending request.
+///
+/// This runs on the thread that created `window` and obtains the target only
+/// from that window's registry entry. It does not observe the prior foreground
+/// window, call `AllowSetForegroundWindow`, synthesize input, or retry a
+/// refusal. Windows remains authoritative over foreground policy.
+fn service_window_focus(window: Hwnd) {
+    let Ok(Some(request_id)) = registry::take_window_focus_request(window) else {
+        return;
+    };
+    // SAFETY: this runs on the thread that created `window`, and `window` is
+    // resolved solely from that session's host-owned view registry entry.
+    let requested = unsafe { SetForegroundWindow(window) } != 0;
+    let _ = registry::complete_window_focus_request(window, request_id, requested);
+}
+
 /// Constructs and attaches one pending session menu on its owning UI thread.
 ///
 /// Native construction happens before taking the process-wide view-registry
@@ -1802,6 +1826,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_menu(window);
             service_window_title(window);
             service_window_state(window);
+            service_window_focus(window);
             service_field_read(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {

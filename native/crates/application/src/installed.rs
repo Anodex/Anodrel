@@ -290,6 +290,7 @@ enum RecordVersion {
     V1_6,
     V1_7,
     V1_8,
+    V1_9,
 }
 
 impl RecordVersion {
@@ -307,6 +308,7 @@ impl RecordVersion {
                 | Self::V1_6
                 | Self::V1_7
                 | Self::V1_8
+                | Self::V1_9
         )
     }
 
@@ -314,7 +316,13 @@ impl RecordVersion {
     const fn accepts_v1_3_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8
+            Self::V1_3
+                | Self::V1_4
+                | Self::V1_5
+                | Self::V1_6
+                | Self::V1_7
+                | Self::V1_8
+                | Self::V1_9
         )
     }
 
@@ -322,13 +330,16 @@ impl RecordVersion {
     const fn accepts_v1_4_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8
+            Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8 | Self::V1_9
         )
     }
 
     /// Whether this version accepts the grant version 1.5 introduced.
     const fn accepts_v1_5_grants(self) -> bool {
-        matches!(self, Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8)
+        matches!(
+            self,
+            Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8 | Self::V1_9
+        )
     }
 }
 
@@ -447,15 +458,26 @@ fn capability_for_record_version(
         "window.state"
             if matches!(
                 version,
-                RecordVersion::V1_6 | RecordVersion::V1_7 | RecordVersion::V1_8
+                RecordVersion::V1_6
+                    | RecordVersion::V1_7
+                    | RecordVersion::V1_8
+                    | RecordVersion::V1_9
             ) =>
         {
             Some(Capability::WindowState)
         }
-        "file.write_text" if matches!(version, RecordVersion::V1_7 | RecordVersion::V1_8) => {
+        "file.write_text"
+            if matches!(
+                version,
+                RecordVersion::V1_7 | RecordVersion::V1_8 | RecordVersion::V1_9
+            ) =>
+        {
             Some(Capability::FileWriteText)
         }
-        "menu.write" if version == RecordVersion::V1_8 => Some(Capability::MenuWrite),
+        "menu.write" if matches!(version, RecordVersion::V1_8 | RecordVersion::V1_9) => {
+            Some(Capability::MenuWrite)
+        }
+        "window.focus" if version == RecordVersion::V1_9 => Some(Capability::WindowFocus),
         _ => None,
     }
 }
@@ -564,6 +586,7 @@ fn validate_version(
         (1, 6) => Ok(RecordVersion::V1_6),
         (1, 7) => Ok(RecordVersion::V1_7),
         (1, 8) => Ok(RecordVersion::V1_8),
+        (1, 9) => Ok(RecordVersion::V1_9),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -1026,6 +1049,58 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_9_adds_window_focus_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 9")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"window.state\", \"menu.write\", \"window.focus\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.9 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::WindowState,
+                anodrel_protocol::Capability::MenuWrite,
+                anodrel_protocol::Capability::WindowFocus,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_window_focus_grant() {
+        // Version 1.8 is the newest record before this grant. Keeping it
+        // invalid prevents a stale provisioning tool from silently widening a
+        // verified application's attention authority.
+        for minor in ["6", "7", "8"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"window.focus\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.9 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

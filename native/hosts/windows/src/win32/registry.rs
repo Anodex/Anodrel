@@ -241,6 +241,33 @@ pub(super) fn complete_window_state_request(
     }
 }
 
+/// Takes one pending foreground request only from its associated UI session.
+///
+/// The request carries no target: the lookup key is the host-owned window that
+/// received its timer message, so this call cannot route it to another view.
+pub(super) fn take_window_focus_request(window: Hwnd) -> io::Result<Option<u64>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_window_focus_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one foreground request from its owning native UI session.
+pub(super) fn complete_window_focus_request(
+    window: Hwnd,
+    request_id: u64,
+    requested: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_window_focus_request(request_id, requested),
+        )),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending menu replacement only from its associated UI session.
 ///
 /// The resulting model has no native object yet, so User32 construction can

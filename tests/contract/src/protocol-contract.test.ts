@@ -757,6 +757,64 @@ test("a session window state is closed, separately granted, and untargetable", a
   );
 });
 
+test("a session window focus request is empty, separately granted, and untargetable", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.focus"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.requestWindowFocus(), { status: "requested" });
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.requestWindowFocus(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "window.focus",
+  );
+
+  // A request that could name a target, change retry policy, or carry input
+  // would be desktop-control authority. The only valid payload is exactly {}.
+  const transport = host.createTransport();
+  for (const payload of [
+    null,
+    { target: "other-window" },
+    { handle: 7 },
+    { retry: true },
+    { input: "click" },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: { major: 1, minor: 20 },
+      kind: "request",
+      requestId: `window-focus-${JSON.stringify(payload)}`,
+      operation: "window.focus.request",
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+
+  const older = await transport.send({
+    protocolVersion: { major: 1, minor: 19 },
+    kind: "request",
+    requestId: "window-focus-before-protocol-1.20",
+    operation: "window.focus.request",
+    payload: {},
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
 test("a native session menu is complete, separately granted, and untargetable", async () => {
   const host = new MockHost({
     applicationId: "test.application",

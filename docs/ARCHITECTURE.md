@@ -178,13 +178,16 @@ ordinary drop paths perform the cleanup. The `--window-lab` diagnostic proves
 this two-window lifecycle without creating a public window-management API. See
 `docs/WINDOW_LIFECYCLE.md`.
 
-The two public session-window commands remain deliberately narrower than that
+The three public session-window commands remain deliberately narrower than that
 private lifecycle: `window.title.set` proposes a title the host composes with a
-validated application name, and `window.state.set` selects one closed minimise,
-maximise, or restore action. Both cross a per-session, one-request bridge to
-the window's owning UI thread; neither exposes a target, handle, geometry,
-current state, focus control, or event. See `docs/WINDOW_TITLE.md`,
-`docs/WINDOW_STATE.md`, Decisions 0066 and 0072.
+validated application name, `window.state.set` selects one closed minimise,
+maximise, or restore action, and `window.focus.request` asks Windows to
+foreground that same session-owned window. All cross a per-session,
+one-request bridge to the window's owning UI thread; none exposes a target,
+handle, geometry, current state, focus readback, input, retry, or event. The
+focus request does not control semantic UI focus or bypass Windows foreground
+policy. See `docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`,
+`docs/WINDOW_FOCUS.md`, Decisions 0066, 0072, and 0085.
 
 ## Modularity and performance
 

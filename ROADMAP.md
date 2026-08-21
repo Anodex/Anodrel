@@ -74,9 +74,16 @@ Status: **Direct Windows host in progress**
   granted minimise, maximise, and restore requests for a session's own window.
   The SDK, mock host, policy parser, session-local UI-thread bridge, direct
   Windows `ShowWindow` adapter, development diagnostic, and contract tests are
-  complete (Decision 0072). Window creation, closing, geometry, enumeration,
-  focus, and every other window property remain deferred, each needing its own
-  grant, decision, and threat-model entry.
+  complete (Decision 0072). The third narrow public lifecycle capability is
+  `window.focus.request`: Protocol 1.20 and record version 1.9 define an exact
+  empty, separately granted request for Windows to foreground only the
+  requesting session's own window. The SDK, mock host, policy parser,
+  session-local UI-thread bridge, direct Windows `SetForegroundWindow` adapter,
+  product-session composition, and development diagnostic are implemented
+  (Decision 0085); its foreground-policy outcome remains a manual desktop
+  check. Window creation, cross-session closing, geometry, enumeration,
+  fullscreen, state or focus readback, and every other window property remain
+  deferred, each needing its own grant, decision, and threat-model entry.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decision 0079 and `docs/FILE_WRITE.md` preserve
   the legacy non-mutating save picker while implementing an independent,
