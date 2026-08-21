@@ -328,7 +328,11 @@ Status: **First starter-package slice in progress**
   TypeScript client stays transport-neutral, returns typed protocol results,
   preserves stable host failures, and exposes no native authority. Its public
   contract and development boundary are documented in `docs/SDK.md`; a
-  published-package and executable-project template remain later work.
+  published-package and executable-project template remain later work. A
+  first-party native child-client foundation is now specified in Decision 0081:
+  it will move bootstrap, authenticated framing, and direct Windows pipe opening
+  out of the product fixture and power an equivalent compiled development probe;
+  it is not yet a stable public native SDK or executable template.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

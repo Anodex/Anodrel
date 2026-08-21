@@ -252,6 +252,11 @@ tools, not part of the shipped host. The fixture is a first-party child that
 speaks only the authenticated protocol; the provisioning helper is the one
 component that writes machine policy, and it can write exactly one value for one
 compile-time identity after validating the record through the host's own parser.
+Decision 0081 separately establishes the first reusable child-side split:
+portable framed conversation code above a direct Windows pipe-opening adapter.
+That planned client foundation inherits an invitation from the host; it cannot
+construct an endpoint, inspect policy, or turn the fixture into a public
+application runtime.
 See `docs/PRODUCT_FIXTURE.md`.
 
 `anodrel-perf-lab` is a development tool, not part of the shipped host. It
@@ -350,9 +355,11 @@ native transport implementation. `docs/TRANSPORT.md` defines the bounded
 frame/session engine, direct one-client Windows named-pipe adapter, and the
 separate private child-bootstrap format. The bootstrap adapter can launch a
 caller-selected executable but is not integrated with application package trust
-or rendered content. The repository's Node-based development sample uses this
-path to exercise a real authenticated health request; it remains a diagnostic
-client, not a trusted application host. Its Protocol 1.11 diagnostic read
+or rendered content. The repository's Node-based development sample currently
+uses this path to exercise a real authenticated health request; the native
+child-client foundation in Decision 0081 will provide an equivalent compiled
+probe without a runtime dependency. Neither is a trusted application host. Its
+Protocol 1.11 diagnostic read
 projects only the host-supplied closed catalogue through the existing
 `diagnostics.read` grant; no transport layer can manufacture dynamic diagnostic
 content. `docs/APPLICATIONS.md` separately
