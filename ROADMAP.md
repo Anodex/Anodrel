@@ -317,6 +317,10 @@ Status: **First starter-package slice in progress**
   `docs/APPLICATION_TEMPLATE.md`.
 - Document packaging, signing, updates, and compatibility.
 - Add examples for a desktop application and a command-line application.
+  **First examples implemented:** the static native text package demonstrates
+  host-owned desktop rendering, and the separate command-line example reports
+  only public SDK health and capability results through the mock-development
+  boundary. Neither claims to be a packaged executable application.
 
 Acceptance gate: a new project can be created from a documented template and
 run without knowing the internals of the native host. The first template covers

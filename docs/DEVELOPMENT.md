@@ -30,6 +30,7 @@ Use the following commands while working on the foundation packages:
 npm run check   # Type-check and build all referenced projects
 npm test        # Run protocol compatibility tests against the mock host
 npm run demo    # Run the sample application through the public SDK
+npm run cli-demo # Run the public-SDK command-line example through the mock host
 ~~~
 
 The workspace uses TypeScript project references to keep package dependencies

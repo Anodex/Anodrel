@@ -43,6 +43,11 @@ The mock models the public protocol and capability checks. It is not a native
 security boundary, a package launcher, or evidence that a real operating-system
 adapter permits an operation.
 
+The repository's `apps/command-line` example uses exactly this path to report
+the host name, negotiated protocol version, and host-issued capabilities. Run
+it with `npm run cli-demo`; it is a development example, not an installed
+command or a replacement for a real authenticated native session.
+
 ## Public surface
 
 `PlatformClient` provides typed methods for the exact operations defined by
