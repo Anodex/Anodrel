@@ -42,13 +42,14 @@
 
       <section class="status" aria-labelledby="status-title">
         <p class="eyebrow">Current foundation</p>
-        <h2 id="status-title">Windows host, private transport, and controlled content.</h2>
+        <h2 id="status-title">Windows host, private transport, and controlled native UI.</h2>
         <p>
           Anodrel is shared infrastructure, not a single application. Today it
           includes a direct Win32 host, a versioned protocol, bounded framing,
-          authenticated local IPC, and controlled native UI surfaces. Future
-          applications can use the same documented security and platform-service
-          boundaries without embedding a browser engine.
+          authenticated local IPC, controlled native UI surfaces, and bounded
+          native session menus. Future applications can use the same documented
+          security and platform-service boundaries without embedding a browser
+          engine.
         </p>
       </section>
 
@@ -61,6 +62,7 @@
           <a href="APPLICATION_TEMPLATE.md">Starter package <span>Create and run the current native text-package boundary</span></a>
           <a href="SDK.md">Application SDK <span>Typed public requests over a host-owned transport</span></a>
           <a href="NATIVE_UI_TEMPLATE.md">Native UI template <span>Generate and run a constrained first-party Rust project</span></a>
+          <a href="NATIVE_MENU_TEMPLATE.md">Native menu template <span>Generate a direct Windows menu app with fixed permissions</span></a>
           <a href="STARTUP_LAB.md">Startup Lab <span>Native visual foundation test</span></a>
           <a href="RENDERER.md">Renderer <span>Software rasterizer and brand API</span></a>
           <a href="TRANSPORT.md">Transport contract <span>Frames, sessions, and limits</span></a>
