@@ -1,0 +1,10 @@
+[package]
+name = "anodrel-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-bootstrap = { path = "../bootstrap" }
+anodrel-json = { path = "../json" }
+anodrel-wire = { path = "../wire" }

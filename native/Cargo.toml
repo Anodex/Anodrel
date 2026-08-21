@@ -13,6 +13,7 @@ members = [
   "crates/wire",
   "crates/transport",
   "crates/bootstrap",
+  "crates/client",
   "crates/application",
   "crates/session-policy",
   "crates/paths",
