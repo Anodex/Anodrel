@@ -125,13 +125,18 @@ Status: **Direct Windows host in progress**
   A visible enabled focus target can now accept `SetFocus` through a private
   per-window route, and only its owning UI thread revalidates and applies that
   move (Decision 0073). It exposes no application focus surface, native input,
-  or activation route. A visible field now exposes only its copied current text
-  through a read-only `IValueProvider`; `SetValue`, selection, caret data, and
-  value events stay absent (Decision 0071). Unit and host checks cover all three
-  routes; manual screen-reader activation, focus control, and field-value
-  verification remain open. Automation events, live announcements, text
-  patterns and ranges, hierarchical grouping, and non-Windows adapters stay
-  deferred. See `docs/ACCESSIBILITY.md` and `docs/UI_AUTOMATION_FOCUS.md`.
+  or activation route. A genuine focus transition now also raises one
+  host-only `UIA_AutomationFocusChangedEventId` from a fresh post-change
+  provider (Decision 0074); it has no listener, callback, or application
+  surface. A visible field now exposes only its copied current text through a
+  read-only `IValueProvider`; `SetValue`, selection, caret data, and value
+  events stay absent (Decision 0071). Unit and host checks cover all four
+  routes; manual screen-reader activation, focus control and event, and
+  field-value verification remain open. Invoke/property/value/text/structure/
+  selection events, live announcements, text patterns and ranges, hierarchical
+  grouping, and non-Windows adapters stay deferred. See
+  `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`, and
+  `docs/UI_AUTOMATION_EVENTS.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

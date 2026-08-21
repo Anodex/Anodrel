@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0074: UI Automation focus events stay host-only.
+
 - 0073: UI Automation focus remains host-owned.
 
 - 0072: Session window state is a closed, write-only command.

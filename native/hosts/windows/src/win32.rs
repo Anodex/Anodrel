@@ -1116,17 +1116,26 @@ fn accessible_elements_for(window: Hwnd) -> anodrel_windows_uia::UiAutomationPub
     )
 }
 
+/// Raises one best-effort outbound focus notification after a real local move.
+///
+/// The publication is freshly derived after the view-registry mutation ended,
+/// so the UI Automation adapter never observes a mutable view or a registry
+/// lock. Its result is intentionally not logged or exposed to an application.
+fn raise_accessibility_focus_changed(window: Hwnd) {
+    anodrel_windows_uia::raise_focus_changed(window, accessible_elements_for(window));
+}
+
 /// Applies a pending host-only UI Automation focus request and repaints only
 /// when a current validated target became focused.
 fn service_accessibility_focus(window: Hwnd) {
     let rect = client_rect(window);
-    let changed =
+    let outcome =
         registry::service_accessibility_focus(window, rect.width() as f32, rect.height() as f32)
             .ok()
-            .flatten()
-            .unwrap_or(false);
-    if changed {
+            .flatten();
+    if outcome.is_some_and(|outcome| outcome.accepted && outcome.changed) {
         invalidate(window);
+        raise_accessibility_focus_changed(window);
     }
 }
 
@@ -1947,6 +1956,9 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             };
             if changed {
                 invalidate(window);
+                if wparam == VK_TAB {
+                    raise_accessibility_focus_changed(window);
+                }
             }
             0
         }
@@ -2093,9 +2105,9 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             // and a click on an action does both — pressing a control is also
             // how a person expects to focus it. Treating these as alternatives
             // is what left a field unreachable by pointer.
-            if let Some(changed) = registry::with_ui_lab(window, |lab| {
+            if let Some((changed, focus_changed)) = registry::with_ui_lab(window, |lab| {
                 let focused = lab.focus_at(width, height, at);
-                lab.invoke(width, height, at) || focused
+                (lab.invoke(width, height, at) || focused, focused)
             })
             .ok()
             .flatten()
@@ -2103,17 +2115,23 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 if changed {
                     invalidate(window);
                 }
+                if focus_changed {
+                    raise_accessibility_focus_changed(window);
+                }
                 return 0;
             }
-            if let Some(changed) = registry::with_ui_session(window, |session| {
+            if let Some((changed, focus_changed)) = registry::with_ui_session(window, |session| {
                 let focused = session.focus_at(width, height, at);
-                session.invoke(width, height, at) || focused
+                (session.invoke(width, height, at) || focused, focused)
             })
             .ok()
             .flatten()
             {
                 if changed {
                     invalidate(window);
+                }
+                if focus_changed {
+                    raise_accessibility_focus_changed(window);
                 }
                 return 0;
             }

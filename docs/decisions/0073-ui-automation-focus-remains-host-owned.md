@@ -1,8 +1,12 @@
 # Decision 0073: UI Automation focus remains host-owned
 
-**Status:** Accepted
+**Status:** Superseded in part by Decision 0074
 
 **Date:** 2026-08-21
+
+Decision 0074 adds one host-only focus-change notification after a genuine
+focus transition. This record continues to define the bounded `SetFocus` route
+and its authority boundary.
 
 ## Context
 
@@ -53,9 +57,9 @@ or otherwise steal focus. Its only successful effect is the host's internal
 focus state and the matching repaint.
 
 There is no protocol operation, capability grant, installed-record version,
-application callback, event, focus readback, or accessibility-presence signal.
-An application can still neither request focus nor learn whether assistive
-technology moved it.
+application callback or event, focus readback, or accessibility-presence
+signal. An application can still neither request focus nor learn whether
+assistive technology moved it.
 
 ## Consequences
 
@@ -91,6 +95,6 @@ break the host's layout-validation boundary, and race document replacement.
 
 ## Revisit conditions
 
-Revisit before adding focus-change events, application focus readback or
-control, automation editing, caret or selection reporting, text ranges,
-hierarchical groups, or a non-Windows accessibility adapter.
+Revisit before adding application focus readback or control, automation
+editing, caret or selection reporting, text ranges, hierarchical groups, or a
+non-Windows accessibility adapter.

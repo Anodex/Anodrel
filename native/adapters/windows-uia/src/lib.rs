@@ -15,6 +15,7 @@
 //! application that assistive technology is listening. See Decisions 0069,
 //! 0071, and 0073.
 
+mod events;
 mod focus;
 mod raw;
 mod raw2;
@@ -48,6 +49,7 @@ use raw3::{IID_IINVOKE_PROVIDER, UIA_INVOKE_PATTERN_ID};
 use raw5::{IID_IVALUE_PROVIDER, UIA_VALUE_PATTERN_ID};
 use tree::Tree;
 
+pub use events::raise_focus_changed;
 pub use focus::{
     UiAutomationFocusMailbox, UiAutomationFocusRequest, UiAutomationFocusRoute,
     UiAutomationFocusSink,
@@ -102,6 +104,17 @@ impl UiAutomationPublication {
     #[must_use]
     pub fn empty() -> Self {
         Self::new(Vec::new(), Vec::new(), None, None, None)
+    }
+
+    fn into_tree(self, title: Vec<u16>) -> Arc<Tree> {
+        Arc::new(Tree::new(
+            title,
+            self.elements,
+            self.field_values,
+            self.focused,
+            self.action_sink,
+            self.focus_sink,
+        ))
     }
 }
 
@@ -163,14 +176,7 @@ pub unsafe fn answer_get_object(
     // requests with nothing, and was resolved to the default window provider
     // instead. Attaching a screen reader afterwards then found no semantics.
 
-    let tree = Arc::new(Tree::new(
-        window_title(window),
-        publication.elements,
-        publication.field_values,
-        publication.focused,
-        publication.action_sink,
-        publication.focus_sink,
-    ));
+    let tree = publication.into_tree(window_title(window));
     let provider = Provider::create(window, None, tree);
     // SAFETY: `provider` is live with one reference held here, and
     // UiaReturnRawElementProvider takes its own before returning.

@@ -225,10 +225,13 @@ surface aloud on Windows 11 and an Inspect cross-check of every published
 property passes. An enabled authenticated-session button now exposes one bounded
 Invoke action that joins the existing revision-bound semantic-event mailbox;
 the provider also reports and can move the host's keyboard-focus snapshot
-through a bounded UI-thread route, and exposes read-only current field values.
-Manual screen-reader activation, focus control, and field-value verification
-remain open. Automation editing, text ranges, events, live announcements, and
-every other pattern remain absent. See `docs/UI_AUTOMATION_FOCUS.md`.
+through a bounded UI-thread route, raises one host-only focus-change event for
+a real focus move, and exposes read-only current field values. Manual
+screen-reader activation, focus control and event, and field-value verification
+remain open. Automation editing, text ranges, Invoke/property/value/text/
+structure/selection events, live announcements, and every other pattern remain
+absent. See `docs/UI_AUTOMATION_FOCUS.md` and
+`docs/UI_AUTOMATION_EVENTS.md`.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows

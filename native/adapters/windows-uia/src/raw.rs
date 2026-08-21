@@ -28,6 +28,9 @@ pub const PROVIDER_OPTIONS_SERVER_SIDE: i32 = 0x1;
 /// `UIA_WindowControlTypeId`.
 pub const CONTROL_TYPE_WINDOW: i32 = 50_032;
 
+/// `UIA_AutomationFocusChangedEventId`.
+pub const UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID: i32 = 20_005;
+
 pub const VT_EMPTY: u16 = 0;
 pub const VT_I4: u16 = 3;
 pub const VT_BSTR: u16 = 8;
@@ -211,6 +214,9 @@ unsafe extern "system" {
         provider: *mut c_void,
     ) -> Lresult;
 
+    /// Raises one standard UI Automation event from a provider element.
+    pub fn UiaRaiseAutomationEvent(provider: *mut c_void, id: i32) -> Hresult;
+
 }
 
 #[link(name = "user32")]
@@ -222,7 +228,7 @@ unsafe extern "system" {
 mod tests {
     use super::{
         E_FAIL, E_NOINTERFACE, E_POINTER, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, S_OK,
-        VARIANT_TRUE, VT_BOOL, VT_EMPTY, VT_I4, Variant,
+        UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, VARIANT_TRUE, VT_BOOL, VT_EMPTY, VT_I4, Variant,
     };
 
     #[test]
@@ -266,5 +272,10 @@ mod tests {
         for failure in [E_POINTER, E_NOINTERFACE, E_FAIL] {
             assert!(failure < 0, "{failure:#x} would read as success");
         }
+    }
+
+    #[test]
+    fn focus_change_event_identifier_matches_ui_automation() {
+        assert_eq!(UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, 20_005);
     }
 }

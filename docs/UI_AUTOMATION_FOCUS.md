@@ -53,6 +53,8 @@ ignored.
 
 This gives the UI thread sole authority to write focus while allowing a screen
 reader to receive an honest `S_OK` only after the host accepted the target.
+A genuine move then raises one separate host-only focus-change event; see
+`docs/UI_AUTOMATION_EVENTS.md`. A successful no-op does not raise one.
 
 ## Boundaries
 

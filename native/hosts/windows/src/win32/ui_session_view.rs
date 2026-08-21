@@ -16,7 +16,7 @@ use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
 
-use super::ui_lab::UiLab;
+use super::ui_lab::{AccessibilityFocusResult, UiLab};
 
 /// A native session view with no application input or event delivery.
 #[derive(Clone)]
@@ -376,7 +376,11 @@ impl UiSessionView {
     }
 
     /// Services one UI Automation focus request on the owning UI thread.
-    pub(super) fn service_accessibility_focus(&mut self, width: f32, height: f32) -> bool {
+    pub(super) fn service_accessibility_focus(
+        &mut self,
+        width: f32,
+        height: f32,
+    ) -> Option<AccessibilityFocusResult> {
         self.lab
             .service_accessibility_focus(Some(self.revision), width, height)
     }

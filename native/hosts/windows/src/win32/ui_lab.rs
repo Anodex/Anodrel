@@ -75,6 +75,17 @@ pub(super) struct UiLab {
     pub(super) last_action: Option<ElementId>,
 }
 
+/// The local result of one UI Automation focus request.
+///
+/// `accepted` stays true when the requested element was already focused: that
+/// is a truthful `SetFocus` success, but it is not a new focus transition to
+/// announce to Windows.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct AccessibilityFocusResult {
+    pub(super) accepted: bool,
+    pub(super) changed: bool,
+}
+
 impl UiLab {
     /// Builds the fixed visual test document.
     pub(super) fn new() -> Self {
@@ -431,26 +442,36 @@ impl UiLab {
         expected_revision: Option<anodrel_ui_session::UiDocumentRevision>,
         width: f32,
         height: f32,
-    ) -> bool {
+    ) -> Option<AccessibilityFocusResult> {
         let mailbox = self.automation_focus.clone();
-        let Some(request) = mailbox.take() else {
-            return false;
-        };
-        mailbox
-            .complete_with(request.id(), || {
-                request.revision() == expected_revision
-                    && self.focus_accessibility_target(width, height, request.target())
-            })
-            .unwrap_or(false)
+        let request = mailbox.take()?;
+        let mut changed = false;
+        let accepted = mailbox.complete_with(request.id(), || {
+            if request.revision() != expected_revision {
+                return false;
+            }
+            let Some(focus_changed) =
+                self.focus_accessibility_target(width, height, request.target())
+            else {
+                return false;
+            };
+            changed = focus_changed;
+            true
+        })?;
+        Some(AccessibilityFocusResult { accepted, changed })
     }
 
-    fn focus_accessibility_target(&mut self, width: f32, height: f32, target: &ElementId) -> bool {
+    fn focus_accessibility_target(
+        &mut self,
+        width: f32,
+        height: f32,
+        target: &ElementId,
+    ) -> Option<bool> {
         let layout = self.layout(width, height);
         if !self.focus.can_focus(&layout, target) {
-            return false;
+            return None;
         }
-        let _ = self.focus.focus_on(&layout, target);
-        true
+        Some(self.focus.focus_on(&layout, target))
     }
 
     fn layout(&self, width: f32, height: f32) -> UiLayout {
@@ -1026,18 +1047,32 @@ mod tests {
         let action = id("ui.lab.hit-test");
         let missing = id("ui.lab.missing");
 
-        assert!(lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field));
+        assert_eq!(
+            lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field),
+            Some(true)
+        );
         assert_eq!(lab.accessibility_focus(), Some(field.clone()));
         // Repeating a valid focus request is successful even though it does
-        // not repaint: UI Automation asked for a state that is already true.
-        assert!(lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field));
-        assert!(lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &action));
+        // not repaint or announce: UI Automation asked for a state that is
+        // already true.
+        assert_eq!(
+            lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field),
+            Some(false)
+        );
+        assert_eq!(
+            lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &action),
+            Some(true)
+        );
         assert_eq!(lab.accessibility_focus(), Some(action));
-        assert!(!lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &missing));
+        assert_eq!(
+            lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &missing),
+            None
+        );
 
         lab.replace_document(UiLab::waiting_for_session().document);
-        assert!(
-            !lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field),
+        assert_eq!(
+            lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field),
+            None,
             "a target removed by replacement retained accessibility focus"
         );
     }

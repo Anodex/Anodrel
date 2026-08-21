@@ -6,7 +6,10 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use super::{Hwnd, StartupLab, View, ui_lab::UiLab};
+use super::{
+    Hwnd, StartupLab, View,
+    ui_lab::{AccessibilityFocusResult, UiLab},
+};
 use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 use anodrel_windows_file_access::WindowsFileTextService;
@@ -321,11 +324,11 @@ pub(super) fn service_accessibility_focus(
     window: Hwnd,
     width: f32,
     height: f32,
-) -> io::Result<Option<bool>> {
+) -> io::Result<Option<AccessibilityFocusResult>> {
     let mut views = lock_views()?;
     Ok(match views.get_mut(&window) {
-        Some(View::UiLab(lab)) => Some(lab.service_accessibility_focus(None, width, height)),
-        Some(View::UiSession(session)) => Some(session.service_accessibility_focus(width, height)),
+        Some(View::UiLab(lab)) => lab.service_accessibility_focus(None, width, height),
+        Some(View::UiSession(session)) => session.service_accessibility_focus(width, height),
         _ => None,
     })
 }
