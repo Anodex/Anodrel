@@ -4,8 +4,8 @@
 Windows retained regular-file registry, and Windows UI-session capture path are
 implemented. Protocol 1.9 `dialog.open_file.v2` and `file.read_text` are
 available only when a host explicitly wires that session-bound capture path;
-the default host services remain unavailable. No file write protocol operation
-exists.
+the default host services remain unavailable. The separately scoped write
+contract is documented in `docs/FILE_WRITE.md`; it is not implemented yet.
 
 ## Purpose
 
@@ -72,9 +72,11 @@ The native text reader is currently limited to **32 KiB** of bytes, requires
 strict UTF-8, and reads only the retained regular-file handle. Public Protocol
 1.9 exposure will apply its stricter 8 KiB response bound. A selection reference
 is single-use and the portable store
-holds at most 32 live references per session. Binary reads, writes,
-directories, multiple selection, persistent grants, bookmarks, drag-and-drop,
-and cross-session sharing remain deferred.
+holds at most 32 live references per session. Binary reads, directories,
+multiple selection, persistent grants, bookmarks, drag-and-drop, and
+cross-session sharing remain deferred. Text writes have their own pending
+retained-output-object contract rather than extending a read-side selection
+reference; see `docs/FILE_WRITE.md` and Decision 0079.
 
 ## Development verification
 

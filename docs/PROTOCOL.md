@@ -1,6 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Foundation contract, version 1.16
+**Status:** Implemented through version 1.16. Protocol 1.17 text-write
+contract accepted; native implementation is pending.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -53,7 +54,7 @@ only after binding an authenticated application session.
 | `cancellationId` | Optional opaque identity used by a separate cancellation message, at most 256 UTF-8 bytes. |
 | `capabilityContext` | Host-issued application ID, session ID, and granted capabilities. |
 
-The current operations are:
+The implemented operations, followed by accepted pending additions, are:
 
 | Operation | Payload | Result | Capability |
 | --- | --- | --- | --- |
@@ -79,6 +80,8 @@ The current operations are:
 | `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
 | `dialog.open_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus selection reference, or cancellation | `dialog.open_file` |
 | `file.read_text` | `{ "selectionReference": string }` | bounded UTF-8 text | `file.read_text` |
+| `dialog.save_file.v2` *(1.17 pending)* | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus save reference, or cancellation | `dialog.save_file` |
+| `file.write_text` *(1.17 pending)* | `{ "saveReference": string, "text": string }` | accepted bounded text replacement | `file.write_text` |
 | `storage.state.read` | `{}` | bounded saved snapshot or absence | `storage.state.read` |
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
@@ -170,6 +173,33 @@ Both operations can return `request.cancelled` only when the host observes the
 cancellation before work begins. A retained-file read performs one fixed,
 bounded synchronous read once started; it does not retain a background transfer
 after returning. Session shutdown revokes all outstanding references.
+
+### `dialog.save_file.v2` and `file.write_text`
+
+The accepted Protocol 1.17 contract adds a separate retained-output-object
+boundary. `dialog.save_file.v2` has the exact bounded filter payload and
+`dialog.save_file` capability from Protocol 1.8. Its success result is
+`{ "status": "selected", "path": string, "saveReference": string }`; its
+other result is `{ "status": "cancelled" }`. A host can return a selected
+result only after it captured a native output object for that exact user choice.
+The existing `dialog.save_file` operation is unchanged: it remains a
+non-mutating destination choice and can never be upgraded into a save
+reference.
+
+`file.write_text` needs the separate host-issued `file.write_text` capability
+and accepts exactly `{ "saveReference": string, "text": string }`. Both
+fields are required; no path, filename, directory, handle, encoding, offset,
+length, append, overwrite, or atomicity field is valid. The 22-character
+base64url save reference is opaque, session-bound, and consumed once. `text`
+is limited to 8 KiB UTF-8 source bytes. Success is `{ "status": "written" }`;
+an unavailable reference or native failure maps to `file.unavailable`, and an
+oversized value maps to `file.text_too_large`.
+
+The operation is synchronous and cancellation is observed only before it
+starts. It makes one non-atomic replacement attempt through the retained native
+object: a failure after mutation begins can leave partial content. Success is
+not a durability or atomicity guarantee. `docs/FILE_WRITE.md` and Decision
+0079 define capture, cleanup, and recovery limits.
 
 ### `dialog.save_file`
 
@@ -382,6 +412,8 @@ errors, clipboard text, or external-link URLs. Protocol 1.6 adds
 Protocol 1.7 adds `dialog.unavailable`.
 Protocol 1.9 adds `file.unavailable`, `file.text_invalid`, and
 `file.text_too_large`.
+Protocol 1.17 reuses `file.unavailable` and `file.text_too_large` for the
+separate retained-output-object text-write boundary; it adds no new error code.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 

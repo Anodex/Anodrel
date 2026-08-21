@@ -33,7 +33,9 @@ A record is strict UTF-8 JSON no larger than **16 KiB**. Version 1.0 accepts
 the existing five fields and grants no capabilities. Version 1.1 adds the
 required `capabilities` array. Version 1.2 adds the later storage, credential,
 and file-operation grants without changing the version 1.1 interpretation.
-Unknown, missing, duplicate, and wrongly typed fields are rejected.
+Version 1.7 will add the separately scoped `file.write_text` grant defined by
+Decision 0079. Unknown, missing, duplicate, and wrongly typed fields are
+rejected.
 
 ~~~json
 {
@@ -53,13 +55,13 @@ Unknown, missing, duplicate, and wrongly typed fields are rejected.
 
 | Field | Rule |
 | --- | --- |
-| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing; minors `1` and `2` require `capabilities`. |
+| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing; every later supported minor requires `capabilities`. |
 | `applicationId` | Uses the same 3â€“128 character identity grammar as the validated package manifest and exactly equals its `applicationId`. |
 | `packageRoot` | Absolute local directory path. Its canonical value is private host data and is never rendered. |
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
-| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 additionally supports `notification.show`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
+| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 additionally supports `notification.show`; 1.7 will add `file.write_text`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's

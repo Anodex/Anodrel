@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0079: Save-file writes use host-retained objects.
+
 - 0078: Native package tooling reuses the host validator.
 
 - 0077: Starter packages preserve the verified content boundary.

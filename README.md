@@ -203,6 +203,9 @@ provisioning contract, and host activation routes that exercise it.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
 boundary.
+`docs/FILE_WRITE.md` defines the separately scoped retained-output-object
+text-write contract. Its implementation is pending; legacy save selection
+remains non-mutating.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

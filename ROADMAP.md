@@ -77,6 +77,12 @@ Status: **Direct Windows host in progress**
   complete (Decision 0072). Window creation, closing, geometry, enumeration,
   focus, and every other window property remain deferred, each needing its own
   grant, decision, and threat-model entry.
+- Define safe application-controlled file output. **Contract completed; native
+  implementation next:** Decision 0079 and `docs/FILE_WRITE.md` preserve the
+  legacy non-mutating save picker while specifying an independent, one-use
+  retained-output-object flow for Protocol 1.17 `dialog.save_file.v2` and
+  `file.write_text`. Atomic replacement, binary data, and persistent file
+  grants remain separate gates.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
@@ -212,7 +218,8 @@ Status: **Direct Windows host in progress**
   returns that reference to the authenticated pipe worker (Decision 0049);
   registered interactive-session composition now binds that UI resource to one
   machine-validated application session before authentication. Signed product
-  launch, file writes, and non-Windows adapters remain deferred.
+  launch and non-Windows adapters remain deferred. The file-write contract is
+  accepted in Decision 0079; its native implementation is the next gate.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded
