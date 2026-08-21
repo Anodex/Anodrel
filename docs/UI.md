@@ -21,7 +21,7 @@ back-pressure, cancellation, focus, accessibility, and lifecycle behavior.
 
 ## Tree model
 
-`UiDocument` owns one validated root node. Its in-memory Rust model has four
+`UiDocument` owns one validated root node. Its in-memory Rust model has five
 node kinds:
 
 | Node | Fields | Meaning |
@@ -30,6 +30,7 @@ node kinds:
 | `Scroll` | element ID, one child | A vertical viewport that clips and translates its one child. |
 | `Text` | element ID, plain text, font size, semantic text tone | A non-interactive text run. |
 | `Action` | element ID, plain label, font size, enabled state, semantic action tone | A semantic, hit-testable action. |
+| `Field` | element ID, label, initial value, optional placeholder, maximum length, font size, enabled state | A host-owned single-line text field. |
 
 An element ID is 1–64 ASCII bytes containing letters, digits, `.`, `_`, or `-`;
 it starts and ends with a letter or digit. IDs must be unique throughout a
@@ -67,9 +68,9 @@ deterministically:
   places them left to right;
 - a text node wraps to the width its stack gives it and takes the measured size
   of the resulting block of lines;
-- an action receives its label's measured size plus fixed owned padding, with a
-  minimum 36-pixel height; stacks and actions stretch across the available
-  cross axis;
+- an action receives its label's measured size plus fixed owned padding, and a
+  field receives its label and fixed host-owned input height; both have a
+  minimum 36-pixel height and stretch across the available cross axis;
 - stack children are clipped to every ancestor's content rectangle; and
 - a hit test checks visible enabled actions in reverse paint order and returns
   `UiEvent::ActionInvoked(element_id)` only.
@@ -124,10 +125,11 @@ a scroll viewport.
 ## Focus traversal
 
 `UiFocus` keeps one optional focus target for a specific `UiLayout`. Its
-`move_next` and `move_previous` methods traverse visible enabled actions in
-source order and wrap at each end. Text, stacks, disabled actions, and fully
-clipped actions cannot receive focus. If the current target disappeared after a
-relayout, traversal starts at the appropriate end of the new layout.
+`move_next` and `move_previous` methods traverse visible enabled fields and
+actions in source order and wrap at each end. Text, stacks, disabled controls,
+and fully clipped controls cannot receive focus. If the current target
+disappeared after a relayout, traversal starts at the appropriate end of the new
+layout.
 
 `activate(layout)` returns `UiEvent::ActionInvoked(element_id)` only when the
 current target is still a visible enabled action in that layout. It has the same
@@ -142,7 +144,7 @@ and accessibility lifecycle to this portable state.
 `UiDocument::accessibility_snapshot(layout)` returns the visible elements of a
 specific layout pass in source order. Every entry has the stable element ID,
 clipped logical-pixel bounds, role, enabled state, and, for text or actions, a
-plain-text accessible name.
+plain-text accessible name for text, actions, or fields.
 
 | UI node | Accessibility role | Accessible name | Enabled |
 | --- | --- | --- | --- |
@@ -150,6 +152,7 @@ plain-text accessible name.
 | `Scroll` | `Group` | none | false |
 | `Text` | `StaticText` | text value | false |
 | `Action` | `Button` | action label | action enabled state |
+| `Field` | `Edit` | field label | field enabled state |
 
 The snapshot contains no invisible or fully clipped node. It does not expose a
 native UI Automation, AT-SPI, NSAccessibility, or Assistive Technology Service
@@ -162,12 +165,14 @@ boundary.
 
 This is a Rust API foundation, not an application file or protocol format.
 `docs/UI_DOCUMENTS.md` separately defines the exact capability-free JSON form.
-Its version 1 shape represents only stacks, text, and actions; it deliberately
-rejects an in-memory scroll node until a new exact format exists. The Windows
+Its version 1 shape represents stacks, text, actions, and single-line fields;
+it deliberately rejects an in-memory scroll node until a new exact format
+exists. The Windows
 UI Lab uses one compiled-in fixture and the separate explicit developer preview
 can render one bounded operator-selected document. When a package or session
 transports this tree to a host, that surface must still have its own lifecycle,
 resource limits, compatibility tests, and security decision before reuse.
+`docs/UI_FIELDS.md` defines the ownership and read boundary for field values.
 
 ## Windows UI Lab
 
@@ -181,10 +186,10 @@ It uses the Windows text-measurement seam, Anodrel's software canvas, and a
 validated `UiDocument` to draw a responsive native screen. Its raised action
 group, text prominence, and emphasized action come from the document's
 semantic appearance roles; the renderer does not infer them from element IDs.
-Hovering and
-clicking an action exercises the same layout hit test and displays its semantic
-element ID. Tab and Shift+Tab exercise the portable focus order with a visible
-focus ring; Enter activates only that same semantic action. The host-owned Lab
+Hovering and clicking an action exercises the same layout hit test and displays
+its semantic element ID. Tab and Shift+Tab exercise the portable focus order
+with a visible focus ring; a focused field receives text editing on the host UI
+thread, while Enter activates only a focused semantic action. The host-owned Lab
 also places its compiled v1 fixture inside an in-memory scroll viewport and
 adds local diagnostic exercises. Page Up and Page Down move only that retained
 viewport state; a Windows mouse-wheel notch maps to one owned line movement.
@@ -202,7 +207,7 @@ or a subscription as a result. See `docs/APPEARANCE.md` and Decision 0055.
 
 The portable crate tests ID validation and every document resource limit,
 unique IDs, vertical and horizontal placement, clipping, responsive bounds,
-disabled actions, top-most action hit testing, appearance-role defaults and
+disabled controls, top-most action hit testing, appearance-role defaults and
 selection, accessibility role/name/visibility semantics, and focus
 traversal/activation. It also tests finite, deterministic line, page, absolute,
 and relayout clamping for the independent scroll-state foundation, plus viewport

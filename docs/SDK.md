@@ -53,7 +53,7 @@ command or a replacement for a real authenticated native session.
 `PlatformClient` provides typed methods for the exact operations defined by
 `docs/PROTOCOL.md`, including health and capability discovery, bounded
 diagnostic reads, UI document replacement and semantic-event reads, session
-close, clipboard, HTTPS handoff, file dialog and retained text read, state,
+close, clipboard, HTTPS handoff, file dialog plus retained text read and write, state,
 credentials, notifications, and the two closed session-window commands. Every
 method takes only the documented payload fields; it cannot accept a native
 handle, arbitrary application identity, capability list, window target,
