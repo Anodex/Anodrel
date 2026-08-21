@@ -150,8 +150,13 @@ Status: **Direct Windows host in progress**
   immutable parent/child/sibling navigation (Decision 0075); its manual
   screen-reader and client hierarchy check remains open. See
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
-  `docs/UI_AUTOMATION_EVENTS.md`, and
-  `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
+   `docs/UI_AUTOMATION_EVENTS.md`, and
+   `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
+   The next desktop command surface is a bounded native session menu: Decision
+   0080 and `docs/MENUS.md` define a separate `menu.write` grant, a complete
+   model, and delivery through the existing revision-checked interaction path.
+   Its portable state, UI-thread bridge, direct Windows adapter, SDK, and
+   verification remain pending.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

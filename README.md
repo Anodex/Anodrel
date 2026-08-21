@@ -212,6 +212,8 @@ boundary.
 `docs/FILE_WRITE.md` defines the separately scoped retained-output-object
 text-write boundary implemented in Protocol 1.17 for the direct Windows
 UI-session host; legacy save selection remains non-mutating.
+`docs/MENUS.md` defines the accepted bounded native session-menu contract for a
+future Protocol 1.18 implementation.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

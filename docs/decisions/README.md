@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0080: Native session menus use bounded semantic commands.
+
 - 0079: Save-file writes use host-retained objects.
 
 - 0078: Native package tooling reuses the host validator.

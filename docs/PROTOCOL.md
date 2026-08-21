@@ -85,6 +85,16 @@ The implemented operations are:
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
 
+### Accepted additions not yet implemented
+
+| Operation | Payload | Result | Capability |
+| --- | --- | --- | --- |
+| `menu.replace` *(1.18 planned)* | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
+
+`docs/MENUS.md` defines the exact bounded model, menu-action event, and
+Windows ownership rule. It is documented before implementation; version 1.17
+hosts must continue to reject this operation.
+
 ### Diagnostic entries
 
 Protocol 1.11 adds `diagnostics.entries.read`. It accepts exactly `{}` and
@@ -413,6 +423,8 @@ Protocol 1.9 adds `file.unavailable`, `file.text_invalid`, and
 `file.text_too_large`.
 Protocol 1.17 reuses `file.unavailable` and `file.text_too_large` for the
 separate retained-output-object text-write boundary; it adds no new error code.
+Protocol 1.18 will add `menu.unavailable` for a host that cannot attach or
+update its own native session menu.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 
@@ -428,6 +440,8 @@ Events are opt-in. Every event must include `protocolVersion`, `kind: "event"`,
 `eventName`, `source`, `schemaVersion`, and a typed payload. Version 1.2
 implements `ui.action.invoked` only through `ui.events.read`; it does not yet
 provide subscriptions, unsolicited delivery, acknowledgements, or cancellation.
+Protocol 1.18 will add `menu.action.invoked` to the same bounded pull result;
+it carries only a host-validated menu revision and semantic action ID.
 
 ## Security rules
 
