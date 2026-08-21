@@ -87,6 +87,10 @@ name = "anodrel-json"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-menu"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-notifications"
 version = "0.1.0"
 

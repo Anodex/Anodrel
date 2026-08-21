@@ -21,6 +21,7 @@ members = [
   "crates/clipboard",
   "crates/notifications",
   "crates/window",
+  "crates/menu",
   "crates/external-links",
   "crates/file-dialog",
   "crates/file-access",
