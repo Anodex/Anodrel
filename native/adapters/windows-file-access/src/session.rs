@@ -5,6 +5,7 @@ use anodrel_file_access::{
     SelectionReference,
 };
 
+use crate::write_session::WindowsFileTextWriteService;
 use crate::{SelectedTextReadError, WindowsSelectedFile, new_selection_reference};
 
 /// Thread-safe selected-file text service for one authenticated Windows session.
@@ -15,6 +16,7 @@ use crate::{SelectedTextReadError, WindowsSelectedFile, new_selection_reference}
 #[derive(Clone, Debug, Default)]
 pub struct WindowsFileTextService {
     selections: Arc<Mutex<WindowsSessionSelections>>,
+    writes: WindowsFileTextWriteService,
 }
 
 impl WindowsFileTextService {
@@ -40,6 +42,16 @@ impl WindowsFileTextService {
         if let Ok(mut selections) = self.selections.lock() {
             selections.clear();
         }
+        self.writes.clear();
+    }
+
+    /// Returns the paired but separately typed selected-output text service.
+    ///
+    /// Sharing this parent session value preserves one lifecycle owner while
+    /// keeping read and write reference stores and protocol services distinct.
+    #[must_use]
+    pub fn write_service(&self) -> WindowsFileTextWriteService {
+        self.writes.clone()
     }
 }
 

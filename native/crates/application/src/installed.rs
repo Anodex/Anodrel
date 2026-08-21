@@ -288,6 +288,7 @@ enum RecordVersion {
     V1_4,
     V1_5,
     V1_6,
+    V1_7,
 }
 
 impl RecordVersion {
@@ -298,23 +299,26 @@ impl RecordVersion {
     const fn accepts_v1_2_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_2 | Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6
+            Self::V1_2 | Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7
         )
     }
 
     /// Whether this version accepts the grant version 1.3 introduced.
     const fn accepts_v1_3_grants(self) -> bool {
-        matches!(self, Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6)
+        matches!(
+            self,
+            Self::V1_3 | Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7
+        )
     }
 
     /// Whether this version accepts the grant version 1.4 introduced.
     const fn accepts_v1_4_grants(self) -> bool {
-        matches!(self, Self::V1_4 | Self::V1_5 | Self::V1_6)
+        matches!(self, Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7)
     }
 
     /// Whether this version accepts the grant version 1.5 introduced.
     const fn accepts_v1_5_grants(self) -> bool {
-        matches!(self, Self::V1_5 | Self::V1_6)
+        matches!(self, Self::V1_5 | Self::V1_6 | Self::V1_7)
     }
 }
 
@@ -430,7 +434,10 @@ fn capability_for_record_version(
         "notification.show" if version.accepts_v1_3_grants() => Some(Capability::NotificationShow),
         "window.title" if version.accepts_v1_4_grants() => Some(Capability::WindowTitle),
         "ui.fields.read" if version.accepts_v1_5_grants() => Some(Capability::UiFieldsRead),
-        "window.state" if version == RecordVersion::V1_6 => Some(Capability::WindowState),
+        "window.state" if matches!(version, RecordVersion::V1_6 | RecordVersion::V1_7) => {
+            Some(Capability::WindowState)
+        }
+        "file.write_text" if version == RecordVersion::V1_7 => Some(Capability::FileWriteText),
         _ => None,
     }
 }
@@ -537,6 +544,7 @@ fn validate_version(
         (1, 4) => Ok(RecordVersion::V1_4),
         (1, 5) => Ok(RecordVersion::V1_5),
         (1, 6) => Ok(RecordVersion::V1_6),
+        (1, 7) => Ok(RecordVersion::V1_7),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -949,6 +957,58 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_7_adds_file_text_write_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 7")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"clipboard.read\", \"window.state\", \"file.write_text\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.7 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::ClipboardRead,
+                anodrel_protocol::Capability::WindowState,
+                anodrel_protocol::Capability::FileWriteText,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_file_text_write_grant() {
+        // Version 1.6 is the newest record before this grant. Keeping it
+        // invalid prevents a stale provisioning tool from silently widening a
+        // verified application's file-system authority.
+        for minor in ["4", "5", "6"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"file.write_text\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.7 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

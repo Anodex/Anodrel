@@ -4,8 +4,9 @@
 Windows retained regular-file registry, and Windows UI-session capture path are
 implemented. Protocol 1.9 `dialog.open_file.v2` and `file.read_text` are
 available only when a host explicitly wires that session-bound capture path;
-the default host services remain unavailable. The separately scoped write
-contract is documented in `docs/FILE_WRITE.md`; it is not implemented yet.
+the default host services remain unavailable. The separately scoped Protocol
+1.17 write contract is implemented through its own retained-output-object
+service; it does not extend a read-side selection reference.
 
 ## Purpose
 
@@ -74,7 +75,7 @@ strict UTF-8, and reads only the retained regular-file handle. Public Protocol
 is single-use and the portable store
 holds at most 32 live references per session. Binary reads, directories,
 multiple selection, persistent grants, bookmarks, drag-and-drop, and
-cross-session sharing remain deferred. Text writes have their own pending
+cross-session sharing remain deferred. Text writes have their own
 retained-output-object contract rather than extending a read-side selection
 reference; see `docs/FILE_WRITE.md` and Decision 0079.
 
@@ -91,6 +92,17 @@ native\\target\\release\\anodrel-windows-host.exe --sample-ui-file-text-client <
 Cancelling the picker also completes the sample safely. This is a diagnostic
 session path, not product executable trust, a persistent file permission, or a
 general filesystem bridge.
+
+The separate write diagnostic opens the host-owned save picker, captures one
+output object, and writes a fixed line through one save reference. Choose a new
+temporary `.txt` destination, then inspect it after the session closes:
+
+~~~text
+native\\target\\release\\anodrel-windows-host.exe --sample-ui-file-write-client <node.exe> apps\\sample\\dist\\native-client.js
+~~~
+
+It cannot write a later path or reuse the reference; the legacy save diagnostic
+remains selection-only.
 
 ## Security invariants
 

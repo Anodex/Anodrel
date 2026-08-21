@@ -201,11 +201,11 @@ provisioning contract, and host activation routes that exercise it.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.
 `docs/EXTERNAL_LINKS.md` defines the validated HTTPS external-link foundation.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
-`docs/FILE_ACCESS.md` defines the planned selection-scoped file-access
+`docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.
 `docs/FILE_WRITE.md` defines the separately scoped retained-output-object
-text-write contract. Its implementation is pending; legacy save selection
-remains non-mutating.
+text-write boundary implemented in Protocol 1.17 for the direct Windows
+UI-session host; legacy save selection remains non-mutating.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

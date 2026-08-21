@@ -4,6 +4,7 @@ import { MockHost } from "@anodrel/mock-host";
 import {
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   MAX_EXTERNAL_LINK_REQUEST_BYTES,
+  MAX_FILE_TEXT_WRITE_BYTES,
   PROTOCOL_VERSION,
   createRequest,
   isWireRequestEnvelope,
@@ -331,6 +332,48 @@ test("selection-scoped file text keeps selection and reading separately granted"
   );
   await assert.rejects(
     () => readClient.readSelectedFileText("C:/private.txt"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+  );
+});
+
+test("selection-scoped file writing keeps save selection and writing separately granted", async () => {
+  const selectionClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.save_file"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  assert.deepEqual(
+    await selectionClient.saveFileDialogWithReference([{ label: "Text", extensions: ["txt"] }]),
+    { status: "cancelled" },
+  );
+
+  await assert.rejects(
+    () => selectionClient.writeSelectedFileText("AbCdEfGhIjKlMnOpQrStUv", "selected text"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "file.write_text",
+  );
+
+  const writeClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["file.write_text"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => writeClient.writeSelectedFileText("AbCdEfGhIjKlMnOpQrStUv", "selected text"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "file.unavailable",
+  );
+  await assert.rejects(
+    () => writeClient.writeSelectedFileText("C:/private.txt", "selected text"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+  );
+  await assert.rejects(
+    () => writeClient.writeSelectedFileText("AbCdEfGhIjKlMnOpQrStUv", "x".repeat(MAX_FILE_TEXT_WRITE_BYTES + 1)),
     (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
   );
 });

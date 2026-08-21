@@ -252,6 +252,18 @@ replace `--sample-ui-client` with `--sample-ui-file-client` or
 `--sample-ui-save-client`. Both commands accept only the strict sample filters;
 the save diagnostic never writes the selected destination.
 
+To exercise the separately granted selection-scoped write route, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-file-write-client $nodePath $clientPath
+~~~
+
+Choose a new temporary `.txt` filename in the host-owned save picker. The
+client receives one opaque save reference and writes a fixed diagnostic line
+through it; inspect the file after the session closes. Cancelling leaves no new
+file behind. This route is deliberately distinct from `--sample-ui-save-client`,
+which remains a non-mutating selection test.
+
 To exercise the bounded application-state service through the same authenticated
 session, run:
 

@@ -147,6 +147,31 @@ export class PlatformClient {
     return this.request("file.read_text", { selectionReference });
   }
 
+  /**
+   * Opens a host-owned save picker and returns a one-use output reference.
+   *
+   * The returned path is display data only. Present its `saveReference` to
+   * {@link writeSelectedFileText}; do not persist, parse, or transform it.
+   */
+  saveFileDialogWithReference(
+    filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
+  ): Promise<ResultFor<"dialog.save_file.v2">> {
+    return this.request("dialog.save_file.v2", { filters });
+  }
+
+  /**
+   * Replaces bounded text through one previously captured output reference.
+   *
+   * The host consumes the reference once. This is not a path-based write API,
+   * and success is not an atomic-replacement or durability guarantee.
+   */
+  writeSelectedFileText(
+    saveReference: string,
+    text: string,
+  ): Promise<ResultFor<"file.write_text">> {
+    return this.request("file.write_text", { saveReference, text });
+  }
+
   readStorageState(): Promise<ResultFor<"storage.state.read">> {
     return this.request("storage.state.read", {});
   }

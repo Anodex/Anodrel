@@ -22,7 +22,10 @@ calls `ui.events.read`; it has no direct native authority.
 Use `--sample-ui-file-client` or `--sample-ui-save-client` with the Windows
 host to run the same authenticated session through the real open or save
 picker. These diagnostics prove only user-mediated path selection; they never
-read, create, truncate, or write a selected file.
+read, create, truncate, or write a selected file. `--sample-ui-file-write-client`
+is separate: it captures one host-retained output object after the save picker,
+then writes a fixed diagnostic line through its one-use save reference. Choose
+a new temporary `.txt` filename for that diagnostic, then inspect its contents.
 
 Use `--sample-ui-window-state-client` to exercise the separately granted
 `window.state.set` command. The development client asks its own session window

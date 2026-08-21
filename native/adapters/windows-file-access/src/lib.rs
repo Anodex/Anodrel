@@ -8,24 +8,48 @@
 
 mod raw;
 mod session;
+mod write;
+mod write_session;
 
-use anodrel_file_access::SelectionReference;
-use anodrel_file_dialog::SelectedFilePath;
+use anodrel_file_access::{SaveReference, SelectionReference};
+use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
 
 pub use session::{SessionSelectionError, WindowsFileTextService, WindowsSessionSelections};
+pub use write_session::{
+    SessionSaveSelectionError, WindowsFileTextWriteService, WindowsSessionSaveSelections,
+};
 
 /// Maximum UTF-8 bytes the first selected-file text reader returns.
 pub const MAX_SELECTED_TEXT_BYTES: usize = 32 * 1024;
+/// Maximum UTF-8 bytes the first selected-output text writer accepts.
+pub const MAX_SELECTED_WRITE_TEXT_BYTES: usize = 8 * 1024;
 
 /// Creates one CNG-backed opaque reference for a selected-file session entry.
 pub fn new_selection_reference() -> Result<SelectionReference, FileAccessError> {
     raw::new_selection_reference().map_err(|_| FileAccessError::Unavailable)
 }
 
+/// Creates one CNG-backed opaque reference for a selected-output session entry.
+pub fn new_save_reference() -> Result<SaveReference, FileAccessError> {
+    SaveReference::new(raw::new_reference_value().map_err(|_| FileAccessError::Unavailable)?)
+        .map_err(|_| FileAccessError::Unavailable)
+}
+
 /// Opens one selected regular file as an identity-retaining read-only object.
 pub fn open_selected_file(path: &SelectedFilePath) -> Result<WindowsSelectedFile, FileAccessError> {
     raw::open_selected_file(path.as_path())
         .map(WindowsSelectedFile)
+        .map_err(|_| FileAccessError::Unavailable)
+}
+
+/// Opens one selected destination as an identity-retaining output object.
+///
+/// Existing contents remain unchanged until [`WindowsSaveFile::write_text`] is
+/// called. A new destination is marked for delete-on-abandon by the private
+/// adapter before a reference can be returned.
+pub fn open_save_file(path: &SaveFilePath) -> Result<WindowsSaveFile, FileAccessError> {
+    write::open_save_file(path.as_path())
+        .map(WindowsSaveFile)
         .map_err(|_| FileAccessError::Unavailable)
 }
 
@@ -58,6 +82,36 @@ impl WindowsSelectedFile {
 impl std::fmt::Debug for WindowsSelectedFile {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("WindowsSelectedFile(..)")
+    }
+}
+
+/// One host-retained Windows output file object.
+///
+/// The underlying handle closes when this value is dropped. It is intentionally
+/// not exposed to applications or protocol callers.
+pub struct WindowsSaveFile(write::WriteOnlyFile);
+
+impl WindowsSaveFile {
+    /// Returns the stable Windows identity captured from the opened object.
+    #[must_use]
+    pub fn identity(&self) -> FileIdentity {
+        self.0.identity()
+    }
+
+    /// Writes one bounded UTF-8 replacement through this retained object.
+    pub fn write_text(&mut self, text: &str) -> Result<(), SelectedTextWriteError> {
+        if text.len() > MAX_SELECTED_WRITE_TEXT_BYTES {
+            return Err(SelectedTextWriteError::TooLarge);
+        }
+        self.0
+            .write_text(text)
+            .map_err(|_| SelectedTextWriteError::Unavailable)
+    }
+}
+
+impl std::fmt::Debug for WindowsSaveFile {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("WindowsSaveFile(..)")
     }
 }
 
@@ -122,3 +176,20 @@ impl std::fmt::Display for SelectedTextReadError {
 }
 
 impl std::error::Error for SelectedTextReadError {}
+
+/// Safe selected-output text-write failure category.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectedTextWriteError {
+    /// The retained destination could not be written.
+    Unavailable,
+    /// The supplied text exceeded the fixed writer limit.
+    TooLarge,
+}
+
+impl std::fmt::Display for SelectedTextWriteError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("selected output text could not be written")
+    }
+}
+
+impl std::error::Error for SelectedTextWriteError {}

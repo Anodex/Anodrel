@@ -94,6 +94,23 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-save-file-text")) {
+      const selection = await client.saveFileDialogWithReference([
+        { label: "Text", extensions: ["txt", "json", "md"] },
+      ]);
+      if (selection.status === "selected") {
+        const written = await client.writeSelectedFileText(
+          selection.saveReference,
+          "Written by the Anodrel native file-write diagnostic.\n",
+        );
+        if (written.status !== "written") {
+          return 29;
+        }
+      } else if (selection.status !== "cancelled") {
+        return 29;
+      }
+    }
+
     if (process.argv.includes("--request-selected-file-text")) {
       const selection = await client.openFileDialogWithReference([
         { label: "Text", extensions: ["txt", "json", "md"] },

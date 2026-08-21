@@ -22,8 +22,10 @@ use anodrel_diagnostics::{DiagnosticsService, DiagnosticsServiceError};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_file_access::{
     FileSelectionResult, FileSelectionService, FileSelectionServiceError, FileTextService,
-    FileTextServiceError, SelectionReference, UnavailableFileSelectionService,
-    UnavailableFileTextService,
+    FileTextServiceError, FileTextWriteService, FileTextWriteServiceError, SaveReference,
+    SaveSelectionResult, SaveSelectionService, SaveSelectionServiceError, SelectionReference,
+    UnavailableFileSelectionService, UnavailableFileTextService, UnavailableFileTextWriteService,
+    UnavailableSaveSelectionService,
 };
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
@@ -53,6 +55,7 @@ pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
 pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
+pub const MAX_FILE_TEXT_WRITE_BYTES: usize = 8 * 1024;
 pub const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES: usize = 24 * 1024;
 
 /// One host-created, coalescing request to end an authenticated session.
@@ -129,6 +132,8 @@ pub struct CoreHost {
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
+    file_save_selections: Box<dyn SaveSelectionService>,
+    file_text_write: Box<dyn FileTextWriteService>,
     storage: Box<dyn StorageService>,
     diagnostics: Box<dyn DiagnosticsService>,
     credentials: Box<dyn CredentialService>,
@@ -152,6 +157,8 @@ pub struct HostServices {
     file_dialogs: Box<dyn FileDialogService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
+    file_save_selections: Box<dyn SaveSelectionService>,
+    file_text_write: Box<dyn FileTextWriteService>,
     storage: Box<dyn StorageService>,
     diagnostics: Box<dyn DiagnosticsService>,
     credentials: Box<dyn CredentialService>,
@@ -289,6 +296,8 @@ impl HostServices {
             file_dialogs: Box::new(UnavailableFileDialogs),
             file_selections: Box::new(UnavailableFileSelectionService),
             file_text: Box::new(UnavailableFileTextService),
+            file_save_selections: Box::new(UnavailableSaveSelectionService),
+            file_text_write: Box::new(UnavailableFileTextWriteService),
             storage: Box::new(UnavailableStorage),
             diagnostics: Box::new(UnavailableDiagnostics),
             credentials: Box::new(UnavailableCredentials),
@@ -373,6 +382,23 @@ impl HostServices {
         self
     }
 
+    /// Replaces the session's retained selected-output service.
+    #[must_use]
+    pub fn with_file_save_selections(
+        mut self,
+        service: impl SaveSelectionService + 'static,
+    ) -> Self {
+        self.file_save_selections = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's selected-output text writer.
+    #[must_use]
+    pub fn with_file_text_write(mut self, service: impl FileTextWriteService + 'static) -> Self {
+        self.file_text_write = Box::new(service);
+        self
+    }
+
     /// Replaces the session's host-owned application-state service.
     #[must_use]
     pub fn with_storage(mut self, service: impl StorageService + 'static) -> Self {
@@ -435,6 +461,8 @@ impl CoreHost {
             file_dialogs: services.file_dialogs,
             file_selections: services.file_selections,
             file_text: services.file_text,
+            file_save_selections: services.file_save_selections,
+            file_text_write: services.file_text_write,
             storage: services.storage,
             diagnostics: services.diagnostics,
             credentials: services.credentials,
@@ -667,6 +695,8 @@ impl CoreHost {
             file_dialogs: Box::new(file_dialogs),
             file_selections: Box::new(file_selections),
             file_text: Box::new(file_text),
+            file_save_selections: Box::new(UnavailableSaveSelectionService),
+            file_text_write: Box::new(UnavailableFileTextWriteService),
             storage: Box::new(storage),
             diagnostics: Box::new(diagnostics),
             credentials: Box::new(credentials),
@@ -798,6 +828,12 @@ impl CoreHost {
             }
             "file.read_text" if request.protocol_version.minor >= 9 => {
                 self.handle_file_text_read(request)
+            }
+            "dialog.save_file.v2" if request.protocol_version.minor >= 17 => {
+                self.handle_file_dialog_save_with_reference(request)
+            }
+            "file.write_text" if request.protocol_version.minor >= 17 => {
+                self.handle_file_text_write(request)
             }
             "storage.state.read" if request.protocol_version.minor >= 10 => {
                 self.handle_storage_read(request)
@@ -1425,13 +1461,14 @@ impl CoreHost {
             ),
             // The typed mailbox prevents this, but an injected host service
             // must never turn a save destination into an open-file result.
-            Ok(FileDialogSelection::Saved(_)) | Ok(FileDialogSelection::Captured(_, _)) => self
-                .failure(
-                    request.request_id,
-                    ProtocolErrorCode::DialogUnavailable,
-                    "file dialog returned an incompatible result.",
-                    None,
-                ),
+            Ok(FileDialogSelection::Saved(_))
+            | Ok(FileDialogSelection::Captured(_, _))
+            | Ok(FileDialogSelection::CapturedSave(_, _)) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::DialogUnavailable,
+                "file dialog returned an incompatible result.",
+                None,
+            ),
             Err(FileDialogServiceError::Unavailable) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::DialogUnavailable,
@@ -1480,6 +1517,7 @@ impl CoreHost {
             ),
             Ok(FileDialogSelection::Selected(_))
             | Ok(FileDialogSelection::Captured(_, _))
+            | Ok(FileDialogSelection::CapturedSave(_, _))
             | Err(FileDialogServiceError::Unavailable) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::DialogUnavailable,
@@ -1541,6 +1579,58 @@ impl CoreHost {
         }
     }
 
+    fn handle_file_dialog_save_with_reference(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(filters) = file_dialog_open_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.save_file.v2 requires strict bounded filters.",
+                None,
+            );
+        };
+        if request.payload.to_json().len() > MAX_FILE_DIALOG_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "dialog.save_file.v2 filters exceeded the operation size limit.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::DialogSaveFile) {
+            return self.capability_denied(request.request_id, "dialog.save_file");
+        }
+        match self.file_save_selections.save_file(&filters) {
+            Ok(SaveSelectionResult::Selected(selection)) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([
+                    ("status", JsonValue::String("selected".to_owned())),
+                    (
+                        "path",
+                        JsonValue::String(
+                            selection.path().as_path().to_string_lossy().into_owned(),
+                        ),
+                    ),
+                    (
+                        "saveReference",
+                        JsonValue::String(selection.reference().as_str().to_owned()),
+                    ),
+                ]),
+            ),
+            Ok(SaveSelectionResult::Cancelled) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("cancelled".to_owned()))]),
+            ),
+            Err(SaveSelectionServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::DialogUnavailable,
+                "file dialog is unavailable.",
+                None,
+            ),
+        }
+    }
+
     fn handle_file_text_read(&self, request: RequestEnvelope) -> JsonValue {
         let Some(reference) = file_text_read_payload(&request.payload) else {
             return self.failure(
@@ -1578,6 +1668,47 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::FileUnavailable,
                 "selected file is unavailable.",
+                None,
+            ),
+        }
+    }
+
+    fn handle_file_text_write(&self, request: RequestEnvelope) -> JsonValue {
+        let Some((reference, text)) = file_text_write_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "file.write_text requires one exact save reference and text.",
+                None,
+            );
+        };
+        if text.len() > MAX_FILE_TEXT_WRITE_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileTextTooLarge,
+                "selected output text is too large.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::FileWriteText) {
+            return self.capability_denied(request.request_id, "file.write_text");
+        }
+        match self.file_text_write.write_text(&reference, text) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("written".to_owned()))]),
+            ),
+            Err(FileTextWriteServiceError::TooLarge) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileTextTooLarge,
+                "selected output text is too large.",
+                None,
+            ),
+            Err(FileTextWriteServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileUnavailable,
+                "selected output is unavailable.",
                 None,
             ),
         }
@@ -1982,6 +2113,17 @@ fn file_text_read_payload(value: &JsonValue) -> Option<SelectionReference> {
     SelectionReference::new(fields.get("selectionReference")?.as_string()?.to_owned()).ok()
 }
 
+fn file_text_write_payload(value: &JsonValue) -> Option<(SaveReference, &str)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    let reference =
+        SaveReference::new(fields.get("saveReference")?.as_string()?.to_owned()).ok()?;
+    let text = fields.get("text")?.as_string()?;
+    Some((reference, text))
+}
+
 fn storage_replace_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -2056,7 +2198,11 @@ mod tests {
     };
     use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
-    use anodrel_file_access::{FileSelection, FileSelectionService, FileTextService};
+    use anodrel_file_access::{
+        FileSelection, FileSelectionService, FileTextService, FileTextWriteService,
+        FileTextWriteServiceError, SaveReference, SaveSelection, SaveSelectionResult,
+        SaveSelectionService, SaveSelectionServiceError,
+    };
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
     use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
@@ -2203,6 +2349,59 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct CapturingSaveDialog;
+
+    impl SaveSelectionService for CapturingSaveDialog {
+        fn save_file(
+            &self,
+            _filters: &[FileDialogFilter],
+        ) -> Result<SaveSelectionResult, SaveSelectionServiceError> {
+            let path = SaveFilePath::new(r"C:\\Users\\Owner\\save.txt").expect("path is valid");
+            let reference =
+                SaveReference::new("ZyXwVuTsRqPoNmLkJiHgFe").expect("reference is valid");
+            Ok(SaveSelectionResult::Selected(SaveSelection::new(
+                path, reference,
+            )))
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct RecordingFileTextWrite {
+        writes: Arc<Mutex<Vec<String>>>,
+        result: Result<(), FileTextWriteServiceError>,
+    }
+
+    impl RecordingFileTextWrite {
+        fn accepting() -> Self {
+            Self {
+                writes: Arc::new(Mutex::new(Vec::new())),
+                result: Ok(()),
+            }
+        }
+
+        fn failing(error: FileTextWriteServiceError) -> Self {
+            Self {
+                writes: Arc::new(Mutex::new(Vec::new())),
+                result: Err(error),
+            }
+        }
+    }
+
+    impl FileTextWriteService for RecordingFileTextWrite {
+        fn write_text(
+            &self,
+            _reference: &SaveReference,
+            text: &str,
+        ) -> Result<(), FileTextWriteServiceError> {
+            self.writes
+                .lock()
+                .expect("write recorder lock is available")
+                .push(text.to_owned());
+            self.result
+        }
+    }
+
+    #[derive(Debug)]
     struct MemoryStorage(Mutex<Result<StorageRead, StorageServiceError>>);
 
     impl MemoryStorage {
@@ -2317,6 +2516,19 @@ mod tests {
             CancellingFileDialog,
             selections,
             text,
+        )
+    }
+
+    fn file_write_host(
+        grants: Vec<Capability>,
+        selections: impl SaveSelectionService + 'static,
+        writer: impl FileTextWriteService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            HostServices::unavailable()
+                .with_file_save_selections(selections)
+                .with_file_text_write(writer),
         )
     }
 
@@ -2721,6 +2933,12 @@ mod tests {
     fn request_v1_16(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":16}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_17(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":17}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -3643,6 +3861,167 @@ mod tests {
             r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
         )))
         .expect("unsupported save dialog response is JSON");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn save_selection_requires_the_save_grant_and_returns_an_opaque_save_reference() {
+        let accepted_host = file_write_host(
+            vec![Capability::DialogSaveFile],
+            CapturingSaveDialog,
+            RecordingFileTextWrite::accepting(),
+        );
+        let accepted = JsonValue::parse(&accepted_host.handle_json(&request_v1_17(
+            "dialog.save_file.v2",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("save selection response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "saveReference").as_string(),
+            Some("ZyXwVuTsRqPoNmLkJiHgFe")
+        );
+
+        let denied = JsonValue::parse(
+            &file_write_host(
+                vec![Capability::DialogOpenFile],
+                CapturingSaveDialog,
+                RecordingFileTextWrite::accepting(),
+            )
+            .handle_json(&request_v1_17(
+                "dialog.save_file.v2",
+                r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+            )),
+        )
+        .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&accepted_host.handle_json(&request_v1_17(
+            "dialog.save_file.v2",
+            r#"{"filters":[{"label":"Raw","extensions":["*.txt"]}]}"#,
+        )))
+        .expect("invalid response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let unsupported = JsonValue::parse(&accepted_host.handle_json(&request_v1_16(
+            "dialog.save_file.v2",
+            r#"{"filters":[{"label":"Text","extensions":["txt"]}]}"#,
+        )))
+        .expect("unsupported response is JSON");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn selected_output_text_is_separately_granted_bounded_and_safe() {
+        let writer = RecordingFileTextWrite::accepting();
+        let writes = Arc::clone(&writer.writes);
+        let write_host =
+            file_write_host(vec![Capability::FileWriteText], CapturingSaveDialog, writer);
+        let reference = "ZyXwVuTsRqPoNmLkJiHgFe";
+        let accepted = JsonValue::parse(&write_host.handle_json(&request_v1_17(
+            "file.write_text",
+            &format!(r#"{{"saveReference":"{reference}","text":"selected text"}}"#),
+        )))
+        .expect("write response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "status").as_string(),
+            Some("written")
+        );
+        assert_eq!(
+            writes
+                .lock()
+                .expect("write recorder lock is available")
+                .as_slice(),
+            ["selected text"]
+        );
+
+        let denied = JsonValue::parse(
+            &file_write_host(
+                vec![Capability::DialogSaveFile],
+                CapturingSaveDialog,
+                RecordingFileTextWrite::accepting(),
+            )
+            .handle_json(&request_v1_17(
+                "file.write_text",
+                &format!(r#"{{"saveReference":"{reference}","text":"selected text"}}"#),
+            )),
+        )
+        .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let invalid = JsonValue::parse(&write_host.handle_json(&request_v1_17(
+            "file.write_text",
+            r#"{"selectionReference":"AbCdEfGhIjKlMnOpQrStUv","text":"selected text"}"#,
+        )))
+        .expect("invalid response is JSON");
+        assert_eq!(
+            field(field(&invalid, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let oversized = JsonValue::parse(&write_host.handle_json(&request_v1_17(
+            "file.write_text",
+            &format!(
+                r#"{{"saveReference":"{reference}","text":"{}"}}"#,
+                "x".repeat(MAX_FILE_TEXT_WRITE_BYTES + 1)
+            ),
+        )))
+        .expect("oversized response is JSON");
+        assert_eq!(
+            field(field(&oversized, "error"), "code").as_string(),
+            Some("file.text_too_large")
+        );
+        assert_eq!(
+            writes
+                .lock()
+                .expect("write recorder lock is available")
+                .as_slice(),
+            ["selected text"]
+        );
+
+        let unavailable = JsonValue::parse(
+            &file_write_host(
+                vec![Capability::FileWriteText],
+                CapturingSaveDialog,
+                RecordingFileTextWrite::failing(FileTextWriteServiceError::Unavailable),
+            )
+            .handle_json(&request_v1_17(
+                "file.write_text",
+                &format!(r#"{{"saveReference":"{reference}","text":"private text"}}"#),
+            )),
+        )
+        .expect("unavailable response is JSON");
+        assert_eq!(
+            field(field(&unavailable, "error"), "code").as_string(),
+            Some("file.unavailable")
+        );
+        assert!(
+            field(field(&unavailable, "error"), "message")
+                .as_string()
+                .is_some_and(|message| !message.contains("private"))
+        );
+
+        let unsupported = JsonValue::parse(&write_host.handle_json(&request_v1_16(
+            "file.write_text",
+            &format!(r#"{{"saveReference":"{reference}","text":"selected text"}}"#),
+        )))
+        .expect("unsupported response is JSON");
         assert_eq!(
             field(field(&unsupported, "error"), "code").as_string(),
             Some("operation.unsupported")

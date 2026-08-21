@@ -13,7 +13,7 @@ use std::{fmt, io};
 
 use anodrel_application::InstalledApplication;
 use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
-use anodrel_file_access::SelectionFileDialogMailbox;
+use anodrel_file_access::{SaveFileDialogMailbox, SelectionFileDialogMailbox};
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
@@ -251,6 +251,8 @@ fn registered_interactive_services(
         .with_file_dialogs(ui.file_dialog_mailbox())
         .with_file_selections(SelectionFileDialogMailbox::new(ui.file_dialog_mailbox()))
         .with_file_text(ui.file_text_service())
+        .with_file_save_selections(SaveFileDialogMailbox::new(ui.file_dialog_mailbox()))
+        .with_file_text_write(ui.file_text_service().write_service())
         // Notifications reach Shell32 through the owning UI thread, so the
         // session gets the mailbox rather than the adapter.
         .with_notifications(ui.notification_mailbox())

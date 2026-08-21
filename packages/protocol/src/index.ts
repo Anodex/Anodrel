@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 16 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 17 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -13,8 +13,11 @@ export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_FILTERS = 8;
 export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
+export const MAX_FILE_TEXT_WRITE_BYTES = 8 * 1024;
 export const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES = 24 * 1024;
 export const SELECTION_REFERENCE_BYTES = 22;
+/** Exact characters in a host-created save reference. */
+export const SAVE_REFERENCE_BYTES = 22;
 /** Maximum UTF-8 bytes in an exact credential name (ASCII only). */
 export const MAX_CREDENTIAL_NAME_BYTES = 64;
 /** Maximum characters in the canonical hexadecimal representation of a secret. */
@@ -37,6 +40,7 @@ export type Capability =
   | "dialog.open_file"
   | "dialog.save_file"
   | "file.read_text"
+  | "file.write_text"
   | "storage.state.read"
   | "storage.state.replace"
   | "storage.state.clear"
@@ -214,6 +218,18 @@ export interface PlatformOperationMap {
   "file.read_text": {
     readonly payload: { readonly selectionReference: string };
     readonly result: { readonly status: "text"; readonly text: string };
+  };
+  "dialog.save_file.v2": {
+    readonly payload: {
+      readonly filters: readonly { readonly label: string; readonly extensions: readonly string[] }[];
+    };
+    readonly result:
+      | { readonly status: "selected"; readonly path: string; readonly saveReference: string }
+      | { readonly status: "cancelled" };
+  };
+  "file.write_text": {
+    readonly payload: { readonly saveReference: string; readonly text: string };
+    readonly result: { readonly status: "written" };
   };
   "storage.state.read": {
     readonly payload: EmptyPayload;
@@ -594,6 +610,21 @@ export function isWindowTitleSetPayload(
     isRecord(value) &&
     Object.keys(value).length === 1 &&
     isWindowTitleProposal(value.title)
+  );
+}
+
+/** Validates one exact opaque save reference and bounded UTF-8 output text. */
+export function isFileTextWritePayload(
+  value: unknown,
+): value is PayloadFor<"file.write_text"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    typeof value.saveReference === "string" &&
+    value.saveReference.length === SAVE_REFERENCE_BYTES &&
+    /^[A-Za-z0-9_-]+$/.test(value.saveReference) &&
+    typeof value.text === "string" &&
+    new TextEncoder().encode(value.text).byteLength <= MAX_FILE_TEXT_WRITE_BYTES
   );
 }
 

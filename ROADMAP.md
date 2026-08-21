@@ -77,12 +77,12 @@ Status: **Direct Windows host in progress**
   complete (Decision 0072). Window creation, closing, geometry, enumeration,
   focus, and every other window property remain deferred, each needing its own
   grant, decision, and threat-model entry.
-- Define safe application-controlled file output. **Contract completed; native
-  implementation next:** Decision 0079 and `docs/FILE_WRITE.md` preserve the
-  legacy non-mutating save picker while specifying an independent, one-use
-  retained-output-object flow for Protocol 1.17 `dialog.save_file.v2` and
-  `file.write_text`. Atomic replacement, binary data, and persistent file
-  grants remain separate gates.
+- Define safe application-controlled file output. **Completed for the direct
+  Windows UI-session host:** Decision 0079 and `docs/FILE_WRITE.md` preserve
+  the legacy non-mutating save picker while implementing an independent,
+  one-use retained-output-object flow for Protocol 1.17
+  `dialog.save_file.v2` and `file.write_text`. Atomic replacement, binary
+  data, and persistent file grants remain separate gates.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and

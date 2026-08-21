@@ -23,6 +23,8 @@ pub const MAX_FILTER_EXTENSIONS: usize = 8;
 pub const MAX_SELECTED_PATH_BYTES: usize = 32 * 1024;
 /// Exact UTF-8 byte length of a Version 1 opaque selection reference.
 pub const SELECTION_REFERENCE_BYTES: usize = 22;
+/// Exact UTF-8 byte length of a Version 1 opaque save reference.
+pub const SAVE_REFERENCE_BYTES: usize = 22;
 
 /// One visible filter and its allowed filename extensions.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -187,11 +189,58 @@ impl fmt::Display for SelectionReferenceError {
 
 impl std::error::Error for SelectionReferenceError {}
 
+/// An opaque Version 1 base64url reference to host-retained output-file state.
+///
+/// A host adapter derives this from 128 bits of cryptographically secure random
+/// data only after it captures the user-selected regular output object. It is
+/// intentionally distinct from [`SelectionReference`], so a read reference
+/// cannot be supplied to a write service by accident.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SaveReference(String);
+
+impl SaveReference {
+    /// Validates one exact opaque save reference.
+    ///
+    /// Validation deliberately does not generate a value or access a file.
+    pub fn new(value: impl Into<String>) -> Result<Self, SaveReferenceError> {
+        let value = value.into();
+        if value.len() != SAVE_REFERENCE_BYTES
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            return Err(SaveReferenceError::Invalid);
+        }
+        Ok(Self(value))
+    }
+
+    /// Returns the opaque reference for the protocol boundary.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A safe failure while validating an opaque save reference.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SaveReferenceError {
+    /// The reference was not an exact Version 1 base64url value.
+    Invalid,
+}
+
+impl fmt::Display for SaveReferenceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("save reference is invalid")
+    }
+}
+
+impl std::error::Error for SaveReferenceError {}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        FileDialogFilter, FileDialogInputError, SaveFilePath, SelectedFilePath, SelectionReference,
-        SelectionReferenceError,
+        FileDialogFilter, FileDialogInputError, SaveFilePath, SaveReference, SaveReferenceError,
+        SelectedFilePath, SelectionReference, SelectionReferenceError,
     };
     #[test]
     fn accepts_strict_filters_and_absolute_selected_paths() {
@@ -227,6 +276,24 @@ mod tests {
         assert_eq!(
             SelectionReference::new("AbCdEfGhIjKlMnOpQrStU!"),
             Err(SelectionReferenceError::Invalid)
+        );
+    }
+
+    #[test]
+    fn save_references_are_exact_and_distinct_from_read_references() {
+        let value = "AbCdEfGhIjKlMnOpQrStUv";
+        let save = SaveReference::new(value).expect("save reference is valid");
+        assert_eq!(save.as_str(), value);
+        assert_eq!(
+            SaveReference::new("short"),
+            Err(SaveReferenceError::Invalid)
+        );
+        assert_ne!(
+            format!("{:?}", save),
+            format!(
+                "{:?}",
+                SelectionReference::new(value).expect("read reference is valid")
+            )
         );
     }
 }

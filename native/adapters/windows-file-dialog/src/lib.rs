@@ -50,6 +50,25 @@ pub fn save_file_with_owner(
 ) -> Result<Option<SaveFilePath>, FileDialogError> {
     raw::save_file(owner_window, filters).map_err(|_| FileDialogError::Unavailable)
 }
+
+/// Opens one host-owned save picker and captures the selected output object
+/// before returning.
+///
+/// The capture callback runs synchronously on the caller's host UI thread only
+/// after Windows confirms one selected destination and before any result
+/// reaches a worker. It may retain adapter-private output state but must not
+/// expose a native handle or filesystem failure through its result.
+pub fn save_file_with_owner_and_capture<T>(
+    owner_window: isize,
+    filters: &[FileDialogFilter],
+    capture: impl FnOnce(&SaveFilePath) -> Result<T, ()>,
+) -> Result<Option<(SaveFilePath, T)>, FileDialogError> {
+    let Some(path) = save_file_with_owner(owner_window, filters)? else {
+        return Ok(None);
+    };
+    let captured = capture(&path).map_err(|_| FileDialogError::Unavailable)?;
+    Ok(Some((path, captured)))
+}
 /// Safe Windows file-dialog failure category.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileDialogError {

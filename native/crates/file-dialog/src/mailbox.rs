@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{FileDialogFilter, SaveFilePath, SelectedFilePath, SelectionReference};
+use crate::{FileDialogFilter, SaveFilePath, SaveReference, SelectedFilePath, SelectionReference};
 
 /// Maximum time a protocol worker may wait for its host UI thread to respond.
 pub const FILE_DIALOG_RESPONSE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -36,6 +36,14 @@ pub trait FileDialogService: fmt::Debug + Send {
     ) -> Result<FileDialogSelection, FileDialogServiceError> {
         Err(FileDialogServiceError::Unavailable)
     }
+
+    /// Requests one save destination that must carry a retained output reference.
+    fn save_file_with_reference(
+        &self,
+        _filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        Err(FileDialogServiceError::Unavailable)
+    }
 }
 
 /// The outcome of a completed file-picker request.
@@ -47,6 +55,8 @@ pub enum FileDialogSelection {
     Saved(SaveFilePath),
     /// The UI thread captured one selected file and its opaque reference.
     Captured(SelectedFilePath, SelectionReference),
+    /// The UI thread captured one selected output object and its opaque reference.
+    CapturedSave(SaveFilePath, SaveReference),
     /// The user dismissed the host-owned picker.
     Cancelled,
 }
@@ -60,6 +70,8 @@ pub enum FileDialogRequestKind {
     Save,
     /// Select one existing file while retaining its native identity.
     OpenWithReference,
+    /// Select one save destination while retaining its native output object.
+    SaveWithReference,
 }
 
 /// A safe host-service failure category.
@@ -254,6 +266,13 @@ impl FileDialogService for FileDialogMailbox {
     ) -> Result<FileDialogSelection, FileDialogServiceError> {
         self.request(FileDialogRequestKind::OpenWithReference, filters)
     }
+
+    fn save_file_with_reference(
+        &self,
+        filters: &[FileDialogFilter],
+    ) -> Result<FileDialogSelection, FileDialogServiceError> {
+        self.request(FileDialogRequestKind::SaveWithReference, filters)
+    }
 }
 
 fn selection_matches_kind(
@@ -275,6 +294,10 @@ fn selection_matches_kind(
                 | (
                     FileDialogRequestKind::OpenWithReference,
                     Ok(FileDialogSelection::Captured(_, _))
+                )
+                | (
+                    FileDialogRequestKind::SaveWithReference,
+                    Ok(FileDialogSelection::CapturedSave(_, _))
                 )
         )
 }
@@ -308,7 +331,9 @@ mod tests {
         FileDialogMailbox, FileDialogRequestKind, FileDialogSelection, FileDialogService,
         FileDialogServiceError,
     };
-    use crate::{FileDialogFilter, SaveFilePath, SelectedFilePath, SelectionReference};
+    use crate::{
+        FileDialogFilter, SaveFilePath, SaveReference, SelectedFilePath, SelectionReference,
+    };
 
     fn filter() -> FileDialogFilter {
         FileDialogFilter::new("Text", vec!["txt".to_owned()]).expect("test filter is valid")
@@ -437,6 +462,30 @@ mod tests {
         assert_eq!(
             waiting.join().expect("worker did not panic"),
             Ok(FileDialogSelection::Captured(path, reference))
+        );
+    }
+
+    #[test]
+    fn captures_a_save_destination_only_for_the_save_reference_request_kind() {
+        let mailbox = FileDialogMailbox::new();
+        let worker = mailbox.clone();
+        let waiting = thread::spawn(move || worker.save_file_with_reference(&[filter()]));
+        let request = loop {
+            if let Some(request) = mailbox.take() {
+                break request;
+            }
+            thread::yield_now();
+        };
+        assert_eq!(request.kind(), FileDialogRequestKind::SaveWithReference);
+        let path = SaveFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid");
+        let reference = SaveReference::new("AbCdEfGhIjKlMnOpQrStUv").expect("reference is valid");
+        assert!(mailbox.complete(
+            request.id(),
+            FileDialogSelection::CapturedSave(path.clone(), reference.clone()),
+        ));
+        assert_eq!(
+            waiting.join().expect("worker did not panic"),
+            Ok(FileDialogSelection::CapturedSave(path, reference))
         );
     }
 }

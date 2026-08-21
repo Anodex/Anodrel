@@ -1,7 +1,6 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.16. Protocol 1.17 text-write
-contract accepted; native implementation is pending.
+**Status:** Implemented through version 1.17.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +28,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.16 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 16}`.
+the host's. Version 1.17 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 17}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -54,7 +53,7 @@ only after binding an authenticated application session.
 | `cancellationId` | Optional opaque identity used by a separate cancellation message, at most 256 UTF-8 bytes. |
 | `capabilityContext` | Host-issued application ID, session ID, and granted capabilities. |
 
-The implemented operations, followed by accepted pending additions, are:
+The implemented operations are:
 
 | Operation | Payload | Result | Capability |
 | --- | --- | --- | --- |
@@ -80,8 +79,8 @@ The implemented operations, followed by accepted pending additions, are:
 | `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
 | `dialog.open_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus selection reference, or cancellation | `dialog.open_file` |
 | `file.read_text` | `{ "selectionReference": string }` | bounded UTF-8 text | `file.read_text` |
-| `dialog.save_file.v2` *(1.17 pending)* | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus save reference, or cancellation | `dialog.save_file` |
-| `file.write_text` *(1.17 pending)* | `{ "saveReference": string, "text": string }` | accepted bounded text replacement | `file.write_text` |
+| `dialog.save_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus save reference, or cancellation | `dialog.save_file` |
+| `file.write_text` | `{ "saveReference": string, "text": string }` | accepted bounded text replacement | `file.write_text` |
 | `storage.state.read` | `{}` | bounded saved snapshot or absence | `storage.state.read` |
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
@@ -176,8 +175,8 @@ after returning. Session shutdown revokes all outstanding references.
 
 ### `dialog.save_file.v2` and `file.write_text`
 
-The accepted Protocol 1.17 contract adds a separate retained-output-object
-boundary. `dialog.save_file.v2` has the exact bounded filter payload and
+Protocol 1.17 adds a separate retained-output-object boundary.
+`dialog.save_file.v2` has the exact bounded filter payload and
 `dialog.save_file` capability from Protocol 1.8. Its success result is
 `{ "status": "selected", "path": string, "saveReference": string }`; its
 other result is `{ "status": "cancelled" }`. A host can return a selected

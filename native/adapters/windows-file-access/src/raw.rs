@@ -116,6 +116,11 @@ pub(super) fn read_bounded(file: &mut ReadOnlyFile, limit: usize) -> Result<Vec<
 }
 
 pub(super) fn new_selection_reference() -> io::Result<SelectionReference> {
+    SelectionReference::new(new_reference_value()?)
+        .map_err(|_| io::Error::other("Windows random reference was malformed"))
+}
+
+pub(super) fn new_reference_value() -> io::Result<String> {
     let mut bytes = [0_u8; 16];
     let status = unsafe {
         // SAFETY: the system-preferred RNG permits a null algorithm handle and
@@ -130,8 +135,7 @@ pub(super) fn new_selection_reference() -> io::Result<SelectionReference> {
     if status != 0 {
         return Err(io::Error::other("Windows random generation failed"));
     }
-    SelectionReference::new(base64url_128(&bytes))
-        .map_err(|_| io::Error::other("Windows random reference was malformed"))
+    Ok(base64url_128(&bytes))
 }
 
 fn base64url_128(bytes: &[u8; 16]) -> String {

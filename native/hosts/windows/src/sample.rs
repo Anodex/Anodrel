@@ -29,6 +29,7 @@ enum SampleDialogRequest {
     OpenFile,
     OpenFileWithReference,
     SaveFile,
+    SaveFileWithReference,
     Storage,
     Scroll,
     Diagnostics,
@@ -76,6 +77,20 @@ pub fn run_ui_session_with_save_file_dialog(
     client_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::SaveFile)
+}
+
+/// Runs the UI-session diagnostic through one selection-scoped native text
+/// replacement. The client receives a save reference, not output authority
+/// that can be redirected to a later path.
+pub fn run_ui_session_with_selected_file_write(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::SaveFileWithReference,
+    )
 }
 
 /// Runs the UI session diagnostic and asks its client to replace and read state.
@@ -233,6 +248,7 @@ fn run_with_optional_session_view(
             Capability::DialogOpenFile,
             Capability::DialogSaveFile,
             Capability::FileReadText,
+            Capability::FileWriteText,
             Capability::StorageStateRead,
             Capability::StorageStateReplace,
             Capability::StorageStateClear,
@@ -256,6 +272,10 @@ fn run_with_optional_session_view(
                 .with_file_dialogs(ui.file_dialog.clone())
                 .with_file_selections(SelectionFileDialogMailbox::new(ui.file_dialog.clone()))
                 .with_file_text(ui.file_text.clone())
+                .with_file_save_selections(anodrel_file_access::SaveFileDialogMailbox::new(
+                    ui.file_dialog.clone(),
+                ))
+                .with_file_text_write(ui.file_text.write_service())
                 .with_storage(sample_storage()?)
                 .with_diagnostics(sample_diagnostics())
                 .with_credentials(sample_credentials()?)
@@ -288,6 +308,9 @@ fn run_with_optional_session_view(
                 command.arg("--request-selected-file-text")?
             }
             SampleDialogRequest::SaveFile => command.arg("--request-save-file")?,
+            SampleDialogRequest::SaveFileWithReference => {
+                command.arg("--request-save-file-text")?
+            }
             SampleDialogRequest::Storage => command.arg("--request-storage-state")?,
             SampleDialogRequest::Scroll => command.arg("--request-scroll-document")?,
             SampleDialogRequest::Diagnostics => command.arg("--request-diagnostics")?,

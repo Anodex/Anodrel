@@ -12,6 +12,7 @@ import {
   isExternalOpenPayload,
   isFileDialogOpenPayload,
   isFileTextReadPayload,
+  isFileTextWritePayload,
   isEmptyPayload,
   isUiDocumentReplacePayload,
   isPingPayload,
@@ -619,6 +620,60 @@ export class MockHost {
           request.requestId,
           "file.unavailable",
           "selected file is unavailable.",
+        );
+
+      case "dialog.save_file.v2":
+        if (request.protocolVersion.minor < 17) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "dialog.save_file.v2 requires protocol 1.17 or later.",
+          );
+        }
+        if (!isFileDialogOpenPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "dialog.save_file.v2 requires strict bounded filters.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "dialog.save_file")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "dialog.save_file.v2 requires the dialog.save_file capability.",
+            { capability: "dialog.save_file" },
+          );
+        }
+        return this.success("dialog.save_file.v2", request.requestId, { status: "cancelled" });
+
+      case "file.write_text":
+        if (request.protocolVersion.minor < 17) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "file.write_text requires protocol 1.17 or later.",
+          );
+        }
+        if (!isFileTextWritePayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "file.write_text requires one exact save reference and bounded text.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "file.write_text")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "file.write_text requires the file.write_text capability.",
+            { capability: "file.write_text" },
+          );
+        }
+        return this.failure(
+          request.requestId,
+          "file.unavailable",
+          "selected output is unavailable.",
         );
 
       case "storage.state.read":

@@ -19,7 +19,7 @@ chooses a new filename.
 
 ## Decision
 
-Protocol 1.17 will add `dialog.save_file.v2` and `file.write_text`.
+Protocol 1.17 adds `dialog.save_file.v2` and `file.write_text`.
 
 - `dialog.save_file.v2` keeps the exact bounded filter request and requires the
   existing `dialog.save_file` grant. A successful result contains the selected

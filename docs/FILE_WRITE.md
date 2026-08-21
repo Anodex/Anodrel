@@ -1,10 +1,10 @@
 # Selection-scoped file writing
 
-**Status:** Contract accepted; implementation is pending.
+**Status:** Implemented for the direct Windows UI-session host in Protocol 1.17.
 
 Anodrel's legacy save picker is intentionally only a user choice. This document
-defines the separate Protocol 1.17 text-write boundary that may follow it. It
-does not make `dialog.save_file` mutating.
+defines the separate Protocol 1.17 text-write boundary. It does not make
+`dialog.save_file` mutating.
 
 ## User-visible flow
 

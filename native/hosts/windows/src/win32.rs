@@ -1818,6 +1818,33 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                             None => Err(anodrel_windows_file_dialog::FileDialogError::Unavailable),
                         }
                     }
+                    FileDialogRequestKind::SaveWithReference => {
+                        let file_text = registry::file_text_service(window).ok().flatten();
+                        match file_text {
+                            Some(file_text) => {
+                                let file_write = file_text.write_service();
+                                anodrel_windows_file_dialog::save_file_with_owner_and_capture(
+                                    window,
+                                    request.filters(),
+                                    |path| {
+                                        let file =
+                                            anodrel_windows_file_access::open_save_file(path)
+                                                .map_err(|_| ())?;
+                                        file_write.register(file).map_err(|_| ())
+                                    },
+                                )
+                                .map(|selection| {
+                                    selection.map_or(
+                                        FileDialogSelection::Cancelled,
+                                        |(path, reference)| {
+                                            FileDialogSelection::CapturedSave(path, reference)
+                                        },
+                                    )
+                                })
+                            }
+                            None => Err(anodrel_windows_file_dialog::FileDialogError::Unavailable),
+                        }
+                    }
                 };
                 let _ = registry::complete_file_dialog_request(window, request.id(), selection);
             }
