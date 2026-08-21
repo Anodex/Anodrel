@@ -31,7 +31,9 @@ the host, start a process, change machine state, create an installed-record,
 grant a capability, or sign content. The operator explicitly starts the
 resulting package through the documented Windows-host command; the host still
 independently validates containment, manifest shape, text constraints, and the
-digest before it creates a window.
+digest before it creates a window. Decision 0078 makes the native package tool
+the authoritative implementation; the PowerShell entry point is only a thin
+Windows convenience wrapper around it.
 
 ## Consequences
 

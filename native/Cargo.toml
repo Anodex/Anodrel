@@ -46,6 +46,7 @@ members = [
   "adapters/windows-appearance",
   "hosts/windows",
   "tools/perf-lab",
+  "tools/package-tool",
   "tools/product-fixture",
   "tools/product-provisioning",
 ]

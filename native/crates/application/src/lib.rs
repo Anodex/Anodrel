@@ -7,6 +7,7 @@
 //! and returns bounded plain text for the native Windows surface. It does
 //! not verify a publisher, launch a process, or execute application code.
 
+mod authoring;
 mod installed;
 mod manifest;
 mod package;
@@ -14,9 +15,12 @@ pub mod sha256;
 
 use std::{fmt, io};
 
+pub use authoring::write_text_package;
 pub use installed::{InstalledApplication, InstalledApplicationError};
-pub use manifest::{ApplicationIdentity, ApplicationManifest, is_valid_application_id};
-pub use package::{ApplicationPackage, VerifiedContent};
+pub use manifest::{
+    ApplicationIdentity, ApplicationManifest, is_valid_application_id, is_valid_display_name,
+};
+pub use package::{ApplicationPackage, VerifiedContent, validate_text_content};
 
 /// Maximum manifest size accepted before UTF-8 or JSON decoding.
 pub const MAX_MANIFEST_BYTES: usize = 16 * 1024;
@@ -36,6 +40,8 @@ pub const TEXT_CONTENT_FORMAT: &str = "anodrel.text.v1";
 
 #[derive(Debug)]
 pub enum ApplicationError {
+    PackageDestinationExists,
+    InvalidPackageDestination,
     Io(io::Error),
     ManifestTooLarge,
     ContentTooLarge,
@@ -49,6 +55,12 @@ pub enum ApplicationError {
 impl fmt::Display for ApplicationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::PackageDestinationExists => {
+                formatter.write_str("application package destination already exists")
+            }
+            Self::InvalidPackageDestination => {
+                formatter.write_str("application package destination is invalid")
+            }
             Self::Io(error) => write!(formatter, "application package I/O failed: {error}"),
             Self::ManifestTooLarge => write!(formatter, "application manifest exceeds its limit"),
             Self::ContentTooLarge => write!(formatter, "application content exceeds its limit"),

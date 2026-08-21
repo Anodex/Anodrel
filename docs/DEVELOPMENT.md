@@ -93,6 +93,11 @@ capabilities or new third-party runtime dependencies. The named-pipe adapter
 already binds a logon-SID DACL and a host-generated credential; the bootstrap
 adapter performs one-time delivery through child standard input.
 
+`anodrel-package-tool` is the first-party native authoring and verification
+tool for the current static application-package boundary. It shares
+`anodrel-application`'s validator and SHA-256 implementation; see
+`docs/APPLICATION_TEMPLATE.md`.
+
 To preview one explicit v1 UI document through the same native renderer, run:
 
 ~~~text
@@ -118,20 +123,18 @@ machine policy record are provisioned.
 
 ### Create a first content package
 
-The first starter tool creates a new strict plain-text package without copying
-host code or generating an executable. From the repository root, run:
+The first-party native package tool creates a new strict plain-text package
+without copying host code or generating an executable. From the repository
+root, run:
 
-~~~powershell
-.\scripts\new-application.ps1 `
-  -Destination .\out\hello-anodrel `
-  -ApplicationId org.example.hello `
-  -DisplayName 'Hello Anodrel' `
-  -Content 'Hello from a native Anodrel package.'
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-package-tool -- init out/hello-anodrel org.example.hello "Hello Anodrel" "Hello from a native Anodrel package."
 ~~~
 
-It writes the exact manifest and content format that the host verifies, but it
-does not sign, install, launch, or grant anything. Use the `--application`
-command above with the new manifest path to open it. See
+It writes through the exact validator and SHA-256 implementation that the host
+uses, then independently reloads its result. It does not sign, install, launch,
+or grant anything. Use the `--application` command above with the new manifest
+path to open it. See
 `docs/APPLICATION_TEMPLATE.md` for its limits, safe failure behaviour, and
 focused verification command.
 

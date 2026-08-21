@@ -207,6 +207,9 @@ the invitation only over a restricted inherited standard-input handle; it does
 not verify executable identity or own a restart policy. Separately,
 `anodrel-application` validates a bounded manifest, canonical package paths,
 and content digest before the host draws a plain-text application surface.
+`anodrel-package-tool` reuses that same portable validator to create or verify
+only the current text-package format; it cannot launch, sign, install, or grant
+an application.
 `anodrel-session-policy` then converts only a validated installed application
 record into the identity and machine-selected grants for one `anodrel-core`
 host session. It has no operating-system store, launch, pipe, bootstrap, or UI

@@ -311,9 +311,10 @@ Status: **First starter-package slice in progress**
   contract and development boundary are documented in `docs/SDK.md`; a
   published-package and executable-project template remain later work.
 - Provide development and diagnostic tools. **The first content-package
-  generator is available:** it creates only a strict, digest-verified
-  `anodrel.text.v1` package in a new directory, never an executable, policy
-  record, capability, or signed product (Decision 0077). See
+  native package tool is available:** it creates and verifies only a strict,
+  digest-verified `anodrel.text.v1` package in a new directory, never an
+  executable, policy record, capability, or signed product (Decisions 0077 and
+  0078). See
   `docs/APPLICATION_TEMPLATE.md`.
 - Document packaging, signing, updates, and compatibility.
 - Add examples for a desktop application and a command-line application.

@@ -80,7 +80,7 @@ impl ApplicationPackage {
         }
         let byte_length = content_bytes.len();
         let text = String::from_utf8(content_bytes).map_err(|_| ApplicationError::InvalidText)?;
-        validate_text(&text)?;
+        validate_text_content(&text)?;
 
         Ok(Self {
             identity: manifest.identity().clone(),
@@ -136,7 +136,11 @@ fn read_limited(path: &Path, maximum: usize) -> Result<Vec<u8>, ApplicationError
     Ok(contents)
 }
 
-fn validate_text(text: &str) -> Result<(), ApplicationError> {
+/// Validates the bounded plain-text content used by `anodrel.text.v1`.
+///
+/// The value must already use LF line endings. It performs no filesystem work
+/// and is shared by package loading and first-party authoring tools.
+pub fn validate_text_content(text: &str) -> Result<(), ApplicationError> {
     if text.chars().count() > MAX_TEXT_SCALARS
         || text
             .chars()

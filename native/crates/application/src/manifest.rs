@@ -147,7 +147,9 @@ pub fn is_valid_application_id(value: &str) -> bool {
             .all(|byte| matches!(byte, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-' | b'_'))
 }
 
-fn is_valid_display_name(value: &str) -> bool {
+/// Returns whether a display name satisfies manifest version 1.0's bounds.
+#[must_use]
+pub fn is_valid_display_name(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= 80 && !value.chars().any(char::is_control)
 }
 
