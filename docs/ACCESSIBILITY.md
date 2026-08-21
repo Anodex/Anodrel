@@ -1,19 +1,19 @@
 # Anodrel Windows accessibility
 
 **Status:** **UI Automation reading is implemented and verified; bounded button
-invocation and focus reporting are implemented and awaiting manual screen-reader
-checks.**
+invocation, focus reporting, and read-only field values are implemented and
+awaiting manual screen-reader checks.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 mapping table below passes with no failures.
 
-Reading and one bounded action are the whole of it. Assistive technology can
-read this surface and invoke an enabled button in an authenticated UI session; it
-reports the host's current keyboard focus but cannot move it, edit a field, read
-a field value, raise an automation event, or receive a live announcement. The
-published tree is flat. Anything beyond reading, button invocation, and focus
-reporting is deferred and listed at the end of this
-document.
+Reading, one bounded action, focus reporting, and read-only field values are the
+whole of it. Assistive technology can read this surface, obtain a visible
+field's current value, and invoke an enabled button in an authenticated UI
+session; it reports the host's current keyboard focus but cannot move it, edit a
+field, raise an automation event, or receive a live announcement. The published
+tree is flat. Anything beyond reading, button invocation, focus reporting, and
+field-value reading is deferred and listed at the end of this document.
 
 ## Boundary
 
@@ -29,18 +29,20 @@ turns one snapshot into the values Microsoft UI Automation asks for.
 The boundary runs in one direction only:
 
 ~~~text
-UiDocument + UiLayout          (portable, already validated)
-        │
-        │ accessibility_snapshot()
-        ▼
-UiAccessibilitySnapshot        (portable semantics, no OS call)
-        │
-        │ anodrel-windows-accessibility
-        ▼
-UIA control types, property values, runtime IDs, screen rectangles
-        │
-        │ anodrel-windows-uia (provider and bounded button invocation)
-        ▼
+UiDocument + UiLayout                          UiFieldStates
+        │                                  (host-owned current text)
+        │ accessibility_snapshot()                    │
+        ▼                                             │ copied only for
+UiAccessibilitySnapshot                              │ matching visible Edit
+        │                                             │
+        │ anodrel-windows-accessibility               │
+        ▼                                             │
+UIA control types, properties, runtime IDs, rectangles │
+        └──────────────────────────┬──────────────────┘
+                                   ▼
+anodrel-windows-uia (provider, bounded Invoke, read-only Value)
+                                   │
+                                   ▼
 Windows, and any assistive technology it serves
 ~~~
 
@@ -64,10 +66,13 @@ An application supplies a UI document and nothing else. It cannot:
 - supply its own accessible role, override a mapping, or add a property; or
 - learn that an assistive technology is running, connected, or reading.
 
-Every value Windows receives is derived by the host from semantics the
-application already declared. There is no accessibility-specific field in the
-document format and none is planned: a role that cannot be expressed by the
-existing model is a gap in the model, not something to bolt on here.
+Every structural value Windows receives is derived by the host from semantics
+the application already declared. A field's text is the narrow exception: it is
+copied from the host-owned current field state only into a matching visible
+`Edit` provider, never from an application request or accessibility-specific
+document field. There is no application-supplied accessibility data in the
+document format: a role that cannot be expressed by the existing model is a gap
+in the model, not something to bolt on here.
 
 ## Mapping
 
@@ -86,13 +91,11 @@ unreachable would be a plain lie to a screen reader; the outbound semantics
 rule below is about keeping the mapping truthful without creating an
 accessibility-specific callback or observation channel.
 
-What an `Edit` does not report is its **value**. It is named by its label, and
-its text leaves the host only through the granted snapshot of Decision 0067 —
-this tree is a published surface, and putting the text here would hand it to
-anything reading it. Assistive technology can therefore find a field, hear its
-name, and not hear what is in it, which is a real limitation for a screen-reader
-user filling a form. Lifting it needs its own decision rather than a quiet
-loosening of this one. See `docs/UI_FIELDS.md`.
+An `Edit` is named by its label and additionally exposes its current value
+through the read-only Value pattern defined below. The value is copied from the
+host's field state for this provider snapshot; it is not the document's initial
+value, an application read, or a typing event. See `docs/UI_FIELDS.md` and
+Decision 0071.
 
 | UIA property | Source |
 | --- | --- |
@@ -102,14 +105,16 @@ loosening of this one. See `docs/UI_FIELDS.md`.
 | `AutomationId` (30011) | The document element ID. |
 | `IsKeyboardFocusable` (30009) | The table above. |
 | `HasKeyboardFocus` (30008) | The host-owned focus snapshot, true only for its current published focus target. |
+| `Value.Value` (30045) | The copied current host field text, only on a matching visible `Edit`. |
+| `Value.IsReadOnly` (30046) | Always true on that `Edit`, because UI Automation has no write route. |
 | `IsControlElement` (30016) | Always true; every node in the snapshot is visible. |
 | `IsContentElement` (30017) | Always true, for the same reason. |
 | `BoundingRectangle` (30001) | Converted as below. |
 
 `IsEnabled` deserves its exception. UI Automation reads it as "can be interacted
 with", and a screen reader announces a disabled element as unavailable. Only an
-action can be unavailable; text and containers are not interactive in the first
-place, so passing the snapshot's flag straight through would have Narrator
+action or field can be unavailable; text and containers are not interactive in
+the first place, so passing the snapshot's flag straight through would have Narrator
 describe ordinary prose as dimmed and out of reach. Real UI Automation
 verification is what caught this.
 
@@ -120,7 +125,7 @@ one. It is not a path, handle, or secret.
 
 Anything not in this table is deliberately absent. In particular there is no
 `HelpText`, `AcceleratorKey`, `AccessKey`, `LocalizedControlType`, or pattern
-provider except the one bounded pattern below: each would be a new promise to
+provider except the two bounded patterns below: each would be a new promise to
 keep, and none has a source in the current model.
 
 ### Button invocation
@@ -157,6 +162,26 @@ later keyboard or pointer focus change; an older provider does not read the
 live view or registry to chase it. There is no `SetFocus`, focus-change event,
 window activation, application callback, protocol field, or capability grant.
 Decision 0070 defines this boundary.
+
+### Field value reading
+
+A visible `Edit` whose current host field state has the same element ID exposes
+`Value` (10002) through `IValueProvider`. Its `Value` is a copied immutable
+UTF-16 snapshot. A fresh UI Automation query can observe a later local edit;
+an older provider never reads the live registry to chase it.
+
+`Value.IsReadOnly` is true and `SetValue` returns `UIA_E_NOTSUPPORTED` for
+every field, including an enabled field. Read-only here describes automation
+authority, not whether a person can use the field: the host continues to accept
+only local keyboard and pointer input. No selector, caret, selection, text
+range, value-change event, native input message, application callback, protocol
+field, grant, or version is added. A disabled field can still report its visible
+value; `IsEnabled` independently reports that a person cannot edit it.
+
+The BSTR returned to a UI Automation client is its own COM allocation. A client
+can retain that copy, so this feature is for ordinary visible v1 text only;
+Anodrel still has no password or masked field. Decision 0071 defines the
+boundary.
 
 ### Bounding rectangles
 
@@ -253,10 +278,15 @@ provider returns the matching child from `GetFocus` and sets
 host's existing layout-validated focus (Decision 0070). It does not implement
 `SetFocus` or send focus-change events.
 
+**Slice 6 — read-only field values. Implemented; manual value check pending.**
+A matching visible `Edit` exposes `IValueProvider`, returns its copied host
+value, and is read-only to automation (Decision 0071). It has no `SetValue`,
+caret, selection, text range, or value-change event.
+
 Also deferred, each needing its own contract and decision: automation events and
 live announcements, focus changes **raised** to assistive technology, focus
-control, text patterns and ranges, relations between nodes, and non-Windows
-accessibility adapters.
+control, selection and caret reporting, text patterns and ranges, relations
+between nodes, automation editing, and non-Windows accessibility adapters.
 
 ## Verification
 
@@ -271,8 +301,9 @@ Provider tests cover the COM object without Windows: the interfaces it answers
 and the ones it refuses, a refused query clearing its output, every method
 rejecting a null output rather than writing through it, reference counting
 freeing the object exactly once, a panicking body returning a failure code
-instead of unwinding, and the Invoke gate admitting only an enabled
-authenticated-session button to the revision-bound mailbox.
+instead of unwinding, the Invoke gate admitting only an enabled authenticated-
+session button to the revision-bound mailbox, and the Value gate returning only
+a matching field snapshot while refusing every automation write.
 
 ### Confirmed against real UI Automation
 
@@ -357,8 +388,9 @@ no failures:
   that same element — eleven of eleven, which exercises hit testing;
 - runtime identifiers are unique across the tree;
 - `HelpText` and `AcceleratorKey` are absent, as the table promises; and
-- **no element supplied a pattern on that UI Lab run**, which is correct because
-  the Lab has no authenticated event mailbox.
+- **no element supplied Invoke on that UI Lab run**, which is correct because
+  the Lab has no authenticated event mailbox. A visible field now separately
+  supplies its read-only Value pattern as Decision 0071 defines.
 
 The window root reports two patterns, `Window` and `Transform`. Those come from
 the host provider Windows supplies for the `HWND` itself — minimising, moving,
@@ -418,5 +450,19 @@ move focus through `SetFocus`.
 This check is currently **pending**. It proves the screen-reader-visible focus
 matches the host focus ring; it does not turn UI Automation into a focus-control
 path.
+
+### Manual field-value verification
+
+On the development UI Session Lab, type an ordinary test value into a visible
+field. Inspect must show the matching `Edit` exposes `Value`, its exact current
+text, and `IsReadOnly = true`. Attempting `SetValue` through a UI Automation
+client must fail and must leave the host-rendered text unchanged. Type another
+character locally, refresh Inspect, and confirm a fresh provider reports the
+new text without any value-change event. Repeat on a disabled field when one is
+present: its visible value may be read, but `IsEnabled` must remain false.
+
+This check is currently **pending**. It proves a screen reader can read what a
+person entered without making UI Automation a writer or exposing typing to the
+application.
 
 See `docs/UI.md`, Decision 0026, and Decision 0063.

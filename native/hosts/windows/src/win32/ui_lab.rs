@@ -382,6 +382,19 @@ impl UiLab {
             .accessibility_snapshot(&self.layout(width, height))
     }
 
+    /// Copies the current host-owned field text for an accessibility snapshot.
+    ///
+    /// This contains only one value per existing field ID. The UI Automation
+    /// adapter still admits it only for a matching visible Edit element, then
+    /// exposes it as read-only to Windows. It never enters an application
+    /// protocol route. See Decision 0071.
+    pub(super) fn accessibility_field_values(&self) -> Vec<(ElementId, String)> {
+        self.fields
+            .iter()
+            .map(|(id, state)| (id.clone(), state.text().to_owned()))
+            .collect()
+    }
+
     /// Returns the host-owned keyboard focus to publish with a matching
     /// accessibility snapshot.
     ///
@@ -1156,6 +1169,20 @@ mod tests {
         assert_eq!(lab.last_action, Some(id("ui.lab.hit-test")));
         assert!(lab.focus_previous(BASE_WIDTH, BASE_HEIGHT));
         assert_eq!(lab.focus.focused(), Some(&id("ui.lab.inspect")));
+    }
+
+    #[test]
+    fn accessibility_field_values_copy_current_text_without_caret_state() {
+        let mut lab = UiLab::new();
+        assert!(lab.focus_next(BASE_WIDTH, BASE_HEIGHT));
+        for character in "Ada".chars() {
+            assert!(lab.type_character(BASE_WIDTH, BASE_HEIGHT, character));
+        }
+
+        assert_eq!(
+            lab.accessibility_field_values(),
+            vec![(id("ui.lab.field"), "Ada".to_owned())]
+        );
     }
 
     #[test]

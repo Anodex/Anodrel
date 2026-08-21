@@ -8,15 +8,17 @@
 //! `docs/ACCESSIBILITY.md`.
 //!
 //! The provider is host-owned. It supplies Invoke only for an enabled button in
-//! a current authenticated UI session, and routes that action through the session's
-//! existing bounded semantic mailbox. It supplies no other pattern and refuses
-//! to move focus. Nothing tells an application that assistive technology is
-//! listening. See Decision 0069.
+//! a current authenticated UI session, routes that action through the session's
+//! existing bounded semantic mailbox, and supplies a read-only field value only
+//! from an immutable host snapshot. It refuses to move focus or set field text.
+//! Nothing tells an application that assistive technology is listening. See
+//! Decisions 0069 and 0071.
 
 mod raw;
 mod raw2;
 mod raw3;
 mod raw4;
+mod raw5;
 mod tree;
 
 use std::{
@@ -41,6 +43,7 @@ use raw2::{
     UIA_E_NOTSUPPORTED, UiaRect,
 };
 use raw3::{IID_IINVOKE_PROVIDER, UIA_INVOKE_PATTERN_ID};
+use raw5::{IID_IVALUE_PROVIDER, UIA_VALUE_PATTERN_ID};
 use tree::Tree;
 
 pub use tree::publishable;
@@ -88,6 +91,9 @@ impl UiAutomationActionSink {
 /// current layout; an empty list publishes a window with no children.
 /// `focused` is the host-owned focus ID from that same layout, if there is one;
 /// the tree filters it to a visible, enabled, focusable published element.
+/// `field_values` are copied host-owned field values from that same view; the
+/// tree filters them to visible published Edit elements before exposing a
+/// read-only UI Automation value.
 ///
 /// Returns `None` when the message is not asking for the UI Automation root, so
 /// the caller falls through to the default window procedure.
@@ -101,6 +107,7 @@ pub unsafe fn answer_get_object(
     wparam: usize,
     lparam: isize,
     elements: Vec<AccessibleElement>,
+    field_values: Vec<(ElementId, String)>,
     focused: Option<ElementId>,
     action_sink: Option<UiAutomationActionSink>,
 ) -> Option<Lresult> {
@@ -117,6 +124,7 @@ pub unsafe fn answer_get_object(
     let tree = Arc::new(Tree::new(
         window_title(window),
         elements,
+        field_values,
         focused,
         action_sink,
     ));
@@ -183,6 +191,18 @@ struct InvokeVtbl {
     invoke: unsafe extern "system" fn(*mut c_void) -> Hresult,
 }
 
+/// `IValueProvider`.
+#[repr(C)]
+struct ValueVtbl {
+    query_interface:
+        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
+    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
+    release: unsafe extern "system" fn(*mut c_void) -> u32,
+    set_value: unsafe extern "system" fn(*mut c_void, *const u16) -> Hresult,
+    get_value: unsafe extern "system" fn(*mut c_void, *mut *mut u16) -> Hresult,
+    get_is_read_only: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
+}
+
 static SIMPLE_VTBL: SimpleVtbl = SimpleVtbl {
     query_interface: simple_query_interface,
     add_ref: simple_add_ref,
@@ -220,6 +240,15 @@ static INVOKE_VTBL: InvokeVtbl = InvokeVtbl {
     invoke,
 };
 
+static VALUE_VTBL: ValueVtbl = ValueVtbl {
+    query_interface: value_query_interface,
+    add_ref: value_add_ref,
+    release: value_release,
+    set_value,
+    get_value,
+    get_is_read_only,
+};
+
 /// One reference-counted provider for the window root or one of its elements.
 ///
 /// COM reaches an object through the vtable pointer for the interface being
@@ -231,6 +260,7 @@ struct Provider {
     fragment: *const FragmentVtbl,
     fragment_root: *const FragmentRootVtbl,
     invoke: *const InvokeVtbl,
+    value: *const ValueVtbl,
     references: AtomicU32,
     window: Handle,
     /// `None` for the window root, otherwise the element's position.
@@ -245,6 +275,7 @@ impl Provider {
             fragment: &raw const FRAGMENT_VTBL,
             fragment_root: &raw const FRAGMENT_ROOT_VTBL,
             invoke: &raw const INVOKE_VTBL,
+            value: &raw const VALUE_VTBL,
             references: AtomicU32::new(1),
             window,
             element,
@@ -282,6 +313,10 @@ unsafe fn invoke_of(this: *mut c_void) -> *mut Provider {
     unsafe { provider_from(this, offset_of!(Provider, invoke)) }
 }
 
+unsafe fn value_of(this: *mut c_void) -> *mut Provider {
+    unsafe { provider_from(this, offset_of!(Provider, value)) }
+}
+
 /// Runs one COM method body, converting a panic into a failure code.
 ///
 /// These are `extern "system"` and do not unwind, so an escaping panic would
@@ -307,7 +342,7 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
     // SAFETY: COM guarantees one readable GUID.
     let requested = unsafe { *requested };
     // SAFETY: the caller holds a reference, so the object is live.
-    let (is_root, element, supports_invoke) = unsafe {
+    let (is_root, element, supports_invoke, supports_value) = unsafe {
         let provider = &*provider;
         (
             provider.is_root(),
@@ -315,6 +350,9 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
             provider
                 .element
                 .is_some_and(|index| provider.tree.supports_invoke(index)),
+            provider
+                .element
+                .is_some_and(|index| provider.tree.supports_value(index)),
         )
     };
 
@@ -334,6 +372,11 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
         // that could act on a stale or diagnostic surface.
         // SAFETY: as above.
         unsafe { (&raw mut (*provider).invoke).cast::<c_void>() }
+    } else if requested == IID_IVALUE_PROVIDER && element.is_some() && supports_value {
+        // A Value interface exists only for a visible Edit with a copied
+        // host-owned value. It is read-only to automation below.
+        // SAFETY: as above.
+        unsafe { (&raw mut (*provider).value).cast::<c_void>() }
     } else {
         return E_NOINTERFACE;
     };
@@ -443,6 +486,12 @@ forward_unknown!(
     invoke_release,
     invoke_of
 );
+forward_unknown!(
+    value_query_interface,
+    value_add_ref,
+    value_release,
+    value_of
+);
 
 unsafe extern "system" fn get_provider_options(_this: *mut c_void, options: *mut i32) -> Hresult {
     contain(|| {
@@ -473,18 +522,31 @@ unsafe extern "system" fn get_pattern_provider(
         let provider = unsafe { simple_of(this) };
         // SAFETY: the caller holds a reference; immutable tree state makes the
         // pattern decision stable for this provider's published layout.
-        let supported = unsafe {
-            (*provider)
-                .element
-                .is_some_and(|index| (*provider).tree.supports_invoke(index))
+        let interface = unsafe {
+            let provider_ref = &*provider;
+            match provider_ref.element {
+                Some(index)
+                    if pattern == UIA_INVOKE_PATTERN_ID
+                        && provider_ref.tree.supports_invoke(index) =>
+                {
+                    Some((&raw mut (*provider).invoke).cast::<c_void>())
+                }
+                Some(index)
+                    if pattern == UIA_VALUE_PATTERN_ID
+                        && provider_ref.tree.supports_value(index) =>
+                {
+                    Some((&raw mut (*provider).value).cast::<c_void>())
+                }
+                _ => None,
+            }
         };
-        if pattern != UIA_INVOKE_PATTERN_ID || !supported {
+        let Some(interface) = interface else {
             return S_OK;
-        }
+        };
         // SAFETY: the provider is live and the new interface gains a reference.
         unsafe {
             increment(provider);
-            *out = (&raw mut (*provider).invoke).cast::<c_void>();
+            *out = interface;
         }
         S_OK
     })
@@ -504,6 +566,78 @@ unsafe extern "system" fn invoke(this: *mut c_void) -> Hresult {
                 .is_some_and(|index| (*provider).tree.invoke(index))
         };
         if accepted { S_OK } else { E_FAIL }
+    })
+}
+
+unsafe extern "system" fn set_value(this: *mut c_void, _value: *const u16) -> Hresult {
+    contain(|| {
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // This deliberately does not read its supplied pointer. UI Automation
+        // cannot turn into a second writer for host-owned field state.
+        UIA_E_NOTSUPPORTED
+    })
+}
+
+unsafe extern "system" fn get_value(this: *mut c_void, out: *mut *mut u16) -> Hresult {
+    contain(|| {
+        if out.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: checked above.
+        unsafe { *out = ptr::null_mut() };
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: `this` points at the Value vtable field of a live provider.
+        let provider = unsafe { value_of(this) };
+        // SAFETY: the caller holds a reference and the tree is immutable.
+        let value = unsafe {
+            (*provider)
+                .element
+                .and_then(|index| (*provider).tree.value(index))
+        };
+        let Some(value) = value else {
+            return E_FAIL;
+        };
+        let Some(value) = raw::allocate_bstr(value) else {
+            return E_FAIL;
+        };
+        // SAFETY: `out` is checked above and the BSTR ownership transfers to
+        // the UI Automation client on success.
+        unsafe { *out = value };
+        S_OK
+    })
+}
+
+unsafe extern "system" fn get_is_read_only(this: *mut c_void, out: *mut i32) -> Hresult {
+    contain(|| {
+        if out.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: checked above.
+        unsafe { *out = 0 };
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: `this` points at the Value vtable field of a live provider.
+        let provider = unsafe { value_of(this) };
+        // SAFETY: the caller holds a reference and the tree is immutable.
+        let supported = unsafe {
+            (*provider)
+                .element
+                .is_some_and(|index| (*provider).tree.supports_value(index))
+        };
+        if !supported {
+            return E_FAIL;
+        }
+        // The field remains editable only through the host's normal local
+        // input route. `SetValue` is unsupported, so this interface is
+        // correctly read-only to automation.
+        // SAFETY: `out` is checked above.
+        unsafe { *out = 1 };
+        S_OK
     })
 }
 
@@ -759,11 +893,13 @@ mod tests {
     use super::{
         E_NOINTERFACE, E_POINTER, Guid, IID_IINVOKE_PROVIDER, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT,
         IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN,
-        InvokeVtbl, Provider, S_OK, Tree, UIA_E_NOTSUPPORTED, UIA_INVOKE_PATTERN_ID,
-        UiAutomationActionSink, contain, increment, release_provider, set_focus,
+        IID_IVALUE_PROVIDER, InvokeVtbl, Provider, S_OK, Tree, UIA_E_NOTSUPPORTED,
+        UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID, UiAutomationActionSink, ValueVtbl, contain,
+        increment, release_provider, set_focus,
     };
 
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
+    const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true}}"#;
 
     struct FixedMeasurer;
 
@@ -777,7 +913,7 @@ mod tests {
     }
 
     fn tree() -> Arc<Tree> {
-        Arc::new(Tree::new(Vec::new(), Vec::new(), None, None))
+        Arc::new(Tree::new(Vec::new(), Vec::new(), Vec::new(), None, None))
     }
 
     fn root() -> *mut Provider {
@@ -812,7 +948,13 @@ mod tests {
             Provider::create(
                 0,
                 Some(0),
-                Arc::new(Tree::new(Vec::new(), elements, None, Some(sink))),
+                Arc::new(Tree::new(
+                    Vec::new(),
+                    elements,
+                    Vec::new(),
+                    None,
+                    Some(sink),
+                )),
             ),
             mailbox,
             revision,
@@ -833,7 +975,32 @@ mod tests {
             Arc::new(Tree::new(
                 Vec::new(),
                 elements,
+                Vec::new(),
                 Some(anodrel_ui::ElementId::new("continue").expect("fixed ID is valid")),
+                None,
+            )),
+        )
+    }
+
+    fn value_child() -> *mut Provider {
+        let document =
+            anodrel_ui_document::decode(FIELD_DOCUMENT).expect("the fixed field document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = super::publishable(accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        ));
+        Provider::create(
+            0,
+            Some(0),
+            Arc::new(Tree::new(
+                Vec::new(),
+                elements,
+                vec![(
+                    anodrel_ui::ElementId::new("name").expect("fixed ID is valid"),
+                    "Ada".to_owned(),
+                )],
+                None,
                 None,
             )),
         )
@@ -954,6 +1121,42 @@ mod tests {
     }
 
     #[test]
+    fn a_field_exposes_its_value_without_an_automation_write() {
+        let provider = value_child();
+        // SAFETY: this test owns one live provider and writable output slots.
+        unsafe {
+            let (result, queried) = query_simple(provider, &IID_IVALUE_PROVIDER);
+            assert_eq!(result, S_OK);
+            assert!(!queried.is_null());
+            release_provider(provider);
+
+            let simple = (&raw mut (*provider).simple).cast::<c_void>();
+            let mut pattern = ptr::null_mut();
+            assert_eq!(
+                super::get_pattern_provider(simple, UIA_VALUE_PATTERN_ID, &mut pattern),
+                S_OK
+            );
+            assert!(!pattern.is_null());
+
+            let vtable = *pattern.cast::<*const ValueVtbl>();
+            let mut value = ptr::null_mut();
+            assert_eq!(((*vtable).get_value)(pattern, &mut value), S_OK);
+            assert!(!value.is_null());
+            assert_eq!(super::raw::copy_and_free_bstr(value), "Ada");
+
+            let mut read_only = 0;
+            assert_eq!(((*vtable).get_is_read_only)(pattern, &mut read_only), S_OK);
+            assert_eq!(read_only, 1);
+            assert_eq!(
+                ((*vtable).set_value)(pattern, ptr::null()),
+                UIA_E_NOTSUPPORTED
+            );
+            release_provider(provider);
+            release_provider(provider);
+        }
+    }
+
+    #[test]
     fn reference_counting_frees_the_object_exactly_once() {
         let provider = root();
         // SAFETY: a live provider held by this test.
@@ -1033,6 +1236,20 @@ mod tests {
             assert_eq!(
                 super::get_focus(
                     (&raw mut (*provider).fragment_root).cast::<c_void>(),
+                    ptr::null_mut(),
+                ),
+                E_POINTER
+            );
+            assert_eq!(
+                super::get_value(
+                    (&raw mut (*provider).value).cast::<c_void>(),
+                    ptr::null_mut(),
+                ),
+                E_POINTER
+            );
+            assert_eq!(
+                super::get_is_read_only(
+                    (&raw mut (*provider).value).cast::<c_void>(),
                     ptr::null_mut(),
                 ),
                 E_POINTER

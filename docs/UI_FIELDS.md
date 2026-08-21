@@ -131,10 +131,12 @@ Installed record version **1.5** adds `ui.fields.read` as a strict superset of
 
 A field publishes as an `Edit` control with its label as its name, so
 `docs/ACCESSIBILITY.md`'s UI Automation support announces it like any
-other element. Consistent with that contract, assistive technology can read a
-field's presence and label and **cannot** read its value or move focus into it —
-the same one-directional rule, applied to the node where reading the value would
-matter most.
+other element. A matching visible field now also exposes its current host-owned
+text through a read-only `IValueProvider` snapshot for Windows. That value
+remains outside the application protocol; automation cannot set it or learn a
+caret, selection, edit history, or change event. Because a UIA client can retain
+a returned value, this does not change the v1 rule that fields are never secret
+or masked. Decision 0071 defines the boundary.
 
 ## Reaching a field
 

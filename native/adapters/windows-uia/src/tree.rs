@@ -4,6 +4,8 @@
 //! layer holds only pointers and reference counts, and every rule about what a
 //! client can see is testable without Windows.
 
+use std::collections::BTreeMap;
+
 use anodrel_ui::ElementId;
 use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, control_type, property};
 
@@ -11,6 +13,7 @@ use crate::UiAutomationActionSink;
 use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
 use crate::raw2::{UiaRect, direction};
 use crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID;
+use crate::raw5::{UIA_VALUE_IS_READ_ONLY_PROPERTY_ID, UIA_VALUE_VALUE_PROPERTY_ID};
 
 /// The fixed automation identifier for an Anodrel surface's root.
 ///
@@ -38,6 +41,7 @@ pub fn publishable(elements: Vec<AccessibleElement>) -> Vec<AccessibleElement> {
 pub struct Tree {
     title: Vec<u16>,
     elements: Vec<AccessibleElement>,
+    field_values: BTreeMap<String, Vec<u16>>,
     focused: Option<usize>,
     action_sink: Option<UiAutomationActionSink>,
 }
@@ -45,22 +49,28 @@ pub struct Tree {
 impl Tree {
     /// Builds the tree for one window title and its publishable elements.
     ///
-    /// Focus is reduced to a published target while the tree is created, so a
-    /// provider never reads a mutable view. A sink exists only for a current
-    /// authenticated UI session. It is still gated per element below, so a
-    /// diagnostic surface cannot become invokable just because it has the same
-    /// visual role as an application button.
+    /// Focus and field values are reduced to published targets while the tree
+    /// is created, so a provider never reads a mutable view. A sink exists
+    /// only for a current authenticated UI session. It is still gated per
+    /// element below, so a diagnostic surface cannot become invokable just
+    /// because it has the same visual role as an application button.
     #[must_use]
     pub fn new(
         title: Vec<u16>,
         elements: Vec<AccessibleElement>,
+        field_values: Vec<(ElementId, String)>,
         focused: Option<ElementId>,
         action_sink: Option<UiAutomationActionSink>,
     ) -> Self {
         let focused = focused.and_then(|id| focus_index(&elements, &id));
+        let field_values = field_values
+            .into_iter()
+            .map(|(id, value)| (id.as_str().to_owned(), utf16(&value)))
+            .collect();
         Self {
             title,
             elements,
+            field_values,
             focused,
             action_sink,
         }
@@ -112,6 +122,10 @@ impl Tree {
             UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => {
                 Some(Variant::boolean(self.focused == Some(index)))
             }
+            UIA_VALUE_VALUE_PROPERTY_ID => Some(Variant::string(self.field_value(index)?)),
+            UIA_VALUE_IS_READ_ONLY_PROPERTY_ID => {
+                self.field_value(index).map(|_| Variant::boolean(true))
+            }
             property::IS_CONTROL_ELEMENT | property::IS_CONTENT_ELEMENT => {
                 Some(Variant::boolean(true))
             }
@@ -159,6 +173,26 @@ impl Tree {
         self.focused
     }
 
+    /// Whether one published element exposes a read-only field-value snapshot.
+    ///
+    /// A value reaches only a matching visible Edit element. No other role can
+    /// become a value control just because it shares an element ID with a host
+    /// field state. See Decision 0071.
+    #[must_use]
+    pub fn supports_value(&self, index: usize) -> bool {
+        self.field_value(index).is_some()
+    }
+
+    /// Returns one visible field's immutable UTF-16 value snapshot.
+    ///
+    /// Only the Value COM binding uses this. The text has already been copied
+    /// from host-owned state and does not provide a route back to an
+    /// application. See Decision 0071.
+    #[must_use]
+    pub fn value(&self, index: usize) -> Option<&[u16]> {
+        self.field_value(index)
+    }
+
     /// Whether one published element supports the bounded Invoke pattern.
     ///
     /// The control type, enabled state, current authenticated-session sink, and
@@ -188,6 +222,17 @@ impl Tree {
         let element = self.elements.get(index)?;
         (element.control_type() == control_type::BUTTON && element.enabled())
             .then(|| ElementId::new(element.automation_id()).ok())
+            .flatten()
+    }
+
+    fn field_value(&self, index: usize) -> Option<&[u16]> {
+        let element = self.elements.get(index)?;
+        (element.control_type() == control_type::EDIT)
+            .then(|| {
+                self.field_values
+                    .get(element.automation_id())
+                    .map(Vec::as_slice)
+            })
             .flatten()
     }
 }
@@ -262,6 +307,7 @@ mod tests {
     use crate::{UiAutomationActionSink, raw::VT_EMPTY};
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"},{"id":"blocked","kind":"action","label":"Unavailable","fontSize":16,"enabled":false,"tone":"accent"}]}}"#;
+    const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true},{"id":"locked","kind":"field","label":"Locked","value":"","maxLength":64,"fontSize":16,"enabled":false},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
 
     struct FixedMeasurer;
 
@@ -285,10 +331,21 @@ mod tests {
         )
     }
 
+    fn field_mapped() -> Vec<AccessibleElement> {
+        let document =
+            anodrel_ui_document::decode(FIELD_DOCUMENT).expect("the field fixture is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        )
+    }
+
     fn tree() -> Tree {
         Tree::new(
             "Window".encode_utf16().collect(),
             publishable(mapped()),
+            Vec::new(),
             None,
             None,
         )
@@ -306,6 +363,7 @@ mod tests {
             Tree::new(
                 "Window".encode_utf16().collect(),
                 publishable(mapped()),
+                Vec::new(),
                 None,
                 Some(sink),
             ),
@@ -395,7 +453,7 @@ mod tests {
         // Asking with each element's own rectangle keeps the test about hit
         // testing rather than about whatever geometry the layout produced.
         let published = publishable(mapped());
-        let tree = Tree::new(Vec::new(), published.clone(), None, None);
+        let tree = Tree::new(Vec::new(), published.clone(), Vec::new(), None, None);
 
         for (index, element) in published.iter().enumerate() {
             let bounds = element.bounds();
@@ -430,6 +488,7 @@ mod tests {
         let focused = Tree::new(
             Vec::new(),
             published.clone(),
+            Vec::new(),
             Some(ElementId::new("go").expect("fixed ID is valid")),
             None,
         );
@@ -463,11 +522,67 @@ mod tests {
             let tree = Tree::new(
                 Vec::new(),
                 published.clone(),
+                Vec::new(),
                 Some(ElementId::new(id).expect("fixed ID is valid")),
                 None,
             );
             assert_eq!(tree.focused(), None, "{id} must not report focus");
         }
+    }
+
+    #[test]
+    fn field_values_are_visible_only_on_matching_edit_elements() {
+        let tree = Tree::new(
+            Vec::new(),
+            publishable(field_mapped()),
+            vec![
+                (
+                    ElementId::new("name").expect("fixed ID is valid"),
+                    "Ada".to_owned(),
+                ),
+                (
+                    ElementId::new("locked").expect("fixed ID is valid"),
+                    "Still readable".to_owned(),
+                ),
+                (
+                    ElementId::new("continue").expect("fixed ID is valid"),
+                    "must not reach an action".to_owned(),
+                ),
+            ],
+            None,
+            None,
+        );
+
+        assert!(tree.supports_value(0));
+        assert!(
+            tree.supports_value(1),
+            "a disabled visible field is readable"
+        );
+        assert!(!tree.supports_value(2), "an action never exposes a value");
+        assert_eq!(
+            String::from_utf16(tree.field_value(0).expect("the name value exists"))
+                .expect("the value is valid UTF-16"),
+            "Ada"
+        );
+        let property = tree
+            .property(Some(0), crate::raw5::UIA_VALUE_VALUE_PROPERTY_ID)
+            .expect("the value property is supplied");
+        // SAFETY: this test owns the BSTR allocated for its Variant result.
+        assert_eq!(
+            unsafe { property.copy_and_free_string() },
+            Some("Ada".to_owned())
+        );
+        assert_eq!(
+            tree.property(Some(0), crate::raw5::UIA_VALUE_IS_READ_ONLY_PROPERTY_ID)
+                .expect("the read-only property is supplied")
+                .boolean_value(),
+            Some(true)
+        );
+        assert!(
+            tree.property(Some(2), crate::raw5::UIA_VALUE_VALUE_PROPERTY_ID)
+                .is_none(),
+            "a non-field never receives a value property"
+        );
     }
 
     #[test]

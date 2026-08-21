@@ -1077,30 +1077,39 @@ fn open_product_session_window(
 /// The semantics come from the same layout the surface draws, so what a screen
 /// reader is told cannot drift from what is on screen. A window with no UI
 /// document publishes nothing, which is the honest answer for a document or
-/// Startup Lab surface. It also carries the current host-owned focus alongside
-/// the same layout, while only an authenticated UI session adds the bounded
-/// action sink used by an enabled button's Invoke pattern.
-fn accessible_elements_for(
-    window: Hwnd,
-) -> (
-    Vec<anodrel_windows_accessibility::AccessibleElement>,
-    Option<anodrel_ui::ElementId>,
-    Option<anodrel_windows_uia::UiAutomationActionSink>,
-) {
+/// Startup Lab surface. It also carries copied host-owned focus and field values
+/// alongside the same layout, while only an authenticated UI session adds the
+/// bounded action sink used by an enabled button's Invoke pattern.
+struct UiAutomationPublication {
+    elements: Vec<anodrel_windows_accessibility::AccessibleElement>,
+    field_values: Vec<(anodrel_ui::ElementId, String)>,
+    focused: Option<anodrel_ui::ElementId>,
+    action_sink: Option<anodrel_windows_uia::UiAutomationActionSink>,
+}
+
+fn accessible_elements_for(window: Hwnd) -> UiAutomationPublication {
     let rect = client_rect(window);
-    let Ok(Some((snapshot, action_sink, focused))) =
+    let Ok(Some(publication)) =
         registry::accessibility_snapshot(window, rect.width() as f32, rect.height() as f32)
     else {
-        return (Vec::new(), None, None);
+        return UiAutomationPublication {
+            elements: Vec::new(),
+            field_values: Vec::new(),
+            focused: None,
+            action_sink: None,
+        };
     };
-    (
-        anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
-            &snapshot,
-            client_origin(window),
-        )),
-        focused,
-        action_sink,
-    )
+    UiAutomationPublication {
+        elements: anodrel_windows_uia::publishable(
+            anodrel_windows_accessibility::accessible_elements(
+                &publication.snapshot,
+                client_origin(window),
+            ),
+        ),
+        field_values: publication.field_values,
+        focused: publication.focused,
+        action_sink: publication.action_sink,
+    }
 }
 
 /// Locates a window's client area on screen, with its current density.
@@ -1576,9 +1585,10 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
     // reaches the default procedure. It publishes semantics outward and only an
     // enabled authenticated-session button can offer its existing revision-bound
     // action mailbox. Focus reporting is a copied layout snapshot; neither
-    // feature has a native-input or application callback route.
+    // feature has a native-input or application callback route. Field values
+    // are another copied snapshot and remain read-only to automation.
     if message == WM_GETOBJECT {
-        let (elements, focused, action_sink) = accessible_elements_for(window);
+        let publication = accessible_elements_for(window);
         // SAFETY: this window belongs to the current thread's message queue,
         // which is the only thread that dispatches to this procedure.
         if let Some(result) = unsafe {
@@ -1586,9 +1596,10 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 window,
                 wparam,
                 lparam,
-                elements,
-                focused,
-                action_sink,
+                publication.elements,
+                publication.field_values,
+                publication.focused,
+                publication.action_sink,
             )
         } {
             return result;

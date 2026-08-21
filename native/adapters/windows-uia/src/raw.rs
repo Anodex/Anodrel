@@ -11,6 +11,8 @@ use std::ffi::c_void;
 pub type Handle = isize;
 pub type Hresult = i32;
 pub type Lresult = isize;
+/// A COM BSTR allocated by this provider for its caller to release.
+pub type Bstr = *mut u16;
 
 pub const S_OK: Hresult = 0;
 pub const E_POINTER: Hresult = -2_147_467_261;
@@ -116,16 +118,9 @@ impl Variant {
     /// provider never reports a string it does not own.
     #[must_use]
     pub fn string(text: &[u16]) -> Self {
-        let length = match u32::try_from(text.len()) {
-            Ok(length) => length,
-            Err(_) => return Self::empty(),
-        };
-        // SAFETY: text is a live slice of exactly `length` UTF-16 units, which
-        // SysAllocStringLen copies into its own allocation.
-        let allocated = unsafe { SysAllocStringLen(text.as_ptr(), length) };
-        if allocated.is_null() {
+        let Some(allocated) = allocate_bstr(text) else {
             return Self::empty();
-        }
+        };
         let mut variant = Self::empty();
         variant.vt = VT_BSTR;
         variant.value[0] = allocated as usize as u64;
@@ -141,11 +136,66 @@ impl Variant {
         }
         Some((self.value[0] as u16 as i16) == VARIANT_TRUE)
     }
+
+    /// Copies and releases a test-owned BSTR variant.
+    ///
+    /// # Safety
+    ///
+    /// This variant must hold one BSTR returned by [`Variant::string`] that
+    /// the test owns and has not released.
+    #[cfg(test)]
+    pub(crate) unsafe fn copy_and_free_string(self) -> Option<String> {
+        if self.vt != VT_BSTR {
+            return None;
+        }
+        let value = self.value[0] as usize as Bstr;
+        (!value.is_null()).then(|| {
+            // SAFETY: this method's contract transfers the one BSTR ownership
+            // into the helper.
+            unsafe { copy_and_free_bstr(value) }
+        })
+    }
+}
+
+/// Allocates a BSTR copy for a COM output parameter.
+///
+/// The caller owns the returned allocation and must release it with the normal
+/// COM BSTR rule. `None` means allocation was impossible; callers must not
+/// report a string they did not allocate.
+#[must_use]
+pub(crate) fn allocate_bstr(text: &[u16]) -> Option<Bstr> {
+    let length = u32::try_from(text.len()).ok()?;
+    // SAFETY: text is a live slice of exactly `length` UTF-16 units, which
+    // SysAllocStringLen copies into its own allocation.
+    let allocated = unsafe { SysAllocStringLen(text.as_ptr(), length) };
+    (!allocated.is_null()).then_some(allocated)
 }
 
 #[link(name = "oleaut32")]
 unsafe extern "system" {
     fn SysAllocStringLen(text: *const u16, length: u32) -> *mut u16;
+    #[cfg(test)]
+    fn SysFreeString(value: Bstr);
+    #[cfg(test)]
+    fn SysStringLen(value: Bstr) -> u32;
+}
+
+/// Copies a test-owned BSTR and releases it through the documented allocator.
+///
+/// # Safety
+///
+/// `value` must be a BSTR allocated by `SysAllocStringLen` that this caller
+/// owns exactly once.
+#[cfg(test)]
+pub(crate) unsafe fn copy_and_free_bstr(value: Bstr) -> String {
+    // SAFETY: the caller provides one valid owned BSTR.
+    let length = unsafe { SysStringLen(value) } as usize;
+    // SAFETY: a valid BSTR contains exactly its reported UTF-16 length.
+    let text = unsafe { std::slice::from_raw_parts(value, length) };
+    let copied = String::from_utf16_lossy(text);
+    // SAFETY: ownership belongs to this helper by contract.
+    unsafe { SysFreeString(value) };
+    copied
 }
 
 #[link(name = "uiautomationcore")]
@@ -190,6 +240,11 @@ mod tests {
         assert_eq!(Variant::boolean(true).vt, VT_BOOL);
         assert_eq!(Variant::boolean(true).boolean_value(), Some(true));
         assert_eq!(Variant::boolean(false).boolean_value(), Some(false));
+        // SAFETY: `string` returns one BSTR owned by this local Variant.
+        assert_eq!(
+            unsafe { Variant::string(&['A' as u16]).copy_and_free_string() },
+            Some("A".to_owned())
+        );
         // A COM boolean is all-bits-set, not one; reporting 1 makes some
         // clients read the value as false.
         assert_eq!(VARIANT_TRUE, -1);

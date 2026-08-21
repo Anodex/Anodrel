@@ -15,9 +15,9 @@ pub enum UiAccessibilityRole {
     Button,
     /// A single-line field a person can type into.
     ///
-    /// Named by its label. Its value is deliberately absent: see
-    /// `docs/UI_FIELDS.md` and `docs/ACCESSIBILITY.md`, which together mean
-    /// assistive technology can find a field and cannot read what is in it.
+    /// Named by its label. Its current value is deliberately absent from this
+    /// portable snapshot: the Windows provider separately copies host-owned
+    /// field state into its narrow read-only Value pattern (Decision 0071).
     Edit,
 }
 
@@ -56,10 +56,10 @@ impl UiAccessibilityNode {
         self.bounds
     }
 
-    /// Returns whether this element can be invoked.
+    /// Returns whether this element is enabled for a person's interaction.
     ///
-    /// Only buttons can be enabled. An enabled button remains semantic data;
-    /// this snapshot cannot invoke it or grant it native authority.
+    /// Buttons and fields can be disabled. Enabled state remains semantic data;
+    /// this snapshot cannot invoke, edit, or grant native authority.
     #[must_use]
     pub const fn enabled(&self) -> bool {
         self.enabled
@@ -135,12 +135,12 @@ fn semantic_fields(node: &UiNode) -> (UiAccessibilityRole, Option<String>, bool)
     }
 }
 
-/// A field is announced by its label and never by what has been typed into it.
+/// A field is named by its label; its current text stays out of the portable
+/// semantic snapshot.
 ///
-/// The accessibility snapshot is a published surface, so putting the value here
-/// would hand it to anything reading the tree — including a path an application
-/// could reach later. The value leaves the host only through the granted
-/// snapshot of Decision 0067, and this is the other door it must not leave by.
+/// The Windows provider separately accepts a host-owned value snapshot above
+/// this layer, so no portable document or application protocol path can infer
+/// the live field text. See Decisions 0067 and 0071.
 fn field_fields(field: &Field) -> (UiAccessibilityRole, Option<String>, bool) {
     (
         UiAccessibilityRole::Edit,

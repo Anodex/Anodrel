@@ -117,10 +117,13 @@ Status: **Direct Windows host in progress**
   application-specific queue; the diagnostic UI Lab remains readable but
   non-invokable. `GetFocus` and `HasKeyboardFocus` now report a copied current
   host-focus snapshot with no `SetFocus`, focus event, or live-state lookup
-  (Decision 0070). Unit and host checks cover both routes; manual screen-reader
-  activation and focus verification remain open. Automation events, live
-  announcements, focus control, text patterns and ranges, hierarchical grouping,
-  and non-Windows adapters stay deferred. See `docs/ACCESSIBILITY.md`.
+  (Decision 0070). A visible field now exposes only its copied current text
+  through a read-only `IValueProvider`; `SetValue`, selection, caret data, and
+  value events stay absent (Decision 0071). Unit and host checks cover all three
+  routes; manual screen-reader activation, focus, and field-value verification
+  remain open. Automation events, live announcements, focus control, text
+  patterns and ranges, hierarchical grouping, and non-Windows adapters stay
+  deferred. See `docs/ACCESSIBILITY.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

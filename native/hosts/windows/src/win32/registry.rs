@@ -15,14 +15,15 @@ static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 
 /// The immutable accessibility data published for one window-message query.
 ///
-/// The focus identifier belongs to the same current UI Lab state as the
-/// snapshot. The UI Automation adapter filters it against the resulting
-/// visible, enabled element tree before it reports any focus to Windows.
-pub(super) type AccessibilityPublication = (
-    anodrel_ui::UiAccessibilitySnapshot,
-    Option<anodrel_windows_uia::UiAutomationActionSink>,
-    Option<anodrel_ui::ElementId>,
-);
+/// The focus identifier and field values belong to the same current UI Lab
+/// state as the snapshot. The UI Automation adapter filters both against the
+/// resulting visible tree before it reports anything to Windows.
+pub(super) struct AccessibilityPublication {
+    pub(super) snapshot: anodrel_ui::UiAccessibilitySnapshot,
+    pub(super) action_sink: Option<anodrel_windows_uia::UiAutomationActionSink>,
+    pub(super) focused: Option<anodrel_ui::ElementId>,
+    pub(super) field_values: Vec<(anodrel_ui::ElementId, String)>,
+}
 
 pub(super) fn insert(window: Hwnd, view: View) -> io::Result<()> {
     let mut views = lock_views()?;
@@ -264,16 +265,18 @@ pub(super) fn accessibility_snapshot(
         // A UI Lab is host-owned diagnostic state. Its local action tiles have
         // no authenticated-session mailbox, so they are readable but
         // intentionally expose no UI Automation Invoke pattern.
-        Some(View::UiLab(lab)) => Some((
-            lab.accessibility_snapshot(width, height),
-            None,
-            lab.accessibility_focus(),
-        )),
-        Some(View::UiSession(session)) => Some((
-            session.lab().accessibility_snapshot(width, height),
-            session.accessibility_action_sink(),
-            session.lab().accessibility_focus(),
-        )),
+        Some(View::UiLab(lab)) => Some(AccessibilityPublication {
+            snapshot: lab.accessibility_snapshot(width, height),
+            action_sink: None,
+            focused: lab.accessibility_focus(),
+            field_values: lab.accessibility_field_values(),
+        }),
+        Some(View::UiSession(session)) => Some(AccessibilityPublication {
+            snapshot: session.lab().accessibility_snapshot(width, height),
+            action_sink: session.accessibility_action_sink(),
+            focused: session.lab().accessibility_focus(),
+            field_values: session.lab().accessibility_field_values(),
+        }),
         _ => None,
     })
 }

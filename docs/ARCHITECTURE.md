@@ -290,11 +290,14 @@ semantic action candidate to the existing session mailbox, with no native input
 message, application callback, focus movement, or accessibility-specific queue
 (Decision 0069). The same provider reports its copied host-focus snapshot
 through `GetFocus` and `HasKeyboardFocus`, without `SetFocus`, events, or a
-live-state lookup (Decision 0070). No other pattern is supplied. The boundary
-does not read the tree back or reveal that assistive technology is present.
-Narrator and an Inspect cross-check verified the read provider on Windows 11;
-manual screen-reader activation and focus verification remain open. See
-`docs/ACCESSIBILITY.md`, Decisions 0063, 0069, and 0070.
+live-state lookup (Decision 0070). A matching visible field separately exposes
+only a copied current host value through a read-only `IValueProvider`; it has no
+automation write, caret, selection, text range, or event route (Decision 0071).
+No other pattern is supplied. The boundary does not read the tree back or reveal
+that assistive technology is present. Narrator and an Inspect cross-check
+verified the read provider on Windows 11; manual screen-reader activation,
+focus, and field-value verification remain open. See `docs/ACCESSIBILITY.md`,
+Decisions 0063, 0069, 0070, and 0071.
 
 ## Communication model
 

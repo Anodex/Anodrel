@@ -62,7 +62,9 @@ impl AccessibleElement {
         self.control_type
     }
 
-    /// Whether the element can be invoked. Only a button is ever disabled.
+    /// Whether the element is enabled for a person's interaction.
+    ///
+    /// Only buttons and fields can be disabled.
     #[must_use]
     pub const fn enabled(&self) -> bool {
         self.enabled
