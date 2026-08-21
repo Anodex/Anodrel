@@ -1,19 +1,20 @@
 # Anodrel Windows accessibility
 
 **Status:** **UI Automation reading is implemented and verified; bounded button
-invocation, focus reporting, and read-only field values are implemented and
-awaiting manual screen-reader checks.**
+invocation, focus reporting and control, and read-only field values are
+implemented and awaiting manual screen-reader checks.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 mapping table below passes with no failures.
 
-Reading, one bounded action, focus reporting, and read-only field values are the
-whole of it. Assistive technology can read this surface, obtain a visible
-field's current value, and invoke an enabled button in an authenticated UI
-session; it reports the host's current keyboard focus but cannot move it, edit a
-field, raise an automation event, or receive a live announcement. The published
-tree is flat. Anything beyond reading, button invocation, focus reporting, and
-field-value reading is deferred and listed at the end of this document.
+Reading, one bounded action, focus reporting and control, and read-only field
+values are the implemented surface. Assistive technology can read this surface,
+obtain a visible field's current value, invoke an enabled button in an
+authenticated UI session, and move to a visible enabled field or button through
+the host's existing focus state. It cannot edit a field, raise an automation
+event, receive a live announcement, or expose focus to an application. The
+published tree is flat. Anything beyond these routes is deferred and listed at
+the end of this document.
 
 ## Boundary
 
@@ -159,9 +160,14 @@ guess.
 
 This is an immutable provider snapshot. A new UI Automation query observes a
 later keyboard or pointer focus change; an older provider does not read the
-live view or registry to chase it. There is no `SetFocus`, focus-change event,
-window activation, application callback, protocol field, or capability grant.
-Decision 0070 defines this boundary.
+live view or registry to chase it. `SetFocus` is the one deliberate action:
+only a visible enabled focusable child can hand one revision-bound request to
+its owning UI thread, which revalidates that same target before it changes the
+host focus state. Windows focuses the containing fragment before calling it, so
+Anodrel does not activate a window or send input. There is no focus-change
+event, application callback, protocol field, or capability grant. Decisions
+0070 and 0073 define these boundaries; `docs/UI_AUTOMATION_FOCUS.md` gives the
+exact route.
 
 ### Field value reading
 
@@ -211,9 +217,11 @@ registry.
 
 ## Threading
 
-UI Automation calls arrive on the UI thread through `WM_GETOBJECT`. The same
-rule that keeps a pipe worker away from User32 and Shell32 applies: an
-authenticated session worker never serves an accessibility request. The mapping
+`WM_GETOBJECT` arrives on the UI thread, which creates the immutable provider
+snapshot. A later UI Automation method can arrive from an automation caller, so
+the only mutating method, `SetFocus`, uses a bounded private request route back
+to that owner. A pipe worker never serves an accessibility request, and an
+automation caller never receives a mutable view or registry entry. The mapping
 itself is pure and holds no lock, so it cannot block a message pump.
 
 ## Failure behaviour
@@ -250,9 +258,11 @@ The window is also an `IRawElementProviderFragmentRoot`, and each published
 element answers `IRawElementProviderFragment`: navigation, `GetRuntimeId` as a
 safe array, `get_BoundingRectangle`, and hit testing from a screen point.
 
-`SetFocus` returns `UIA_E_NOTSUPPORTED`. Moving focus is an action, and this
-provider performs none. `GetFocus` is added separately in Slice 5, using the
-host's copied focus snapshot rather than guessing or reading live view state.
+`SetFocus` succeeds only for a published visible enabled focus target. It uses
+the host-owned route described in `docs/UI_AUTOMATION_FOCUS.md`; the root,
+static text, disabled elements, clipped elements, stale session providers, and
+unavailable views fail. `GetFocus` remains a snapshot lookup rather than a live
+view query.
 
 The published tree is **flat**, and groups are filtered out of it. A container
 whose children sit beside it rather than inside it would be announced as an
@@ -275,18 +285,24 @@ manual check below must still prove Narrator can activate a button.
 **Slice 5 — focus reporting. Implemented; manual focus check pending.** The
 provider returns the matching child from `GetFocus` and sets
 `HasKeyboardFocus` only on that element, using one immutable snapshot of the
-host's existing layout-validated focus (Decision 0070). It does not implement
-`SetFocus` or send focus-change events.
+host's existing layout-validated focus (Decision 0070).
 
 **Slice 6 — read-only field values. Implemented; manual value check pending.**
 A matching visible `Edit` exposes `IValueProvider`, returns its copied host
 value, and is read-only to automation (Decision 0071). It has no `SetValue`,
 caret, selection, text range, or value-change event.
 
+**Slice 7 — bounded focus control. Implemented; manual focus-control check
+pending.** A visible enabled field or button can request focus through
+`IRawElementProviderFragment::SetFocus`; a private per-window route returns to
+the UI thread, which revalidates the provider revision and target before it
+updates host focus (Decision 0073). It does not expose focus to an application,
+activate a window, or raise a focus event.
+
 Also deferred, each needing its own contract and decision: automation events and
-live announcements, focus changes **raised** to assistive technology, focus
-control, selection and caret reporting, text patterns and ranges, relations
-between nodes, automation editing, and non-Windows accessibility adapters.
+live announcements, focus changes **raised** to assistive technology, selection
+and caret reporting, text patterns and ranges, relations between nodes,
+automation editing, and non-Windows accessibility adapters.
 
 ## Verification
 
@@ -303,7 +319,10 @@ rejecting a null output rather than writing through it, reference counting
 freeing the object exactly once, a panicking body returning a failure code
 instead of unwinding, the Invoke gate admitting only an enabled authenticated-
 session button to the revision-bound mailbox, and the Value gate returning only
-a matching field snapshot while refusing every automation write.
+a matching field snapshot while refusing every automation write. They also
+prove the Focus gate admits only a visible enabled field or button, keeps one
+provider's updated focus snapshot local to that provider, and refuses an
+expired, busy, unknown, or late-completing route without changing host focus.
 
 ### Confirmed against real UI Automation
 
@@ -444,12 +463,15 @@ field or button. Inspect must show that element's `HasKeyboardFocus` as true
 and `GetFocus` must return that same element. Move focus with Tab again and ask
 Inspect to refresh: the new provider snapshot must name the new target. The
 previous provider is allowed to retain its old snapshot, because this slice
-does not raise focus-change events. Confirm that a UI Automation client cannot
-move focus through `SetFocus`.
+does not raise focus-change events. Confirm that a UI Automation client can
+move focus through `SetFocus` only to a visible enabled control. It must fail
+for a disabled or clipped control, and it must not activate an action or edit a
+field.
 
 This check is currently **pending**. It proves the screen-reader-visible focus
-matches the host focus ring; it does not turn UI Automation into a focus-control
-path.
+matches the host focus ring and that controlled focus stays inside the declared
+boundary; it does not expose focus to an application or turn UI Automation into
+a general input path.
 
 ### Manual field-value verification
 

@@ -117,15 +117,24 @@ impl UiFocus {
         if self.focused.as_ref() == Some(target) {
             return false;
         }
-        let reachable = layout
-            .items()
-            .iter()
-            .any(|item| is_focusable(item) && item.id() == target);
-        if !reachable {
+        if !self.can_focus(layout, target) {
             return false;
         }
         self.focused = Some(target.clone());
         true
+    }
+
+    /// Returns whether a target remains reachable in this exact layout.
+    ///
+    /// Hosts use this before accepting a focus request whose provider may have
+    /// been created before a relayout. The check exposes no native focus handle
+    /// and has no side effect.
+    #[must_use]
+    pub fn can_focus(&self, layout: &UiLayout, target: &ElementId) -> bool {
+        layout
+            .items()
+            .iter()
+            .any(|item| is_focusable(item) && item.id() == target)
     }
 
     fn select(&mut self, item: &UiLayoutItem) -> Option<ElementId> {

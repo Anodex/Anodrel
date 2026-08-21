@@ -224,10 +224,11 @@ Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11 and an Inspect cross-check of every published
 property passes. An enabled authenticated-session button now exposes one bounded
 Invoke action that joins the existing revision-bound semantic-event mailbox;
-the provider also reports the existing host keyboard-focus snapshot and
-read-only current field values. Manual screen-reader activation, focus, and
-field-value verification remain open. Focus control, automation editing, text
-ranges, events, live announcements, and every other pattern remain absent.
+the provider also reports and can move the host's keyboard-focus snapshot
+through a bounded UI-thread route, and exposes read-only current field values.
+Manual screen-reader activation, focus control, and field-value verification
+remain open. Automation editing, text ranges, events, live announcements, and
+every other pattern remain absent. See `docs/UI_AUTOMATION_FOCUS.md`.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows

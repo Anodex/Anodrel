@@ -119,6 +119,11 @@ const CHAR_BACKSPACE: u32 = 0x08;
 /// collected from the host-owned slot in [`product_tile`].
 const WM_APP: Uint = 0x8000;
 const WM_ANODREL_PRODUCT_SESSION: Uint = WM_APP + 1;
+/// Private payload-free wakeup for one pending UI Automation focus request.
+///
+/// A route carries the target in host-owned memory; this message carries no
+/// pointer or input data, so an externally posted copy cannot inject focus.
+const WM_ANODREL_UIA_FOCUS: Uint = WM_APP + 2;
 
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 const REVEAL_TIMER: usize = 1;
@@ -1090,35 +1095,38 @@ fn open_product_session_window(
 /// Startup Lab surface. It also carries copied host-owned focus and field values
 /// alongside the same layout, while only an authenticated UI session adds the
 /// bounded action sink used by an enabled button's Invoke pattern.
-struct UiAutomationPublication {
-    elements: Vec<anodrel_windows_accessibility::AccessibleElement>,
-    field_values: Vec<(anodrel_ui::ElementId, String)>,
-    focused: Option<anodrel_ui::ElementId>,
-    action_sink: Option<anodrel_windows_uia::UiAutomationActionSink>,
-}
-
-fn accessible_elements_for(window: Hwnd) -> UiAutomationPublication {
+fn accessible_elements_for(window: Hwnd) -> anodrel_windows_uia::UiAutomationPublication {
     let rect = client_rect(window);
     let Ok(Some(publication)) =
         registry::accessibility_snapshot(window, rect.width() as f32, rect.height() as f32)
     else {
-        return UiAutomationPublication {
-            elements: Vec::new(),
-            field_values: Vec::new(),
-            focused: None,
-            action_sink: None,
-        };
+        return anodrel_windows_uia::UiAutomationPublication::empty();
     };
-    UiAutomationPublication {
-        elements: anodrel_windows_uia::publishable(
-            anodrel_windows_accessibility::accessible_elements(
-                &publication.snapshot,
-                client_origin(window),
-            ),
-        ),
-        field_values: publication.field_values,
-        focused: publication.focused,
-        action_sink: publication.action_sink,
+    anodrel_windows_uia::UiAutomationPublication::new(
+        anodrel_windows_uia::publishable(anodrel_windows_accessibility::accessible_elements(
+            &publication.snapshot,
+            client_origin(window),
+        )),
+        publication.field_values,
+        publication.focused,
+        publication.action_sink,
+        publication
+            .focus_route
+            .map(|route| route.for_window(window, WM_ANODREL_UIA_FOCUS)),
+    )
+}
+
+/// Applies a pending host-only UI Automation focus request and repaints only
+/// when a current validated target became focused.
+fn service_accessibility_focus(window: Hwnd) {
+    let rect = client_rect(window);
+    let changed =
+        registry::service_accessibility_focus(window, rect.width() as f32, rect.height() as f32)
+            .ok()
+            .flatten()
+            .unwrap_or(false);
+    if changed {
+        invalidate(window);
     }
 }
 
@@ -1630,19 +1638,15 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         let publication = accessible_elements_for(window);
         // SAFETY: this window belongs to the current thread's message queue,
         // which is the only thread that dispatches to this procedure.
-        if let Some(result) = unsafe {
-            anodrel_windows_uia::answer_get_object(
-                window,
-                wparam,
-                lparam,
-                publication.elements,
-                publication.field_values,
-                publication.focused,
-                publication.action_sink,
-            )
-        } {
+        if let Some(result) =
+            unsafe { anodrel_windows_uia::answer_get_object(window, wparam, lparam, publication) }
+        {
             return result;
         }
+    }
+    if message == WM_ANODREL_UIA_FOCUS {
+        service_accessibility_focus(window);
+        return 0;
     }
     match message {
         message

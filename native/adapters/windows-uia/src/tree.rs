@@ -4,16 +4,16 @@
 //! layer holds only pointers and reference counts, and every rule about what a
 //! client can see is testable without Windows.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Mutex};
 
 use anodrel_ui::ElementId;
 use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, control_type, property};
 
-use crate::UiAutomationActionSink;
 use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
 use crate::raw2::{UiaRect, direction};
 use crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID;
 use crate::raw5::{UIA_VALUE_IS_READ_ONLY_PROPERTY_ID, UIA_VALUE_VALUE_PROPERTY_ID};
+use crate::{UiAutomationActionSink, UiAutomationFocusSink};
 
 /// The fixed automation identifier for an Anodrel surface's root.
 ///
@@ -42,18 +42,20 @@ pub struct Tree {
     title: Vec<u16>,
     elements: Vec<AccessibleElement>,
     field_values: BTreeMap<String, Vec<u16>>,
-    focused: Option<usize>,
+    /// A provider's initial snapshot, updated only after that same provider's
+    /// successful `SetFocus` call. It never observes unrelated live focus.
+    focused: Mutex<Option<usize>>,
     action_sink: Option<UiAutomationActionSink>,
+    focus_sink: Option<UiAutomationFocusSink>,
 }
 
 impl Tree {
     /// Builds the tree for one window title and its publishable elements.
     ///
     /// Focus and field values are reduced to published targets while the tree
-    /// is created, so a provider never reads a mutable view. A sink exists
-    /// only for a current authenticated UI session. It is still gated per
-    /// element below, so a diagnostic surface cannot become invokable just
-    /// because it has the same visual role as an application button.
+    /// is created, so a provider never reads a mutable view. The action sink
+    /// exists only for a current authenticated UI session. The focus sink is a
+    /// host-only route for this one view; both are gated per element below.
     #[must_use]
     pub fn new(
         title: Vec<u16>,
@@ -61,6 +63,7 @@ impl Tree {
         field_values: Vec<(ElementId, String)>,
         focused: Option<ElementId>,
         action_sink: Option<UiAutomationActionSink>,
+        focus_sink: Option<UiAutomationFocusSink>,
     ) -> Self {
         let focused = focused.and_then(|id| focus_index(&elements, &id));
         let field_values = field_values
@@ -71,8 +74,9 @@ impl Tree {
             title,
             elements,
             field_values,
-            focused,
+            focused: Mutex::new(focused),
             action_sink,
+            focus_sink,
         }
     }
 
@@ -120,7 +124,7 @@ impl Tree {
             property::IS_ENABLED => Some(Variant::boolean(element.enabled())),
             property::IS_KEYBOARD_FOCUSABLE => Some(Variant::boolean(element.keyboard_focusable())),
             UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => {
-                Some(Variant::boolean(self.focused == Some(index)))
+                Some(Variant::boolean(self.focused() == Some(index)))
             }
             UIA_VALUE_VALUE_PROPERTY_ID => Some(Variant::string(self.field_value(index)?)),
             UIA_VALUE_IS_READ_ONLY_PROPERTY_ID => {
@@ -169,8 +173,11 @@ impl Tree {
     /// A missing, clipped, disabled, non-focusable, or filtered ID is reduced
     /// to no focus at construction time. See Decision 0070.
     #[must_use]
-    pub const fn focused(&self) -> Option<usize> {
-        self.focused
+    pub fn focused(&self) -> Option<usize> {
+        *self
+            .focused
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Whether one published element exposes a read-only field-value snapshot.
@@ -218,11 +225,49 @@ impl Tree {
         sink.offer(id)
     }
 
+    /// Whether one published element supports host-owned UI Automation focus.
+    ///
+    /// This is separate from button invocation: a field can take focus but
+    /// cannot create a semantic action, and a diagnostic view can take focus
+    /// without gaining an application action route.
+    #[must_use]
+    pub fn supports_focus(&self, index: usize) -> bool {
+        self.focus_target(index).is_some() && self.focus_sink.is_some()
+    }
+
+    /// Requests focus for one published element through its host-only route.
+    ///
+    /// The owner still validates the current layout and snapshot revision
+    /// before it writes focus. On success only this tree's copied focus result
+    /// changes, so an immediate query stays truthful without a live lookup.
+    pub fn focus(&self, index: usize) -> bool {
+        let Some(target) = self.focus_target(index) else {
+            return false;
+        };
+        let Some(sink) = &self.focus_sink else {
+            return false;
+        };
+        if !sink.focus(target) {
+            return false;
+        }
+        *self
+            .focused
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(index);
+        true
+    }
+
     fn invocation_id(&self, index: usize) -> Option<ElementId> {
         let element = self.elements.get(index)?;
         (element.control_type() == control_type::BUTTON && element.enabled())
             .then(|| ElementId::new(element.automation_id()).ok())
             .flatten()
+    }
+
+    fn focus_target(&self, index: usize) -> Option<ElementId> {
+        let element = self.elements.get(index)?;
+        let id = ElementId::new(element.automation_id()).ok()?;
+        (focus_index(&self.elements, &id) == Some(index)).then_some(id)
     }
 
     fn field_value(&self, index: usize) -> Option<&[u16]> {
@@ -304,7 +349,7 @@ mod tests {
     };
 
     use super::{ROOT_AUTOMATION_ID, Tree, direction, publishable, step};
-    use crate::{UiAutomationActionSink, raw::VT_EMPTY};
+    use crate::{UiAutomationActionSink, UiAutomationFocusMailbox, raw::VT_EMPTY};
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"},{"id":"blocked","kind":"action","label":"Unavailable","fontSize":16,"enabled":false,"tone":"accent"}]}}"#;
     const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true},{"id":"locked","kind":"field","label":"Locked","value":"","maxLength":64,"fontSize":16,"enabled":false},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
@@ -348,6 +393,7 @@ mod tests {
             Vec::new(),
             None,
             None,
+            None,
         )
     }
 
@@ -366,10 +412,21 @@ mod tests {
                 Vec::new(),
                 None,
                 Some(sink),
+                None,
             ),
             mailbox,
             revision,
         )
+    }
+
+    fn focus_sink() -> crate::UiAutomationFocusSink {
+        let mailbox = UiAutomationFocusMailbox::new();
+        let route = mailbox.route(None);
+        let completing = mailbox.clone();
+        route.with_notifier(move || {
+            let request = completing.take().expect("a focus route is pending");
+            completing.complete(request.id(), true)
+        })
     }
 
     #[test]
@@ -453,7 +510,7 @@ mod tests {
         // Asking with each element's own rectangle keeps the test about hit
         // testing rather than about whatever geometry the layout produced.
         let published = publishable(mapped());
-        let tree = Tree::new(Vec::new(), published.clone(), Vec::new(), None, None);
+        let tree = Tree::new(Vec::new(), published.clone(), Vec::new(), None, None, None);
 
         for (index, element) in published.iter().enumerate() {
             let bounds = element.bounds();
@@ -491,6 +548,7 @@ mod tests {
             Vec::new(),
             Some(ElementId::new("go").expect("fixed ID is valid")),
             None,
+            None,
         );
         // The stack was filtered, leaving text, the enabled action, then the
         // disabled action. The portable focus target therefore maps directly
@@ -525,9 +583,33 @@ mod tests {
                 Vec::new(),
                 Some(ElementId::new(id).expect("fixed ID is valid")),
                 None,
+                None,
             );
             assert_eq!(tree.focused(), None, "{id} must not report focus");
         }
+    }
+
+    #[test]
+    fn focus_route_accepts_only_a_visible_enabled_focus_target() {
+        let tree = Tree::new(
+            Vec::new(),
+            publishable(mapped()),
+            Vec::new(),
+            None,
+            None,
+            Some(focus_sink()),
+        );
+
+        // The stack was filtered, then the text, the enabled action, and the
+        // disabled action remained. Only the enabled action can enter the
+        // route, and success updates this provider's own focus snapshot.
+        assert!(!tree.supports_focus(0));
+        assert!(tree.supports_focus(1));
+        assert!(!tree.supports_focus(2));
+        assert!(tree.focus(1));
+        assert_eq!(tree.focused(), Some(1));
+        assert!(!tree.focus(2));
+        assert_eq!(tree.focused(), Some(1));
     }
 
     #[test]
@@ -549,6 +631,7 @@ mod tests {
                     "must not reach an action".to_owned(),
                 ),
             ],
+            None,
             None,
             None,
         );

@@ -118,17 +118,20 @@ Status: **Direct Windows host in progress**
   joined by one bounded action: an enabled button in an authenticated UI session
   exposes `IInvokeProvider`, which queues the same revision-bound semantic
   event as local pointer and keyboard activation (Decision 0069). It has no
-  native-input shortcut, focus movement, accessibility callback, or
+  native-input shortcut, accessibility callback, or
   application-specific queue; the diagnostic UI Lab remains readable but
   non-invokable. `GetFocus` and `HasKeyboardFocus` now report a copied current
-  host-focus snapshot with no `SetFocus`, focus event, or live-state lookup
-  (Decision 0070). A visible field now exposes only its copied current text
+  host-focus snapshot with no focus event or live-state lookup (Decision 0070).
+  A visible enabled focus target can now accept `SetFocus` through a private
+  per-window route, and only its owning UI thread revalidates and applies that
+  move (Decision 0073). It exposes no application focus surface, native input,
+  or activation route. A visible field now exposes only its copied current text
   through a read-only `IValueProvider`; `SetValue`, selection, caret data, and
   value events stay absent (Decision 0071). Unit and host checks cover all three
-  routes; manual screen-reader activation, focus, and field-value verification
-  remain open. Automation events, live announcements, focus control, text
+  routes; manual screen-reader activation, focus control, and field-value
+  verification remain open. Automation events, live announcements, text
   patterns and ranges, hierarchical grouping, and non-Windows adapters stay
-  deferred. See `docs/ACCESSIBILITY.md`.
+  deferred. See `docs/ACCESSIBILITY.md` and `docs/UI_AUTOMATION_FOCUS.md`.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

@@ -10,10 +10,12 @@
 //! The provider is host-owned. It supplies Invoke only for an enabled button in
 //! a current authenticated UI session, routes that action through the session's
 //! existing bounded semantic mailbox, and supplies a read-only field value only
-//! from an immutable host snapshot. It refuses to move focus or set field text.
-//! Nothing tells an application that assistive technology is listening. See
-//! Decisions 0069 and 0071.
+//! from an immutable host snapshot. A visible enabled field or button can use a
+//! bounded host-owned focus route; it cannot set field text. Nothing tells an
+//! application that assistive technology is listening. See Decisions 0069,
+//! 0071, and 0073.
 
+mod focus;
 mod raw;
 mod raw2;
 mod raw3;
@@ -46,6 +48,10 @@ use raw3::{IID_IINVOKE_PROVIDER, UIA_INVOKE_PATTERN_ID};
 use raw5::{IID_IVALUE_PROVIDER, UIA_VALUE_PATTERN_ID};
 use tree::Tree;
 
+pub use focus::{
+    UiAutomationFocusMailbox, UiAutomationFocusRequest, UiAutomationFocusRoute,
+    UiAutomationFocusSink,
+};
 pub use tree::publishable;
 
 /// The session-bound semantic route an invokable authenticated button may use.
@@ -58,6 +64,45 @@ pub use tree::publishable;
 pub struct UiAutomationActionSink {
     revision: UiDocumentRevision,
     mailbox: UiInputMailbox,
+}
+
+/// The immutable semantic data one host window publishes to UI Automation.
+///
+/// This packages the five snapshots and bounded routes that must remain aligned
+/// for one `WM_GETOBJECT` reply. The host creates a fresh value for each reply;
+/// the provider never retains a mutable native view or application callback.
+pub struct UiAutomationPublication {
+    elements: Vec<AccessibleElement>,
+    field_values: Vec<(ElementId, String)>,
+    focused: Option<ElementId>,
+    action_sink: Option<UiAutomationActionSink>,
+    focus_sink: Option<UiAutomationFocusSink>,
+}
+
+impl UiAutomationPublication {
+    /// Builds one immutable publication from a single host layout snapshot.
+    #[must_use]
+    pub fn new(
+        elements: Vec<AccessibleElement>,
+        field_values: Vec<(ElementId, String)>,
+        focused: Option<ElementId>,
+        action_sink: Option<UiAutomationActionSink>,
+        focus_sink: Option<UiAutomationFocusSink>,
+    ) -> Self {
+        Self {
+            elements,
+            field_values,
+            focused,
+            action_sink,
+            focus_sink,
+        }
+    }
+
+    /// Builds the empty publication for a window without a native UI document.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::new(Vec::new(), Vec::new(), None, None, None)
+    }
 }
 
 impl UiAutomationActionSink {
@@ -106,10 +151,7 @@ pub unsafe fn answer_get_object(
     window: Handle,
     wparam: usize,
     lparam: isize,
-    elements: Vec<AccessibleElement>,
-    field_values: Vec<(ElementId, String)>,
-    focused: Option<ElementId>,
-    action_sink: Option<UiAutomationActionSink>,
+    publication: UiAutomationPublication,
 ) -> Option<Lresult> {
     if lparam != UIA_ROOT_OBJECT_ID {
         return None;
@@ -123,10 +165,11 @@ pub unsafe fn answer_get_object(
 
     let tree = Arc::new(Tree::new(
         window_title(window),
-        elements,
-        field_values,
-        focused,
-        action_sink,
+        publication.elements,
+        publication.field_values,
+        publication.focused,
+        publication.action_sink,
+        publication.focus_sink,
     ));
     let provider = Provider::create(window, None, tree);
     // SAFETY: `provider` is live with one reference held here, and
@@ -794,9 +837,25 @@ unsafe extern "system" fn get_embedded_fragment_roots(
     })
 }
 
-unsafe extern "system" fn set_focus(_this: *mut c_void) -> Hresult {
-    // Read-only. Moving focus is an action, and this provider performs none.
-    UIA_E_NOTSUPPORTED
+unsafe extern "system" fn set_focus(this: *mut c_void) -> Hresult {
+    contain(|| {
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: `this` points at the Fragment vtable field of a live provider.
+        let provider = unsafe { fragment_of(this) };
+        // SAFETY: the caller holds a reference; the element and tree are valid.
+        let (element, tree) = unsafe { ((*provider).element, &(*provider).tree) };
+        let Some(element) = element else {
+            // The window root is already focused by UI Automation before it
+            // reaches an element's SetFocus implementation.
+            return UIA_E_NOTSUPPORTED;
+        };
+        if !tree.supports_focus(element) {
+            return UIA_E_NOTSUPPORTED;
+        }
+        if tree.focus(element) { S_OK } else { E_FAIL }
+    })
 }
 
 unsafe extern "system" fn get_fragment_root(this: *mut c_void, out: *mut *mut c_void) -> Hresult {
@@ -891,11 +950,12 @@ mod tests {
     use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
 
     use super::{
-        E_NOINTERFACE, E_POINTER, Guid, IID_IINVOKE_PROVIDER, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT,
-        IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN,
-        IID_IVALUE_PROVIDER, InvokeVtbl, Provider, S_OK, Tree, UIA_E_NOTSUPPORTED,
-        UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID, UiAutomationActionSink, ValueVtbl, contain,
-        increment, release_provider, set_focus,
+        E_NOINTERFACE, E_POINTER, FragmentVtbl, Guid, IID_IINVOKE_PROVIDER,
+        IID_IRAW_ELEMENT_PROVIDER_FRAGMENT, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT,
+        IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, IID_IVALUE_PROVIDER, InvokeVtbl, Provider,
+        S_OK, Tree, UIA_E_NOTSUPPORTED, UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID,
+        UiAutomationActionSink, UiAutomationFocusMailbox, ValueVtbl, contain, increment,
+        release_provider, set_focus,
     };
 
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
@@ -913,7 +973,14 @@ mod tests {
     }
 
     fn tree() -> Arc<Tree> {
-        Arc::new(Tree::new(Vec::new(), Vec::new(), Vec::new(), None, None))
+        Arc::new(Tree::new(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+            None,
+        ))
     }
 
     fn root() -> *mut Provider {
@@ -954,6 +1021,7 @@ mod tests {
                     Vec::new(),
                     None,
                     Some(sink),
+                    None,
                 )),
             ),
             mailbox,
@@ -978,6 +1046,37 @@ mod tests {
                 Vec::new(),
                 Some(anodrel_ui::ElementId::new("continue").expect("fixed ID is valid")),
                 None,
+                None,
+            )),
+        )
+    }
+
+    /// Builds one visible enabled child whose host-only route accepts focus.
+    fn focusable_child() -> *mut Provider {
+        let document = anodrel_ui_document::decode(ACTION_DOCUMENT)
+            .expect("the fixed action document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = super::publishable(accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        ));
+        let mailbox = UiAutomationFocusMailbox::new();
+        let route = mailbox.route(None);
+        let completing = mailbox.clone();
+        let sink = route.with_notifier(move || {
+            let request = completing.take().expect("focus request is pending");
+            completing.complete(request.id(), true)
+        });
+        Provider::create(
+            0,
+            Some(0),
+            Arc::new(Tree::new(
+                Vec::new(),
+                elements,
+                Vec::new(),
+                None,
+                None,
+                Some(sink),
             )),
         )
     }
@@ -1000,6 +1099,7 @@ mod tests {
                     anodrel_ui::ElementId::new("name").expect("fixed ID is valid"),
                     "Ada".to_owned(),
                 )],
+                None,
                 None,
                 None,
             )),
@@ -1168,11 +1268,31 @@ mod tests {
     }
 
     #[test]
-    fn focus_cannot_be_moved_through_a_read_only_provider() {
-        // SAFETY: set_focus reads nothing from its argument.
+    fn focus_requires_a_live_visible_provider_and_updates_its_snapshot() {
+        // SAFETY: a null interface pointer has no live provider to recover.
         let result = unsafe { set_focus(ptr::null_mut()) };
+        assert_eq!(result, E_POINTER);
+
+        let root = root();
+        // SAFETY: this test owns a live root provider, which is not a child
+        // focus target.
+        let result = unsafe { set_focus((&raw mut (*root).fragment).cast::<c_void>()) };
         assert_eq!(result, UIA_E_NOTSUPPORTED);
         assert!(result < 0);
+        // SAFETY: releasing this test's creation reference.
+        unsafe { release_provider(root) };
+
+        let provider = focusable_child();
+        // SAFETY: the provider is live and the route completes synchronously
+        // in this test without creating a native input path.
+        unsafe {
+            let fragment = (&raw mut (*provider).fragment).cast::<c_void>();
+            assert_eq!(set_focus(fragment), S_OK);
+            assert_eq!((*provider).tree.focused(), Some(0));
+            let vtable = *fragment.cast::<*const FragmentVtbl>();
+            assert_eq!(((*vtable).set_focus)(fragment), S_OK);
+            release_provider(provider);
+        }
     }
 
     #[test]

@@ -21,6 +21,7 @@ static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 pub(super) struct AccessibilityPublication {
     pub(super) snapshot: anodrel_ui::UiAccessibilitySnapshot,
     pub(super) action_sink: Option<anodrel_windows_uia::UiAutomationActionSink>,
+    pub(super) focus_route: Option<anodrel_windows_uia::UiAutomationFocusRoute>,
     pub(super) focused: Option<anodrel_ui::ElementId>,
     pub(super) field_values: Vec<(anodrel_ui::ElementId, String)>,
 }
@@ -297,15 +298,34 @@ pub(super) fn accessibility_snapshot(
         Some(View::UiLab(lab)) => Some(AccessibilityPublication {
             snapshot: lab.accessibility_snapshot(width, height),
             action_sink: None,
+            focus_route: Some(lab.accessibility_focus_route(None)),
             focused: lab.accessibility_focus(),
             field_values: lab.accessibility_field_values(),
         }),
         Some(View::UiSession(session)) => Some(AccessibilityPublication {
             snapshot: session.lab().accessibility_snapshot(width, height),
             action_sink: session.accessibility_action_sink(),
+            focus_route: Some(session.accessibility_focus_route()),
             focused: session.lab().accessibility_focus(),
             field_values: session.lab().accessibility_field_values(),
         }),
+        _ => None,
+    })
+}
+
+/// Takes and revalidates a private UI Automation focus request on one view.
+///
+/// It is intentionally not a generic focus API: the only caller is the
+/// host's payload-free UIA wake message, and it cannot choose a view or target.
+pub(super) fn service_accessibility_focus(
+    window: Hwnd,
+    width: f32,
+    height: f32,
+) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    Ok(match views.get_mut(&window) {
+        Some(View::UiLab(lab)) => Some(lab.service_accessibility_focus(None, width, height)),
+        Some(View::UiSession(session)) => Some(session.service_accessibility_focus(width, height)),
         _ => None,
     })
 }

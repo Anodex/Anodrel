@@ -16,6 +16,7 @@ use anodrel_ui::{
 use anodrel_ui_document::decode;
 use anodrel_ui_session::UiFieldSnapshot;
 use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
+use anodrel_windows_uia::{UiAutomationFocusMailbox, UiAutomationFocusRoute};
 
 use super::text;
 use super::text::{Align, TextSpec};
@@ -65,6 +66,11 @@ pub(super) struct UiLab {
     /// Host-owned and never sent anywhere. A document seeds it; after that only
     /// a person changes it. See `docs/UI_FIELDS.md`.
     fields: UiFieldStates,
+    /// The private UI Automation route for this one native view.
+    ///
+    /// A provider receives only a revision-bound route, never this mutable
+    /// view. The UI thread revalidates every request below.
+    automation_focus: UiAutomationFocusMailbox,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
 }
@@ -218,6 +224,7 @@ impl UiLab {
             scroll_offsets: UiScrollOffsets::new(),
             wheel: UiScrollWheel::default(),
             fields,
+            automation_focus: UiAutomationFocusMailbox::new(),
             hovered: None,
             last_action: None,
         }
@@ -403,6 +410,47 @@ impl UiLab {
     /// clipped target becomes no reported focus rather than a guess.
     pub(super) fn accessibility_focus(&self) -> Option<ElementId> {
         self.focus.focused().cloned()
+    }
+
+    /// Binds one immutable provider snapshot to this view's focus route.
+    pub(super) fn accessibility_focus_route(
+        &self,
+        revision: Option<anodrel_ui_session::UiDocumentRevision>,
+    ) -> UiAutomationFocusRoute {
+        self.automation_focus.route(revision)
+    }
+
+    /// Takes and revalidates at most one pending UI Automation focus request.
+    ///
+    /// `expected_revision` is `None` for the fixed diagnostic UI Lab and the
+    /// current accepted document revision for an authenticated session. A
+    /// successful request can leave an already-focused target in place, which
+    /// is still a truthful success for `SetFocus`.
+    pub(super) fn service_accessibility_focus(
+        &mut self,
+        expected_revision: Option<anodrel_ui_session::UiDocumentRevision>,
+        width: f32,
+        height: f32,
+    ) -> bool {
+        let mailbox = self.automation_focus.clone();
+        let Some(request) = mailbox.take() else {
+            return false;
+        };
+        mailbox
+            .complete_with(request.id(), || {
+                request.revision() == expected_revision
+                    && self.focus_accessibility_target(width, height, request.target())
+            })
+            .unwrap_or(false)
+    }
+
+    fn focus_accessibility_target(&mut self, width: f32, height: f32, target: &ElementId) -> bool {
+        let layout = self.layout(width, height);
+        if !self.focus.can_focus(&layout, target) {
+            return false;
+        }
+        let _ = self.focus.focus_on(&layout, target);
+        true
     }
 
     fn layout(&self, width: f32, height: f32) -> UiLayout {
@@ -969,6 +1017,29 @@ mod tests {
         // Clicking the same field again is not a change, so the caller does not
         // repaint for it.
         assert!(!lab.focus_at(BASE_WIDTH, BASE_HEIGHT, centre));
+    }
+
+    #[test]
+    fn automation_focus_revalidates_the_current_layout_before_it_moves() {
+        let mut lab = UiLab::new();
+        let field = id("ui.lab.field");
+        let action = id("ui.lab.hit-test");
+        let missing = id("ui.lab.missing");
+
+        assert!(lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field));
+        assert_eq!(lab.accessibility_focus(), Some(field.clone()));
+        // Repeating a valid focus request is successful even though it does
+        // not repaint: UI Automation asked for a state that is already true.
+        assert!(lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field));
+        assert!(lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &action));
+        assert_eq!(lab.accessibility_focus(), Some(action));
+        assert!(!lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &missing));
+
+        lab.replace_document(UiLab::waiting_for_session().document);
+        assert!(
+            !lab.focus_accessibility_target(BASE_WIDTH, BASE_HEIGHT, &field),
+            "a target removed by replacement retained accessibility focus"
+        );
     }
 
     #[test]

@@ -370,6 +370,17 @@ impl UiSessionView {
         )
     }
 
+    /// Binds this current session revision to its host-only UIA focus route.
+    pub(super) fn accessibility_focus_route(&self) -> anodrel_windows_uia::UiAutomationFocusRoute {
+        self.lab.accessibility_focus_route(Some(self.revision))
+    }
+
+    /// Services one UI Automation focus request on the owning UI thread.
+    pub(super) fn service_accessibility_focus(&mut self, width: f32, height: f32) -> bool {
+        self.lab
+            .service_accessibility_focus(Some(self.revision), width, height)
+    }
+
     fn queue_event(&self, event: UiEvent) -> bool {
         if self.revision == UiDocumentRevision::INITIAL {
             return false;

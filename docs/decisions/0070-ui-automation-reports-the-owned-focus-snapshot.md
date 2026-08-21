@@ -1,8 +1,12 @@
 # Decision 0070: UI Automation reports the owned focus snapshot without controlling it
 
-**Status:** Accepted
+**Status:** Superseded in part by Decision 0073
 
 **Date:** 2026-08-21
+
+Decision 0073 adds a separate bounded `SetFocus` route. This record continues
+to define the immutable focus-reporting snapshot and remains the boundary for
+all focus reporting that is not the provider's own successful focus request.
 
 ## Context
 
