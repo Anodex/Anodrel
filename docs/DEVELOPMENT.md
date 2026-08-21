@@ -475,6 +475,26 @@ This manual check is not yet recorded as passed. See `docs/WINDOW_FOCUS.md` for
 the deliberately absent target, focus readback, input, retry, and foreground
 policy bypass APIs.
 
+To exercise the separately granted reversible fullscreen command, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-fullscreen-client $nodePath $clientPath
+~~~
+
+The client requests borderless `fullscreen`, holds it briefly, then requests
+`windowed`. Watch the Anodrel window fill the monitor it already occupies and
+return to its original framed placement. It never receives the monitor, bounds,
+style, display mode, or current fullscreen state. On a multi-monitor desktop,
+move the window to a non-primary monitor before the first request and confirm
+that same monitor is used. Then complete the normal semantic action to close
+the session. If the client stops at safe stage 30, the host could not safely
+apply or restore the mode; it deliberately does not reveal which native step
+failed.
+
+This manual check is not yet recorded as passed. See `docs/WINDOW_FULLSCREEN.md`
+for the deliberately absent monitor selection, exclusive display control,
+geometry, state readback, event, and cross-window APIs.
+
 To exercise text fields and the granted value read, run:
 
 ~~~powershell

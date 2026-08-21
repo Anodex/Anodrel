@@ -25,6 +25,7 @@ pub(crate) struct DevelopmentSessionUi {
     pub(crate) window_title: anodrel_window::WindowTitleMailbox,
     pub(crate) window_state: anodrel_window::WindowStateMailbox,
     pub(crate) window_focus: anodrel_window::WindowFocusMailbox,
+    pub(crate) window_fullscreen: anodrel_window::WindowFullscreenMailbox,
     pub(crate) fields: UiFieldMailbox,
 }
 
@@ -43,6 +44,7 @@ impl DevelopmentSessionUi {
             window_title: anodrel_window::WindowTitleMailbox::new(),
             window_state: anodrel_window::WindowStateMailbox::new(),
             window_focus: anodrel_window::WindowFocusMailbox::new(),
+            window_fullscreen: anodrel_window::WindowFullscreenMailbox::new(),
             fields: UiFieldMailbox::new(),
         }
     }

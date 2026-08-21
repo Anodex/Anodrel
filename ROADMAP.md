@@ -81,9 +81,17 @@ Status: **Direct Windows host in progress**
   session-local UI-thread bridge, direct Windows `SetForegroundWindow` adapter,
   product-session composition, and development diagnostic are implemented
   (Decision 0085); its foreground-policy outcome remains a manual desktop
-  check. Window creation, cross-session closing, geometry, enumeration,
-  fullscreen, state or focus readback, and every other window property remain
-  deferred, each needing its own grant, decision, and threat-model entry.
+  check. The fourth narrow public lifecycle capability is
+  `window.fullscreen.set`: Protocol 1.21 and record version 1.10 define the
+  separately granted closed `fullscreen` or `windowed` request for only that
+  same session window. The SDK, mock host, policy parser, session-local
+  UI-thread bridge, private placement restoration, direct User32 and monitor
+  adapter, product-session composition, and development diagnostic are
+  implemented (Decision 0086); its desktop entry-and-restore check remains
+  manual. Window creation, cross-session closing, geometry, enumeration,
+  exclusive display control, monitor selection, state or focus readback, and
+  every other window property remain deferred, each needing its own grant,
+  decision, and threat-model entry.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decision 0079 and `docs/FILE_WRITE.md` preserve
   the legacy non-mutating save picker while implementing an independent,

@@ -7,6 +7,7 @@ import {
   type RequestEnvelope,
   type ResultFor,
   type NativeSessionMenu,
+  type WindowFullscreenMode,
   type WindowState,
 } from "@anodrel/protocol";
 
@@ -95,6 +96,20 @@ export class PlatformClient {
    */
   requestWindowFocus(): Promise<ResultFor<"window.focus.request">> {
     return this.request("window.focus.request", {});
+  }
+
+  /**
+   * Chooses reversible borderless fullscreen for this session's own window.
+   *
+   * This is not display control: there is no window target, monitor,
+   * coordinate, display mode, geometry, fullscreen-state readback, or event.
+   * The host retains the restoration details and success means only that its
+   * UI thread accepted the closed requested mode.
+   */
+  setWindowFullscreen(
+    mode: WindowFullscreenMode,
+  ): Promise<ResultFor<"window.fullscreen.set">> {
+    return this.request("window.fullscreen.set", { mode });
   }
 
   /**

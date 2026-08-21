@@ -291,6 +291,7 @@ enum RecordVersion {
     V1_7,
     V1_8,
     V1_9,
+    V1_10,
 }
 
 impl RecordVersion {
@@ -309,6 +310,7 @@ impl RecordVersion {
                 | Self::V1_7
                 | Self::V1_8
                 | Self::V1_9
+                | Self::V1_10
         )
     }
 
@@ -323,6 +325,7 @@ impl RecordVersion {
                 | Self::V1_7
                 | Self::V1_8
                 | Self::V1_9
+                | Self::V1_10
         )
     }
 
@@ -330,7 +333,13 @@ impl RecordVersion {
     const fn accepts_v1_4_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_4 | Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8 | Self::V1_9
+            Self::V1_4
+                | Self::V1_5
+                | Self::V1_6
+                | Self::V1_7
+                | Self::V1_8
+                | Self::V1_9
+                | Self::V1_10
         )
     }
 
@@ -338,7 +347,7 @@ impl RecordVersion {
     const fn accepts_v1_5_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8 | Self::V1_9
+            Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8 | Self::V1_9 | Self::V1_10
         )
     }
 }
@@ -462,6 +471,7 @@ fn capability_for_record_version(
                     | RecordVersion::V1_7
                     | RecordVersion::V1_8
                     | RecordVersion::V1_9
+                    | RecordVersion::V1_10
             ) =>
         {
             Some(Capability::WindowState)
@@ -469,15 +479,28 @@ fn capability_for_record_version(
         "file.write_text"
             if matches!(
                 version,
-                RecordVersion::V1_7 | RecordVersion::V1_8 | RecordVersion::V1_9
+                RecordVersion::V1_7
+                    | RecordVersion::V1_8
+                    | RecordVersion::V1_9
+                    | RecordVersion::V1_10
             ) =>
         {
             Some(Capability::FileWriteText)
         }
-        "menu.write" if matches!(version, RecordVersion::V1_8 | RecordVersion::V1_9) => {
+        "menu.write"
+            if matches!(
+                version,
+                RecordVersion::V1_8 | RecordVersion::V1_9 | RecordVersion::V1_10
+            ) =>
+        {
             Some(Capability::MenuWrite)
         }
-        "window.focus" if version == RecordVersion::V1_9 => Some(Capability::WindowFocus),
+        "window.focus" if matches!(version, RecordVersion::V1_9 | RecordVersion::V1_10) => {
+            Some(Capability::WindowFocus)
+        }
+        "window.fullscreen" if version == RecordVersion::V1_10 => {
+            Some(Capability::WindowFullscreen)
+        }
         _ => None,
     }
 }
@@ -587,6 +610,7 @@ fn validate_version(
         (1, 7) => Ok(RecordVersion::V1_7),
         (1, 8) => Ok(RecordVersion::V1_8),
         (1, 9) => Ok(RecordVersion::V1_9),
+        (1, 10) => Ok(RecordVersion::V1_10),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -1074,6 +1098,58 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_10_adds_window_fullscreen_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 10")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"window.state\", \"window.focus\", \"window.fullscreen\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.10 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::WindowState,
+                anodrel_protocol::Capability::WindowFocus,
+                anodrel_protocol::Capability::WindowFullscreen,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_window_fullscreen_grant() {
+        // Version 1.9 is the newest record before this grant. Keeping it
+        // invalid prevents a stale provisioning tool from silently widening a
+        // verified application's desktop-presentation authority.
+        for minor in ["6", "7", "8", "9"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"window.fullscreen\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.10 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

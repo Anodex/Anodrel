@@ -226,6 +226,21 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-window-fullscreen")) {
+      // The host picks the monitor for its own known window and keeps all
+      // placement facts private. Pauses make both transitions observable, but
+      // this client learns only that each closed mode was accepted.
+      const entered = await client.setWindowFullscreen("fullscreen");
+      if (entered.status !== "applied") {
+        return 30;
+      }
+      await delay(900);
+      const restored = await client.setWindowFullscreen("windowed");
+      if (restored.status !== "applied") {
+        return 30;
+      }
+    }
+
     if (process.argv.includes("--request-credentials")) {
       const result = await runCredentialDiagnostic(client);
       if (result !== 0) {

@@ -268,6 +268,63 @@ pub(super) fn complete_window_focus_request(
     }
 }
 
+/// Takes one pending fullscreen mode only from its associated UI session.
+///
+/// The returned restore facts are a private copy held by that same view. The
+/// caller never sees a window handle, monitor, rectangle, or current-state
+/// value; it can only hand the known host window to the native adapter.
+pub(super) fn take_window_fullscreen_request(
+    window: Hwnd,
+) -> io::Result<
+    Option<(
+        u64,
+        anodrel_window::WindowFullscreenMode,
+        Option<super::fullscreen::FullscreenRestore>,
+    )>,
+> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session
+            .take_window_fullscreen_request()
+            .map(|(request_id, mode)| (request_id, mode, session.fullscreen_restore()))),
+        _ => Ok(None),
+    }
+}
+
+/// Stores or clears private fullscreen restoration facts for one UI session.
+///
+/// This is deliberately independent from replying to the protocol worker: a
+/// UI-thread transition that finishes as a worker expires must remain
+/// restorable rather than losing its only copy of the original placement.
+pub(super) fn set_window_fullscreen_restore(
+    window: Hwnd,
+    restore: Option<super::fullscreen::FullscreenRestore>,
+) -> io::Result<Option<()>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => {
+            session.set_fullscreen_restore(restore);
+            Ok(Some(()))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Completes one fullscreen request from its owning native UI session.
+pub(super) fn complete_window_fullscreen_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_window_fullscreen_request(request_id, applied),
+        )),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending menu replacement only from its associated UI session.
 ///
 /// The resulting model has no native object yet, so User32 construction can

@@ -12,7 +12,10 @@ use anodrel_ui_session::{
     UiDocumentMailbox, UiDocumentRevision, UiFieldMailbox, UiFieldRequest, UiInputCandidate,
     UiInputMailbox,
 };
-use anodrel_window::{WindowFocusMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox};
+use anodrel_window::{
+    WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowState,
+    WindowStateMailbox, WindowTitleMailbox,
+};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
@@ -63,6 +66,15 @@ pub(super) struct UiSessionView {
     /// The view supplies no target or native handle. Its owning UI thread can
     /// ask Windows to foreground only the window that owns this view.
     window_focus: Option<WindowFocusMailbox>,
+    /// This session's one-request reversible fullscreen bridge, when it has
+    /// one. The host keeps its saved native presentation facts beside this
+    /// session view; neither facts nor a native handle reach the application.
+    window_fullscreen: Option<WindowFullscreenMailbox>,
+    /// The pre-fullscreen native presentation facts retained by the host.
+    ///
+    /// `Some` means the host has a restoration path it must preserve. It is
+    /// never a protocol-visible current-state flag.
+    fullscreen_restore: Option<super::fullscreen::FullscreenRestore>,
     /// The validated display name appended to any title this session proposes.
     ///
     /// Held beside the mailbox rather than passed with each request: it comes
@@ -111,6 +123,8 @@ impl UiSessionView {
             window_title: None,
             window_state: None,
             window_focus: None,
+            window_fullscreen: None,
+            fullscreen_restore: None,
             display_name: None,
             field_reads: None,
             revision: UiDocumentRevision::INITIAL,
@@ -145,6 +159,13 @@ impl UiSessionView {
     #[must_use]
     pub(super) fn with_window_focus(mut self, mailbox: WindowFocusMailbox) -> Self {
         self.window_focus = Some(mailbox);
+        self
+    }
+
+    /// Attaches this session's guarded reversible-fullscreen bridge.
+    #[must_use]
+    pub(super) fn with_window_fullscreen(mut self, mailbox: WindowFullscreenMailbox) -> Self {
+        self.window_fullscreen = Some(mailbox);
         self
     }
 
@@ -256,6 +277,45 @@ impl UiSessionView {
         }
     }
 
+    /// Takes one pending reversible fullscreen mode for this window's UI thread.
+    pub(super) fn take_window_fullscreen_request(&self) -> Option<(u64, WindowFullscreenMode)> {
+        let request = self.window_fullscreen.as_ref()?.take()?;
+        Some((request.id(), request.mode()))
+    }
+
+    /// Returns a private copy of the presentation facts retained for restore.
+    pub(super) fn fullscreen_restore(&self) -> Option<super::fullscreen::FullscreenRestore> {
+        self.fullscreen_restore.clone()
+    }
+
+    /// Replaces the private presentation facts after one host-side transition.
+    ///
+    /// This deliberately does not consult the protocol request: operating
+    /// system state must remain recoverable even if the matching worker timed
+    /// out just as the UI thread finished the native call.
+    pub(super) fn set_fullscreen_restore(
+        &mut self,
+        restore: Option<super::fullscreen::FullscreenRestore>,
+    ) {
+        self.fullscreen_restore = restore;
+    }
+
+    /// Completes one fullscreen request after the host applies its transition.
+    pub(super) fn complete_window_fullscreen_request(
+        &self,
+        request_id: u64,
+        applied: bool,
+    ) -> bool {
+        let Some(mailbox) = self.window_fullscreen.as_ref() else {
+            return false;
+        };
+        if applied {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
+        }
+    }
+
     /// Takes a pending notification for the host UI thread.
     ///
     /// The entry is returned alongside so the Shell32 call happens outside the
@@ -300,6 +360,7 @@ impl UiSessionView {
         .with_menu(ui.menu_mailbox())
         .with_window_state(ui.window_state_mailbox())
         .with_window_focus(ui.window_focus_mailbox())
+        .with_window_fullscreen(ui.window_fullscreen_mailbox())
         .with_field_reads(ui.field_mailbox());
         view.product_session = Some(Arc::new(session));
         view
@@ -504,7 +565,8 @@ mod tests {
     use anodrel_windows_file_access::WindowsFileTextService;
 
     use super::{
-        UiSessionView, WindowFocusMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox,
+        UiSessionView, WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode,
+        WindowState, WindowStateMailbox, WindowTitleMailbox,
     };
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
@@ -599,6 +661,21 @@ mod tests {
             NotificationMailbox::new(),
         )
         .with_window_focus(mailbox.clone());
+        (view, mailbox)
+    }
+
+    /// A session view with its own reversible-fullscreen bridge.
+    fn view_with_fullscreen() -> (UiSessionView, WindowFullscreenMailbox) {
+        let mailbox = WindowFullscreenMailbox::new();
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_window_fullscreen(mailbox.clone());
         (view, mailbox)
     }
 
@@ -757,6 +834,21 @@ mod tests {
     }
 
     #[test]
+    fn a_session_without_a_fullscreen_bridge_answers_nothing_and_completes_nothing() {
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_window_fullscreen_request().is_none());
+        assert!(!view.complete_window_fullscreen_request(1, true));
+        assert!(view.fullscreen_restore().is_none());
+    }
+
+    #[test]
     fn a_session_without_a_menu_bridge_has_no_menu_request_or_command_route() {
         let view = UiSessionView::new(
             UiDocumentMailbox::new(),
@@ -814,6 +906,33 @@ mod tests {
             std::thread::yield_now();
         };
         assert!(first.complete_window_focus_request(request_id, true));
+        assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
+    }
+
+    #[test]
+    fn one_session_cannot_take_another_sessions_fullscreen_request() {
+        let (first, first_mailbox) = view_with_fullscreen();
+        let (second, _second_mailbox) = view_with_fullscreen();
+        let worker = first_mailbox.clone();
+        let waiting = std::thread::spawn(move || {
+            anodrel_window::WindowFullscreenService::set_fullscreen(
+                &worker,
+                WindowFullscreenMode::Fullscreen,
+            )
+        });
+
+        let (request_id, mode) = loop {
+            assert!(
+                second.take_window_fullscreen_request().is_none(),
+                "a session took another session's fullscreen request"
+            );
+            if let Some(request) = first.take_window_fullscreen_request() {
+                break request;
+            }
+            std::thread::yield_now();
+        };
+        assert_eq!(mode, WindowFullscreenMode::Fullscreen);
+        assert!(first.complete_window_fullscreen_request(request_id, true));
         assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
     }
 

@@ -30,6 +30,12 @@ Protocol 1.20 implements the separately granted session-window foreground
 request through one UI-thread bridge and direct `SetForegroundWindow`; it has
 no target, focus observation, input, retry, or cross-window path. The manual
 Windows foreground-policy diagnostic remains an explicit acceptance check.
+Protocol 1.21 implements separately granted reversible session-window
+fullscreen through one UI-thread bridge. It uses only the monitor Windows
+associates with that host-selected window and retains its native style and
+placement privately; it has no target, monitor selection, display control,
+geometry, fullscreen-state observation, or cross-window path. The manual
+Windows entry-and-restore diagnostic remains an explicit acceptance check.
 Clipboard, external-link, file-dialog, selection-scoped file-text, and
 application-state operations each have their own bounded values and separate
 host-issued grants. The development UI-session sample exercises these only with
@@ -110,6 +116,7 @@ authority for permissions.
 | UI input exhausts memory or silently loses state. | Keep a per-session queue of 32 candidates. Drop newer candidates only when full and report the exact dropped count on the next `ui.events.read`; return a separate discarded count for stale or unavailable actions. |
 | An application closes another window or turns a close request into process control. | Accept `session.close` only from the authenticated session carrying its host-issued `session.close` grant. Carry no target or native handle, coalesce it into one host-owned signal, and let the host UI or lifecycle owner decide and perform cleanup. |
 | An application steals focus, observes another application's foreground state, or turns a focus request into input authority. | Require the separate `window.focus` grant and exact empty Protocol 1.20 payload. Resolve the target only from the requesting authenticated session, transfer it through one five-second UI-thread mailbox, and call `SetForegroundWindow` only for that host-owned window. Windows may refuse; map refusal, timeout, and no associated window only to `window.unavailable`, return no resulting focus or prior-foreground data, and provide no target, input, callback, retry, `AllowSetForegroundWindow`, or accessibility path. See `docs/WINDOW_FOCUS.md` and Decision 0085. |
+| An application gains arbitrary desktop or display control through fullscreen, loses a window's restoration facts, or learns topology from the result. | Require the separate `window.fullscreen` grant and exact one-field Protocol 1.21 payload with only `fullscreen` or `windowed`. Resolve the target only from the requesting authenticated session and transfer it through one five-second UI-thread mailbox. The Windows adapter chooses the monitor only from the known host window, stores its original style and placement only beside that session view, applies borderless **windowed** fullscreen rather than exclusive display control, and restores with the matching placement API. No target, handle, monitor, coordinate, geometry, display mode, topmost flag, visibility, state readback, event, callback, shortcut, or retry crosses the boundary. Missing surface, timeout, and native failure map only to `window.unavailable`; a concurrent request maps only to `window.busy`. See `docs/WINDOW_FULLSCREEN.md` and Decision 0086. |
 | Two host invocations race to display one package identity. | Claim a current-session mutex from the validated application ID; a secondary waits at most one second and can only issue a no-data best-effort activation request. |
 | A same-session process signals or reserves an instance object. | Treat the instance channel as local coordination only: it carries no payload or authority and returns a safe failure instead of creating a second window when readiness cannot be established. |
 | Two native windows render each other's state or one close ends the host early. | Keep immutable host-created views in a handle-keyed registry and exit the UI loop only after the final registered window is destroyed. |

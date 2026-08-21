@@ -14,6 +14,7 @@
 mod appicon;
 mod crash;
 mod document;
+mod fullscreen;
 mod menu;
 mod present;
 mod product_tile;
@@ -39,7 +40,10 @@ use anodrel_windows_instance::PrimaryInstance;
 
 use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
-use anodrel_window::{WindowFocusMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox};
+use anodrel_window::{
+    WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowState,
+    WindowStateMailbox, WindowTitleMailbox,
+};
 
 use crate::product::PreflightOutcome;
 use document::{Body, Document, Section};
@@ -315,7 +319,10 @@ enum View {
     Document(Document),
     StartupLab(StartupLab),
     UiLab(ui_lab::UiLab),
-    UiSession(ui_session_view::UiSessionView),
+    // The session carries its intentionally private service bridges. Keeping
+    // that larger, per-window state behind one allocation keeps every other
+    // window definition and registry entry compact.
+    UiSession(Box<ui_session_view::UiSessionView>),
 }
 
 struct WindowDefinition {
@@ -652,6 +659,7 @@ pub fn run_ui_session(
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_focus: WindowFocusMailbox,
+    window_fullscreen: WindowFullscreenMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -667,6 +675,7 @@ pub fn run_ui_session(
         window_title,
         window_state,
         window_focus,
+        window_fullscreen,
         display_name,
         field_reads,
     )
@@ -691,6 +700,10 @@ pub fn run_ui_session(
 /// `window_focus` carries only a request to foreground this same host-selected
 /// window. It exposes no target, input, retry, or observed focus state; see
 /// `docs/WINDOW_FOCUS.md`.
+///
+/// `window_fullscreen` carries only a reversible borderless or windowed mode
+/// for this same host-selected window. The UI thread retains native restoration
+/// facts privately; see `docs/WINDOW_FULLSCREEN.md`.
 #[allow(clippy::too_many_arguments)]
 pub fn run_authenticated_ui_session(
     title: &str,
@@ -704,6 +717,7 @@ pub fn run_authenticated_ui_session(
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_focus: WindowFocusMailbox,
+    window_fullscreen: WindowFullscreenMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -713,7 +727,7 @@ pub fn run_authenticated_ui_session(
             title: title.to_owned(),
             width: (920.0 * scale) as i32,
             height: (660.0 * scale) as i32,
-            view: View::UiSession(
+            view: View::UiSession(Box::new(
                 ui_session_view::UiSessionView::new(
                     mailbox,
                     input_mailbox,
@@ -726,8 +740,9 @@ pub fn run_authenticated_ui_session(
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
                 .with_window_focus(window_focus)
+                .with_window_fullscreen(window_fullscreen)
                 .with_field_reads(field_reads),
-            ),
+            )),
         }],
         None,
     )
@@ -1091,7 +1106,9 @@ fn open_product_session_window(
         title: "Anodrel Development Product Fixture".to_owned(),
         width: (920.0 * scale) as i32,
         height: (660.0 * scale) as i32,
-        view: View::UiSession(ui_session_view::UiSessionView::for_product_session(session)),
+        view: View::UiSession(Box::new(
+            ui_session_view::UiSessionView::for_product_session(session),
+        )),
     };
     let window = create_window(instance, &class_name, &definition)?;
     if let Err(error) = registry::insert(window, definition.view) {
@@ -1312,6 +1329,57 @@ fn service_window_focus(window: Hwnd) {
     // resolved solely from that session's host-owned view registry entry.
     let requested = unsafe { SetForegroundWindow(window) } != 0;
     let _ = registry::complete_window_focus_request(window, request_id, requested);
+}
+
+/// Applies one pending reversible fullscreen mode for a session window.
+///
+/// All registry access is deliberately short and ends before calling User32:
+/// frame changes can synchronously re-enter this window procedure. Restore
+/// facts are recorded before entry and cleared only after a completed native
+/// restore, so a worker timeout cannot strand a borderless window without its
+/// original placement.
+fn service_window_fullscreen(window: Hwnd) {
+    let Ok(Some((request_id, mode, saved))) = registry::take_window_fullscreen_request(window)
+    else {
+        return;
+    };
+
+    let applied = match (mode, saved) {
+        // The host's retained record makes this duplicate request idempotent
+        // without a native state query or a protocol-visible state read.
+        (WindowFullscreenMode::Fullscreen, Some(_)) => true,
+        (WindowFullscreenMode::Fullscreen, None) => match fullscreen::capture(window) {
+            None => false,
+            Some(saved) => {
+                if registry::set_window_fullscreen_restore(window, Some(saved.clone()))
+                    .ok()
+                    .flatten()
+                    .is_none()
+                {
+                    false
+                } else {
+                    match fullscreen::enter(window, &saved) {
+                        fullscreen::FullscreenEntry::Applied => true,
+                        fullscreen::FullscreenEntry::Windowed => {
+                            let _ = registry::set_window_fullscreen_restore(window, None);
+                            false
+                        }
+                        fullscreen::FullscreenEntry::RestorePending => false,
+                    }
+                }
+            }
+        },
+        // Exiting a window that the host has not entered is also idempotent.
+        (WindowFullscreenMode::Windowed, None) => true,
+        (WindowFullscreenMode::Windowed, Some(saved)) => {
+            let restored = fullscreen::restore(window, &saved);
+            if restored {
+                let _ = registry::set_window_fullscreen_restore(window, None);
+            }
+            restored
+        }
+    };
+    let _ = registry::complete_window_fullscreen_request(window, request_id, applied);
 }
 
 /// Constructs and attaches one pending session menu on its owning UI thread.
@@ -1827,6 +1895,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_window_title(window);
             service_window_state(window);
             service_window_focus(window);
+            service_window_fullscreen(window);
             service_field_read(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0086: Session window fullscreen is borderless and restorable.
+
 - 0085: Session window focus is a guarded request.
 
 - 0084: HTTPS text fetch is host-authorized, origin-bound, and direct.

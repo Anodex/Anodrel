@@ -19,7 +19,9 @@ use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
-use anodrel_window::{WindowFocusMailbox, WindowStateMailbox, WindowTitleMailbox};
+use anodrel_window::{
+    WindowFocusMailbox, WindowFullscreenMailbox, WindowStateMailbox, WindowTitleMailbox,
+};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
@@ -46,6 +48,7 @@ pub struct RegisteredSessionUi {
     window_title_mailbox: WindowTitleMailbox,
     window_state_mailbox: WindowStateMailbox,
     window_focus_mailbox: WindowFocusMailbox,
+    window_fullscreen_mailbox: WindowFullscreenMailbox,
     field_mailbox: UiFieldMailbox,
     /// The display name the host appends to any title this session proposes.
     ///
@@ -69,6 +72,7 @@ impl RegisteredSessionUi {
             window_title_mailbox: WindowTitleMailbox::new(),
             window_state_mailbox: WindowStateMailbox::new(),
             window_focus_mailbox: WindowFocusMailbox::new(),
+            window_fullscreen_mailbox: WindowFullscreenMailbox::new(),
             field_mailbox: UiFieldMailbox::new(),
             display_name: display_name.into(),
         }
@@ -143,6 +147,16 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn window_focus_mailbox(&self) -> WindowFocusMailbox {
         self.window_focus_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread fullscreen mailbox.
+    ///
+    /// It carries only the two reversible presentation modes. The owning UI
+    /// thread retains every native style and placement fact and resolves the
+    /// one session window; see `docs/WINDOW_FULLSCREEN.md`.
+    #[must_use]
+    pub fn window_fullscreen_mailbox(&self) -> WindowFullscreenMailbox {
+        self.window_fullscreen_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread field-read mailbox.
@@ -293,6 +307,9 @@ fn registered_interactive_services(
         // Foregrounding stays in the same session-owned UI-thread boundary.
         // The policy parser admits this mailbox only for record version 1.9.
         .with_window_focus(ui.window_focus_mailbox())
+        // Reversible fullscreen uses a distinct session-local bridge. The
+        // parser admits this mailbox only for record version 1.10.
+        .with_window_fullscreen(ui.window_fullscreen_mailbox())
         // Field values live with the window that owns them, so a read crosses
         // to the UI thread the same way. See `docs/UI_FIELDS.md`.
         .with_ui_fields(ui.field_mailbox()))

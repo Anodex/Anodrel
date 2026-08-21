@@ -815,6 +815,65 @@ test("a session window focus request is empty, separately granted, and untargeta
   );
 });
 
+test("a session window fullscreen mode is closed, separately granted, and untargetable", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.fullscreen"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.setWindowFullscreen("fullscreen"), { status: "applied" });
+  assert.deepEqual(await client.setWindowFullscreen("windowed"), { status: "applied" });
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.setWindowFullscreen("fullscreen"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "window.fullscreen",
+  );
+
+  // A monitor, display mode, geometry, native style, or target would turn
+  // reversible presentation into desktop-control authority.
+  const transport = host.createTransport();
+  for (const payload of [
+    {},
+    { mode: "exclusive" },
+    { mode: "fullscreen", monitor: "other" },
+    { mode: "windowed", bounds: { width: 1 } },
+    { mode: true },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: { major: 1, minor: 21 },
+      kind: "request",
+      requestId: `window-fullscreen-${JSON.stringify(payload)}`,
+      operation: "window.fullscreen.set",
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+
+  const older = await transport.send({
+    protocolVersion: { major: 1, minor: 20 },
+    kind: "request",
+    requestId: "window-fullscreen-before-protocol-1.21",
+    operation: "window.fullscreen.set",
+    payload: { mode: "fullscreen" },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
 test("a native session menu is complete, separately granted, and untargetable", async () => {
   const host = new MockHost({
     applicationId: "test.application",

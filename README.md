@@ -78,6 +78,17 @@ installed-record version 1.9 policy, direct User32 adapter, and development
 diagnostic are implemented; its desktop foreground-policy check remains a
 manual verification. See `docs/WINDOW_FOCUS.md`.
 
+Protocol 1.21 adds a separately granted reversible session-window fullscreen
+request. An authenticated session carrying `window.fullscreen` can select only
+borderless `fullscreen` or restored `windowed` presentation for its own host
+window. The direct Windows host keeps the original style and placement private,
+uses the monitor Windows already associates with that window, and never exposes
+a handle, monitor, geometry, display mode, fullscreen state, event, or
+cross-window route. The typed SDK, mock host, record version 1.10 policy,
+direct User32 and monitor adapter, and development diagnostic are implemented;
+its desktop entry-and-restore check remains manual. See
+`docs/WINDOW_FULLSCREEN.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
@@ -279,6 +290,9 @@ name or inspect any window.
 `docs/WINDOW_FOCUS.md` defines the separately granted request for Windows to
 foreground that same session-owned window, without exposing focus state or
 desktop-control authority.
+`docs/WINDOW_FULLSCREEN.md` defines the separately granted reversible
+borderless fullscreen request for that same session-owned window, without
+exposing monitor selection, display control, geometry, or fullscreen state.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance

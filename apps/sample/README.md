@@ -32,6 +32,12 @@ Use `--sample-ui-window-state-client` to exercise the separately granted
 to minimise, maximise, and restore; it never receives a handle, target, or
 state readback. See `docs/WINDOW_STATE.md` and `docs/DEVELOPMENT.md`.
 
+Use `--sample-ui-window-fullscreen-client` to exercise the separately granted
+`window.fullscreen.set` command. The development client asks only for
+borderless fullscreen and then windowed restoration of its own session window;
+it never receives a handle, monitor, geometry, display mode, or fullscreen
+state. See `docs/WINDOW_FULLSCREEN.md` and `docs/DEVELOPMENT.md`.
+
 `anodrel.application.json` and `content/main.txt` are a separate static
 application package for the first Windows content surface. The host
 verifies the declared SHA-256 digest and package containment before drawing the

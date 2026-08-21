@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.20, including the separately granted
-session-window focus request documented in `docs/WINDOW_FOCUS.md`.
+**Status:** Implemented through version 1.21, including the separately granted
+session-window fullscreen request documented in `docs/WINDOW_FULLSCREEN.md`.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.20 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 20}`.
+the host's. Version 1.21 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 21}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -70,6 +70,7 @@ The implemented operations are:
 | `ui.fields.read` | `{}` | whole-surface current values | `ui.fields.read` |
 | `window.state.set` | `{ "state": "minimized" \| "maximized" \| "restored" }` | `{ "status": "applied" }` | `window.state` |
 | `window.focus.request` | `{}` | `{ "status": "requested" }` | `window.focus` |
+| `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
@@ -116,6 +117,28 @@ UI bridge, and such a refusal without revealing which occurred. The response
 does not state whether the window became foreground, received keyboard focus,
 moved in z-order, or was noticed by a person. A concurrent request returns
 `window.busy`. See `docs/WINDOW_FOCUS.md` and Decision 0085.
+
+### Session-window fullscreen request
+
+Protocol 1.21 implements `window.fullscreen.set` behind its separate
+`window.fullscreen` grant. It accepts exactly `{ "mode": "fullscreen" | "windowed" }`
+and returns exactly `{ "status": "applied" }` when the owning host UI thread
+accepts the requested reversible presentation action for that authenticated
+session's own window.
+
+The operation cannot name a target, window handle, process, monitor,
+coordinate, size, style, display mode, z-order, visibility, keyboard shortcut,
+callback, or accessibility element. On Windows, `fullscreen` means borderless
+windowed fullscreen on the monitor Windows associates with that known window;
+it is not exclusive display control. The host retains restoration facts
+privately and `windowed` restores them. Duplicate requests for the current host
+mode are accepted without revealing that mode.
+
+`window.unavailable` covers a missing session window, expired bridge, and a
+safe native-transition failure without revealing which occurred. A concurrent
+request returns `window.busy`. The response never states resulting bounds,
+monitor, style, visibility, or fullscreen state. See
+`docs/WINDOW_FULLSCREEN.md` and Decision 0086.
 
 ### Native session menus
 
@@ -465,6 +488,8 @@ Protocol 1.19 adds `network.unavailable` and `network.response_invalid` for
 its HTTPS text-fetch boundary.
 Protocol 1.20 adds no error code; its window-focus request reuses the existing
 safe `window.unavailable` and `window.busy` categories.
+Protocol 1.21 adds no error code; its fullscreen request reuses the same safe
+`window.unavailable` and `window.busy` categories.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 

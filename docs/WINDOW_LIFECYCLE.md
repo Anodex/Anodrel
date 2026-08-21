@@ -68,7 +68,12 @@ with an application-name suffix the proposal cannot suppress or forge. Protocol
 1.16 lets the separately granted `window.state` capability request only
 minimise, maximise, or restore for that same session-owned window. Neither
 request names a window, handle, target, geometry, focus action, or readback.
-See `docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`, Decisions 0066 and 0072.
+Protocol 1.21 separately permits `window.fullscreen.set` to choose only
+reversible borderless fullscreen or windowed restoration for that same session
+window; the host retains its native style and placement facts, and no monitor
+or display control is exposed. See `docs/WINDOW_TITLE.md`,
+`docs/WINDOW_STATE.md`, `docs/WINDOW_FULLSCREEN.md`, Decisions 0066, 0072,
+and 0086.
 Everything else in this document is unchanged: the application still does not
 learn that it has a window, where it is, or how large it is.
 

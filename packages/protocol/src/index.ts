@@ -3,7 +3,7 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 20 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 21 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -62,12 +62,16 @@ export type Capability =
   | "ui.fields.read"
   | "window.state"
   | "window.focus"
+  | "window.fullscreen"
   | "menu.write";
 
 export type EmptyPayload = Record<string, never>;
 
 /** The complete set of presentation states an application may request. */
 export type WindowState = "minimized" | "maximized" | "restored";
+
+/** The only reversible fullscreen modes an application may request. */
+export type WindowFullscreenMode = "fullscreen" | "windowed";
 
 /** One enabled or disabled semantic command in a native session menu. */
 export interface NativeMenuItem {
@@ -175,6 +179,17 @@ export interface PlatformOperationMap {
   "window.focus.request": {
     readonly payload: EmptyPayload;
     readonly result: { readonly status: "requested" };
+  };
+  /**
+   * Chooses reversible borderless fullscreen for this session's own window.
+   *
+   * The host retains native style and placement facts privately. There is no
+   * target, monitor, geometry, display-mode control, state readback, or event;
+   * success means only that the host UI thread accepted the closed action.
+   */
+  "window.fullscreen.set": {
+    readonly payload: { readonly mode: WindowFullscreenMode };
+    readonly result: { readonly status: "applied" };
   };
   /**
    * Replaces this authenticated session's complete native menu model.
@@ -828,6 +843,22 @@ export function isWindowStateSetPayload(
     isRecord(value) &&
     Object.keys(value).length === 1 &&
     (value.state === "minimized" || value.state === "maximized" || value.state === "restored")
+  );
+}
+
+/**
+ * Returns whether a value is exactly one closed reversible fullscreen request.
+ *
+ * An extra field is a mismatch rather than a future monitor, display-mode,
+ * geometry, style, z-order, or native-command escape hatch. See Decision 0086.
+ */
+export function isWindowFullscreenSetPayload(
+  value: unknown,
+): value is PayloadFor<"window.fullscreen.set"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    (value.mode === "fullscreen" || value.mode === "windowed")
   );
 }
 

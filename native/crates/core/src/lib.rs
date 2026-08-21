@@ -49,8 +49,9 @@ use anodrel_ui_session::{
     UiFieldReader, UiFieldSnapshot, UiInputMailbox,
 };
 use anodrel_window::{
-    WindowFocusService, WindowFocusServiceError, WindowState, WindowStateService,
-    WindowStateServiceError, WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
+    WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
+    WindowFullscreenServiceError, WindowState, WindowStateService, WindowStateServiceError,
+    WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
 };
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -144,6 +145,7 @@ pub struct CoreHost {
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
     window_focus: Box<dyn WindowFocusService>,
+    window_fullscreen: Box<dyn WindowFullscreenService>,
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
@@ -172,6 +174,7 @@ pub struct HostServices {
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
     window_focus: Box<dyn WindowFocusService>,
+    window_fullscreen: Box<dyn WindowFullscreenService>,
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
@@ -264,6 +267,18 @@ impl WindowFocusService for UnavailableWindowFocus {
 }
 
 #[derive(Debug)]
+struct UnavailableWindowFullscreen;
+
+impl WindowFullscreenService for UnavailableWindowFullscreen {
+    fn set_fullscreen(
+        &self,
+        _mode: WindowFullscreenMode,
+    ) -> Result<(), WindowFullscreenServiceError> {
+        Err(WindowFullscreenServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
 struct UnavailableFileDialogs;
 
 impl FileDialogService for UnavailableFileDialogs {
@@ -335,6 +350,7 @@ impl HostServices {
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
             window_focus: Box::new(UnavailableWindowFocus),
+            window_fullscreen: Box::new(UnavailableWindowFullscreen),
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
@@ -424,6 +440,21 @@ impl HostServices {
     #[must_use]
     pub fn with_window_focus(mut self, service: impl WindowFocusService + 'static) -> Self {
         self.window_focus = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed fullscreen service.
+    ///
+    /// The supplied service must apply only the closed reversible mode to the
+    /// requesting session's own window from the host UI thread. It accepts no
+    /// target, monitor, geometry, display mode, or state query; see
+    /// `docs/WINDOW_FULLSCREEN.md`.
+    #[must_use]
+    pub fn with_window_fullscreen(
+        mut self,
+        service: impl WindowFullscreenService + 'static,
+    ) -> Self {
+        self.window_fullscreen = Box::new(service);
         self
     }
 
@@ -537,6 +568,7 @@ impl CoreHost {
             window_title: services.window_title,
             window_state: services.window_state,
             window_focus: services.window_focus,
+            window_fullscreen: services.window_fullscreen,
             menu: services.menu,
             ui_fields: services.ui_fields,
             file_dialogs: services.file_dialogs,
@@ -775,6 +807,7 @@ impl CoreHost {
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
             window_focus: Box::new(UnavailableWindowFocus),
+            window_fullscreen: Box::new(UnavailableWindowFullscreen),
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(file_dialogs),
@@ -883,6 +916,9 @@ impl CoreHost {
             }
             "window.focus.request" if request.protocol_version.minor >= 20 => {
                 self.handle_window_focus_request(request)
+            }
+            "window.fullscreen.set" if request.protocol_version.minor >= 21 => {
+                self.handle_window_fullscreen_set(request)
             }
             "menu.replace" if request.protocol_version.minor >= 18 => {
                 self.handle_menu_replace(request)
@@ -1589,6 +1625,46 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::WindowBusy,
                 "a window state change is already pending.",
+                None,
+            ),
+        }
+    }
+
+    /// Applies one reversible fullscreen mode to this session's own window.
+    ///
+    /// The payload is one closed mode rather than a monitor, rectangle,
+    /// display-mode, style, or native command. The host resolves the window
+    /// from the authenticated session and retains all restoration facts; a
+    /// success response is action acceptance, not fullscreen-state readback.
+    fn handle_window_fullscreen_set(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(mode) = window_fullscreen_set_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.fullscreen.set requires one closed mode string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::WindowFullscreen) {
+            return self.capability_denied(request.request_id, "window.fullscreen.set");
+        }
+
+        match self.window_fullscreen.set_fullscreen(mode) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("applied".to_owned()))]),
+            ),
+            Err(WindowFullscreenServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no session window is available for the requested fullscreen mode.",
+                None,
+            ),
+            Err(WindowFullscreenServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "a window fullscreen change is already pending.",
                 None,
             ),
         }
@@ -2353,6 +2429,23 @@ fn window_state_set_payload(value: &JsonValue) -> Option<WindowState> {
     }
 }
 
+/// Reads the exact one-field payload `window.fullscreen.set` accepts.
+///
+/// Extra fields are a mismatch rather than a future monitor, display-mode,
+/// geometry, style, z-order, or input escape hatch. The value itself remains a
+/// closed portable mode, so the core never receives a native presentation code.
+fn window_fullscreen_set_payload(value: &JsonValue) -> Option<WindowFullscreenMode> {
+    let fields = value.as_object()?;
+    if fields.len() != 1 {
+        return None;
+    }
+    match fields.get("mode")?.as_string()? {
+        "fullscreen" => Some(WindowFullscreenMode::Fullscreen),
+        "windowed" => Some(WindowFullscreenMode::Windowed),
+        _ => None,
+    }
+}
+
 fn external_open_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -2556,8 +2649,9 @@ mod tests {
     use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::{MenuInputCandidate, UiInputCandidate};
     use anodrel_window::{
-        WindowFocusService, WindowFocusServiceError, WindowState, WindowStateService,
-        WindowStateServiceError, WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
+        WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
+        WindowFullscreenServiceError, WindowState, WindowStateService, WindowStateServiceError,
+        WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
     };
 
     use super::*;
@@ -3393,6 +3487,12 @@ mod tests {
         )
     }
 
+    fn request_v1_21(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":21}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
     fn host_with_menu(service: impl MenuService + 'static) -> CoreHost {
         CoreHost::with_services(
             HostPolicy::new("test.application", vec![Capability::MenuWrite], "test-host")
@@ -3419,6 +3519,28 @@ mod tests {
         result: Option<WindowFocusServiceError>,
     }
 
+    #[derive(Debug, Default)]
+    struct RecordingWindowFullscreen {
+        applied: Arc<Mutex<Vec<WindowFullscreenMode>>>,
+        result: Option<WindowFullscreenServiceError>,
+    }
+
+    impl WindowFullscreenService for RecordingWindowFullscreen {
+        fn set_fullscreen(
+            &self,
+            mode: WindowFullscreenMode,
+        ) -> Result<(), WindowFullscreenServiceError> {
+            if let Some(error) = self.result {
+                return Err(error);
+            }
+            self.applied
+                .lock()
+                .expect("the test mutex is usable")
+                .push(mode);
+            Ok(())
+        }
+    }
+
     impl WindowFocusService for RecordingWindowFocus {
         fn request_focus(&self) -> Result<(), WindowFocusServiceError> {
             if let Some(error) = self.result {
@@ -3439,6 +3561,18 @@ mod tests {
             )
             .expect("test policy is valid"),
             HostServices::unavailable().with_window_focus(service),
+        )
+    }
+
+    fn host_with_window_fullscreen(service: impl WindowFullscreenService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::WindowFullscreen],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_window_fullscreen(service),
         )
     }
 
@@ -3678,6 +3812,138 @@ mod tests {
                 HostServices::unavailable(),
             )
             .handle_json(&request_v1_20("window.focus.request", r#"{}"#)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("window.unavailable")
+        );
+    }
+
+    #[test]
+    fn every_granted_window_fullscreen_mode_reaches_only_the_fullscreen_service() {
+        for (payload, expected) in [
+            (r#"{"mode":"fullscreen"}"#, WindowFullscreenMode::Fullscreen),
+            (r#"{"mode":"windowed"}"#, WindowFullscreenMode::Windowed),
+        ] {
+            let service = RecordingWindowFullscreen::default();
+            let applied = Arc::clone(&service.applied);
+            let response = JsonValue::parse(
+                &host_with_window_fullscreen(service)
+                    .handle_json(&request_v1_21("window.fullscreen.set", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(field(&response, "status").as_string(), Some("success"));
+            assert_eq!(
+                field(field(&response, "result"), "status").as_string(),
+                Some("applied")
+            );
+            assert_eq!(
+                applied.lock().expect("the test mutex is usable").as_slice(),
+                &[expected]
+            );
+        }
+    }
+
+    #[test]
+    fn window_fullscreen_needs_its_own_grant_and_protocol_version() {
+        let payload = r#"{"mode":"fullscreen"}"#;
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowFocus, Capability::WindowState],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable()
+                    .with_window_fullscreen(RecordingWindowFullscreen::default()),
+            )
+            .handle_json(&request_v1_21("window.fullscreen.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let unsupported = JsonValue::parse(
+            &host_with_window_fullscreen(RecordingWindowFullscreen::default())
+                .handle_json(&request_v1_20("window.fullscreen.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn window_fullscreen_payload_is_exact_and_closed() {
+        for payload in [
+            r#"{}"#,
+            r#"{"mode":"exclusive"}"#,
+            r#"{"mode":"fullscreen","monitor":"other"}"#,
+            r#"{"mode":"windowed","bounds":{"width":1}}"#,
+            r#"{"mode":true}"#,
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_fullscreen(RecordingWindowFullscreen::default())
+                    .handle_json(&request_v1_21("window.fullscreen.set", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn window_fullscreen_service_failures_map_to_safe_shared_codes() {
+        for (error, code) in [
+            (
+                WindowFullscreenServiceError::Unavailable,
+                "window.unavailable",
+            ),
+            (WindowFullscreenServiceError::Busy, "window.busy"),
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_fullscreen(RecordingWindowFullscreen {
+                    result: Some(error),
+                    ..RecordingWindowFullscreen::default()
+                })
+                .handle_json(&request_v1_21(
+                    "window.fullscreen.set",
+                    r#"{"mode":"fullscreen"}"#,
+                )),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(code),
+                "{error:?} mapped to the wrong code"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_without_a_window_fullscreen_service_reports_unavailable() {
+        let response = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowFullscreen],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            )
+            .handle_json(&request_v1_21(
+                "window.fullscreen.set",
+                r#"{"mode":"windowed"}"#,
+            )),
         )
         .expect("response JSON is valid");
         assert_eq!(

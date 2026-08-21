@@ -16,6 +16,7 @@
 
 mod bridge;
 mod focus;
+mod fullscreen;
 mod state;
 mod title;
 
@@ -23,6 +24,10 @@ use std::fmt;
 
 pub use focus::{
     WINDOW_FOCUS_RESPONSE_TIMEOUT, WindowFocusMailbox, WindowFocusRequest, WindowFocusService,
+};
+pub use fullscreen::{
+    WINDOW_FULLSCREEN_RESPONSE_TIMEOUT, WindowFullscreenMailbox, WindowFullscreenRequest,
+    WindowFullscreenService,
 };
 pub use state::{
     WINDOW_STATE_RESPONSE_TIMEOUT, WindowStateMailbox, WindowStateRequest, WindowStateService,
@@ -134,6 +139,20 @@ pub enum WindowState {
     Restored,
 }
 
+/// A closed presentation mode for the session's own window.
+///
+/// The host resolves the window from the authenticated session and retains all
+/// native presentation facts privately. This is neither exclusive display
+/// control nor a way to select a monitor, change geometry, or observe current
+/// window state. See `docs/WINDOW_FULLSCREEN.md` and Decision 0086.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WindowFullscreenMode {
+    /// Apply reversible borderless fullscreen to the session's own window.
+    Fullscreen,
+    /// Restore the host-retained normal framed-window presentation.
+    Windowed,
+}
+
 /// A safe failure category returned by a session-owned window command.
 ///
 /// Both title and state commands use these categories. They deliberately do
@@ -177,6 +196,9 @@ pub type WindowStateServiceError = WindowCommandError;
 
 /// Errors shared by the focused session-window service and its host bridge.
 pub type WindowFocusServiceError = WindowCommandError;
+
+/// Errors shared by the session fullscreen service and its host bridge.
+pub type WindowFullscreenServiceError = WindowCommandError;
 
 /// A stable validation failure raised before any native call.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

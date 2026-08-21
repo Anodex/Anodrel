@@ -37,6 +37,7 @@ enum SampleDialogRequest {
     WindowTitle,
     WindowState,
     WindowFocus,
+    WindowFullscreen,
     FieldRead,
     Menu,
 }
@@ -173,6 +174,22 @@ pub fn run_ui_session_with_window_focus(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowFocus)
 }
 
+/// Runs the UI-session diagnostic through reversible borderless fullscreen.
+///
+/// The client requests fullscreen and then windowed mode. An operator observes
+/// both the monitor-filling transition and restoration; it receives no monitor
+/// or bounds readback. See `docs/WINDOW_FULLSCREEN.md`.
+pub fn run_ui_session_with_window_fullscreen(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::WindowFullscreen,
+    )
+}
+
 /// Runs the UI session diagnostic with two fields a person can type into.
 ///
 /// The client reads the field values twice: once before anyone has typed, and
@@ -245,9 +262,13 @@ fn run_with_optional_session_view(
         Capability::WindowState,
     ];
     // New authority is never silently added to an older broad diagnostic. The
-    // focus route is explicit so its manual check proves the exact grant too.
+    // focus and fullscreen routes are explicit so each manual check proves the
+    // exact grant rather than silently widening a broad diagnostic.
     if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
         capabilities.push(Capability::WindowFocus);
+    }
+    if matches!(dialog_request, SampleDialogRequest::WindowFullscreen) {
+        capabilities.push(Capability::WindowFullscreen);
     }
     let policy = HostPolicy::new("anodrel.sample", capabilities, "anodrel-windows-host")?;
     let (server, invitation) = match session_ui.as_ref() {
@@ -272,6 +293,7 @@ fn run_with_optional_session_view(
                 .with_window_title(ui.window_title.clone())
                 .with_window_state(ui.window_state.clone())
                 .with_window_focus(ui.window_focus.clone())
+                .with_window_fullscreen(ui.window_fullscreen.clone())
                 .with_ui_fields(ui.fields.clone());
             WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
@@ -309,6 +331,7 @@ fn run_with_optional_session_view(
             SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
             SampleDialogRequest::WindowState => command.arg("--request-window-state")?,
             SampleDialogRequest::WindowFocus => command.arg("--request-window-focus")?,
+            SampleDialogRequest::WindowFullscreen => command.arg("--request-window-fullscreen")?,
             SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
             SampleDialogRequest::Menu => command.arg("--request-native-menu")?,
         }
@@ -328,6 +351,7 @@ fn run_with_optional_session_view(
             ui.window_title,
             ui.window_state,
             ui.window_focus,
+            ui.window_fullscreen,
             SAMPLE_DISPLAY_NAME,
             ui.fields,
         )?;

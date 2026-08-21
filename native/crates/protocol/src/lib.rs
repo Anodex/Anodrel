@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 20;
+pub const PROTOCOL_MINOR: u16 = 21;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -85,6 +85,12 @@ pub enum Capability {
     /// The request has no target or focus-state readback. Windows may refuse
     /// it under its foreground rules; see `docs/WINDOW_FOCUS.md`.
     WindowFocus,
+    /// Choose reversible borderless fullscreen for the session's own window.
+    ///
+    /// The host retains every native style and placement fact. This grant
+    /// cannot select a monitor, change a display mode, set geometry, or read
+    /// window state; see `docs/WINDOW_FULLSCREEN.md`.
+    WindowFullscreen,
     /// Read every field value on the session's own current surface.
     ///
     /// A snapshot, not a stream. There is no selector and no change event, so
@@ -124,6 +130,7 @@ impl Capability {
             Self::WindowTitle => "window.title",
             Self::WindowState => "window.state",
             Self::WindowFocus => "window.focus",
+            Self::WindowFullscreen => "window.fullscreen",
             Self::UiFieldsRead => "ui.fields.read",
             Self::MenuWrite => "menu.write",
         }

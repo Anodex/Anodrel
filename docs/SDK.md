@@ -100,6 +100,17 @@ provide a native handle, change retry
 policy, inject input, return focus state, or subscribe to a change. See
 `docs/WINDOW_FOCUS.md`.
 
+### Session-window fullscreen request
+
+Protocol 1.21 adds `setWindowFullscreen("fullscreen" | "windowed")`. It
+requires the separate `window.fullscreen` grant and returns only
+`{ status: "applied" }`. The host chooses and owns the native presentation of
+the one host window already bound to the authenticated session: there is no
+window argument, monitor selection, coordinate, display mode, geometry,
+fullscreen-state readback, or event. `fullscreen` is reversible borderless
+windowed fullscreen, not exclusive display control; `windowed` asks the host to
+restore its retained presentation facts. See `docs/WINDOW_FULLSCREEN.md`.
+
 ## Windows development transport
 
 `@anodrel/windows-transport` is a separate development-only Node-core adapter

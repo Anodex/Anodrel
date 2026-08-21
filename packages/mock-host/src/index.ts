@@ -8,6 +8,7 @@ import {
   isCredentialWritePayload,
   isMenuReplacePayload,
   isNotificationShowPayload,
+  isWindowFullscreenSetPayload,
   isWindowStateSetPayload,
   isWindowTitleSetPayload,
   isExternalOpenPayload,
@@ -368,6 +369,34 @@ export class MockHost {
         // The mock has no native focus state. It reports only that the host
         // accepted the request, matching the intentionally one-way contract.
         return this.success("window.focus.request", request.requestId, { status: "requested" });
+
+      case "window.fullscreen.set":
+        if (request.protocolVersion.minor < 21) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "window.fullscreen.set requires protocol 1.21 or later.",
+          );
+        }
+        if (!isWindowFullscreenSetPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "window.fullscreen.set requires one closed mode string.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "window.fullscreen")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "window.fullscreen.set requires the window.fullscreen capability.",
+            { capability: "window.fullscreen" },
+          );
+        }
+        // The mock deliberately stores no fullscreen state. It reports only
+        // that the host accepted one closed request, matching the one-way
+        // contract rather than simulating monitor or geometry observation.
+        return this.success("window.fullscreen.set", request.requestId, { status: "applied" });
 
       case "menu.replace":
         if (request.protocolVersion.minor < 18) {
