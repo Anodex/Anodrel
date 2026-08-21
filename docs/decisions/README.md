@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0083: Development native menu templates add one fixed menu grant.
+
 - 0082: Development native UI templates use a typed constrained client.
 
 - 0081: Native child clients reuse the private transport without a runtime.

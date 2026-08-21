@@ -49,6 +49,10 @@ The application still explicitly opens the one invited Windows pipe through
 adapter can open only the invitation's exact pipe and owns no host policy or
 window API. See `docs/NATIVE_CLIENT.md`.
 
+The regular template has no `menu.write` grant. The separate planned native
+menu template uses an explicit generator command and host route rather than
+silently broadening this project's authority; see `docs/NATIVE_MENU_TEMPLATE.md`.
+
 ## Generated project contract
 
 `anodrel-native-app-tool init` accepts a destination, a Cargo-compatible

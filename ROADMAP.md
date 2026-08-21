@@ -350,6 +350,10 @@ Status: **First starter-package slice in progress**
   Its explicit Windows host route is also implemented: it grants exactly
   document write, action read, and self-close to an operator-selected
   development executable and shares the compiled probe's bounded lifecycle.
+  Decision 0083 defines the next separate native menu-template slice: an
+  explicit menu generator and fixed four-grant host route will expose the
+  existing bounded session-menu contract without broadening the regular
+  template.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an
