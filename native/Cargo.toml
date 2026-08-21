@@ -44,6 +44,7 @@ members = [
   "adapters/windows-clipboard",
   "adapters/windows-notifications",
   "adapters/windows-external-links",
+  "adapters/windows-network",
   "adapters/windows-file-dialog",
   "adapters/windows-file-access",
   "adapters/windows-accessibility",

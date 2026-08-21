@@ -399,7 +399,8 @@ text-only `GET` result sit behind a separate capability; an application cannot
 choose headers, bodies, cookies, redirects, credentials, proxies, certificates,
 or a native handle. The portable protocol core, strict URL and exact-origin
 values, SDK, and mock host are implemented; its direct WinHTTP adapter and
-product origin policy remain separate host work. See `docs/NETWORK.md`.
+direct no-proxy adapter are implemented; a fixed-origin host route and product
+origin policy remain separate work. See `docs/NETWORK.md`.
 
 Every request should have:
 

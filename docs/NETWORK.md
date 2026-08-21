@@ -1,8 +1,8 @@
 # Anodrel HTTPS text fetch
 
 **Status:** The portable Protocol 1.19 core, strict URL and exact-origin
-values, TypeScript SDK, and deterministic mock host are implemented. No direct
-Windows adapter, development route, or installed-application policy currently
+values, TypeScript SDK, deterministic mock host, and direct WinHTTP adapter
+are implemented. No development route or installed-application policy currently
 attaches the service to a real application session.
 
 ## Purpose and boundary
@@ -85,16 +85,20 @@ one successful protocol result.
 
 ## Windows mapping
 
-The planned adapter will use direct WinHTTP: `WinHttpOpen`, `WinHttpConnect`,
+The direct adapter uses WinHTTP: `WinHttpOpen`, `WinHttpConnect`,
 `WinHttpOpenRequest`, `WinHttpSendRequest`, `WinHttpReceiveResponse`, status
 query, bounded reads, and `WinHttpCloseHandle`. It uses no browser, webview,
 Node.js, WinINet, COM browser component, or third-party network library.
 
 Every session, connection, and request handle has one RAII owner. Parent and
 child handles are closed on every success, rejection, timeout, and failure path.
-The adapter maps all native failure detail to the two stable safe errors above.
-It does not start a callback, background worker, or UI operation; the existing
-authenticated session worker holds the bounded synchronous work.
+Each request creates a fresh direct no-proxy session, then disables cookies,
+redirects, automatic authentication, and keep-alive before it connects. It
+sets every phase timeout to ten seconds, enables Windows certificate-revocation
+checking, and sets no certificate-error-ignore flag. The adapter maps all
+native failure detail to the two stable safe errors above. It does not start a
+callback, background worker, or UI operation; the existing authenticated session
+worker holds the bounded synchronous work.
 
 ## Deferred work
 

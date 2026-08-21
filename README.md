@@ -231,8 +231,8 @@ provisioning contract, and host activation routes that exercise it.
 `docs/CLIPBOARD.md` defines the bounded text-only clipboard foundation.
 `docs/EXTERNAL_LINKS.md` defines the validated HTTPS external-link foundation.
 `docs/NETWORK.md` defines the implemented portable host-authorized HTTPS
-text-fetch contract, SDK, and mock-host boundary. Its direct Windows adapter,
-development route, and production origin policy remain unimplemented.
+text-fetch contract, SDK, mock-host boundary, and direct WinHTTP adapter. Its
+development route and production origin policy remain unimplemented.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.
