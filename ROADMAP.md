@@ -217,9 +217,11 @@ Status: **Direct Windows host in progress**
   session captures and holds the selected regular-file identity before it
   returns that reference to the authenticated pipe worker (Decision 0049);
   registered interactive-session composition now binds that UI resource to one
-  machine-validated application session before authentication. Signed product
-  launch and non-Windows adapters remain deferred. The file-write contract is
-  accepted in Decision 0079; its native implementation is the next gate.
+  machine-validated application session before authentication. Protocol 1.17
+  now adds separate retained-output capture and bounded one-use text writing
+  through `dialog.save_file.v2` and `file.write_text` (Decision 0079), while
+  the legacy save picker stays non-mutating. Signed product launch,
+  atomic replacement, binary output, and non-Windows adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded
