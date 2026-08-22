@@ -10,13 +10,16 @@ use anodrel_canvas::{Canvas, Color, Paint, Point, Rect, point};
 use anodrel_ui::{
     Action, Axis, ElementId, FIELD_HORIZONTAL_PADDING, Field, Insets, Scroll, Stack, Text,
     TextMeasurer, UiActionTone, UiDocument, UiEvent, UiFieldState, UiFieldStates, UiFocus,
-    UiLayout, UiLayoutKind, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollWheel, UiSize,
-    UiSurfaceTone, UiTextTone, wrap_text,
+    UiLayout, UiLayoutKind, UiNode, UiPoint, UiRect, UiScrollOffsets, UiScrollState, UiScrollWheel,
+    UiSize, UiSurfaceTone, UiTextTone, wrap_text,
 };
 use anodrel_ui_document::decode;
 use anodrel_ui_session::UiFieldSnapshot;
 use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
-use anodrel_windows_uia::{UiAutomationFocusMailbox, UiAutomationFocusRoute};
+use anodrel_windows_uia::{
+    UiAutomationFocusMailbox, UiAutomationFocusRoute, UiAutomationScrollCommand,
+    UiAutomationScrollMailbox, UiAutomationScrollRoute, UiAutomationScrollSnapshot,
+};
 
 use super::scrollbar::{Scrollbar, ScrollbarHit};
 use super::text;
@@ -76,6 +79,8 @@ pub(super) struct UiLab {
     /// A provider receives only a revision-bound route, never this mutable
     /// view. The UI thread revalidates every request below.
     automation_focus: UiAutomationFocusMailbox,
+    /// The private UI Automation route for this view's retained scroll state.
+    automation_scroll: UiAutomationScrollMailbox,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
 }
@@ -94,6 +99,16 @@ struct ScrollbarDrag {
 /// announce to Windows.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct AccessibilityFocusResult {
+    pub(super) accepted: bool,
+    pub(super) changed: bool,
+}
+
+/// The local result of one UI Automation scroll request.
+///
+/// An accepted request can be at its existing limit. That remains a truthful
+/// ScrollPattern success without a repaint.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct AccessibilityScrollResult {
     pub(super) accepted: bool,
     pub(super) changed: bool,
 }
@@ -251,6 +266,7 @@ impl UiLab {
             scrollbar_release_pending: false,
             fields,
             automation_focus: UiAutomationFocusMailbox::new(),
+            automation_scroll: UiAutomationScrollMailbox::new(),
             hovered: None,
             last_action: None,
         }
@@ -357,7 +373,8 @@ impl UiLab {
     /// This is local Windows Lab behavior only. It does not produce an
     /// application event or carry native authority.
     pub(super) fn scroll_page(&mut self, width: f32, height: f32, forward: bool) -> bool {
-        let Some(metrics) = self.layout(width, height).scroll_metrics().first().cloned() else {
+        let layout = self.layout(width, height);
+        let Some(metrics) = Self::first_overflowing_scroll_metric(&layout) else {
             return false;
         };
         let changed = self
@@ -373,7 +390,8 @@ impl UiLab {
 
     /// Moves the first visible diagnostic scroll viewport by one local line.
     pub(super) fn scroll_line(&mut self, width: f32, height: f32, forward: bool) -> bool {
-        let Some(metrics) = self.layout(width, height).scroll_metrics().first().cloned() else {
+        let layout = self.layout(width, height);
+        let Some(metrics) = Self::first_overflowing_scroll_metric(&layout) else {
             return false;
         };
         let changed = self
@@ -540,6 +558,38 @@ impl UiLab {
         self.automation_focus.route(revision)
     }
 
+    /// Copies the one host-selected vertical scroll snapshot for UI Automation.
+    ///
+    /// It is derived from the same layout and retained offset currently drawn.
+    /// A non-overflowing document has no automation scroll target.
+    pub(super) fn accessibility_scroll_snapshot(
+        &self,
+        width: f32,
+        height: f32,
+    ) -> Option<UiAutomationScrollSnapshot> {
+        let layout = self.layout(width, height);
+        let metrics = Self::first_overflowing_scroll_metric(&layout)?;
+        let offset = self
+            .scroll_offsets
+            .get(metrics.id())
+            .copied()
+            .map_or(0.0, UiScrollState::offset_y);
+        UiAutomationScrollSnapshot::new(
+            metrics.id().clone(),
+            metrics.viewport_height(),
+            metrics.content_height(),
+            offset,
+        )
+    }
+
+    /// Binds one immutable provider snapshot to this view's scroll route.
+    pub(super) fn accessibility_scroll_route(
+        &self,
+        revision: Option<anodrel_ui_session::UiDocumentRevision>,
+    ) -> UiAutomationScrollRoute {
+        self.automation_scroll.route(revision)
+    }
+
     /// Takes and revalidates at most one pending UI Automation focus request.
     ///
     /// `expected_revision` is `None` for the fixed diagnostic UI Lab and the
@@ -583,6 +633,76 @@ impl UiLab {
         Some(self.focus.focus_on(&layout, target))
     }
 
+    /// Takes and revalidates at most one UI Automation scroll request.
+    ///
+    /// The provider's revision and selected viewport must still match the
+    /// current view. The one accepted command changes only the established
+    /// host-retained position, never application state or input.
+    pub(super) fn service_accessibility_scroll(
+        &mut self,
+        expected_revision: Option<anodrel_ui_session::UiDocumentRevision>,
+        width: f32,
+        height: f32,
+    ) -> Option<AccessibilityScrollResult> {
+        let mailbox = self.automation_scroll.clone();
+        let request = mailbox.take()?;
+        let mut changed = false;
+        let accepted = mailbox.complete_with(request.id(), || {
+            if request.revision() != expected_revision {
+                return false;
+            }
+            let Some(scroll_changed) = self.scroll_accessibility_target(
+                width,
+                height,
+                request.target(),
+                request.command(),
+            ) else {
+                return false;
+            };
+            changed = scroll_changed;
+            true
+        })?;
+        Some(AccessibilityScrollResult { accepted, changed })
+    }
+
+    fn scroll_accessibility_target(
+        &mut self,
+        width: f32,
+        height: f32,
+        target: &ElementId,
+        command: UiAutomationScrollCommand,
+    ) -> Option<bool> {
+        let layout = self.layout(width, height);
+        let metrics = Self::first_overflowing_scroll_metric(&layout)?;
+        if metrics.id() != target {
+            return None;
+        }
+        let state = self.scroll_offsets.entry(metrics.id().clone()).or_default();
+        let changed = match command {
+            UiAutomationScrollCommand::Line { forward } => {
+                state.scroll_line(forward, metrics.viewport_height(), metrics.content_height())
+            }
+            UiAutomationScrollCommand::Page { forward } => {
+                state.scroll_page(forward, metrics.viewport_height(), metrics.content_height())
+            }
+            UiAutomationScrollCommand::Percent { percent } => {
+                let maximum = UiScrollState::maximum_offset(
+                    metrics.viewport_height(),
+                    metrics.content_height(),
+                );
+                state.scroll_to(
+                    maximum * (percent / 100.0) as f32,
+                    metrics.viewport_height(),
+                    metrics.content_height(),
+                )
+            }
+        };
+        if changed {
+            self.hovered = None;
+        }
+        Some(changed)
+    }
+
     fn layout(&self, width: f32, height: f32) -> UiLayout {
         let surface = Surface::new(width, height);
         self.document.layout_with_scroll_offsets(
@@ -605,7 +725,7 @@ impl UiLab {
         &self,
         layout: &UiLayout,
     ) -> Option<(Scrollbar, anodrel_ui::UiScrollMetrics)> {
-        let metrics = layout.scroll_metrics().first()?.clone();
+        let metrics = Self::first_overflowing_scroll_metric(layout)?;
         let viewport = layout.bounds(metrics.id())?;
         let offset = self
             .scroll_offsets
@@ -613,6 +733,17 @@ impl UiLab {
             .copied()
             .map_or(0.0, |state| state.offset_y());
         Scrollbar::from_metric(&metrics, viewport, offset).map(|scrollbar| (scrollbar, metrics))
+    }
+
+    fn first_overflowing_scroll_metric(layout: &UiLayout) -> Option<anodrel_ui::UiScrollMetrics> {
+        layout
+            .scroll_metrics()
+            .iter()
+            .find(|metrics| {
+                UiScrollState::maximum_offset(metrics.viewport_height(), metrics.content_height())
+                    > 0.0
+            })
+            .cloned()
     }
 }
 
@@ -1526,6 +1657,55 @@ mod tests {
                 .bounds(&id("ui.lab.scroll.exercise-9"))
                 .is_some()
         );
+    }
+
+    #[test]
+    fn accessibility_scroll_uses_the_same_selected_retained_viewport() {
+        let mut lab = UiLab::new();
+        let snapshot = lab
+            .accessibility_scroll_snapshot(BASE_WIDTH, BASE_HEIGHT)
+            .expect("the fixed Lab viewport overflows");
+        assert_eq!(snapshot.target(), &id("ui.lab.viewport"));
+        assert_eq!(snapshot.vertical_scroll_percent(), 0.0);
+        assert!(snapshot.vertical_view_size() > 0.0);
+        assert!(snapshot.vertical_view_size() < 100.0);
+
+        assert_eq!(
+            lab.scroll_accessibility_target(
+                BASE_WIDTH,
+                BASE_HEIGHT,
+                &id("missing"),
+                UiAutomationScrollCommand::Page { forward: true },
+            ),
+            None,
+            "a UIA request cannot select another viewport"
+        );
+        assert_eq!(
+            lab.scroll_accessibility_target(
+                BASE_WIDTH,
+                BASE_HEIGHT,
+                snapshot.target(),
+                UiAutomationScrollCommand::Line { forward: true },
+            ),
+            Some(true)
+        );
+        assert!(lab.scroll_offsets[&id("ui.lab.viewport")].offset_y() > 0.0);
+
+        assert_eq!(
+            lab.scroll_accessibility_target(
+                BASE_WIDTH,
+                BASE_HEIGHT,
+                snapshot.target(),
+                UiAutomationScrollCommand::Percent { percent: 100.0 },
+            ),
+            Some(true)
+        );
+        let refreshed = lab
+            .accessibility_scroll_snapshot(BASE_WIDTH, BASE_HEIGHT)
+            .expect("the fixed Lab viewport remains overflowing");
+        assert_eq!(refreshed.vertical_scroll_percent(), 100.0);
+        assert_eq!(lab.last_action, None);
+        assert_eq!(lab.focus.focused(), None);
     }
 
     #[test]

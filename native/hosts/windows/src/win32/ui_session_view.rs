@@ -24,7 +24,7 @@ use super::{
     Hwnd, Lparam, Wparam,
     menu::{MenuBar, UnattachedMenu},
     session_window_group::{SessionWindowMember, SessionWindowOpenRequest},
-    ui_lab::{AccessibilityFocusResult, UiLab},
+    ui_lab::{AccessibilityFocusResult, AccessibilityScrollResult, UiLab},
 };
 
 /// A native session view with no application input or event delivery.
@@ -730,6 +730,13 @@ impl UiSessionView {
         self.lab.accessibility_focus_route(Some(self.revision))
     }
 
+    /// Binds this current session revision to its host-only UIA scroll route.
+    pub(super) fn accessibility_scroll_route(
+        &self,
+    ) -> anodrel_windows_uia::UiAutomationScrollRoute {
+        self.lab.accessibility_scroll_route(Some(self.revision))
+    }
+
     /// Services one UI Automation focus request on the owning UI thread.
     pub(super) fn service_accessibility_focus(
         &mut self,
@@ -738,6 +745,16 @@ impl UiSessionView {
     ) -> Option<AccessibilityFocusResult> {
         self.lab
             .service_accessibility_focus(Some(self.revision), width, height)
+    }
+
+    /// Services one UI Automation scroll request on the owning UI thread.
+    pub(super) fn service_accessibility_scroll(
+        &mut self,
+        width: f32,
+        height: f32,
+    ) -> Option<AccessibilityScrollResult> {
+        self.lab
+            .service_accessibility_scroll(Some(self.revision), width, height)
     }
 
     fn queue_event(&self, event: UiEvent) -> bool {

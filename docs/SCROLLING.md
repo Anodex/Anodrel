@@ -40,9 +40,11 @@ overflowing viewport in source order. Its track and thumb are derived from the
 same current layout metrics and host-retained offset; clicking the track moves
 one viewport and dragging the thumb changes only that local offset. It does not
 change layout, consume a document field, move application focus, emit a
-semantic event, expose a handle, or cross the protocol. Nested-scrollbar
-arbitration and an assistive-technology scrolling surface are not established
-by this first slice. See Decision 0096.
+semantic event, expose a handle, or cross the protocol. Decision 0097 implements
+the matching Windows UI Automation surface for that same first viewport:
+vertical line, page, and percentage movement return through a bounded
+host-owned route and never become application state. Nested-scrollbar
+arbitration remains separate. See `docs/UI_AUTOMATION_SCROLL.md`.
 
 The `--sample-ui-scroll-client` Windows development command sends one exact v2
 tree whose only enabled action begins below the initial viewport. An operator

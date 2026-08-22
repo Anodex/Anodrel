@@ -22,6 +22,8 @@ mod raw2;
 mod raw3;
 mod raw4;
 mod raw5;
+mod raw6;
+mod scroll;
 mod tree;
 
 use std::{
@@ -47,12 +49,21 @@ use raw2::{
 };
 use raw3::{IID_IINVOKE_PROVIDER, UIA_INVOKE_PATTERN_ID};
 use raw5::{IID_IVALUE_PROVIDER, UIA_VALUE_PATTERN_ID};
+use raw6::{
+    IID_ISCROLL_PROVIDER, SCROLL_AMOUNT_LARGE_DECREMENT, SCROLL_AMOUNT_LARGE_INCREMENT,
+    SCROLL_AMOUNT_NO_AMOUNT, SCROLL_AMOUNT_SMALL_DECREMENT, SCROLL_AMOUNT_SMALL_INCREMENT,
+    UIA_SCROLL_PATTERN_ID, UIA_SCROLL_PATTERN_NO_SCROLL,
+};
 use tree::Tree;
 
 pub use events::{raise_focus_changed, raise_structure_changed};
 pub use focus::{
     UiAutomationFocusMailbox, UiAutomationFocusRequest, UiAutomationFocusRoute,
     UiAutomationFocusSink,
+};
+pub use scroll::{
+    UiAutomationScrollCommand, UiAutomationScrollMailbox, UiAutomationScrollRequest,
+    UiAutomationScrollRoute, UiAutomationScrollSink, UiAutomationScrollSnapshot,
 };
 
 /// The session-bound semantic route an invokable authenticated button may use.
@@ -69,7 +80,7 @@ pub struct UiAutomationActionSink {
 
 /// The immutable semantic data one host window publishes to UI Automation.
 ///
-/// This packages the five snapshots and bounded routes that must remain aligned
+/// This packages the six snapshots and bounded routes that must remain aligned
 /// for one `WM_GETOBJECT` reply. The host creates a fresh value for each reply;
 /// the provider never retains a mutable native view or application callback.
 pub struct UiAutomationPublication {
@@ -78,6 +89,8 @@ pub struct UiAutomationPublication {
     focused: Option<ElementId>,
     action_sink: Option<UiAutomationActionSink>,
     focus_sink: Option<UiAutomationFocusSink>,
+    scroll_snapshot: Option<UiAutomationScrollSnapshot>,
+    scroll_sink: Option<UiAutomationScrollSink>,
 }
 
 impl UiAutomationPublication {
@@ -96,6 +109,8 @@ impl UiAutomationPublication {
             focused,
             action_sink,
             focus_sink,
+            scroll_snapshot: None,
+            scroll_sink: None,
         }
     }
 
@@ -105,15 +120,45 @@ impl UiAutomationPublication {
         Self::new(Vec::new(), Vec::new(), None, None, None)
     }
 
+    /// Adds the one host-selected vertical scroll snapshot and route.
+    ///
+    /// The host calls this only when the same current layout has a first
+    /// overflowing viewport. The provider keeps those immutable values paired
+    /// with its bounded route; it cannot look up a mutable view later.
+    #[must_use]
+    pub fn with_scroll(
+        mut self,
+        snapshot: UiAutomationScrollSnapshot,
+        sink: UiAutomationScrollSink,
+    ) -> Self {
+        self.scroll_snapshot = Some(snapshot);
+        self.scroll_sink = Some(sink);
+        self
+    }
+
     fn into_tree(self, title: Vec<u16>) -> Arc<Tree> {
-        Arc::new(Tree::new(
+        let Self {
+            elements,
+            field_values,
+            focused,
+            action_sink,
+            focus_sink,
+            scroll_snapshot,
+            scroll_sink,
+        } = self;
+        let tree = Tree::new(
             title,
-            self.elements,
-            self.field_values,
-            self.focused,
-            self.action_sink,
-            self.focus_sink,
-        ))
+            elements,
+            field_values,
+            focused,
+            action_sink,
+            focus_sink,
+        );
+        let tree = match (scroll_snapshot, scroll_sink) {
+            (Some(snapshot), Some(sink)) => tree.with_scroll(snapshot, sink),
+            _ => tree,
+        };
+        Arc::new(tree)
     }
 }
 
@@ -251,6 +296,23 @@ struct ValueVtbl {
     get_is_read_only: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
 }
 
+/// `IScrollProvider`.
+#[repr(C)]
+struct ScrollVtbl {
+    query_interface:
+        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
+    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
+    release: unsafe extern "system" fn(*mut c_void) -> u32,
+    scroll: unsafe extern "system" fn(*mut c_void, i32, i32) -> Hresult,
+    set_scroll_percent: unsafe extern "system" fn(*mut c_void, f64, f64) -> Hresult,
+    get_horizontal_scroll_percent: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
+    get_vertical_scroll_percent: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
+    get_horizontal_view_size: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
+    get_vertical_view_size: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
+    get_horizontally_scrollable: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
+    get_vertically_scrollable: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
+}
+
 static SIMPLE_VTBL: SimpleVtbl = SimpleVtbl {
     query_interface: simple_query_interface,
     add_ref: simple_add_ref,
@@ -297,6 +359,20 @@ static VALUE_VTBL: ValueVtbl = ValueVtbl {
     get_is_read_only,
 };
 
+static SCROLL_VTBL: ScrollVtbl = ScrollVtbl {
+    query_interface: scroll_query_interface,
+    add_ref: scroll_add_ref,
+    release: scroll_release,
+    scroll,
+    set_scroll_percent,
+    get_horizontal_scroll_percent,
+    get_vertical_scroll_percent,
+    get_horizontal_view_size,
+    get_vertical_view_size,
+    get_horizontally_scrollable,
+    get_vertically_scrollable,
+};
+
 /// One reference-counted provider for the window root or one of its elements.
 ///
 /// COM reaches an object through the vtable pointer for the interface being
@@ -309,6 +385,7 @@ struct Provider {
     fragment_root: *const FragmentRootVtbl,
     invoke: *const InvokeVtbl,
     value: *const ValueVtbl,
+    scroll: *const ScrollVtbl,
     references: AtomicU32,
     window: Handle,
     /// `None` for the window root, otherwise the element's position.
@@ -324,6 +401,7 @@ impl Provider {
             fragment_root: &raw const FRAGMENT_ROOT_VTBL,
             invoke: &raw const INVOKE_VTBL,
             value: &raw const VALUE_VTBL,
+            scroll: &raw const SCROLL_VTBL,
             references: AtomicU32::new(1),
             window,
             element,
@@ -365,6 +443,10 @@ unsafe fn value_of(this: *mut c_void) -> *mut Provider {
     unsafe { provider_from(this, offset_of!(Provider, value)) }
 }
 
+unsafe fn scroll_of(this: *mut c_void) -> *mut Provider {
+    unsafe { provider_from(this, offset_of!(Provider, scroll)) }
+}
+
 /// Runs one COM method body, converting a panic into a failure code.
 ///
 /// These are `extern "system"` and do not unwind, so an escaping panic would
@@ -390,7 +472,7 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
     // SAFETY: COM guarantees one readable GUID.
     let requested = unsafe { *requested };
     // SAFETY: the caller holds a reference, so the object is live.
-    let (is_root, element, supports_invoke, supports_value) = unsafe {
+    let (is_root, element, supports_invoke, supports_value, supports_scroll) = unsafe {
         let provider = &*provider;
         (
             provider.is_root(),
@@ -401,6 +483,9 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
             provider
                 .element
                 .is_some_and(|index| provider.tree.supports_value(index)),
+            provider
+                .element
+                .is_some_and(|index| provider.tree.supports_scroll(index)),
         )
     };
 
@@ -425,6 +510,11 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
         // host-owned value. It is read-only to automation below.
         // SAFETY: as above.
         unsafe { (&raw mut (*provider).value).cast::<c_void>() }
+    } else if requested == IID_ISCROLL_PROVIDER && element.is_some() && supports_scroll {
+        // A Scroll interface exists only for the one selected overflowing Group
+        // and only while this immutable publication carries its host-only route.
+        // SAFETY: as above.
+        unsafe { (&raw mut (*provider).scroll).cast::<c_void>() }
     } else {
         return E_NOINTERFACE;
     };
@@ -540,6 +630,12 @@ forward_unknown!(
     value_release,
     value_of
 );
+forward_unknown!(
+    scroll_query_interface,
+    scroll_add_ref,
+    scroll_release,
+    scroll_of
+);
 
 unsafe extern "system" fn get_provider_options(_this: *mut c_void, options: *mut i32) -> Hresult {
     contain(|| {
@@ -584,6 +680,12 @@ unsafe extern "system" fn get_pattern_provider(
                         && provider_ref.tree.supports_value(index) =>
                 {
                     Some((&raw mut (*provider).value).cast::<c_void>())
+                }
+                Some(index)
+                    if pattern == UIA_SCROLL_PATTERN_ID
+                        && provider_ref.tree.supports_scroll(index) =>
+                {
+                    Some((&raw mut (*provider).scroll).cast::<c_void>())
                 }
                 _ => None,
             }
@@ -687,6 +789,165 @@ unsafe extern "system" fn get_is_read_only(this: *mut c_void, out: *mut i32) -> 
         unsafe { *out = 1 };
         S_OK
     })
+}
+
+unsafe extern "system" fn scroll(
+    this: *mut c_void,
+    horizontal_amount: i32,
+    vertical_amount: i32,
+) -> Hresult {
+    contain(|| {
+        if this.is_null() {
+            return E_POINTER;
+        }
+        if horizontal_amount != SCROLL_AMOUNT_NO_AMOUNT {
+            return UIA_E_NOTSUPPORTED;
+        }
+        let command = match vertical_amount {
+            SCROLL_AMOUNT_NO_AMOUNT => return S_OK,
+            SCROLL_AMOUNT_SMALL_DECREMENT => UiAutomationScrollCommand::Line { forward: false },
+            SCROLL_AMOUNT_SMALL_INCREMENT => UiAutomationScrollCommand::Line { forward: true },
+            SCROLL_AMOUNT_LARGE_DECREMENT => UiAutomationScrollCommand::Page { forward: false },
+            SCROLL_AMOUNT_LARGE_INCREMENT => UiAutomationScrollCommand::Page { forward: true },
+            _ => return UIA_E_NOTSUPPORTED,
+        };
+        // SAFETY: this points at the Scroll vtable field of a live provider.
+        let provider = unsafe { scroll_of(this) };
+        // SAFETY: the caller holds a reference; the immutable tree checks that
+        // this exact element is still the publication's selected scroll group.
+        let accepted = unsafe {
+            (*provider)
+                .element
+                .is_some_and(|index| (*provider).tree.scroll(index, command))
+        };
+        if accepted { S_OK } else { E_FAIL }
+    })
+}
+
+unsafe extern "system" fn set_scroll_percent(
+    this: *mut c_void,
+    horizontal_percent: f64,
+    vertical_percent: f64,
+) -> Hresult {
+    contain(|| {
+        if this.is_null() {
+            return E_POINTER;
+        }
+        if horizontal_percent != UIA_SCROLL_PATTERN_NO_SCROLL
+            || !vertical_percent.is_finite()
+            || !(0.0..=100.0).contains(&vertical_percent)
+        {
+            return UIA_E_NOTSUPPORTED;
+        }
+        // SAFETY: this points at the Scroll vtable field of a live provider.
+        let provider = unsafe { scroll_of(this) };
+        // SAFETY: as above.
+        let accepted = unsafe {
+            (*provider).element.is_some_and(|index| {
+                (*provider).tree.scroll(
+                    index,
+                    UiAutomationScrollCommand::Percent {
+                        percent: vertical_percent,
+                    },
+                )
+            })
+        };
+        if accepted { S_OK } else { E_FAIL }
+    })
+}
+
+unsafe extern "system" fn get_horizontal_scroll_percent(
+    this: *mut c_void,
+    out: *mut f64,
+) -> Hresult {
+    // SAFETY: the COM caller supplied this interface pointer.
+    unsafe { get_scroll_double(this, out, |_| UIA_SCROLL_PATTERN_NO_SCROLL) }
+}
+
+unsafe extern "system" fn get_vertical_scroll_percent(this: *mut c_void, out: *mut f64) -> Hresult {
+    // SAFETY: the COM caller supplied this interface pointer.
+    unsafe {
+        get_scroll_double(
+            this,
+            out,
+            UiAutomationScrollSnapshot::vertical_scroll_percent,
+        )
+    }
+}
+
+unsafe extern "system" fn get_horizontal_view_size(this: *mut c_void, out: *mut f64) -> Hresult {
+    // SAFETY: the COM caller supplied this interface pointer.
+    unsafe { get_scroll_double(this, out, |_| 100.0) }
+}
+
+unsafe extern "system" fn get_vertical_view_size(this: *mut c_void, out: *mut f64) -> Hresult {
+    // SAFETY: the COM caller supplied this interface pointer.
+    unsafe { get_scroll_double(this, out, UiAutomationScrollSnapshot::vertical_view_size) }
+}
+
+unsafe extern "system" fn get_horizontally_scrollable(this: *mut c_void, out: *mut i32) -> Hresult {
+    // SAFETY: the COM caller supplied this interface pointer.
+    unsafe { get_scroll_bool(this, out, false) }
+}
+
+unsafe extern "system" fn get_vertically_scrollable(this: *mut c_void, out: *mut i32) -> Hresult {
+    // SAFETY: the COM caller supplied this interface pointer.
+    unsafe { get_scroll_bool(this, out, true) }
+}
+
+unsafe fn get_scroll_double(
+    this: *mut c_void,
+    out: *mut f64,
+    value: impl FnOnce(&UiAutomationScrollSnapshot) -> f64,
+) -> Hresult {
+    contain(|| {
+        if out.is_null() {
+            return E_POINTER;
+        }
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: this points at the Scroll vtable field of a live provider.
+        let snapshot = unsafe { scroll_snapshot(this) };
+        let Some(snapshot) = snapshot else {
+            return E_FAIL;
+        };
+        // SAFETY: out was checked above.
+        unsafe { *out = value(&snapshot) };
+        S_OK
+    })
+}
+
+unsafe fn get_scroll_bool(this: *mut c_void, out: *mut i32, value: bool) -> Hresult {
+    contain(|| {
+        if out.is_null() {
+            return E_POINTER;
+        }
+        if this.is_null() {
+            return E_POINTER;
+        }
+        // SAFETY: this points at the Scroll vtable field of a live provider.
+        if unsafe { scroll_snapshot(this) }.is_none() {
+            return E_FAIL;
+        }
+        // SAFETY: out was checked above.
+        unsafe { *out = i32::from(value) };
+        S_OK
+    })
+}
+
+/// Returns the immutable snapshot associated with one live Scroll interface.
+///
+/// # Safety
+///
+/// `this` must be the Scroll vtable pointer of a live provider.
+unsafe fn scroll_snapshot(this: *mut c_void) -> Option<UiAutomationScrollSnapshot> {
+    // SAFETY: the caller supplies the matching live interface pointer.
+    let provider = unsafe { scroll_of(this) };
+    // SAFETY: the caller holds a COM reference; tree state is immutable.
+    let index = unsafe { (*provider).element? };
+    // SAFETY: as above.
+    unsafe { (*provider).tree.scroll_snapshot(index).cloned() }
 }
 
 unsafe extern "system" fn get_property_value(
@@ -948,7 +1209,11 @@ fn window_title(window: Handle) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::c_void, ptr, sync::Arc};
+    use std::{
+        ffi::c_void,
+        ptr,
+        sync::{Arc, Mutex},
+    };
 
     use anodrel_ui::UiRect;
     use anodrel_ui_session::{SessionInteractionCandidate, UiDocumentSession, UiInputMailbox};
@@ -957,15 +1222,17 @@ mod tests {
     use super::{
         E_NOINTERFACE, E_POINTER, FragmentVtbl, Guid, IID_IINVOKE_PROVIDER,
         IID_IRAW_ELEMENT_PROVIDER_FRAGMENT, IID_IRAW_ELEMENT_PROVIDER_FRAGMENT_ROOT,
-        IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, IID_IVALUE_PROVIDER, InvokeVtbl, Provider,
-        S_OK, Tree, UIA_E_NOTSUPPORTED, UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID,
-        UiAutomationActionSink, UiAutomationFocusMailbox, ValueVtbl, contain, increment,
-        release_provider, set_focus,
+        IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_ISCROLL_PROVIDER, IID_IUNKNOWN, IID_IVALUE_PROVIDER,
+        InvokeVtbl, Provider, S_OK, ScrollVtbl, Tree, UIA_E_NOTSUPPORTED, UIA_INVOKE_PATTERN_ID,
+        UIA_SCROLL_PATTERN_ID, UIA_VALUE_PATTERN_ID, UiAutomationActionSink,
+        UiAutomationFocusMailbox, UiAutomationScrollCommand, UiAutomationScrollMailbox,
+        UiAutomationScrollSnapshot, ValueVtbl, contain, increment, release_provider, set_focus,
     };
 
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
     const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true}}"#;
     const HIERARCHY_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"section","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"detail","kind":"text","value":"Nested","fontSize":16,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]},{"id":"footer","kind":"text","value":"Done","fontSize":16,"tone":"primary"}]}}"#;
+    const SCROLL_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":0,"surfaceTone":"plain","children":[{"id":"one","kind":"action","label":"One","fontSize":16,"enabled":true,"tone":"accent"},{"id":"two","kind":"action","label":"Two","fontSize":16,"enabled":true,"tone":"accent"},{"id":"three","kind":"action","label":"Three","fontSize":16,"enabled":true,"tone":"accent"}]}}}"#;
 
     struct FixedMeasurer;
 
@@ -1109,6 +1376,49 @@ mod tests {
                 None,
                 None,
             )),
+        )
+    }
+
+    /// Builds the selected scroll group with a notifier that records each
+    /// closed provider command and accepts it as the host would.
+    fn scrollable_child() -> (*mut Provider, Arc<Mutex<Vec<UiAutomationScrollCommand>>>) {
+        let document = anodrel_ui_document::decode_v2(SCROLL_DOCUMENT)
+            .expect("the fixed scroll document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 40.0), &FixedMeasurer);
+        let elements = accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        );
+        let recorded = Arc::new(Mutex::new(Vec::new()));
+        let recorded_for_route = Arc::clone(&recorded);
+        let mailbox = UiAutomationScrollMailbox::new();
+        let route = mailbox.route(None);
+        let completing = mailbox.clone();
+        let sink = route.with_notifier(move || {
+            let request = completing.take().expect("scroll request is pending");
+            recorded_for_route
+                .lock()
+                .expect("test recording lock is available")
+                .push(request.command());
+            completing.complete_with(request.id(), || true).is_some()
+        });
+        let snapshot = UiAutomationScrollSnapshot::new(
+            anodrel_ui::ElementId::new("viewport").expect("fixed ID is valid"),
+            40.0,
+            80.0,
+            0.0,
+        )
+        .expect("fixed viewport overflows");
+        (
+            Provider::create(
+                0,
+                Some(0),
+                Arc::new(
+                    Tree::new(Vec::new(), elements, Vec::new(), None, None, None)
+                        .with_scroll(snapshot, sink),
+                ),
+            ),
+            recorded,
         )
     }
 
@@ -1340,6 +1650,80 @@ mod tests {
             release_provider(provider);
             release_provider(provider);
         }
+    }
+
+    #[test]
+    fn only_the_selected_overflowing_group_exposes_standard_vertical_scroll() {
+        let (provider, commands) = scrollable_child();
+        // SAFETY: this test owns one live provider, the interface pointers it
+        // queries, and all output slots passed to its COM calls.
+        unsafe {
+            let (result, queried) = query_simple(provider, &IID_ISCROLL_PROVIDER);
+            assert_eq!(result, S_OK);
+            assert!(!queried.is_null());
+            release_provider(provider);
+
+            let simple = (&raw mut (*provider).simple).cast::<c_void>();
+            let mut pattern = ptr::null_mut();
+            assert_eq!(
+                super::get_pattern_provider(simple, UIA_SCROLL_PATTERN_ID, &mut pattern),
+                S_OK
+            );
+            assert!(!pattern.is_null());
+
+            let vtable = *pattern.cast::<*const ScrollVtbl>();
+            let mut horizontal = 0.0;
+            let mut vertical = 0.0;
+            let mut view = 0.0;
+            let mut horizontal_enabled = 1;
+            let mut vertical_enabled = 0;
+            assert_eq!(
+                ((*vtable).get_horizontal_scroll_percent)(pattern, &mut horizontal),
+                S_OK
+            );
+            assert_eq!(
+                ((*vtable).get_vertical_scroll_percent)(pattern, &mut vertical),
+                S_OK
+            );
+            assert_eq!(((*vtable).get_vertical_view_size)(pattern, &mut view), S_OK);
+            assert_eq!(
+                ((*vtable).get_horizontally_scrollable)(pattern, &mut horizontal_enabled),
+                S_OK
+            );
+            assert_eq!(
+                ((*vtable).get_vertically_scrollable)(pattern, &mut vertical_enabled),
+                S_OK
+            );
+            assert_eq!(horizontal, -1.0);
+            assert_eq!(vertical, 0.0);
+            assert_eq!(view, 50.0);
+            assert_eq!(horizontal_enabled, 0);
+            assert_eq!(vertical_enabled, 1);
+
+            let mut property = super::Variant::empty();
+            assert_eq!(
+                super::get_property_value(simple, 30_055, &mut property),
+                S_OK
+            );
+            assert_eq!(property.double_value(), Some(0.0));
+
+            assert_eq!(((*vtable).scroll)(pattern, 2, 4), S_OK);
+            assert_eq!(((*vtable).set_scroll_percent)(pattern, -1.0, 37.5), S_OK);
+            assert_eq!(((*vtable).scroll)(pattern, 4, 4), UIA_E_NOTSUPPORTED);
+            assert_eq!(
+                ((*vtable).set_scroll_percent)(pattern, -1.0, f64::NAN),
+                UIA_E_NOTSUPPORTED
+            );
+            release_provider(provider);
+            release_provider(provider);
+        }
+        assert_eq!(
+            *commands.lock().expect("test recording lock is available"),
+            vec![
+                UiAutomationScrollCommand::Line { forward: true },
+                UiAutomationScrollCommand::Percent { percent: 37.5 },
+            ]
+        );
     }
 
     #[test]

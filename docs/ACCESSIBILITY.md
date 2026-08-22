@@ -1,16 +1,17 @@
 # Anodrel Windows accessibility
 
-**Status:** **UI Automation reading is implemented. Narrator and Inspect
-verified the earlier flat semantic surface; manual hierarchy verification, plus
-the existing button invocation, focus, focus-event, field-value, and
-structure-event screen-reader checks, remain open.**
+**Status:** **UI Automation reading and host-owned vertical scrolling are
+implemented. Narrator and Inspect verified the earlier flat semantic surface;
+manual hierarchy, scrolling, button invocation, focus, focus-event, field-value,
+and structure-event screen-reader checks remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 pre-hierarchy mapping table passed with no failures.
 
 Reading, one bounded action, focus reporting and control, one host-raised
-focus-change event, one host-raised document-replacement structure event, and
-read-only field values are the implemented surface.
+focus-change event, one host-raised document-replacement structure event,
+read-only field values, and one host-owned vertical ScrollPattern are the
+implemented surface.
 Assistive technology can read this surface, obtain a visible field's current
 value, invoke an enabled button in an authenticated UI session, and move to a
 visible enabled field or button through the host's existing focus state. An
@@ -113,8 +114,11 @@ actual visible hierarchy; top-level snapshot nodes belong to the host-owned
 window root.
 
 Groups are structural only. They are not keyboard focusable and expose no
-action, value, or additional pattern. An unnamed group remains unnamed because
-the portable document model has no group-label field. Hit testing returns the
+action or value pattern. A currently selected overflowing `Scroll` group is the
+one exception: Decision 0097 gives it the host-owned vertical `ScrollPattern`
+described in `docs/UI_AUTOMATION_SCROLL.md`, without changing its Group control
+type or document semantics. An unnamed group remains unnamed because the
+portable document model has no group-label field. Hit testing returns the
 deepest mapped element containing a point; overlapping siblings follow source
 paint order, with the later sibling winning.
 
@@ -152,9 +156,10 @@ characters, and assistive technology and UI test tooling both rely on a stable
 one. It is not a path, handle, or secret.
 
 Anything not in this table is deliberately absent. In particular there is no
-`HelpText`, `AcceleratorKey`, `AccessKey`, `LocalizedControlType`, or pattern
-provider except the two bounded patterns below: each would be a new promise to
-keep, and none has a source in the current model.
+`HelpText`, `AcceleratorKey`, `AccessKey`, or `LocalizedControlType`. The
+implemented bounded patterns are described below; Decision 0097 implements a
+vertical `ScrollPattern` for the one host-selected overflowing scroll group. It
+does not add an application accessibility field or pattern choice.
 
 ### Button invocation
 
@@ -248,10 +253,11 @@ registry.
 
 `WM_GETOBJECT` arrives on the UI thread, which creates the immutable provider
 snapshot. A later UI Automation method can arrive from an automation caller, so
-the only mutating method, `SetFocus`, uses a bounded private request route back
-to that owner. A pipe worker never serves an accessibility request, and an
-automation caller never receives a mutable view or registry entry. The mapping
-itself is pure and holds no lock, so it cannot block a message pump.
+the mutating methods, `SetFocus` and `IScrollProvider`, use bounded private
+request routes back to that owner. A pipe worker never serves an accessibility
+request, and an automation caller never receives a mutable view or registry
+entry. The mapping itself is pure and holds no lock, so it cannot block a
+message pump.
 
 ## Failure behaviour
 
@@ -346,10 +352,23 @@ Stale or absent documents, layout, resize, typing, field changes, focus,
 actions, dialogs, notifications, and closure raise nothing. See
 `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
 
+**Slice 10 — host-owned vertical scrolling. Implemented; manual scrolling
+check pending.** The first visible overflowing `Scroll` group exposes
+`IScrollProvider`. Its immutable provider snapshot reports vertical percentage
+and view size only; small and large increments return through a 250 ms
+revision-bound route to the owning UI thread, which confirms the same group is
+still the first overflowing viewport before it changes the established retained
+offset. The unit and host checks prove pattern gating, standard values, command
+validation, mailbox timeout safety, revision/target revalidation, and reuse of
+the pointer/wheel/keyboard scrollbar state. It has no event, application
+callback, position readback, or horizontal/nested target. See
+`docs/UI_AUTOMATION_SCROLL.md`.
+
 Also deferred, each needing its own contract and decision: Invoke,
 property/value/text/selection events, live announcements, selection
 and caret reporting, text patterns and ranges, labelled-by or described-by
-relations, automation editing, and non-Windows accessibility adapters.
+relations, automation editing, `IScrollItemProvider`, horizontal or nested
+scroll automation, scroll events, and non-Windows accessibility adapters.
 
 ## Verification
 
@@ -375,6 +394,12 @@ provider's updated focus snapshot local to that provider, and refuses an
 expired, busy, unknown, or late-completing route without changing host focus.
 The event adapter separately proves that an empty publication has no event
 source and that a focus event names the currently published focused child.
+The scroll provider tests additionally prove that only the selected overflowing
+Group answers the standard interface and pattern, reports finite vertical
+values, accepts only closed vertical commands, rejects malformed or horizontal
+requests, and never lets a busy or timed-out route apply later. The Windows-host
+test proves those commands reach the same retained position used by direct
+pointer, wheel, and keyboard movement.
 
 ### Confirmed against real UI Automation before hierarchy
 

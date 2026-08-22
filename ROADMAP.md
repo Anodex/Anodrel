@@ -200,7 +200,9 @@ Status: **Direct Windows host in progress**
    Windows UI Lab and authenticated UI-session view. Its track paging and
    captured thumb dragging change only host-retained scroll state, not a
    document or application event; nested arbitration and accessibility scroll
-   control remain separate gates.
+   control remain separate gates. Decision 0097 now implements the matching
+   Windows UI Automation ScrollPattern boundary; its manual Narrator/Inspect
+   verification remains a separate gate.
    The desktop command surface is a bounded native session menu: Decision 0080
    and `docs/MENUS.md` define a separate `menu.write` grant, a complete model,
    and delivery through the existing revision-checked interaction path.

@@ -144,6 +144,11 @@ const WM_ANODREL_PRODUCT_SESSION: Uint = WM_APP + 1;
 /// A route carries the target in host-owned memory; this message carries no
 /// pointer or input data, so an externally posted copy cannot inject focus.
 const WM_ANODREL_UIA_FOCUS: Uint = WM_APP + 2;
+/// Private payload-free wakeup for one pending UI Automation scroll request.
+///
+/// The selected viewport and closed command stay in host-owned route memory;
+/// an externally posted copy cannot select a target or inject scroll data.
+const WM_ANODREL_UIA_SCROLL: Uint = WM_APP + 3;
 
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 const REVEAL_TIMER: usize = 1;
@@ -1360,18 +1365,28 @@ fn accessible_elements_for(window: Hwnd) -> anodrel_windows_uia::UiAutomationPub
     else {
         return anodrel_windows_uia::UiAutomationPublication::empty();
     };
-    anodrel_windows_uia::UiAutomationPublication::new(
-        anodrel_windows_accessibility::accessible_elements(
-            &publication.snapshot,
-            client_origin(window),
-        ),
-        publication.field_values,
-        publication.focused,
-        publication.action_sink,
-        publication
-            .focus_route
-            .map(|route| route.for_window(window, WM_ANODREL_UIA_FOCUS)),
-    )
+    let registry::AccessibilityPublication {
+        snapshot,
+        action_sink,
+        focus_route,
+        scroll_snapshot,
+        scroll_route,
+        focused,
+        field_values,
+    } = publication;
+    let publication = anodrel_windows_uia::UiAutomationPublication::new(
+        anodrel_windows_accessibility::accessible_elements(&snapshot, client_origin(window)),
+        field_values,
+        focused,
+        action_sink,
+        focus_route.map(|route| route.for_window(window, WM_ANODREL_UIA_FOCUS)),
+    );
+    match (scroll_snapshot, scroll_route) {
+        (Some(snapshot), Some(route)) => {
+            publication.with_scroll(snapshot, route.for_window(window, WM_ANODREL_UIA_SCROLL))
+        }
+        _ => publication,
+    }
 }
 
 /// Raises one best-effort outbound focus notification after a real local move.
@@ -1399,6 +1414,19 @@ fn service_accessibility_focus(window: Hwnd) {
     if outcome.is_some_and(|outcome| outcome.accepted && outcome.changed) {
         invalidate(window);
         raise_accessibility_focus_changed(window);
+    }
+}
+
+/// Applies one pending host-only UI Automation scroll request and repaints only
+/// when the same retained position used by local input changed.
+fn service_accessibility_scroll(window: Hwnd) {
+    let rect = client_rect(window);
+    let outcome =
+        registry::service_accessibility_scroll(window, rect.width() as f32, rect.height() as f32)
+            .ok()
+            .flatten();
+    if outcome.is_some_and(|outcome| outcome.accepted && outcome.changed) {
+        invalidate(window);
     }
 }
 
@@ -2016,6 +2044,10 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
     }
     if message == WM_ANODREL_UIA_FOCUS {
         service_accessibility_focus(window);
+        return 0;
+    }
+    if message == WM_ANODREL_UIA_SCROLL {
+        service_accessibility_scroll(window);
         return 0;
     }
     match message {

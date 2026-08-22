@@ -470,8 +470,11 @@ thumb geometry from existing layout metrics and retained scroll state; the UI
 thread maps direct pointer paging and captured thumb dragging back into that
 same state. The control changes no portable document data, protocol field,
 application focus, action event, native handle, or input authority. Nested
-scrollbar arbitration and UI Automation scroll control remain separate
-decisions. See `docs/SCROLLING.md` and Decision 0096.
+scrollbar arbitration remains separate. Decision 0097 implements the matching
+Windows UI Automation vertical ScrollPattern as one bounded route back to that
+same host state; it adds no application-visible position, event, or capability.
+See `docs/SCROLLING.md`, `docs/UI_AUTOMATION_SCROLL.md`, Decisions 0096 and
+0097.
 
 Decision 0084 reserves the first direct network data seam without turning the
 host into a browser runtime. Its host-selected HTTPS origins and bounded

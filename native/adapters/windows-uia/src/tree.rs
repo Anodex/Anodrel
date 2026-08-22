@@ -13,7 +13,16 @@ use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
 use crate::raw2::{UiaRect, direction};
 use crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID;
 use crate::raw5::{UIA_VALUE_IS_READ_ONLY_PROPERTY_ID, UIA_VALUE_VALUE_PROPERTY_ID};
-use crate::{UiAutomationActionSink, UiAutomationFocusSink};
+use crate::raw6::{
+    UIA_SCROLL_HORIZONTAL_SCROLL_PERCENT_PROPERTY_ID, UIA_SCROLL_HORIZONTAL_VIEW_SIZE_PROPERTY_ID,
+    UIA_SCROLL_HORIZONTALLY_SCROLLABLE_PROPERTY_ID, UIA_SCROLL_PATTERN_NO_SCROLL,
+    UIA_SCROLL_VERTICAL_SCROLL_PERCENT_PROPERTY_ID, UIA_SCROLL_VERTICAL_VIEW_SIZE_PROPERTY_ID,
+    UIA_SCROLL_VERTICALLY_SCROLLABLE_PROPERTY_ID,
+};
+use crate::{
+    UiAutomationActionSink, UiAutomationFocusSink, UiAutomationScrollCommand,
+    UiAutomationScrollSink, UiAutomationScrollSnapshot,
+};
 
 /// The fixed automation identifier for an Anodrel surface's root.
 ///
@@ -32,6 +41,14 @@ pub struct Tree {
     focused: Mutex<Option<usize>>,
     action_sink: Option<UiAutomationActionSink>,
     focus_sink: Option<UiAutomationFocusSink>,
+    scroll: Option<ScrollCapability>,
+}
+
+/// The one host-selected vertical viewport that this immutable tree may expose.
+#[derive(Debug)]
+struct ScrollCapability {
+    snapshot: UiAutomationScrollSnapshot,
+    sink: UiAutomationScrollSink,
 }
 
 /// Immutable direct relationships derived from one mapped semantic snapshot.
@@ -142,7 +159,22 @@ impl Tree {
             focused: Mutex::new(focused),
             action_sink,
             focus_sink,
+            scroll: None,
         }
+    }
+
+    /// Adds the one host-selected scroll capability to this immutable tree.
+    ///
+    /// The snapshot and route are retained together so a provider can never
+    /// advertise a pattern without the host-only path that can revalidate it.
+    #[must_use]
+    pub(crate) fn with_scroll(
+        mut self,
+        snapshot: UiAutomationScrollSnapshot,
+        sink: UiAutomationScrollSink,
+    ) -> Self {
+        self.scroll = Some(ScrollCapability { snapshot, sink });
+        self
     }
 
     /// Resolves one direct UI Automation navigation step in this snapshot.
@@ -204,6 +236,24 @@ impl Tree {
             UIA_VALUE_VALUE_PROPERTY_ID => Some(Variant::string(self.field_value(index)?)),
             UIA_VALUE_IS_READ_ONLY_PROPERTY_ID => {
                 self.field_value(index).map(|_| Variant::boolean(true))
+            }
+            UIA_SCROLL_HORIZONTAL_SCROLL_PERCENT_PROPERTY_ID => self
+                .scroll_snapshot(index)
+                .map(|_| Variant::double(UIA_SCROLL_PATTERN_NO_SCROLL)),
+            UIA_SCROLL_HORIZONTAL_VIEW_SIZE_PROPERTY_ID => {
+                self.scroll_snapshot(index).map(|_| Variant::double(100.0))
+            }
+            UIA_SCROLL_VERTICAL_SCROLL_PERCENT_PROPERTY_ID => self
+                .scroll_snapshot(index)
+                .map(|snapshot| Variant::double(snapshot.vertical_scroll_percent())),
+            UIA_SCROLL_VERTICAL_VIEW_SIZE_PROPERTY_ID => self
+                .scroll_snapshot(index)
+                .map(|snapshot| Variant::double(snapshot.vertical_view_size())),
+            UIA_SCROLL_HORIZONTALLY_SCROLLABLE_PROPERTY_ID => {
+                self.scroll_snapshot(index).map(|_| Variant::boolean(false))
+            }
+            UIA_SCROLL_VERTICALLY_SCROLLABLE_PROPERTY_ID => {
+                self.scroll_snapshot(index).map(|_| Variant::boolean(true))
             }
             property::IS_CONTROL_ELEMENT | property::IS_CONTENT_ELEMENT => {
                 Some(Variant::boolean(true))
@@ -330,6 +380,36 @@ impl Tree {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(index);
         true
+    }
+
+    /// Whether one published Group exposes the bounded vertical ScrollPattern.
+    #[must_use]
+    pub(crate) fn supports_scroll(&self, index: usize) -> bool {
+        self.scroll_snapshot(index).is_some()
+    }
+
+    /// Returns the published immutable scroll values for one selected group.
+    #[must_use]
+    pub(crate) fn scroll_snapshot(&self, index: usize) -> Option<&UiAutomationScrollSnapshot> {
+        let capability = self.scroll.as_ref()?;
+        let element = self.elements.get(index)?;
+        (element.control_type() == control_type::GROUP
+            && element.automation_id() == capability.snapshot.target().as_str())
+        .then_some(&capability.snapshot)
+    }
+
+    /// Offers one closed vertical command to the selected host-owned viewport.
+    ///
+    /// `false` combines every generic refusal. The provider has no route to an
+    /// application, a pointer stream, another viewport, or a failure detail.
+    pub(crate) fn scroll(&self, index: usize, command: UiAutomationScrollCommand) -> bool {
+        let capability = match (self.scroll.as_ref(), self.scroll_snapshot(index)) {
+            (Some(capability), Some(_)) => capability,
+            _ => return false,
+        };
+        capability
+            .sink
+            .scroll(capability.snapshot.target().clone(), command)
     }
 
     fn invocation_id(&self, index: usize) -> Option<ElementId> {

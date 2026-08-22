@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0097: Windows UI Automation scrolling remains host-owned.
+
 - 0096: Windows scrollbar input stays host-owned.
 
 - 0095: Development native form templates keep typing host-owned.

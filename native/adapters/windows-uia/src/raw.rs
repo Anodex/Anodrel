@@ -35,6 +35,7 @@ pub const STRUCTURE_CHANGE_CHILDREN_INVALIDATED: i32 = 2;
 
 pub const VT_EMPTY: u16 = 0;
 pub const VT_I4: u16 = 3;
+pub const VT_R8: u16 = 5;
 pub const VT_BSTR: u16 = 8;
 pub const VT_BOOL: u16 = 11;
 
@@ -106,6 +107,15 @@ impl Variant {
         variant
     }
 
+    /// A 64-bit floating-point variant.
+    #[must_use]
+    pub const fn double(value: f64) -> Self {
+        let mut variant = Self::empty();
+        variant.vt = VT_R8;
+        variant.value[0] = value.to_bits();
+        variant
+    }
+
     /// A COM boolean variant.
     #[must_use]
     pub const fn boolean(value: bool) -> Self {
@@ -140,6 +150,15 @@ impl Variant {
             return None;
         }
         Some((self.value[0] as u16 as i16) == VARIANT_TRUE)
+    }
+
+    /// Returns a floating-point value for internal tests.
+    #[cfg(test)]
+    pub(crate) const fn double_value(&self) -> Option<f64> {
+        if self.vt != VT_R8 {
+            return None;
+        }
+        Some(f64::from_bits(self.value[0]))
     }
 
     /// Copies and releases a test-owned BSTR variant.
@@ -239,7 +258,7 @@ mod tests {
     use super::{
         E_FAIL, E_NOINTERFACE, E_POINTER, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, S_OK,
         STRUCTURE_CHANGE_CHILDREN_INVALIDATED, UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, VARIANT_TRUE,
-        VT_BOOL, VT_EMPTY, VT_I4, Variant,
+        VT_BOOL, VT_EMPTY, VT_I4, VT_R8, Variant,
     };
 
     #[test]
@@ -254,6 +273,9 @@ mod tests {
     fn simple_variants_carry_their_tag_and_value() {
         assert_eq!(Variant::empty().vt, VT_EMPTY);
         assert_eq!(Variant::int(50_032).vt, VT_I4);
+        assert_eq!(Variant::double(12.5).vt, VT_R8);
+        assert_eq!(Variant::double(12.5).value[0], 12.5_f64.to_bits());
+        assert_eq!(Variant::double(12.5).double_value(), Some(12.5));
         assert_eq!(Variant::boolean(true).vt, VT_BOOL);
         assert_eq!(Variant::boolean(true).boolean_value(), Some(true));
         assert_eq!(Variant::boolean(false).boolean_value(), Some(false));

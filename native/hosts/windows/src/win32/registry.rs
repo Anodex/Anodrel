@@ -9,7 +9,7 @@ use std::{
 use super::{
     Hwnd, StartupLab, View,
     menu::UnattachedMenu,
-    ui_lab::{AccessibilityFocusResult, UiLab},
+    ui_lab::{AccessibilityFocusResult, AccessibilityScrollResult, UiLab},
 };
 use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
@@ -27,6 +27,8 @@ pub(super) struct AccessibilityPublication {
     pub(super) snapshot: anodrel_ui::UiAccessibilitySnapshot,
     pub(super) action_sink: Option<anodrel_windows_uia::UiAutomationActionSink>,
     pub(super) focus_route: Option<anodrel_windows_uia::UiAutomationFocusRoute>,
+    pub(super) scroll_snapshot: Option<anodrel_windows_uia::UiAutomationScrollSnapshot>,
+    pub(super) scroll_route: Option<anodrel_windows_uia::UiAutomationScrollRoute>,
     pub(super) focused: Option<anodrel_ui::ElementId>,
     pub(super) field_values: Vec<(anodrel_ui::ElementId, String)>,
 }
@@ -534,6 +536,8 @@ pub(super) fn accessibility_snapshot(
             snapshot: lab.accessibility_snapshot(width, height),
             action_sink: None,
             focus_route: Some(lab.accessibility_focus_route(None)),
+            scroll_snapshot: lab.accessibility_scroll_snapshot(width, height),
+            scroll_route: Some(lab.accessibility_scroll_route(None)),
             focused: lab.accessibility_focus(),
             field_values: lab.accessibility_field_values(),
         }),
@@ -541,6 +545,8 @@ pub(super) fn accessibility_snapshot(
             snapshot: session.lab().accessibility_snapshot(width, height),
             action_sink: session.accessibility_action_sink(),
             focus_route: Some(session.accessibility_focus_route()),
+            scroll_snapshot: session.lab().accessibility_scroll_snapshot(width, height),
+            scroll_route: Some(session.accessibility_scroll_route()),
             focused: session.lab().accessibility_focus(),
             field_values: session.lab().accessibility_field_values(),
         }),
@@ -561,6 +567,23 @@ pub(super) fn service_accessibility_focus(
     Ok(match views.get_mut(&window) {
         Some(View::UiLab(lab)) => lab.service_accessibility_focus(None, width, height),
         Some(View::UiSession(session)) => session.service_accessibility_focus(width, height),
+        _ => None,
+    })
+}
+
+/// Takes and revalidates a private UI Automation scroll request on one view.
+///
+/// The caller is the host's payload-free UIA wake message. Its target and
+/// command came from the one active host-owned route, not from a window message.
+pub(super) fn service_accessibility_scroll(
+    window: Hwnd,
+    width: f32,
+    height: f32,
+) -> io::Result<Option<AccessibilityScrollResult>> {
+    let mut views = lock_views()?;
+    Ok(match views.get_mut(&window) {
+        Some(View::UiLab(lab)) => lab.service_accessibility_scroll(None, width, height),
+        Some(View::UiSession(session)) => session.service_accessibility_scroll(width, height),
         _ => None,
     })
 }
