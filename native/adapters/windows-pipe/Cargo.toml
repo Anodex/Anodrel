@@ -16,6 +16,8 @@ anodrel-file-dialog = { path = "../../crates/file-dialog" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-storage = { path = "../../crates/storage" }
 anodrel-transport = { path = "../../crates/transport" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
+anodrel-window = { path = "../../crates/window" }
 anodrel-wire = { path = "../../crates/wire" }
 
 [dev-dependencies]

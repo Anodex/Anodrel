@@ -33,6 +33,8 @@ use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageS
 use anodrel_transport::{
     SessionCredentials, TransportSession, UiDocumentMailbox, UiInputMailbox, authentication_message,
 };
+use anodrel_ui_session::UiWindowGroup;
+use anodrel_window::WindowTitleProposal;
 use anodrel_wire::encode_json;
 
 use crate::{raw::PIPE_BUFFER_BYTES, security::CurrentSessionSecurity};
@@ -347,6 +349,31 @@ impl WindowsPipeServer {
                 credentials,
                 ui_document_mailbox,
                 ui_input_mailbox,
+                session_close_signal,
+                services,
+            )
+        })
+    }
+
+    /// Creates an authenticated interactive endpoint whose primary view belongs
+    /// to one host-created session-owned window group.
+    ///
+    /// The group contains portable state and mailboxes only. Native host code
+    /// remains responsible for servicing its creation requests on the owning
+    /// UI thread and for retaining its lifetime with the associated window.
+    #[allow(clippy::too_many_arguments)] // The explicit host-owned boundaries are security-relevant.
+    pub fn create_with_session_window_group_and_service_bundle(
+        policy: HostPolicy,
+        session_id: impl Into<String>,
+        ui_window_group: UiWindowGroup<WindowTitleProposal>,
+        session_close_signal: SessionCloseSignal,
+        services: HostServices,
+    ) -> io::Result<(Self, SessionInvitation)> {
+        Self::create_endpoint(session_id.into(), move |credentials| {
+            TransportSession::with_session_window_group_and_service_bundle(
+                policy,
+                credentials,
+                ui_window_group,
                 session_close_signal,
                 services,
             )

@@ -126,8 +126,10 @@ authenticated transport before the peer connects. In that mode the core
 publishes accepted primary snapshots directly through the group's primary
 mailbox; the transport has no second legacy mailbox to publish. Existing
 targetless document and event requests still resolve only `main`, and no
-released protocol can open, select, or observe a secondary view. Direct Windows
-group ownership remains a separate integration step.
+released protocol can open, select, or observe a secondary view. The Windows
+registered-session and named-pipe adapters compose this group for a validated
+interactive session; direct Windows dynamic-view ownership remains a separate
+integration step.
 
 For a host that chooses to support caller-initiated session termination, the
 transport can also receive one host-owned `SessionCloseSignal`. A successful,

@@ -103,9 +103,11 @@ Status: **Direct Windows host in progress**
   revisions and input queues, and group-wide shutdown. **Completed for the
   portable state and worker-to-UI creation handoff:** the group has a bounded
   take-once request, commit-only snapshot publication, and rollback of failed
-  or timed-out native creation. Protocol, Windows-host, and group-lifetime
-  integration remain in progress; no released protocol version lets an
-  application create or target another view yet.
+  or timed-out native creation. The core, authenticated transport, and
+  registered Windows-session composition now use the group for the existing
+  primary view without copying its mailboxes. Protocol, direct Windows-host,
+  and group-lifetime integration remain in progress; no released protocol
+  version lets an application create or target another view yet.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
   non-mutating save picker while implementing an independent, one-use

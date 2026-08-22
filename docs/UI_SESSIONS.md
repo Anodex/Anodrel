@@ -115,9 +115,10 @@ The native core and authenticated transport now support this as an opt-in
 session mode: those existing targetless operations resolve only the group's
 `main` view and publish through its supplied primary mailbox. They do not drain
 or validate any secondary input, and group delivery has no second legacy
-mailbox that can publish a duplicate snapshot. Direct Windows group ownership
-is still in progress, so no released application protocol can select or create
-a view.
+mailbox that can publish a duplicate snapshot. The Windows registered-session
+and pipe-composition adapters now create and retain this same group before
+authentication. Direct Windows dynamic-view ownership is still in progress, so
+no released application protocol can select or create a view.
 
 ## Latest-document delivery
 

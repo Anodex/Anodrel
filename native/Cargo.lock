@@ -465,6 +465,8 @@ dependencies = [
  "anodrel-protocol",
  "anodrel-storage",
  "anodrel-transport",
+ "anodrel-ui-session",
+ "anodrel-window",
  "anodrel-windows-credentials",
  "anodrel-wire",
 ]

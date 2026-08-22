@@ -18,10 +18,12 @@ use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
-use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
+use anodrel_ui_session::{
+    UiDocumentMailbox, UiFieldMailbox, UiInputMailbox, UiWindowGroup, UiWindowId,
+};
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowSizeMailbox, WindowStateMailbox,
-    WindowTitleMailbox,
+    WindowTitleMailbox, WindowTitleProposal,
 };
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
@@ -39,8 +41,7 @@ use anodrel_windows_storage::WindowsStorageService;
 /// that belongs to the same session returned by [`RegisteredUiSession`].
 #[derive(Clone, Debug)]
 pub struct RegisteredSessionUi {
-    document_mailbox: UiDocumentMailbox,
-    input_mailbox: UiInputMailbox,
+    window_group: UiWindowGroup<WindowTitleProposal>,
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
@@ -63,9 +64,10 @@ pub struct RegisteredSessionUi {
 
 impl RegisteredSessionUi {
     fn new(display_name: impl Into<String>) -> Self {
+        let document_mailbox = UiDocumentMailbox::new();
+        let input_mailbox = UiInputMailbox::new();
         Self {
-            document_mailbox: UiDocumentMailbox::new(),
-            input_mailbox: UiInputMailbox::new(),
+            window_group: UiWindowGroup::with_primary_resources(document_mailbox, input_mailbox),
             close_signal: SessionCloseSignal::default(),
             file_dialog_mailbox: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
@@ -84,13 +86,23 @@ impl RegisteredSessionUi {
     /// Returns this session's document-delivery mailbox.
     #[must_use]
     pub fn document_mailbox(&self) -> UiDocumentMailbox {
-        self.document_mailbox.clone()
+        self.primary_resources().document_mailbox()
     }
 
     /// Returns this session's bounded semantic-input mailbox.
     #[must_use]
     pub fn input_mailbox(&self) -> UiInputMailbox {
-        self.input_mailbox.clone()
+        self.primary_resources().input_mailbox()
+    }
+
+    /// Returns this registered session's host-owned portable view group.
+    ///
+    /// This value has no native handle or application-selected state. The
+    /// Windows host uses it only for the same registered session's UI-thread
+    /// lifecycle and authenticated transport composition.
+    #[must_use]
+    pub fn window_group(&self) -> UiWindowGroup<WindowTitleProposal> {
+        self.window_group.clone()
     }
 
     /// Returns this session's host-owned close signal.
@@ -182,6 +194,12 @@ impl RegisteredSessionUi {
     pub fn display_name(&self) -> &str {
         &self.display_name
     }
+
+    fn primary_resources(&self) -> anodrel_ui_session::UiWindowResources {
+        self.window_group
+            .resources(&UiWindowId::primary())
+            .expect("a session-owned group always retains its primary view")
+    }
 }
 
 /// One registered interactive session before a host starts pipe I/O.
@@ -248,11 +266,10 @@ pub fn create_registered_ui_session(
     let ui = RegisteredSessionUi::new(application.identity().display_name());
     let services = registered_interactive_services(&application, &ui)?;
     let (server, invitation) =
-        WindowsPipeServer::create_with_session_components_and_service_bundle(
+        WindowsPipeServer::create_with_session_window_group_and_service_bundle(
             policy,
             session_id,
-            ui.document_mailbox(),
-            ui.input_mailbox(),
+            ui.window_group(),
             ui.close_signal(),
             services,
         )
@@ -412,6 +429,33 @@ mod tests {
         first.close_signal().request();
         assert!(first.close_signal().take());
         assert!(!second.close_signal().take());
+    }
+
+    #[test]
+    fn each_registered_session_owns_one_isolated_primary_view_group() {
+        let first = RegisteredSessionUi::new("First Application");
+        let second = RegisteredSessionUi::new("Second Application");
+        let document = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"First","fontSize":16,"tone":"primary"}}"#;
+        let primary = anodrel_ui_session::UiWindowId::primary();
+
+        let snapshot = first
+            .window_group()
+            .replace_document(&primary, document)
+            .expect("the primary document validates");
+        assert_eq!(snapshot.snapshot().revision().value(), 1);
+        assert_eq!(
+            first
+                .document_mailbox()
+                .take()
+                .expect("the first group publishes to its primary mailbox")
+                .revision()
+                .value(),
+            1
+        );
+        assert!(
+            second.document_mailbox().take().is_none(),
+            "registered sessions must never share a primary document mailbox"
+        );
     }
 
     #[test]
