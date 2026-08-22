@@ -402,6 +402,17 @@ impl UiWindowSessions {
             .collect()
     }
 
+    /// Drains the bounded native input queue for one known session-owned view.
+    ///
+    /// A caller that preserves a legacy primary-only operation uses this method
+    /// rather than draining other views' queues as a side effect.
+    pub fn drain_input_batch(&self, id: &UiWindowId) -> Result<UiInputBatch, UiWindowSessionError> {
+        self.windows
+            .get(id)
+            .map(|state| state.input_mailbox.drain())
+            .ok_or(UiWindowSessionError::WindowUnavailable)
+    }
+
     /// Removes one secondary view after its host-owned native view has closed.
     ///
     /// A closed identity remains unavailable even when capacity later permits a

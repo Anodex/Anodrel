@@ -308,6 +308,16 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`,
 `docs/SCROLLING.md`, and Decisions 0025 through 0039.
 
+Decision 0092 adds an opt-in portable `UiWindowGroup` around that same state:
+it binds the already-created primary document and input mailboxes rather than
+copying them into a parallel session, then reserves independent resources for
+at most three secondary logical views. The core can operate in this group mode
+while retaining every targetless document and event operation as primary-only;
+it never drains a secondary view on that compatibility path. The group has no
+native authority, and its creation handoff stops at the owning UI thread. The
+authenticated transport and direct Windows host must still compose and service
+it before Protocol 1.25 can be released.
+
 `anodrel-menu` is a separate portable module for one authenticated session's
 complete bounded menu model, monotonic revision, enabled-command revalidation,
 and optional canonical local shortcut declaration. Its one-way service seam

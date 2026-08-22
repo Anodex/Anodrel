@@ -47,7 +47,7 @@ use anodrel_protocol::{
 use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
 use anodrel_ui_session::{
     SessionInteractionCandidate, UiDocumentSession, UiDocumentSnapshot, UiFieldReadError,
-    UiFieldReader, UiFieldSnapshot, UiInputMailbox,
+    UiFieldReader, UiFieldSnapshot, UiInputMailbox, UiWindowGroup, UiWindowId,
 };
 use anodrel_window::{
     WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
@@ -135,11 +135,12 @@ impl HostPolicy {
 #[derive(Debug)]
 pub struct CoreHost {
     policy: HostPolicy,
-    ui_document_session: RefCell<UiDocumentSession>,
+    ui_document_session: Option<RefCell<UiDocumentSession>>,
+    ui_window_group: Option<UiWindowGroup<WindowTitleProposal>>,
     menu_session: RefCell<MenuSession>,
-    ui_input_mailbox: UiInputMailbox,
+    ui_input_mailbox: Option<UiInputMailbox>,
     session_close_signal: SessionCloseSignal,
-    pending_ui_document_update: RefCell<Option<UiDocumentSnapshot>>,
+    pending_ui_document_update: Option<RefCell<Option<UiDocumentSnapshot>>>,
     clipboard: Box<dyn ClipboardService>,
     external_links: Box<dyn ExternalLinkService>,
     network: Box<dyn NetworkTextService>,
@@ -599,11 +600,12 @@ impl CoreHost {
     ) -> Self {
         Self {
             policy,
-            ui_document_session: RefCell::new(UiDocumentSession::new()),
+            ui_document_session: Some(RefCell::new(UiDocumentSession::new())),
+            ui_window_group: None,
             menu_session: RefCell::new(MenuSession::new()),
-            ui_input_mailbox,
+            ui_input_mailbox: Some(ui_input_mailbox),
             session_close_signal,
-            pending_ui_document_update: RefCell::new(None),
+            pending_ui_document_update: Some(RefCell::new(None)),
             clipboard: services.clipboard,
             external_links: services.external_links,
             network: services.network,
@@ -625,6 +627,35 @@ impl CoreHost {
             diagnostics: services.diagnostics,
             credentials: services.credentials,
         }
+    }
+
+    /// Creates a core whose primary UI state is part of one session-owned
+    /// window group.
+    ///
+    /// The caller constructs the group with the primary view's real document
+    /// and input mailboxes before authentication. This core therefore has no
+    /// parallel primary document or input state to keep in sync. Existing
+    /// targetless UI operations continue to resolve only `main`; the public
+    /// multi-window protocol remains unavailable until its Windows integration
+    /// is complete.
+    #[must_use]
+    pub fn with_session_window_group_and_service_bundle(
+        policy: HostPolicy,
+        ui_window_group: UiWindowGroup<WindowTitleProposal>,
+        session_close_signal: SessionCloseSignal,
+        services: HostServices,
+    ) -> Self {
+        let mut core = Self::with_session_components_and_service_bundle(
+            policy,
+            UiInputMailbox::new(),
+            session_close_signal,
+            services,
+        );
+        core.ui_document_session = None;
+        core.ui_window_group = Some(ui_window_group);
+        core.ui_input_mailbox = None;
+        core.pending_ui_document_update = None;
+        core
     }
 
     /// Creates a core with only an identity-bound credential service enabled.
@@ -837,11 +868,12 @@ impl CoreHost {
     ) -> Self {
         Self {
             policy,
-            ui_document_session: RefCell::new(UiDocumentSession::new()),
+            ui_document_session: Some(RefCell::new(UiDocumentSession::new())),
+            ui_window_group: None,
             menu_session: RefCell::new(MenuSession::new()),
-            ui_input_mailbox,
+            ui_input_mailbox: Some(ui_input_mailbox),
             session_close_signal,
-            pending_ui_document_update: RefCell::new(None),
+            pending_ui_document_update: Some(RefCell::new(None)),
             clipboard: Box::new(clipboard),
             external_links: Box::new(external_links),
             network: Box::new(UnavailableNetwork),
@@ -871,7 +903,9 @@ impl CoreHost {
     /// Takes the latest accepted document snapshot not yet observed by the
     /// transport that owns this core host.
     pub fn take_ui_document_update(&self) -> Option<UiDocumentSnapshot> {
-        self.pending_ui_document_update.borrow_mut().take()
+        self.pending_ui_document_update
+            .as_ref()
+            .and_then(|update| update.borrow_mut().take())
     }
 
     pub fn handle_json(&self, message: &str) -> String {
@@ -1193,8 +1227,20 @@ impl CoreHost {
             );
         }
 
-        let Some(snapshot) = ({
-            let mut session = self.ui_document_session.borrow_mut();
+        let snapshot = if let Some(group) = &self.ui_window_group {
+            let primary = UiWindowId::primary();
+            let replacement = if version_two {
+                group.replace_document_v2(&primary, document)
+            } else {
+                group.replace_document(&primary, document)
+            };
+            replacement.ok().map(|snapshot| snapshot.snapshot().clone())
+        } else {
+            let session = self
+                .ui_document_session
+                .as_ref()
+                .expect("legacy core has a primary document session");
+            let mut session = session.borrow_mut();
             let revision = if version_two {
                 session.replace_document_v2(document)
             } else {
@@ -1205,7 +1251,8 @@ impl CoreHost {
                     .snapshot()
                     .filter(|snapshot| snapshot.revision() == revision)
             })
-        }) else {
+        };
+        let Some(snapshot) = snapshot else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
@@ -1214,7 +1261,9 @@ impl CoreHost {
             );
         };
         let revision = snapshot.revision();
-        *self.pending_ui_document_update.borrow_mut() = Some(snapshot);
+        if let Some(update) = &self.pending_ui_document_update {
+            *update.borrow_mut() = Some(snapshot);
+        }
         ResponseEnvelope::success(
             request.request_id,
             &self.policy.host_name,
@@ -1298,7 +1347,24 @@ impl CoreHost {
             );
         }
 
-        let batch = self.ui_input_mailbox.drain();
+        let batch = if let Some(group) = &self.ui_window_group {
+            match group.drain_input_batch(&UiWindowId::primary()) {
+                Ok(batch) => batch,
+                Err(_) => {
+                    return self.failure(
+                        request.request_id,
+                        ProtocolErrorCode::WindowUnavailable,
+                        "the session UI view is unavailable.",
+                        None,
+                    );
+                }
+            }
+        } else {
+            self.ui_input_mailbox
+                .as_ref()
+                .expect("legacy core has a primary input mailbox")
+                .drain()
+        };
         let dropped = batch.dropped();
         let mut discarded = 0_u32;
         let mut events = Vec::new();
@@ -1306,13 +1372,21 @@ impl CoreHost {
             match candidate {
                 SessionInteractionCandidate::Ui(candidate) => {
                     let (revision, event) = candidate.into_parts();
-                    match self
-                        .ui_document_session
-                        .borrow()
-                        .accept_event(revision, event)
-                    {
-                        Ok(event) => events.push(ui_action_event(event)),
-                        Err(_) => discarded = discarded.saturating_add(1),
+                    let accepted = if let Some(group) = &self.ui_window_group {
+                        group
+                            .accept_event(&UiWindowId::primary(), revision, event)
+                            .ok()
+                    } else {
+                        self.ui_document_session
+                            .as_ref()
+                            .expect("legacy core has a primary document session")
+                            .borrow()
+                            .accept_event(revision, event)
+                            .ok()
+                    };
+                    match accepted {
+                        Some(event) => events.push(ui_action_event(event)),
+                        None => discarded = discarded.saturating_add(1),
                     }
                 }
                 SessionInteractionCandidate::Menu(candidate) => {
@@ -2807,6 +2881,7 @@ mod tests {
     use std::cell::RefCell;
     use std::collections::BTreeMap;
     use std::sync::{Arc, Mutex};
+    use std::thread;
 
     use anodrel_clipboard::{
         ClipboardRead, ClipboardService, ClipboardServiceError, ClipboardText,
@@ -2827,7 +2902,9 @@ mod tests {
     use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
     use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
     use anodrel_ui::{ElementId, UiEvent};
-    use anodrel_ui_session::{MenuInputCandidate, UiInputCandidate};
+    use anodrel_ui_session::{
+        MenuInputCandidate, UiDocumentMailbox, UiInputCandidate, UiInputMailbox, UiWindowGroup,
+    };
     use anodrel_window::{
         WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
         WindowFullscreenServiceError, WindowSize, WindowSizeService, WindowSizeServiceError,
@@ -5051,6 +5128,89 @@ mod tests {
         assert_eq!(
             field(field(&stale, "result"), "discarded"),
             &JsonValue::Number("1".to_owned())
+        );
+    }
+
+    #[test]
+    fn grouped_primary_operations_reuse_the_primary_mailboxes_and_leave_secondary_input_local() {
+        let document_mailbox = UiDocumentMailbox::new();
+        let input_mailbox = UiInputMailbox::new();
+        let group = UiWindowGroup::<WindowTitleProposal>::with_primary_resources(
+            document_mailbox.clone(),
+            input_mailbox.clone(),
+        );
+        let host = CoreHost::with_session_window_group_and_service_bundle(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiDocumentWrite, Capability::UiEventsRead],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            group.clone(),
+            SessionCloseSignal::default(),
+            HostServices::unavailable(),
+        );
+        let document = valid_ui_document("Continue");
+
+        let replacement = JsonValue::parse(&host.handle_json(&request_v1_1(
+            "ui.document.replace",
+            &ui_document_payload(&document),
+        )))
+        .expect("replacement response is JSON");
+        assert_eq!(field(&replacement, "status").as_string(), Some("success"));
+        assert!(
+            host.take_ui_document_update().is_none(),
+            "the group publishes directly to its primary mailbox"
+        );
+        let primary_snapshot = document_mailbox
+            .take()
+            .expect("the supplied primary mailbox receives the snapshot");
+        assert_eq!(primary_snapshot.revision().value(), 1);
+
+        let opening_group = group.clone();
+        let opening_document = document.clone();
+        let opening = thread::spawn(move || {
+            opening_group.open_secondary(
+                WindowTitleProposal::new("Secondary").expect("test title is valid"),
+                &opening_document,
+            )
+        });
+        let request = loop {
+            if let Some(request) = group.take_open_request() {
+                break request;
+            }
+            thread::yield_now();
+        };
+        assert!(group.complete_open(request.id(), true));
+        let secondary = opening
+            .join()
+            .expect("opening worker does not panic")
+            .expect("secondary opens");
+        let secondary_resources = group
+            .resources(&secondary)
+            .expect("secondary resources are registered");
+        secondary_resources
+            .input_mailbox()
+            .push(UiInputCandidate::new(
+                request.snapshot().snapshot().revision(),
+                UiEvent::ActionInvoked(ElementId::new("root").expect("test ID is valid")),
+            ));
+
+        let primary_read =
+            JsonValue::parse(&host.handle_json(&request_v1_2("ui.events.read", "{}")))
+                .expect("event response is JSON");
+        let JsonValue::Array(events) = field(field(&primary_read, "result"), "events") else {
+            panic!("events is an array");
+        };
+        assert!(events.is_empty());
+        assert_eq!(
+            group
+                .drain_input_batch(&secondary)
+                .expect("secondary remains registered")
+                .into_candidates()
+                .len(),
+            1,
+            "targetless primary reads cannot consume a secondary view's input"
         );
     }
 

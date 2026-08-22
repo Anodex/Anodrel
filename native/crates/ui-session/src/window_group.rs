@@ -214,6 +214,21 @@ impl<T> UiWindowGroup<T> {
         lock(&self.state).windows.drain_input_batches()
     }
 
+    /// Drains the bounded semantic-input queue for one known logical view.
+    ///
+    /// This supports primary-only compatibility paths without consuming a
+    /// secondary view's local input. An unavailable view returns only the
+    /// existing safe group category.
+    pub fn drain_input_batch(
+        &self,
+        id: &UiWindowId,
+    ) -> Result<crate::UiInputBatch, UiWindowGroupError> {
+        lock(&self.state)
+            .windows
+            .drain_input_batch(id)
+            .map_err(map_window_error)
+    }
+
     /// Removes one secondary view after its native window is gone.
     pub fn close_secondary(&self, id: &UiWindowId) -> Result<(), UiWindowGroupError> {
         lock(&self.state)
