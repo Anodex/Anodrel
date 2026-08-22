@@ -94,6 +94,12 @@ handles. `anodrel-windows-product-session` now provides the required
 tracked-child and pipe shutdown owner. A provisioned signed application remains
 required before this becomes an executable host path.
 
+`docs/MULTI_WINDOW.md` and Decision 0092 now define the future public
+session-owned view model. That contract has no relationship to a raw registry
+entry: its logical identifiers are session-scoped, bounded, and never native
+handles. The host must first implement its group lifetime and per-view state
+before it exposes any part of the reserved protocol surface.
+
 ## Manual verification
 
 From the repository root, run:

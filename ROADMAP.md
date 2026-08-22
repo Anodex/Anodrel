@@ -98,7 +98,11 @@ Status: **Direct Windows host in progress**
   version 1.12 policy, session-local UI-thread bridge, direct DPI-aware User32
   adapter, product-session composition, and development diagnostic are
   implemented (Decision 0088); scaling and fullscreen-interaction checks remain
-  manual.
+  manual. Decision 0092 now specifies the next multi-window section: a
+  bounded four-view session group with opaque identities, separate document
+  revisions and input queues, and group-wide shutdown. Its portable state
+  foundation is in progress; no released protocol version lets an application
+  create or target another view yet.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
   non-mutating save picker while implementing an independent, one-use

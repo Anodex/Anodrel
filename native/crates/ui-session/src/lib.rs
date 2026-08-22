@@ -22,6 +22,7 @@ mod mailbox;
 mod revision;
 mod session;
 mod snapshot;
+mod windows;
 
 pub use error::UiSessionError;
 pub use event::UiApplicationEvent;
@@ -36,6 +37,10 @@ pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;
 pub use session::UiDocumentSession;
 pub use snapshot::UiDocumentSnapshot;
+pub use windows::{
+    MAX_SECONDARY_WINDOW_IDENTITIES, MAX_SESSION_WINDOWS, PendingUiWindow, UiWindowId,
+    UiWindowIdError, UiWindowResources, UiWindowSessionError, UiWindowSessions, UiWindowSnapshot,
+};
 
 #[cfg(test)]
 mod tests {

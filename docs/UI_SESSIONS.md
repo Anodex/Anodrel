@@ -70,6 +70,23 @@ below. It does not expose document readback, subscriptions, callbacks,
 cancellation, or update back-pressure. Those need their own contracts before
 this becomes a broader interactive application surface.
 
+## Session-owned view groups
+
+Decision 0092 extends the **future** session model from one document to a
+bounded group of independently revised views. The existing `UiDocumentSession`
+remains the current single-view primitive; it is not widened with an ambient
+window target. The portable group layer owns a `main` primary view and at most
+three secondary logical views, each with its own document state, coalescing
+mailbox, and bounded input queue. It has no native window, transport, or
+application identity.
+
+This keeps a revision number meaningful only together with its owning logical
+view. A revision-one action from `window-1` can never be accepted against a
+revision-one document in `window-2`. The current targetless authenticated
+operations still mean the primary view. The reserved Protocol 1.25 operations
+in `docs/MULTI_WINDOW.md` will add explicit view identity rather than changing
+those operations' meaning.
+
 ## Latest-document delivery
 
 `UiDocumentMailbox` is a portable, per-session handoff for a host that must

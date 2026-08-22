@@ -310,6 +310,8 @@ its recovery and capability contract.
 `docs/INSTANCE_LIFECYCLE.md` defines the first Windows primary-instance
 contract.
 `docs/WINDOW_LIFECYCLE.md` defines the multi-window host foundation.
+`docs/MULTI_WINDOW.md` defines the bounded session-owned multi-window contract
+currently being implemented; it is not a public protocol capability yet.
 `docs/WINDOW_TITLE.md` defines the first public window capability: an
 authenticated session proposes its own window's title and the host composes the
 displayed caption with an application-name suffix the proposal cannot suppress

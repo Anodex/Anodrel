@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0092: Session-owned multi-window views use opaque identities.
+
 - 0091: Atomic selected-file replacement keeps private identities.
 
 - 0090: Development native menu templates use one fixed canonical shortcut.
