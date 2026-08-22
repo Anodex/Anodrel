@@ -9,6 +9,8 @@ import {
   type RequestEnvelope,
   type ResultFor,
   type NativeSessionMenu,
+  type SessionWindowId,
+  type SecondarySessionWindowId,
   type WindowFullscreenMode,
   type WindowState,
 } from "@anodrel/protocol";
@@ -129,6 +131,32 @@ export class PlatformClient {
   }
 
   /**
+   * Opens one independently revised secondary view in this authenticated
+   * session. The returned identity is opaque and session-local: retain it only
+   * to update or close this view through the matching SDK methods.
+   *
+   * Native size, position, monitor, parentage, and handles remain host-owned.
+   */
+  openWindow(
+    title: string,
+    document: string,
+  ): Promise<ResultFor<"window.open">> {
+    return this.request("window.open", { title, document });
+  }
+
+  /**
+   * Asks the host to close one secondary view issued to this session.
+   *
+   * Acceptance means the host queued the request; it does not report whether
+   * Windows has destroyed a native surface or why a view later became absent.
+   * The primary `main` view cannot be passed here—use `closeSession()` to end
+   * the whole authenticated session.
+   */
+  closeWindow(windowId: SecondarySessionWindowId): Promise<ResultFor<"window.close">> {
+    return this.request("window.close", { windowId });
+  }
+
+  /**
    * Replaces this session's complete native menu bar.
    *
    * Items are semantic display commands only. The host owns every native menu
@@ -151,6 +179,17 @@ export class PlatformClient {
   }
 
   /**
+   * Replaces the strict v1 document of `main` or one secondary view this
+   * session received from `openWindow`. Every view keeps its own revision.
+   */
+  replaceUiDocumentInWindow(
+    windowId: SessionWindowId,
+    document: string,
+  ): Promise<ResultFor<"ui.document.replace.window">> {
+    return this.request("ui.document.replace.window", { windowId, document });
+  }
+
+  /**
    * Reads every field value on this session's own current surface.
    *
    * A snapshot taken when you ask, not a stream. There is no way to name a
@@ -164,6 +203,17 @@ export class PlatformClient {
 
   readUiEvents(): Promise<ResultFor<"ui.events.read">> {
     return this.request("ui.events.read", {});
+  }
+
+  /**
+   * Drains bounded semantic events from every current session view.
+   *
+   * Each event carries its opaque `windowId`. Event order is meaningful only
+   * inside that one view; do not infer cross-window desktop timing from this
+   * batch.
+   */
+  readWindowUiEvents(): Promise<ResultFor<"ui.events.read.window">> {
+    return this.request("ui.events.read.window", {});
   }
 
   closeSession(): Promise<ResultFor<"session.close">> {

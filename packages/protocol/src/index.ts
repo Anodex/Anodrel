@@ -7,7 +7,7 @@ import { canonicalBase64UrlDecodedLength } from "./base64url.js";
 
 export { encodeCanonicalBase64Url } from "./base64url.js";
 
-export const PROTOCOL_VERSION = { major: 1, minor: 24 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 25 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -79,6 +79,8 @@ export type Capability =
   | "window.focus"
   | "window.fullscreen"
   | "window.size"
+  | "window.open"
+  | "window.close"
   | "menu.write";
 
 export type EmptyPayload = Record<string, never>;
@@ -88,6 +90,18 @@ export type WindowState = "minimized" | "maximized" | "restored";
 
 /** The only reversible fullscreen modes an application may request. */
 export type WindowFullscreenMode = "fullscreen" | "windowed";
+
+/**
+ * An opaque identity for one view in the current authenticated UI session.
+ *
+ * `main` names the session's primary view. The host issues secondary values as
+ * canonical `window-<n>` strings and never treats either form as a native
+ * handle, a global name, or a cross-session lookup key.
+ */
+export type SessionWindowId = "main" | SecondarySessionWindowId;
+
+/** An opaque secondary view identity returned only by `window.open`. */
+export type SecondarySessionWindowId = `window-${number}`;
 
 /** One ASCII key permitted in a canonical local native-menu shortcut. */
 export type NativeMenuShortcutKey =
@@ -232,6 +246,22 @@ export interface PlatformOperationMap {
     readonly result: { readonly status: "applied" };
   };
   /**
+   * Opens one independently revised secondary view in this session.
+   *
+   * The host chooses all native presentation details. The returned ID is
+   * opaque and session-scoped; it cannot be converted to a handle, a desktop
+   * position, or a way to enumerate other views.
+   */
+  "window.open": {
+    readonly payload: { readonly title: string; readonly document: string };
+    readonly result: { readonly windowId: SecondarySessionWindowId };
+  };
+  /** Requests a close for one previously issued secondary view. */
+  "window.close": {
+    readonly payload: { readonly windowId: SecondarySessionWindowId };
+    readonly result: { readonly status: "requested" };
+  };
+  /**
    * Replaces this authenticated session's complete native menu model.
    *
    * There is no native command number, accelerator, target, callback, or
@@ -266,10 +296,24 @@ export interface PlatformOperationMap {
     readonly payload: { readonly document: string };
     readonly result: { readonly revision: string };
   };
+  /** Replaces the strict v1 document of one known session view. */
+  "ui.document.replace.window": {
+    readonly payload: { readonly windowId: SessionWindowId; readonly document: string };
+    readonly result: { readonly revision: string };
+  };
   "ui.events.read": {
     readonly payload: EmptyPayload;
     readonly result: {
       readonly events: readonly UiInteractionEvent[];
+      readonly dropped: number;
+      readonly discarded: number;
+    };
+  };
+  /** Reads bounded semantic events from each current session view. */
+  "ui.events.read.window": {
+    readonly payload: EmptyPayload;
+    readonly result: {
+      readonly events: readonly WindowUiInteractionEvent[];
       readonly dropped: number;
       readonly discarded: number;
     };
@@ -747,6 +791,39 @@ export function isNetworkFetchTextPayload(
   );
 }
 
+/** Validates the exact Protocol 1.25 secondary-window creation payload. */
+export function isWindowOpenPayload(value: unknown): value is PayloadFor<"window.open"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    isWindowTitleProposal(value.title) &&
+    typeof value.document === "string" &&
+    new TextEncoder().encode(value.document).byteLength <= MAX_UI_DOCUMENT_REQUEST_BYTES
+  );
+}
+
+/** Validates one exact currently issued secondary-view close request shape. */
+export function isWindowClosePayload(value: unknown): value is PayloadFor<"window.close"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    isCanonicalSecondaryWindowId(value.windowId)
+  );
+}
+
+/** Validates one exact strict-v1 update targeted at a known session view. */
+export function isUiDocumentReplaceWindowPayload(
+  value: unknown,
+): value is PayloadFor<"ui.document.replace.window"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    isCanonicalSessionWindowId(value.windowId) &&
+    typeof value.document === "string" &&
+    new TextEncoder().encode(value.document).byteLength <= MAX_UI_DOCUMENT_REQUEST_BYTES
+  );
+}
+
 /** One current enabled semantic command selected from a native session menu. */
 export interface MenuActionInvokedEvent
   extends EventEnvelope<{ readonly menuRevision: string; readonly action: string }> {
@@ -757,6 +834,11 @@ export interface MenuActionInvokedEvent
 
 /** A semantic interaction delivered by the bounded `ui.events.read` result. */
 export type UiInteractionEvent = UiActionInvokedEvent | MenuActionInvokedEvent;
+
+/** A UI or primary-menu action tagged with the logical view that produced it. */
+export type WindowUiInteractionEvent =
+  | (UiActionInvokedEvent & { readonly windowId: SessionWindowId })
+  | (MenuActionInvokedEvent & { readonly windowId: SessionWindowId });
 
 /** Validates one exact opaque save reference and bounded UTF-8 output text. */
 export function isFileTextWritePayload(
@@ -994,7 +1076,7 @@ export function isWindowSizeSetPayload(
 }
 
 /** Returns whether a value is a bounded, single-line window-title proposal. */
-function isWindowTitleProposal(value: unknown): boolean {
+export function isWindowTitleProposal(value: unknown): value is string {
   if (
     typeof value !== "string" ||
     value.length === 0 ||
@@ -1009,6 +1091,20 @@ function isWindowTitleProposal(value: unknown): boolean {
     }
   }
   return true;
+}
+
+/** Returns whether a value is one exact session-local logical view identity. */
+export function isCanonicalSessionWindowId(value: unknown): value is SessionWindowId {
+  return value === "main" || isCanonicalSecondaryWindowId(value);
+}
+
+/** Returns whether a value is one exact session-local secondary identity. */
+export function isCanonicalSecondaryWindowId(value: unknown): value is SecondarySessionWindowId {
+  if (typeof value !== "string" || !/^window-[1-9][0-9]{0,4}$/.test(value)) {
+    return false;
+  }
+  const suffix = Number(value.slice("window-".length));
+  return Number.isSafeInteger(suffix) && suffix <= 65_535;
 }
 
 /** Returns whether a value is the stable protocol credential-name grammar. */

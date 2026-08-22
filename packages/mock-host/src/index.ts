@@ -2,6 +2,7 @@ import {
   PROTOCOL_VERSION,
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   MAX_STORAGE_SNAPSHOT_REQUEST_BYTES,
+  MAX_UI_DOCUMENT_REQUEST_BYTES,
   isCancellationEnvelope,
   isClipboardWritePayload,
   isCredentialReadPayload,
@@ -14,13 +15,18 @@ import {
   isWindowTitleSetPayload,
   isExternalOpenPayload,
   isNetworkFetchTextPayload,
+  isRecord,
   isFileDialogOpenPayload,
   classifyFileBinaryWritePayload,
   isFileBinaryWritePayloadShape,
   isFileTextReadPayload,
   isFileTextWritePayload,
   isEmptyPayload,
+  isUiDocumentReplaceWindowPayload,
   isUiDocumentReplacePayload,
+  isWindowClosePayload,
+  isWindowOpenPayload,
+  isWindowTitleProposal,
   isPingPayload,
   isStorageStateReplacePayload,
   isSupportedProtocolVersion,
@@ -35,6 +41,7 @@ import {
   type ResponseDiagnostics,
   type ResponseEnvelope,
   type ResultFor,
+  type SecondarySessionWindowId,
   type WireRequestEnvelope,
 } from "@anodrel/protocol";
 
@@ -126,14 +133,14 @@ export class MockHost {
 
   createTransport(sessionId = `mock-session-${++this.sessionCount}`): MockHostTransport {
     const cancelled = new Set<string>();
-    const uiDocument = { revision: 0 };
+    const sessionWindows = createUiWindowState();
     const menu = { revision: 0 };
 
     return {
       send: async <TOperation extends PlatformOperation>(
         request: RequestEnvelope<TOperation>,
       ) =>
-        this.handle(request, sessionId, cancelled, uiDocument, menu) as Promise<ResponseEnvelope<TOperation>>,
+        this.handle(request, sessionId, cancelled, sessionWindows, menu) as Promise<ResponseEnvelope<TOperation>>,
       cancel: async (cancellation: CancellationEnvelope) => {
         if (!isCancellationEnvelope(cancellation)) {
           throw new Error("MockHost received an invalid cancellation envelope.");
@@ -152,7 +159,7 @@ export class MockHost {
     request: unknown,
     sessionId = `direct-session-${++this.sessionCount}`,
     cancelled: ReadonlySet<string> = new Set(),
-    uiDocument: UiDocumentState = { revision: 0 },
+    sessionWindows: UiWindowState = createUiWindowState(),
     menu: MenuState = { revision: 0 },
   ): Promise<ResponseEnvelope> {
     const requestId = extractRequestId(request);
@@ -177,13 +184,13 @@ export class MockHost {
       );
     }
 
-    return this.dispatch(request, sessionId, uiDocument, menu);
+    return this.dispatch(request, sessionId, sessionWindows, menu);
   }
 
   private dispatch(
     request: WireRequestEnvelope,
     sessionId: string,
-    uiDocument: UiDocumentState,
+    sessionWindows: UiWindowState,
     menu: MenuState,
   ): ResponseEnvelope {
     switch (request.operation) {
@@ -428,6 +435,96 @@ export class MockHost {
         // current size, position, monitor, DPI, or resulting outer rectangle.
         return this.success("window.size.set", request.requestId, { status: "applied" });
 
+      case "window.open":
+        if (request.protocolVersion.minor < 25) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "window.open requires protocol 1.25 or later.",
+          );
+        }
+        if (
+          !isRecord(request.payload) ||
+          Object.keys(request.payload).length !== 2 ||
+          typeof request.payload.title !== "string" ||
+          typeof request.payload.document !== "string" ||
+          new TextEncoder().encode(request.payload.document).byteLength > MAX_UI_DOCUMENT_REQUEST_BYTES
+        ) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "window.open requires one exact title and bounded document.",
+          );
+        }
+        if (!isWindowOpenPayload(request.payload) || !isWindowTitleProposal(request.payload.title)) {
+          return this.failure(
+            request.requestId,
+            "window.title_invalid",
+            "window.open title is invalid.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "window.open")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "window.open requires the window.open capability.",
+            { capability: "window.open" },
+          );
+        }
+        if (!this.hasCapability(sessionId, "ui.document.write")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "window.open requires the ui.document.write capability.",
+            { capability: "ui.document.write" },
+          );
+        }
+        if (sessionWindows.revisions.size >= 4 || sessionWindows.nextSecondaryId > 65_535) {
+          return this.failure(
+            request.requestId,
+            "window.unavailable",
+            "the session window group is unavailable.",
+          );
+        }
+        {
+          const windowId = `window-${sessionWindows.nextSecondaryId}` as SecondarySessionWindowId;
+          sessionWindows.nextSecondaryId += 1;
+          sessionWindows.revisions.set(windowId, 1);
+          return this.success("window.open", request.requestId, { windowId });
+        }
+
+      case "window.close":
+        if (request.protocolVersion.minor < 25) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "window.close requires protocol 1.25 or later.",
+          );
+        }
+        if (!isWindowClosePayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "window.close requires one canonical secondary windowId.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "window.close")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "window.close requires the window.close capability.",
+            { capability: "window.close" },
+          );
+        }
+        if (!sessionWindows.revisions.delete(request.payload.windowId)) {
+          return this.failure(
+            request.requestId,
+            "window.unavailable",
+            "the requested session window is unavailable.",
+          );
+        }
+        return this.success("window.close", request.requestId, { status: "requested" });
+
       case "menu.replace":
         if (request.protocolVersion.minor < 18) {
           return this.failure(
@@ -497,10 +594,50 @@ export class MockHost {
             { capability: "ui.document.write" },
           );
         }
-        uiDocument.revision += 1;
+        const revision = (sessionWindows.revisions.get("main") ?? 0) + 1;
+        sessionWindows.revisions.set("main", revision);
         return this.success(request.operation, request.requestId, {
-          revision: uiDocument.revision.toString(),
+          revision: revision.toString(),
         });
+
+      case "ui.document.replace.window":
+        if (request.protocolVersion.minor < 25) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "ui.document.replace.window requires protocol 1.25 or later.",
+          );
+        }
+        if (!isUiDocumentReplaceWindowPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "ui.document.replace.window requires one canonical windowId and bounded document.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "ui.document.write")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "ui.document.replace.window requires the ui.document.write capability.",
+            { capability: "ui.document.write" },
+          );
+        }
+        {
+          const revision = sessionWindows.revisions.get(request.payload.windowId);
+          if (revision === undefined) {
+            return this.failure(
+              request.requestId,
+              "window.unavailable",
+              "the requested session window is unavailable.",
+            );
+          }
+          const next = revision + 1;
+          sessionWindows.revisions.set(request.payload.windowId, next);
+          return this.success("ui.document.replace.window", request.requestId, {
+            revision: next.toString(),
+          });
+        }
 
       case "ui.events.read":
         if (request.protocolVersion.minor < 2) {
@@ -526,6 +663,35 @@ export class MockHost {
           );
         }
         return this.success("ui.events.read", request.requestId, {
+          events: [],
+          dropped: 0,
+          discarded: 0,
+        });
+
+      case "ui.events.read.window":
+        if (request.protocolVersion.minor < 25) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "ui.events.read.window requires protocol 1.25 or later.",
+          );
+        }
+        if (!isEmptyPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "ui.events.read.window does not accept a payload.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "ui.events.read")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "ui.events.read.window requires the ui.events.read capability.",
+            { capability: "ui.events.read" },
+          );
+        }
+        return this.success("ui.events.read.window", request.requestId, {
           events: [],
           dropped: 0,
           discarded: 0,
@@ -962,8 +1128,16 @@ export class MockHost {
   }
 }
 
-interface UiDocumentState {
-  revision: number;
+interface UiWindowState {
+  nextSecondaryId: number;
+  readonly revisions: Map<string, number>;
+}
+
+function createUiWindowState(): UiWindowState {
+  return {
+    nextSecondaryId: 1,
+    revisions: new Map([["main", 0]]),
+  };
 }
 
 interface MenuState {

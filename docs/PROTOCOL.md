@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.24, including bounded local native
-menu shortcuts documented in `docs/MENUS.md`.
+**Status:** Implemented through version 1.25, including bounded session-owned
+secondary views documented in `docs/MULTI_WINDOW.md`.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.24 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 24}`.
+the host's. Version 1.25 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 25}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -72,10 +72,14 @@ The implemented operations are:
 | `window.focus.request` | `{}` | `{ "status": "requested" }` | `window.focus` |
 | `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
 | `window.size.set` | `{ "width": integer, "height": integer }` | `{ "status": "applied" }` | `window.size` |
+| `window.open` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
+| `window.close` | `{ "windowId": string }` | `{ "status": "requested" }` | `window.close` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean, "shortcut"?: "Ctrl+<A-Z0-9>" \| "Ctrl+Shift+<A-Z0-9>" }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
+| `ui.document.replace.window` | `{ "windowId": string, "document": string }` | accepted view document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
+| `ui.events.read.window` | `{}` | bounded per-view tagged UI events | `ui.events.read` |
 | `session.close` | `{}` | accepted close request | `session.close` |
 | `clipboard.read` | `{}` | bounded Unicode text or no text | `clipboard.read` |
 | `clipboard.write` | `{ "text": string }` | accepted write | `clipboard.write` |
@@ -159,6 +163,33 @@ fullscreen session safely answers `window.unavailable` rather than changing
 private restore facts. A concurrent request returns `window.busy`; neither
 result reveals native geometry or current presentation. See
 `docs/WINDOW_SIZE.md` and Decision 0088.
+
+### Session-owned secondary views
+
+Protocol 1.25 adds `window.open`, `window.close`,
+`ui.document.replace.window`, and `ui.events.read.window`. `window.open`
+requires both its separate `window.open` grant and the existing
+`ui.document.write` grant. It accepts only a bounded single-line title proposal
+and one 24 KiB-or-smaller `anodrel.ui.document.v1` document; the host composes
+the displayed caption, creates the native view on its UI thread, and returns a
+session-local opaque `windowId` only after successful registration. There can
+be at most three open secondary views.
+
+`window.close` needs its separate `window.close` grant and accepts only one
+current canonical secondary `window-<n>` identity. It rejects `main`; the
+existing `session.close` operation remains the group-wide path. Its success
+means only that the host accepted the close request. A closed or unknown
+identity returns `window.unavailable` without revealing native close state or
+reason.
+
+`ui.document.replace.window` accepts `main` or a current secondary identity and
+updates only that view's strict v1 document and independent revision. The
+targetless document operations remain primary-only. `ui.events.read.window`
+accepts `{}` and returns only revision-checked semantic UI actions, each tagged
+with its opaque `windowId`, plus aggregated bounded dropped and discarded
+counts. It promises order only within an individual view; it never exposes
+native handles, geometry, lifecycle events, view enumeration, or desktop
+timing. See `docs/MULTI_WINDOW.md` and Decisions 0092–0093.
 
 ### Native session menus
 

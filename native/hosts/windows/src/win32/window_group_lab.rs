@@ -2,7 +2,7 @@
 //!
 //! This is intentionally a host diagnostic, not a protocol operation. It lets
 //! a person exercise the same worker-to-UI creation, per-view routing, and
-//! group-close path that Protocol 1.25 will later use without allowing an
+//! group-close path that Protocol 1.25 uses without requiring an
 //! application to create, target, or inspect any native window.
 
 use std::io;

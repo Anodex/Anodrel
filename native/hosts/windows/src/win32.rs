@@ -517,7 +517,7 @@ pub fn run_window_lab() -> io::Result<()> {
 
 /// Opens a host-controlled diagnostic for the dynamic session-window path.
 ///
-/// The worker uses the same portable handoff later reserved for Protocol 1.25,
+/// The worker uses the same portable handoff Protocol 1.25 uses,
 /// while the host supplies both fixed captions and documents. Nothing in this
 /// route accepts application data, grants, native handles, or a product child;
 /// it exists solely for the manual lifecycle check in `docs/WINDOW_LIFECYCLE.md`.
@@ -1285,6 +1285,21 @@ fn service_session_window_open(window: Hwnd) {
         return;
     };
     let _ = open_session_secondary_window(request);
+}
+
+/// Destroys the host-private secondary windows whose authenticated session
+/// requested a close. Logical state is released later by `WM_DESTROY`, after
+/// Windows confirms each native view has actually left the group.
+fn service_session_window_close(window: Hwnd) {
+    let Ok(targets) = registry::take_secondary_close_windows(window) else {
+        return;
+    };
+    for target in targets {
+        // SAFETY: `target` came from this process's private group mapping. The
+        // registry lock has been released, and duplicate close requests have
+        // already coalesced in the portable group.
+        unsafe { DestroyWindow(target) };
+    }
 }
 
 /// Maps a window's current layout into hierarchical accessibility elements.
@@ -2067,6 +2082,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 }
             }
             service_session_window_open(window);
+            service_session_window_close(window);
             service_notification(window);
             service_menu(window);
             service_window_title(window);

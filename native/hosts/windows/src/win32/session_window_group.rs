@@ -127,6 +127,25 @@ impl SessionWindowGroup {
             })
     }
 
+    /// Resolves queued portable secondary closes to private Win32 windows.
+    ///
+    /// The portable group exposes only logical identities. This is the sole
+    /// host-side point that turns those identities into native targets, after
+    /// which the caller destroys each window on its owning UI thread. A group
+    /// shutdown takes precedence: each surviving view will then observe the
+    /// shared close latch through its normal timer path.
+    pub(super) fn take_secondary_close_windows(&self) -> Vec<Hwnd> {
+        if self.observe_shutdown() {
+            return Vec::new();
+        }
+        let requested = self.portable.take_secondary_close_requests();
+        let state = lock(&self.state);
+        requested
+            .into_iter()
+            .filter_map(|id| state.windows.get(&id).copied())
+            .collect()
+    }
+
     /// Returns whether all remaining native views must now close.
     ///
     /// The first timer to consume the coalescing core signal latches native
@@ -234,6 +253,12 @@ impl SessionWindowMember {
     /// Takes one pending secondary-view creation handoff for this UI thread.
     pub(super) fn take_open_request(&self) -> Option<SessionWindowOpenRequest> {
         self.group.take_open_request()
+    }
+
+    /// Takes host-private native windows whose logical secondary members asked
+    /// to close through the authenticated protocol.
+    pub(super) fn take_secondary_close_windows(&self) -> Vec<Hwnd> {
+        self.group.take_secondary_close_windows()
     }
 }
 
@@ -349,6 +374,43 @@ mod tests {
         member.on_native_destroy(-311);
         assert!(!portable.contains(&id));
         assert!(!group.member(UiWindowId::primary()).observe_shutdown());
+    }
+
+    #[test]
+    fn resolves_a_queued_secondary_close_only_through_the_private_native_map() {
+        let group = group();
+        let primary = group.member(UiWindowId::primary());
+        assert!(primary.register_native_window(-316));
+        let portable = group.portable.clone();
+        let worker = portable.clone();
+        let (sent, received) = mpsc::channel();
+        let waiting =
+            thread::spawn(move || sent.send(worker.open_secondary(title("Notes"), DOCUMENT)));
+
+        let request = loop {
+            if let Some(request) = group.take_open_request() {
+                break request;
+            }
+            thread::yield_now();
+        };
+        let member = request.member();
+        assert!(member.register_native_window(-317));
+        assert!(request.complete());
+        let secondary = received
+            .recv()
+            .expect("worker returns a response")
+            .expect("secondary was committed");
+        waiting
+            .join()
+            .expect("worker does not panic")
+            .expect("worker submits its response");
+
+        assert!(portable.request_secondary_close(&secondary).is_ok());
+        assert_eq!(group.take_secondary_close_windows(), vec![-317]);
+        assert!(group.take_secondary_close_windows().is_empty());
+        assert!(portable.contains(&secondary));
+        member.on_native_destroy(-317);
+        assert!(!portable.contains(&secondary));
     }
 
     #[test]

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 24;
+pub const PROTOCOL_MINOR: u16 = 25;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -102,6 +102,18 @@ pub enum Capability {
     /// target or move a window, select a monitor, read geometry, or expose a
     /// native rectangle; see `docs/WINDOW_SIZE.md` and Decision 0088.
     WindowSize,
+    /// Create one bounded secondary view in the authenticated session group.
+    ///
+    /// The application supplies only a validated caption proposal and strict
+    /// UI document. The host alone creates and maps the native window; the
+    /// returned identity is session-local and never a native handle.
+    WindowOpen,
+    /// Ask the host to close one known secondary session view.
+    ///
+    /// The primary remains the session anchor and can end only through the
+    /// separately granted `session.close` operation. This grant exposes no
+    /// close state, reason, event, or native target.
+    WindowClose,
     /// Read every field value on the session's own current surface.
     ///
     /// A snapshot, not a stream. There is no selector and no change event, so
@@ -144,6 +156,8 @@ impl Capability {
             Self::WindowFocus => "window.focus",
             Self::WindowFullscreen => "window.fullscreen",
             Self::WindowSize => "window.size",
+            Self::WindowOpen => "window.open",
+            Self::WindowClose => "window.close",
             Self::UiFieldsRead => "ui.fields.read",
             Self::MenuWrite => "menu.write",
         }

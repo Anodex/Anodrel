@@ -55,8 +55,8 @@ command or a replacement for a real authenticated native session.
 diagnostic reads, UI document replacement and semantic-event reads, session
 close, clipboard, HTTPS handoff, file dialog plus retained text read and
 bounded text or binary write, state, credentials, notifications, host-authorized
-HTTPS text fetches, and the four
-narrow session-window commands. Every
+HTTPS text fetches, narrow primary-window commands, and bounded session-owned
+view creation, replacement, close, and event reads. Every
 method takes only the documented payload fields; it cannot accept a native
 handle, arbitrary application identity, capability list, window target,
 filesystem path where the protocol does not allow one, or a callback.
@@ -132,6 +132,26 @@ width 320 through 3840 and height 240 through 2160. The result is only
 DPI of the one session-bound window. There is no window argument, target,
 position, outer bounds, monitor, DPI readback, state readback, resize event,
 constraint, or native handle. See `docs/WINDOW_SIZE.md`.
+
+### Session-owned secondary views
+
+Protocol 1.25 adds `openWindow(title, document)`, `closeWindow(windowId)`,
+`replaceUiDocumentInWindow(windowId, document)`, and `readWindowUiEvents()`.
+`openWindow` requires both `window.open` and `ui.document.write`; it returns an
+opaque `windowId` only after the host created and registered a secondary view.
+There can be at most three secondary views. The SDK cannot supply native size,
+position, monitor, parentage, style, handle, or an identity from another
+session.
+
+`closeWindow` requires `window.close` and accepts only a secondary identity
+returned by `openWindow`; `main` remains the session anchor and ends through
+`closeSession()`. Its result confirms host acceptance, not destruction or a
+person's observation. `replaceUiDocumentInWindow` requires the existing
+`ui.document.write` grant and accepts `main` or a currently issued secondary
+identity, always using the strict v1 document format. `readWindowUiEvents`
+requires `ui.events.read` and returns only revision-checked semantic actions
+tagged with their `windowId`; order across different views has no desktop-time
+meaning. See `docs/MULTI_WINDOW.md`.
 
 ### Native session menus
 

@@ -63,8 +63,9 @@ window to exercise the view registry and final-window shutdown behavior.
 
 ## Boundaries
 
-All dimensions and views are created by the host, and no app protocol request
-can create, enumerate, close, focus, or inject into a native window.
+All native dimensions, placement, parentage, and views are selected by the
+host. No app protocol request can enumerate, inspect, focus, inject into, or
+obtain a handle for a native window.
 
 There are two narrow public exceptions. Protocol 1.14 lets an authenticated
 session holding the `window.title` grant **propose** the title of the window it
@@ -85,6 +86,13 @@ position, monitor, DPI, bounds, or geometry readback. See
 Everything else in this document is unchanged: the application still does not
 learn that it has a window, where it is, or how large it is.
 
+Protocol 1.25 adds the one bounded multi-view exception: a separately granted
+session may create a secondary view with a strict v1 document and request the
+close of an opaque issued secondary identity. The host maps those identities to
+private windows only on the UI thread. It does not accept a native target,
+size, position, parent, monitor, handle, enumeration selector, close-state
+readback, or lifecycle subscription. See `docs/MULTI_WINDOW.md`.
+
 The Window Lab carries no package content, credentials, URLs, command data, or
 privileged service. It is a native lifecycle test surface only. A public
 window-management capability requires a versioned protocol, verified executable
@@ -99,13 +107,12 @@ handles. `anodrel-windows-product-session` now provides the required
 tracked-child and pipe shutdown owner. A provisioned signed application remains
 required before this becomes an executable host path.
 
-`docs/MULTI_WINDOW.md` and Decisions 0092 and 0093 define the future public
+`docs/MULTI_WINDOW.md` and Decisions 0092 and 0093 define the public
 session-owned view model. That contract has no relationship to a raw registry
 entry: its logical identifiers are session-scoped, bounded, and never native
-handles. The host now implements its group lifetime, per-view resources, and
-worker-to-UI creation handoff, but no application-facing part of the reserved
-Protocol 1.25 surface is exposed until protocol, policy, SDK, mock-host, and
-compatibility work ship together.
+handles. Protocol 1.25 exposes only explicit group creation, secondary close,
+strict-v1 per-view replacement, and tagged semantic-event routes after the
+protocol, policy, SDK, mock-host, and compatibility checks ship together.
 
 ## Manual verification
 
@@ -121,8 +128,7 @@ other must stay open. Close the remaining window: the host process must exit.
 ## Session-window group manual verification
 
 The development-only Group Lab exercises the same dynamic creation handoff
-that a future Protocol 1.25 request will use, without accepting any application
-protocol command:
+that Protocol 1.25 uses, without needing an application protocol command:
 
 ~~~text
 cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-group-lab
@@ -132,4 +138,5 @@ Confirm that **Anodrel Window Group Lab** opens first and then a separately
 captioned secondary window opens. Close the secondary: the primary remains.
 Run it again and close the primary: the secondary closes shortly afterwards and
 the process exits. This proves only host-owned group lifecycle and per-view
-routing; it is not a public window API or a signed product-session test.
+routing; it is not an application-driven Protocol 1.25 or signed
+product-session test.

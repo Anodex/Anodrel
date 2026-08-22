@@ -343,6 +343,110 @@ test("selection-scoped file text keeps selection and reading separately granted"
   );
 });
 
+test("session-owned secondary windows stay bounded, opaque, and independently revised", async () => {
+  const document =
+    '{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"Hello","fontSize":16,"tone":"primary"}}';
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.open", "window.close", "ui.document.write", "ui.events.read"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  const opened = await client.openWindow("Notes", document);
+  assert.deepEqual(opened, { windowId: "window-1" });
+  assert.deepEqual(await client.replaceUiDocumentInWindow(opened.windowId, document), {
+    revision: "2",
+  });
+  assert.deepEqual(await client.replaceUiDocumentInWindow("main", document), { revision: "1" });
+  assert.deepEqual(await client.readWindowUiEvents(), {
+    events: [],
+    dropped: 0,
+    discarded: 0,
+  });
+  assert.deepEqual(await client.closeWindow(opened.windowId), { status: "requested" });
+
+  await assert.rejects(
+    () => client.replaceUiDocumentInWindow(opened.windowId, document),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "window.unavailable",
+  );
+
+  const ungrantedOpen = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["ui.document.write"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungrantedOpen.openWindow("Notes", document),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "window.open",
+  );
+
+  const noDocumentGrant = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["window.open"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => noDocumentGrant.openWindow("Notes", document),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "ui.document.write",
+  );
+
+  const transport = host.createTransport();
+  for (const [operation, payload] of [
+    ["window.open", { title: "Notes", document, width: 900 }],
+    ["window.close", { windowId: "main" }],
+    ["window.close", { windowId: "window-01" }],
+    ["ui.document.replace.window", { windowId: "window-0", document }],
+    ["ui.events.read.window", { windowId: "window-1" }],
+  ] as const) {
+    const response = await transport.send({
+      protocolVersion: PROTOCOL_VERSION,
+      kind: "request",
+      requestId: `window-payload-${operation}-${JSON.stringify(payload)}`,
+      operation,
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${operation} accepted ${JSON.stringify(payload)}`,
+    );
+  }
+
+  const invalidTitle = await transport.send({
+    protocolVersion: PROTOCOL_VERSION,
+    kind: "request",
+    requestId: "window-open-invalid-title",
+    operation: "window.open",
+    payload: { title: "Notes\nMore", document },
+  });
+  assert.equal(
+    invalidTitle.status === "failure" ? invalidTitle.error.code : undefined,
+    "window.title_invalid",
+  );
+
+  const older = await transport.send({
+    protocolVersion: { major: 1, minor: 24 },
+    kind: "request",
+    requestId: "window-open-before-protocol-1.25",
+    operation: "window.open",
+    payload: { title: "Notes", document },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
 test("SDK and host agree on one separately granted bounded HTTPS text fetch", async () => {
   const client = new PlatformClient(
     new MockHost({

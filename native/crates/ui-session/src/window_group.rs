@@ -40,6 +40,7 @@ struct State<T> {
     windows: UiWindowSessions,
     next_request_id: u64,
     active: Option<ActiveOpen<T>>,
+    pending_secondary_closes: Vec<UiWindowId>,
 }
 
 #[derive(Debug)]
@@ -134,6 +135,7 @@ impl<T> UiWindowGroup<T> {
                 windows: UiWindowSessions::new(),
                 next_request_id: 0,
                 active: None,
+                pending_secondary_closes: Vec::new(),
             })),
         }
     }
@@ -152,6 +154,7 @@ impl<T> UiWindowGroup<T> {
                 windows: UiWindowSessions::with_primary_resources(document_mailbox, input_mailbox),
                 next_request_id: 0,
                 active: None,
+                pending_secondary_closes: Vec::new(),
             })),
         }
     }
@@ -182,8 +185,8 @@ impl<T> UiWindowGroup<T> {
 
     /// Replaces one current view's explicit v2 document and publishes it.
     ///
-    /// No released multi-window protocol operation reaches this method yet.
-    /// It exists so a future v2 view operation can preserve the v1 boundary.
+    /// Protocol 1.25 intentionally does not reach this method. It exists so a
+    /// future exact v2 view operation can preserve the strict v1 boundary.
     pub fn replace_document_v2(
         &self,
         id: &UiWindowId,
@@ -231,10 +234,43 @@ impl<T> UiWindowGroup<T> {
 
     /// Removes one secondary view after its native window is gone.
     pub fn close_secondary(&self, id: &UiWindowId) -> Result<(), UiWindowGroupError> {
-        lock(&self.state)
+        let state = &mut *lock(&self.state);
+        state
             .windows
             .close_secondary(id)
-            .map_err(map_window_error)
+            .map_err(map_window_error)?;
+        state
+            .pending_secondary_closes
+            .retain(|pending| pending != id);
+        Ok(())
+    }
+
+    /// Queues one host-owned close for a current secondary view.
+    ///
+    /// This records only an opaque logical identity. A native host later takes
+    /// the request on its UI thread, resolves it through its private mapping,
+    /// and destroys that one native window. The primary `main` view is the
+    /// session anchor and is intentionally not closable through this route.
+    /// Repeated requests for the same still-open secondary coalesce.
+    pub fn request_secondary_close(&self, id: &UiWindowId) -> Result<(), UiWindowGroupError> {
+        let state = &mut *lock(&self.state);
+        if id.is_primary() || !state.windows.contains(id) {
+            return Err(UiWindowGroupError::Unavailable);
+        }
+        if !state.pending_secondary_closes.contains(id) {
+            state.pending_secondary_closes.push(id.clone());
+        }
+        Ok(())
+    }
+
+    /// Takes every coalesced secondary close request for the host UI thread.
+    ///
+    /// The returned identities remain portable. Resolving them to native
+    /// windows is a host-private operation, and actual removal happens only
+    /// after that native window is destroyed.
+    #[must_use]
+    pub fn take_secondary_close_requests(&self) -> Vec<UiWindowId> {
+        std::mem::take(&mut lock(&self.state).pending_secondary_closes)
     }
 
     /// Cancels one worker-to-UI creation handoff during host group shutdown.
@@ -644,5 +680,43 @@ mod tests {
         assert_eq!(id, primary);
         assert_eq!(batch.dropped(), 0);
         assert_eq!(batch.into_candidates().len(), 1);
+    }
+
+    #[test]
+    fn queues_each_secondary_close_once_and_never_queues_the_primary() {
+        let group = UiWindowGroup::new();
+        let worker = group.clone();
+        let (sent, received) = mpsc::channel();
+        let waiting = thread::spawn(move || sent.send(worker.open_secondary("caption", DOCUMENT)));
+        let request = take_pending(&group);
+        assert!(group.complete_open(request.id(), true));
+        let secondary = received
+            .recv()
+            .expect("worker returns a response")
+            .expect("secondary view opens");
+        waiting
+            .join()
+            .expect("worker does not panic")
+            .expect("worker submits its response");
+
+        assert_eq!(
+            group.request_secondary_close(&UiWindowId::primary()),
+            Err(UiWindowGroupError::Unavailable)
+        );
+        assert!(group.request_secondary_close(&secondary).is_ok());
+        assert!(group.request_secondary_close(&secondary).is_ok());
+        assert_eq!(
+            group.take_secondary_close_requests(),
+            vec![secondary.clone()]
+        );
+        assert!(group.take_secondary_close_requests().is_empty());
+
+        assert!(group.request_secondary_close(&secondary).is_ok());
+        assert!(group.close_secondary(&secondary).is_ok());
+        assert!(group.take_secondary_close_requests().is_empty());
+        assert_eq!(
+            group.request_secondary_close(&secondary),
+            Err(UiWindowGroupError::Unavailable)
+        );
     }
 }

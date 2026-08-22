@@ -84,10 +84,11 @@ identity.
 This keeps a revision number meaningful only together with its owning logical
 view. A revision-one action from `window-1` can never be accepted against a
 revision-one document in `window-2`. The current targetless authenticated
-operations still mean the primary view. The reserved Protocol 1.25 operations
-in `docs/MULTI_WINDOW.md` will add explicit view identity rather than changing
-those operations' meaning. They remain unavailable until their protocol, host,
-and compatibility work land together.
+operations still mean the primary view. Protocol 1.25 adds explicit view
+identity only through `window.open`, `window.close`,
+`ui.document.replace.window`, and `ui.events.read.window`; it does not change
+the legacy operations' meaning or allow them to consume secondary traffic.
+See `docs/MULTI_WINDOW.md`.
 
 ### Native-creation handoff
 

@@ -116,6 +116,17 @@ delivers the same revision-checked semantic event as a menu click. It exposes
 no global hotkey, raw keyboard data, native accelerator, callback, or shortcut
 readback. See `docs/MENUS.md`.
 
+Protocol 1.25 adds a bounded session-owned multi-window API. A session with
+the separate `window.open` and `window.close` grants can create or request the
+close of up to three secondary views, each with its own strict v1 document,
+revision, input queue, and opaque session-local identity. Applications cannot
+select native geometry, a monitor, parent, handle, or another session's view;
+the direct Windows host resolves every identity through its private group map
+on the UI thread. `ui.document.replace.window` updates `main` or a known
+secondary, while `ui.events.read.window` returns only revision-checked semantic
+events tagged by their logical view. Installed record version 1.13 adds the
+two new optional grants. See `docs/MULTI_WINDOW.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The

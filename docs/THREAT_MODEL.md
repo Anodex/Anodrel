@@ -180,6 +180,14 @@ The direct window host routes painting through its own handle-keyed registry;
 the current package and Startup Lab surfaces cannot supply entries to it. A
 failed multi-window creation is rolled back before the message loop starts, and
 closing one window does not end the host while another registered window exists.
+Protocol 1.25 narrows the authenticated exception to a session-owned group:
+`window.open` validates a bounded document and title before the host UI thread
+creates a private view, and `window.close` queues only a current opaque
+secondary identity. The host resolves that identity through its own group map;
+applications cannot supply, read, enumerate, or retain a raw handle, native
+geometry, lifecycle state, or another session's route. A failed or timed-out
+creation rolls back its logical identity, and native destruction removes the
+matching identity only after the actual private view is gone.
 
 ## Rendering boundary
 

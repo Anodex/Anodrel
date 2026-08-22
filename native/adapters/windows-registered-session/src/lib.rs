@@ -343,6 +343,10 @@ fn registered_interactive_services(
         // Bounded client sizing stays on the same session-local UI-thread
         // boundary. The parser admits this mailbox only for record version 1.12.
         .with_window_size(ui.window_size_mailbox())
+        // Protocol 1.25 window.open/window.close routes use the separately
+        // supplied UiWindowGroup at core construction. They need no service
+        // mailbox here: the group owns only logical identities while the
+        // Windows host retains its private native-window mapping.
         // Field values live with the window that owns them, so a read crosses
         // to the UI thread the same way. See `docs/UI_FIELDS.md`.
         .with_ui_fields(ui.field_mailbox()))

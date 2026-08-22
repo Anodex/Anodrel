@@ -527,6 +527,16 @@ impl UiSessionView {
             .and_then(SessionWindowMember::take_open_request)
     }
 
+    /// Takes host-private native windows requested for secondary-view close.
+    ///
+    /// The member resolves only identities belonging to this authenticated
+    /// group. A view without a group has no cross-view close route at all.
+    pub(super) fn take_secondary_close_windows(&self) -> Vec<Hwnd> {
+        self.session_window
+            .as_ref()
+            .map_or_else(Vec::new, SessionWindowMember::take_secondary_close_windows)
+    }
+
     /// Takes a pending modal request for the host UI thread.
     pub(super) fn take_file_dialog_request(&self) -> Option<FileDialogRequest> {
         self.file_dialog_mailbox.take()

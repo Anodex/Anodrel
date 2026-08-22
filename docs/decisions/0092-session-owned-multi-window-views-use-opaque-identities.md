@@ -32,7 +32,7 @@ state before any protocol or Win32 bridge uses it. That keeps validation,
 limits, identity parsing, and stale-event isolation testable without a desktop
 or an operating-system API.
 
-The reserved Protocol 1.25 surface separates four powers: `window.open` needs
+Protocol 1.25 separates four powers: `window.open` needs
 both `window.open` and `ui.document.write`; `window.close` needs
 `window.close`; view-targeted document replacement needs only
 `ui.document.write`; and view-tagged event retrieval needs only

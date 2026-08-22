@@ -178,22 +178,31 @@ ordinary drop paths perform the cleanup. The `--window-lab` diagnostic proves
 this two-window lifecycle without creating a public window-management API. See
 `docs/WINDOW_LIFECYCLE.md`.
 
-The five public session-window commands remain deliberately narrower than that
-private lifecycle: `window.title.set` proposes a title the host composes with a
-validated application name, `window.state.set` selects one closed minimise,
-maximise, or restore action, and `window.focus.request` asks Windows to
-foreground that same session-owned window. `window.fullscreen.set` chooses only
-reversible borderless fullscreen or windowed restoration for that same window;
-`window.size.set` chooses only a bounded logical client area for it.
-All cross a per-session, one-request bridge to the window's owning UI thread;
-none exposes a target, handle, geometry, monitor, display mode, current state,
-focus readback, input, retry, event, position, DPI, or bounds readback. The
-focus request does not control
-semantic UI focus or bypass Windows foreground policy; fullscreen retains its
-native placement facts privately and is not exclusive display control. See
-`docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`, `docs/WINDOW_FOCUS.md`,
-`docs/WINDOW_FULLSCREEN.md`, `docs/WINDOW_SIZE.md`, Decisions 0066, 0072,
-0085, 0086, and 0088.
+The existing primary-only session-window commands remain deliberately narrower
+than the private lifecycle: `window.title.set` proposes a title the host
+composes with a validated application name, `window.state.set` selects one
+closed minimise, maximise, or restore action, and `window.focus.request` asks
+Windows to foreground that same session-owned window. `window.fullscreen.set`
+chooses only reversible borderless fullscreen or windowed restoration for that
+same window; `window.size.set` chooses only a bounded logical client area for
+it. All cross a per-session, one-request bridge to the window's owning UI
+thread; none exposes a target, handle, geometry, monitor, display mode,
+current state, focus readback, input, retry, event, position, DPI, or bounds
+readback. The focus request does not control semantic UI focus or bypass
+Windows foreground policy; fullscreen retains its native placement facts
+privately and is not exclusive display control.
+
+Protocol 1.25 adds a separate bounded exception: `window.open` and
+`window.close` address only opaque views in the authenticated session's own
+four-view group. The portable group validates documents, revisions, and input
+queues; the direct Windows host performs all logical-ID-to-HWND resolution on
+the UI thread through a private map. `ui.document.replace.window` can update
+`main` or a known secondary, and `ui.events.read.window` returns only
+revision-checked actions tagged by their logical view. Neither operation
+enumerates, looks up, or observes a native window. See
+`docs/MULTI_WINDOW.md`, `docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`,
+`docs/WINDOW_FOCUS.md`, `docs/WINDOW_FULLSCREEN.md`, `docs/WINDOW_SIZE.md`,
+and Decisions 0066, 0072, 0085, 0086, 0088, 0092, and 0093.
 
 ## Modularity and performance
 
@@ -325,8 +334,9 @@ authenticated transport now composes this mode without a duplicate legacy
 document mailbox. The direct Windows host services its creation handoff on the
 owning UI thread, while Decision 0093 latches a primary close or session-close
 request across the native group and retains a product lifetime through the last
-view. Protocol 1.25 remains unavailable until its protocol, policy, SDK,
-mock-host, and compatibility work land together.
+view. Protocol 1.25 now exposes only the group’s explicit creation, secondary
+close, strict-v1 per-view replacement, and tagged semantic-event routes; all
+native mapping and presentation state remain on the host side of this seam.
 
 `anodrel-menu` is a separate portable module for one authenticated session's
 complete bounded menu model, monotonic revision, enabled-command revalidation,

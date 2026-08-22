@@ -294,76 +294,39 @@ enum RecordVersion {
     V1_10,
     V1_11,
     V1_12,
+    V1_13,
 }
 
 impl RecordVersion {
+    /// Returns whether this strictly ordered record version includes grants
+    /// introduced by `minimum`. Keeping the comparison here prevents a newer
+    /// record from accidentally losing an older optional grant when another
+    /// version is added.
+    const fn accepts(self, minimum: Self) -> bool {
+        (self as u8) >= (minimum as u8)
+    }
+
     /// Whether this version accepts the grants version 1.2 introduced.
     ///
     /// Each later version is a superset, so a record written for 1.2 keeps its
     /// exact meaning when read as 1.3 or 1.4.
     const fn accepts_v1_2_grants(self) -> bool {
-        matches!(
-            self,
-            Self::V1_2
-                | Self::V1_3
-                | Self::V1_4
-                | Self::V1_5
-                | Self::V1_6
-                | Self::V1_7
-                | Self::V1_8
-                | Self::V1_9
-                | Self::V1_10
-                | Self::V1_11
-                | Self::V1_12
-        )
+        self.accepts(Self::V1_2)
     }
 
     /// Whether this version accepts the grant version 1.3 introduced.
     const fn accepts_v1_3_grants(self) -> bool {
-        matches!(
-            self,
-            Self::V1_3
-                | Self::V1_4
-                | Self::V1_5
-                | Self::V1_6
-                | Self::V1_7
-                | Self::V1_8
-                | Self::V1_9
-                | Self::V1_10
-                | Self::V1_11
-                | Self::V1_12
-        )
+        self.accepts(Self::V1_3)
     }
 
     /// Whether this version accepts the grant version 1.4 introduced.
     const fn accepts_v1_4_grants(self) -> bool {
-        matches!(
-            self,
-            Self::V1_4
-                | Self::V1_5
-                | Self::V1_6
-                | Self::V1_7
-                | Self::V1_8
-                | Self::V1_9
-                | Self::V1_10
-                | Self::V1_11
-                | Self::V1_12
-        )
+        self.accepts(Self::V1_4)
     }
 
     /// Whether this version accepts the grant version 1.5 introduced.
     const fn accepts_v1_5_grants(self) -> bool {
-        matches!(
-            self,
-            Self::V1_5
-                | Self::V1_6
-                | Self::V1_7
-                | Self::V1_8
-                | Self::V1_9
-                | Self::V1_10
-                | Self::V1_11
-                | Self::V1_12
-        )
+        self.accepts(Self::V1_5)
     }
 }
 
@@ -479,68 +442,21 @@ fn capability_for_record_version(
         "notification.show" if version.accepts_v1_3_grants() => Some(Capability::NotificationShow),
         "window.title" if version.accepts_v1_4_grants() => Some(Capability::WindowTitle),
         "ui.fields.read" if version.accepts_v1_5_grants() => Some(Capability::UiFieldsRead),
-        "window.state"
-            if matches!(
-                version,
-                RecordVersion::V1_6
-                    | RecordVersion::V1_7
-                    | RecordVersion::V1_8
-                    | RecordVersion::V1_9
-                    | RecordVersion::V1_10
-                    | RecordVersion::V1_11
-                    | RecordVersion::V1_12
-            ) =>
-        {
-            Some(Capability::WindowState)
-        }
-        "file.write_text"
-            if matches!(
-                version,
-                RecordVersion::V1_7
-                    | RecordVersion::V1_8
-                    | RecordVersion::V1_9
-                    | RecordVersion::V1_10
-                    | RecordVersion::V1_11
-                    | RecordVersion::V1_12
-            ) =>
-        {
+        "window.state" if version.accepts(RecordVersion::V1_6) => Some(Capability::WindowState),
+        "file.write_text" if version.accepts(RecordVersion::V1_7) => {
             Some(Capability::FileWriteText)
         }
-        "menu.write"
-            if matches!(
-                version,
-                RecordVersion::V1_8
-                    | RecordVersion::V1_9
-                    | RecordVersion::V1_10
-                    | RecordVersion::V1_11
-                    | RecordVersion::V1_12
-            ) =>
-        {
-            Some(Capability::MenuWrite)
-        }
-        "window.focus"
-            if matches!(
-                version,
-                RecordVersion::V1_9
-                    | RecordVersion::V1_10
-                    | RecordVersion::V1_11
-                    | RecordVersion::V1_12
-            ) =>
-        {
-            Some(Capability::WindowFocus)
-        }
-        "window.fullscreen"
-            if matches!(
-                version,
-                RecordVersion::V1_10 | RecordVersion::V1_11 | RecordVersion::V1_12
-            ) =>
-        {
+        "menu.write" if version.accepts(RecordVersion::V1_8) => Some(Capability::MenuWrite),
+        "window.focus" if version.accepts(RecordVersion::V1_9) => Some(Capability::WindowFocus),
+        "window.fullscreen" if version.accepts(RecordVersion::V1_10) => {
             Some(Capability::WindowFullscreen)
         }
-        "file.write_binary" if matches!(version, RecordVersion::V1_11 | RecordVersion::V1_12) => {
+        "file.write_binary" if version.accepts(RecordVersion::V1_11) => {
             Some(Capability::FileWriteBinary)
         }
-        "window.size" if version == RecordVersion::V1_12 => Some(Capability::WindowSize),
+        "window.size" if version.accepts(RecordVersion::V1_12) => Some(Capability::WindowSize),
+        "window.open" if version == RecordVersion::V1_13 => Some(Capability::WindowOpen),
+        "window.close" if version == RecordVersion::V1_13 => Some(Capability::WindowClose),
         _ => None,
     }
 }
@@ -653,6 +569,7 @@ fn validate_version(
         (1, 10) => Ok(RecordVersion::V1_10),
         (1, 11) => Ok(RecordVersion::V1_11),
         (1, 12) => Ok(RecordVersion::V1_12),
+        (1, 13) => Ok(RecordVersion::V1_13),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -1215,6 +1132,55 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_13_adds_session_window_grants_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 13")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"window.size\", \"window.open\", \"window.close\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.13 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::WindowSize,
+                anodrel_protocol::Capability::WindowOpen,
+                anodrel_protocol::Capability::WindowClose,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_session_window_grants() {
+        for minor in 0..=12 {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"window.open\", \"window.close\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.13 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

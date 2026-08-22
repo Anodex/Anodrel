@@ -4,8 +4,10 @@
 and direct Windows session-group lifecycle are implemented. The development
 Group Lab manually exercises dynamic secondary creation and primary-driven
 group shutdown. Protocol 1.25's public surface, installed capability policy,
-SDK, mock host, and compatibility work are still under implementation. No
-released protocol version yet lets an application create one.
+SDK, mock host, and compatibility work are implemented and contract-tested.
+The direct Windows host resolves every application-visible identity through its
+private group map; no released operation exposes a native handle or desktop
+state.
 
 ## Purpose
 
@@ -42,11 +44,10 @@ operation on a closed or unknown identity returns the existing safe
 `window.unavailable` category; it does not reveal whether a person closed a
 window or why the host no longer has it.
 
-## Reserved Protocol 1.25 surface
+## Protocol 1.25 surface
 
-Protocol 1.25 is reserved for the following exact operations. They are not
-accepted by the current 1.24 host and must not be used by an application until
-the implementation, compatibility tests, and host integration ship together.
+Protocol 1.25 introduces the following exact operations. Earlier protocol
+versions reject them as unsupported.
 
 | Operation | Exact payload | Exact success result | Required grants |
 | --- | --- | --- | --- |
@@ -72,6 +73,11 @@ name `main`; `session.close` remains the one operation that asks the host to
 end the entire authenticated session. Its success acknowledges that the host
 accepted the close request, not that a native window was destroyed or that a
 person saw anything.
+
+`ui.document.replace.window` accepts `main` or a currently issued secondary
+identity. It is the uniform strict-v1 update route for applications that need
+to address a known view; it is not a lookup, enumeration, or a way to retarget
+the existing primary-only window services.
 
 `ui.events.read.window` returns no document data. Each accepted UI action is
 tagged with the logical `windowId` that produced its revision-bound semantic
@@ -102,8 +108,8 @@ only; it does not inherit a generic native service bridge.
 
 ## Portable creation handoff
 
-Before the host exposes Protocol 1.25, its portable UI-session group validates
-the proposed initial document and reserves one secondary identity. It sends
+For a Protocol 1.25 `window.open`, the portable UI-session group validates the
+proposed initial document and reserves one secondary identity. It sends
 the host-created context, revision-one snapshot, document mailbox, and input
 mailbox through one take-once request for the owning UI thread. The caller
 receives the logical identity only after that UI thread reports successful

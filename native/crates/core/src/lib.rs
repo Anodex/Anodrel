@@ -47,7 +47,7 @@ use anodrel_protocol::{
 use anodrel_storage::{StorageRead, StorageService, StorageServiceError, StorageSnapshot};
 use anodrel_ui_session::{
     SessionInteractionCandidate, UiDocumentSession, UiDocumentSnapshot, UiFieldReadError,
-    UiFieldReader, UiFieldSnapshot, UiInputMailbox, UiWindowGroup, UiWindowId,
+    UiFieldReader, UiFieldSnapshot, UiInputMailbox, UiWindowGroup, UiWindowGroupError, UiWindowId,
 };
 use anodrel_window::{
     WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
@@ -635,9 +635,9 @@ impl CoreHost {
     /// The caller constructs the group with the primary view's real document
     /// and input mailboxes before authentication. This core therefore has no
     /// parallel primary document or input state to keep in sync. Existing
-    /// targetless UI operations continue to resolve only `main`; the public
-    /// multi-window protocol remains unavailable until its Windows integration
-    /// is complete.
+    /// targetless UI operations continue to resolve only `main`; Protocol 1.25
+    /// adds separate explicit operations for the bounded group without
+    /// widening those compatibility paths.
     #[must_use]
     pub fn with_session_window_group_and_service_bundle(
         policy: HostPolicy,
@@ -1004,6 +1004,12 @@ impl CoreHost {
             "window.size.set" if request.protocol_version.minor >= 23 => {
                 self.handle_window_size_set(request)
             }
+            "window.open" if request.protocol_version.minor >= 25 => {
+                self.handle_window_open(request)
+            }
+            "window.close" if request.protocol_version.minor >= 25 => {
+                self.handle_window_close(request)
+            }
             "menu.replace" if request.protocol_version.minor >= 18 => {
                 self.handle_menu_replace(request)
             }
@@ -1013,8 +1019,14 @@ impl CoreHost {
             "ui.document.replace.v2" if request.protocol_version.minor >= 4 => {
                 self.handle_ui_document_replace(request, true)
             }
+            "ui.document.replace.window" if request.protocol_version.minor >= 25 => {
+                self.handle_ui_document_replace_window(request)
+            }
             "ui.events.read" if request.protocol_version.minor >= 2 => {
                 self.handle_ui_events_read(request)
+            }
+            "ui.events.read.window" if request.protocol_version.minor >= 25 => {
+                self.handle_ui_events_read_window(request)
             }
             "session.close" if request.protocol_version.minor >= 3 => {
                 self.handle_session_close(request)
@@ -1271,6 +1283,175 @@ impl CoreHost {
         )
     }
 
+    /// Opens one bounded secondary view in this authenticated session group.
+    ///
+    /// The worker owns no native window. It can wait only for the portable
+    /// group to report that the host UI thread created and registered one
+    /// private native view. A successful opaque ID is therefore never a
+    /// speculative reservation or a native handle.
+    fn handle_window_open(&self, request: RequestEnvelope) -> JsonValue {
+        let Some((title, document)) = window_open_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.open requires one title and one document string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::WindowOpen) {
+            return self.capability_denied(request.request_id, "window.open");
+        }
+        if !self.policy.has(Capability::UiDocumentWrite) {
+            return self.capability_denied(request.request_id, "ui.document.write");
+        }
+        if document.len() > MAX_UI_DOCUMENT_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.open document exceeded the operation size limit.",
+                None,
+            );
+        }
+        let Ok(title) = WindowTitleProposal::new(title) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowTitleInvalid,
+                "window.open title is invalid.",
+                None,
+            );
+        };
+        let Some(group) = &self.ui_window_group else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the session window group is unavailable.",
+                None,
+            );
+        };
+        match group.open_secondary(title, document) {
+            Ok(id) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("windowId", JsonValue::String(id.to_protocol_string()))]),
+            ),
+            Err(UiWindowGroupError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "another session window creation is pending.",
+                None,
+            ),
+            Err(UiWindowGroupError::DocumentRejected(_)) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.open document is invalid.",
+                None,
+            ),
+            Err(UiWindowGroupError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the session window group is unavailable.",
+                None,
+            ),
+        }
+    }
+
+    /// Requests a host-owned close for one current secondary view.
+    ///
+    /// The protocol acknowledges queueing only. Windows may still be
+    /// processing the request, and the actual logical view remains available
+    /// until the native destroy path removes its private mapping.
+    fn handle_window_close(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(id) = secondary_window_id_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.close requires one canonical secondary windowId.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::WindowClose) {
+            return self.capability_denied(request.request_id, "window.close");
+        }
+        let Some(group) = &self.ui_window_group else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the session window group is unavailable.",
+                None,
+            );
+        };
+        if group.request_secondary_close(&id).is_err() {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the requested session window is unavailable.",
+                None,
+            );
+        }
+        ResponseEnvelope::success(
+            request.request_id,
+            &self.policy.host_name,
+            object([("status", JsonValue::String("requested".to_owned()))]),
+        )
+    }
+
+    /// Replaces the strict v1 document of one logical session view.
+    ///
+    /// `main` remains a legal target here so callers can keep one uniform
+    /// document-update path after opening a secondary. Closing `main` remains
+    /// forbidden: it is the group anchor rather than an ordinary target.
+    fn handle_ui_document_replace_window(&self, request: RequestEnvelope) -> JsonValue {
+        let Some((id, document)) = window_document_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.document.replace.window requires one canonical windowId and document string.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::UiDocumentWrite) {
+            return self.capability_denied(request.request_id, "ui.document.write");
+        }
+        if document.len() > MAX_UI_DOCUMENT_REQUEST_BYTES {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.document.replace.window document exceeded the operation size limit.",
+                None,
+            );
+        }
+        let Some(group) = &self.ui_window_group else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the session window group is unavailable.",
+                None,
+            );
+        };
+        match group.replace_document(&id, document) {
+            Ok(snapshot) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([(
+                    "revision",
+                    JsonValue::String(snapshot.snapshot().revision().value().to_string()),
+                )]),
+            ),
+            Err(UiWindowGroupError::DocumentRejected(_)) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.document.replace.window document is invalid.",
+                None,
+            ),
+            Err(UiWindowGroupError::Busy | UiWindowGroupError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the requested session window is unavailable.",
+                None,
+            ),
+        }
+    }
+
     fn handle_menu_replace(&self, request: RequestEnvelope) -> JsonValue {
         let Some(model) =
             menu_replace_payload(&request.payload, request.protocol_version.minor >= 24)
@@ -1394,6 +1575,75 @@ impl CoreHost {
                     match self.menu_session.borrow().accept_action(revision, action) {
                         Ok(event) => events.push(menu_action_event(event)),
                         Err(_) => discarded = discarded.saturating_add(1),
+                    }
+                }
+            }
+        }
+        ResponseEnvelope::success(
+            request.request_id,
+            &self.policy.host_name,
+            object([
+                ("events", JsonValue::Array(events)),
+                ("dropped", JsonValue::Number(dropped.to_string())),
+                ("discarded", JsonValue::Number(discarded.to_string())),
+            ]),
+        )
+    }
+
+    /// Drains bounded semantic input from every current view in this session.
+    ///
+    /// Batches retain their own view-local input order. The group deliberately
+    /// makes no cross-view timing claim, even though its private iteration is
+    /// deterministic for testability. Every accepted event receives an opaque
+    /// `windowId` tag so application code can validate it against the view
+    /// identity it created without learning any native state.
+    fn handle_ui_events_read_window(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "ui.events.read.window does not accept a payload.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::UiEventsRead) {
+            return self.capability_denied(request.request_id, "ui.events.read");
+        }
+        let Some(group) = &self.ui_window_group else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "the session window group is unavailable.",
+                None,
+            );
+        };
+
+        let mut dropped = 0_u32;
+        let mut discarded = 0_u32;
+        let mut events = Vec::new();
+        for window_batch in group.drain_input_batches() {
+            let (id, batch) = window_batch.into_parts();
+            dropped = dropped.saturating_add(batch.dropped());
+            for candidate in batch.into_candidates() {
+                match candidate {
+                    SessionInteractionCandidate::Ui(candidate) => {
+                        let (revision, event) = candidate.into_parts();
+                        match group.accept_event(&id, revision, event) {
+                            Ok(event) => events.push(window_ui_action_event(&id, event)),
+                            Err(_) => discarded = discarded.saturating_add(1),
+                        }
+                    }
+                    SessionInteractionCandidate::Menu(candidate) if id.is_primary() => {
+                        let (revision, action) = candidate.into_parts();
+                        match self.menu_session.borrow().accept_action(revision, action) {
+                            Ok(event) => events.push(window_menu_action_event(&id, event)),
+                            Err(_) => discarded = discarded.saturating_add(1),
+                        }
+                    }
+                    SessionInteractionCandidate::Menu(_) => {
+                        // A secondary receives no menu bridge. If a malformed
+                        // host route ever places one there, fail it closed.
+                        discarded = discarded.saturating_add(1);
                     }
                 }
             }
@@ -2559,6 +2809,42 @@ fn ui_action_event(event: anodrel_ui_session::UiApplicationEvent) -> JsonValue {
     ])
 }
 
+/// Builds one v1.25 view-tagged UI action without exposing any native window
+/// fact. The tag is an opaque session-local identity, not a handle or a lookup
+/// key outside this authenticated group.
+fn window_ui_action_event(
+    id: &UiWindowId,
+    event: anodrel_ui_session::UiApplicationEvent,
+) -> JsonValue {
+    object([
+        ("protocolVersion", ProtocolVersion::CURRENT.to_json()),
+        ("kind", JsonValue::String("event".to_owned())),
+        (
+            "eventName",
+            JsonValue::String("ui.action.invoked".to_owned()),
+        ),
+        ("source", JsonValue::String("native.ui".to_owned())),
+        (
+            "schemaVersion",
+            ProtocolVersion { major: 1, minor: 0 }.to_json(),
+        ),
+        ("windowId", JsonValue::String(id.to_protocol_string())),
+        (
+            "payload",
+            object([
+                (
+                    "revision",
+                    JsonValue::String(event.revision().value().to_string()),
+                ),
+                (
+                    "action",
+                    JsonValue::String(event.action().as_str().to_owned()),
+                ),
+            ]),
+        ),
+    ])
+}
+
 fn menu_action_event(event: anodrel_menu::MenuActionEvent) -> JsonValue {
     object([
         ("protocolVersion", ProtocolVersion::CURRENT.to_json()),
@@ -2585,12 +2871,88 @@ fn menu_action_event(event: anodrel_menu::MenuActionEvent) -> JsonValue {
     ])
 }
 
+/// Builds one v1.25 primary-view-tagged menu action. Menu ownership is still
+/// primary-only; the tag makes that fact explicit without reporting a native
+/// menu, shortcut, focus state, or window handle.
+fn window_menu_action_event(id: &UiWindowId, event: anodrel_menu::MenuActionEvent) -> JsonValue {
+    object([
+        ("protocolVersion", ProtocolVersion::CURRENT.to_json()),
+        ("kind", JsonValue::String("event".to_owned())),
+        (
+            "eventName",
+            JsonValue::String("menu.action.invoked".to_owned()),
+        ),
+        ("source", JsonValue::String("native.menu".to_owned())),
+        ("schemaVersion", MENU_ACTION_EVENT_SCHEMA_VERSION.to_json()),
+        ("windowId", JsonValue::String(id.to_protocol_string())),
+        (
+            "payload",
+            object([
+                (
+                    "menuRevision",
+                    JsonValue::String(event.revision().value().to_string()),
+                ),
+                (
+                    "action",
+                    JsonValue::String(event.action().as_str().to_owned()),
+                ),
+            ]),
+        ),
+    ])
+}
+
 fn ui_document_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
         .then(|| fields.get("document"))
         .flatten()
         .and_then(JsonValue::as_string)
+}
+
+/// Reads the exact two-field initial secondary-window payload.
+///
+/// Extra fields stay invalid so an application cannot smuggle a position,
+/// size, parent, native style, handle, or any other desktop control into the
+/// first deliberately small window-creation contract.
+fn window_open_payload(value: &JsonValue) -> Option<(&str, &str)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    Some((
+        fields.get("title")?.as_string()?,
+        fields.get("document")?.as_string()?,
+    ))
+}
+
+/// Reads one exact secondary-window close payload.
+///
+/// `main` is intentionally rejected here before any host state is consulted:
+/// it is the session anchor and ends only through the separately granted
+/// `session.close` operation.
+fn secondary_window_id_payload(value: &JsonValue) -> Option<UiWindowId> {
+    let fields = value.as_object()?;
+    if fields.len() != 1 {
+        return None;
+    }
+    let id = UiWindowId::parse(fields.get("windowId")?.as_string()?).ok()?;
+    (!id.is_primary()).then_some(id)
+}
+
+/// Reads one exact strict-v1 document update targeted at a logical view.
+///
+/// `main` is allowed, which lets applications use a uniform known-view update
+/// method. The host still resolves it only inside the current authenticated
+/// group and never exposes a lookup or enumeration operation.
+fn window_document_payload(value: &JsonValue) -> Option<(UiWindowId, &str)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    Some((
+        UiWindowId::parse(fields.get("windowId")?.as_string()?).ok()?,
+        fields.get("document")?.as_string()?,
+    ))
 }
 
 fn clipboard_write_payload(value: &JsonValue) -> Option<&str> {
@@ -3792,6 +4154,12 @@ mod tests {
     fn request_v1_24(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":24}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_25(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":25}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -5211,6 +5579,129 @@ mod tests {
                 .len(),
             1,
             "targetless primary reads cannot consume a secondary view's input"
+        );
+    }
+
+    #[test]
+    fn protocol_v1_25_opens_targets_reads_and_closes_only_session_owned_views() {
+        let document_mailbox = UiDocumentMailbox::new();
+        let input_mailbox = UiInputMailbox::new();
+        let group = UiWindowGroup::<WindowTitleProposal>::with_primary_resources(
+            document_mailbox,
+            input_mailbox,
+        );
+        let host = CoreHost::with_session_window_group_and_service_bundle(
+            HostPolicy::new(
+                "test.application",
+                vec![
+                    Capability::WindowOpen,
+                    Capability::WindowClose,
+                    Capability::UiDocumentWrite,
+                    Capability::UiEventsRead,
+                ],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            group.clone(),
+            SessionCloseSignal::default(),
+            HostServices::unavailable(),
+        );
+        let document = valid_ui_document("Secondary action");
+        let opening_group = group.clone();
+        let native_creator = thread::spawn(move || {
+            loop {
+                if let Some(request) = opening_group.take_open_request() {
+                    assert_eq!(request.context().as_str(), "Notes");
+                    assert!(opening_group.complete_open(request.id(), true));
+                    break;
+                }
+                thread::yield_now();
+            }
+        });
+
+        let open_payload = object([
+            ("document", JsonValue::String(document.clone())),
+            ("title", JsonValue::String("Notes".to_owned())),
+        ])
+        .to_json();
+        let opened =
+            JsonValue::parse(&host.handle_json(&request_v1_25("window.open", &open_payload)))
+                .expect("open response is JSON");
+        native_creator
+            .join()
+            .expect("native group creator does not panic");
+        assert_eq!(field(&opened, "status").as_string(), Some("success"));
+        let window_id = field(field(&opened, "result"), "windowId")
+            .as_string()
+            .expect("open result carries an identity");
+        assert_eq!(window_id, "window-1");
+        let secondary = UiWindowId::parse(window_id).expect("fixed secondary ID parses");
+
+        let replacement_payload = object([
+            ("document", JsonValue::String(document.clone())),
+            ("windowId", JsonValue::String(window_id.to_owned())),
+        ])
+        .to_json();
+        let replacement = JsonValue::parse(&host.handle_json(&request_v1_25(
+            "ui.document.replace.window",
+            &replacement_payload,
+        )))
+        .expect("replacement response is JSON");
+        assert_eq!(
+            field(field(&replacement, "result"), "revision").as_string(),
+            Some("2")
+        );
+
+        let secondary_resources = group
+            .resources(&secondary)
+            .expect("secondary resources remain available");
+        let revision = secondary_resources
+            .document_mailbox()
+            .take()
+            .expect("targeted replacement publishes the secondary snapshot")
+            .revision();
+        secondary_resources
+            .input_mailbox()
+            .push(UiInputCandidate::new(
+                revision,
+                UiEvent::ActionInvoked(ElementId::new("root").expect("fixed action ID is valid")),
+            ));
+        let events =
+            JsonValue::parse(&host.handle_json(&request_v1_25("ui.events.read.window", "{}")))
+                .expect("events response is JSON");
+        let JsonValue::Array(events) = field(field(&events, "result"), "events") else {
+            panic!("events result is an array");
+        };
+        assert_eq!(events.len(), 1);
+        assert_eq!(field(&events[0], "windowId").as_string(), Some("window-1"));
+        assert_eq!(
+            field(&events[0], "eventName").as_string(),
+            Some("ui.action.invoked")
+        );
+
+        let close_payload =
+            object([("windowId", JsonValue::String(window_id.to_owned()))]).to_json();
+        let close =
+            JsonValue::parse(&host.handle_json(&request_v1_25("window.close", &close_payload)))
+                .expect("close response is JSON");
+        assert_eq!(
+            field(field(&close, "result"), "status").as_string(),
+            Some("requested")
+        );
+        assert_eq!(
+            group.take_secondary_close_requests(),
+            vec![secondary.clone()]
+        );
+        assert!(group.close_secondary(&secondary).is_ok());
+
+        let unavailable = JsonValue::parse(&host.handle_json(&request_v1_25(
+            "ui.document.replace.window",
+            &replacement_payload,
+        )))
+        .expect("unavailable response is JSON");
+        assert_eq!(
+            field(field(&unavailable, "error"), "code").as_string(),
+            Some("window.unavailable")
         );
     }
 

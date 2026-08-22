@@ -148,6 +148,17 @@ pub(super) fn take_secondary_open_request(
     }
 }
 
+/// Takes host-private native secondary windows requested for close by this
+/// session group. The caller must invoke `DestroyWindow` only after this
+/// registry lock has been released.
+pub(super) fn take_secondary_close_windows(window: Hwnd) -> io::Result<Vec<Hwnd>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_secondary_close_windows()),
+        _ => Ok(Vec::new()),
+    }
+}
+
 /// Takes one pending modal dialog request only from its associated UI session.
 pub(super) fn take_file_dialog_request(window: Hwnd) -> io::Result<Option<FileDialogRequest>> {
     let mut views = lock_views()?;

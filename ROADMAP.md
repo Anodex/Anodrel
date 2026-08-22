@@ -111,9 +111,12 @@ Status: **Direct Windows host in progress**
   closes through an idempotent mapping removal, and retains a verified product
   session until the final group view leaves. Primary close and `session.close`
   are group-wide (Decision 0093); an in-flight creation cancels safely during
-  shutdown. Protocol, installed policy, SDK, mock-host, and compatibility work
-  remain in progress; no released protocol version lets an application create
-  or target another view yet.
+  shutdown. **Completed for Protocol 1.25:** `window.open`, `window.close`,
+  strict-v1 per-view replacement, and tagged multi-view event reads have typed
+  SDK, mock-host, installed-record 1.13 policy, native host routing, and
+  compatibility coverage. The direct Windows host still retains all native
+  mapping and presentation decisions; the public API exposes no handles,
+  geometry, enumeration, or lifecycle observation.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
   non-mutating save picker while implementing an independent, one-use
