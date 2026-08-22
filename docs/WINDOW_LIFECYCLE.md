@@ -46,9 +46,14 @@ This is containment, not recovery. The host does not resume after a contained
 panic, because the state that produced it is not known to be sound.
 
 A removed view is dropped after the registry lock is released, never while it is
-held. Most views drop trivially, but a view that owns a verified product session
-ends that session as it goes: it shuts down the child and joins two worker
-threads. Doing that under the process-wide registry lock would hold every other
+held. A session-window view first removes its exact host-private logical/native
+mapping outside that lock. Removing a secondary then releases only that
+secondary's portable resources. Removing the primary requests group-wide
+shutdown, so each remaining group window closes through its own UI-thread timer
+rather than leaving current primary-only bridges detached from a real surface.
+The group, rather than its first window, retains a verified product session; it
+ends the child and joins its two worker threads only after the final group view
+leaves. Doing that under the process-wide registry lock would hold every other
 window's message handling behind it, and would deadlock if a worker ever needed
 to read the registry on its way out.
 
@@ -94,11 +99,13 @@ handles. `anodrel-windows-product-session` now provides the required
 tracked-child and pipe shutdown owner. A provisioned signed application remains
 required before this becomes an executable host path.
 
-`docs/MULTI_WINDOW.md` and Decision 0092 now define the future public
+`docs/MULTI_WINDOW.md` and Decisions 0092 and 0093 define the future public
 session-owned view model. That contract has no relationship to a raw registry
 entry: its logical identifiers are session-scoped, bounded, and never native
-handles. The host must first implement its group lifetime and per-view state
-before it exposes any part of the reserved protocol surface.
+handles. The host now implements its group lifetime, per-view resources, and
+worker-to-UI creation handoff, but no application-facing part of the reserved
+Protocol 1.25 surface is exposed until protocol, policy, SDK, mock-host, and
+compatibility work ship together.
 
 ## Manual verification
 
@@ -110,3 +117,19 @@ cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-
 
 Confirm that two **Anodrel Window Lab** windows open. Close either one: the
 other must stay open. Close the remaining window: the host process must exit.
+
+## Session-window group manual verification
+
+The development-only Group Lab exercises the same dynamic creation handoff
+that a future Protocol 1.25 request will use, without accepting any application
+protocol command:
+
+~~~text
+cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-group-lab
+~~~
+
+Confirm that **Anodrel Window Group Lab** opens first and then a separately
+captioned secondary window opens. Close the secondary: the primary remains.
+Run it again and close the primary: the secondary closes shortly afterwards and
+the process exits. This proves only host-owned group lifecycle and per-view
+routing; it is not a public window API or a signed product-session test.

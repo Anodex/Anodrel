@@ -1,10 +1,11 @@
 # Anodrel session-owned multi-window contract
 
-**Status:** The portable session-owned state and worker-to-UI creation handoff
-are implemented. The direct Windows host can already create and route several
-native windows, but its session-group integration and the Protocol 1.25 public
-surface are still under implementation. No released protocol version yet lets
-an application create one.
+**Status:** The portable session-owned state, worker-to-UI creation handoff,
+and direct Windows session-group lifecycle are implemented. The development
+Group Lab manually exercises dynamic secondary creation and primary-driven
+group shutdown. Protocol 1.25's public surface, installed capability policy,
+SDK, mock host, and compatibility work are still under implementation. No
+released protocol version yet lets an application create one.
 
 ## Purpose
 
@@ -85,8 +86,11 @@ meaning and cannot consume secondary-view traffic.
 A host owns one session-window group. Its group owns the per-view native
 mapping, cross-thread document mailboxes, input queues, and—where applicable—
 the tracked verified child lifetime. Removing a secondary view drops only that
-view's resources. Closing the final view ends the group. A granted
-`session.close` request is group-wide: the host asks every view in that one
+view's resources. Closing the final view ends the group. The primary view is
+the group anchor: if Windows destroys its native primary window, the host
+requests group-wide shutdown rather than leaving primary-only services attached
+to a logical `main` view that no longer exists. A granted `session.close`
+request uses that same group-wide path. The host asks every view in that one
 authenticated session to close before it releases the child and pipe workers.
 
 No view grants authority over another application or session. Existing
@@ -125,6 +129,9 @@ leaves.
   worker.
 - A close request, timer wake-up, and native destroy path are idempotent. No
   completed or timed-out request can make an identity refer to a later window.
+- Destroying the native primary window is group-wide shutdown. Destroying a
+  secondary removes only that exact secondary after its native window is gone;
+  it cannot promote a sibling or transfer primary-only authority.
 - Every secondary document has an independent monotonically increasing
   revision. A candidate from one view cannot be accepted against another
   view's same-numbered revision.

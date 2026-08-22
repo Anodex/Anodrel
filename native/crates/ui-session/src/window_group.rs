@@ -236,6 +236,36 @@ impl<T> UiWindowGroup<T> {
             .close_secondary(id)
             .map_err(map_window_error)
     }
+
+    /// Cancels one worker-to-UI creation handoff during host group shutdown.
+    ///
+    /// A native group calls this after it has begun closing its views. The
+    /// request has no native view yet, so retaining it until the five-second
+    /// timeout would strand an authenticated worker after the session is
+    /// already ending. The reserved logical identity is rolled back before the
+    /// waiter is released, and a UI thread that had not taken the request has
+    /// nothing to create.
+    ///
+    /// Returns `true` only when a request was cancelled. A UI thread that
+    /// already took a request may still be between native creation and
+    /// [`Self::complete_open`]; that completion returns `false` and requires
+    /// the host to destroy the late native view, as documented there.
+    pub fn cancel_open_request(&self) -> bool {
+        let mut state = lock(&self.state);
+        let Some(active) = state.active.take() else {
+            return false;
+        };
+        let _ = state.windows.abort_secondary(active.pending);
+        let response = active.response;
+        // Hold the group state lock while making the worker outcome visible,
+        // matching `complete_open`. A deadline race can therefore observe
+        // either an active request or its completed unavailable response, but
+        // never a transient empty state.
+        let value = &mut *lock(&response.value);
+        *value = Some(Err(UiWindowGroupError::Unavailable));
+        response.ready.notify_one();
+        true
+    }
 }
 
 impl<T: Clone> UiWindowGroup<T> {
@@ -545,6 +575,38 @@ mod tests {
             Err(UiWindowGroupError::DocumentRejected(_))
         ));
         assert!(group.take_open_request().is_none());
+    }
+
+    #[test]
+    fn group_shutdown_cancels_a_taken_open_without_waiting_for_its_deadline() {
+        let group = UiWindowGroup::new();
+        let worker = group.clone();
+        let (sent, received) = mpsc::channel();
+        let waiting = thread::spawn(move || sent.send(worker.open_secondary("caption", DOCUMENT)));
+
+        // Wait until the worker has reserved its view, but deliberately do not
+        // hand it to a UI thread. Shutdown must answer now rather than making
+        // the worker wait for the ordinary five-second host-response bound.
+        loop {
+            if group.take_open_request().is_some() {
+                break;
+            }
+            thread::yield_now();
+        }
+        // The request was taken above, so cancellation takes the same active
+        // handoff and publishes an unavailable outcome. A native thread that
+        // had actually begun creating a window will instead see
+        // `complete_open` return false after the cancellation.
+        assert!(group.cancel_open_request());
+        assert_eq!(
+            received.recv().expect("worker receives cancellation"),
+            Err(UiWindowGroupError::Unavailable)
+        );
+        waiting
+            .join()
+            .expect("worker does not panic")
+            .expect("worker submits its response");
+        assert!(!group.contains(&UiWindowId::parse("window-1").expect("fixed ID parses")));
     }
 
     #[test]

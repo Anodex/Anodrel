@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0093: Closing the primary session view ends its whole group.
+
 - 0092: Session-owned multi-window views use opaque identities.
 
 - 0091: Atomic selected-file replacement keeps private identities.

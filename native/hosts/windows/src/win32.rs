@@ -6,8 +6,8 @@
 //!
 //! Submodules split that responsibility: [`present`] moves a canvas to the
 //! screen, [`text`] turns GDI glyphs into canvas coverage, [`appicon`] builds
-//! the window icon from brand geometry, and [`startup_lab`], [`document`], and
-//! [`ui_lab`] own the host surfaces.
+//! the window icon from brand geometry, and [`startup_lab`], [`document`],
+//! [`ui_lab`], and [`window_group_lab`] own the host diagnostic surfaces.
 
 #![allow(non_snake_case)]
 
@@ -19,12 +19,14 @@ mod menu;
 mod present;
 mod product_tile;
 mod registry;
+mod session_window_group;
 mod size;
 mod startup_lab;
 mod stats;
 mod text;
 mod ui_lab;
 mod ui_session_view;
+mod window_group_lab;
 
 use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
@@ -332,6 +334,14 @@ enum View {
     UiSession(Box<ui_session_view::UiSessionView>),
 }
 
+impl View {
+    /// Whether this view must join a session-owned native group before it can
+    /// be shown. A legacy UI-session diagnostic intentionally has no group.
+    fn requires_group_registration(&self) -> bool {
+        matches!(self, Self::UiSession(session) if session.is_group_member())
+    }
+}
+
 struct WindowDefinition {
     title: String,
     width: i32,
@@ -503,6 +513,16 @@ pub fn run_window_lab() -> io::Result<()> {
         ],
         None,
     )
+}
+
+/// Opens a host-controlled diagnostic for the dynamic session-window path.
+///
+/// The worker uses the same portable handoff later reserved for Protocol 1.25,
+/// while the host supplies both fixed captions and documents. Nothing in this
+/// route accepts application data, grants, native handles, or a product child;
+/// it exists solely for the manual lifecycle check in `docs/WINDOW_LIFECYCLE.md`.
+pub fn run_window_group_lab() -> io::Result<()> {
+    window_group_lab::run()
 }
 
 /// Deliberate fault injection, for proving the containment path end to end.
@@ -785,6 +805,7 @@ fn run_windows(
     for definition in definitions {
         let animated = matches!(definition.view, View::StartupLab(_));
         let session_driven = matches!(definition.view, View::UiSession(_));
+        let group_driven = definition.view.requires_group_registration();
         let window = match create_window(instance, &class_name, &definition) {
             Ok(window) => window,
             Err(error) => {
@@ -796,6 +817,24 @@ fn run_windows(
             destroy_window(window);
             destroy_windows(&windows);
             return Err(error);
+        }
+        if group_driven {
+            let joined_group = match registry::register_ui_session_window(window) {
+                Ok(Some(joined)) => joined,
+                Ok(None) => false,
+                Err(error) => {
+                    destroy_window(window);
+                    destroy_windows(&windows);
+                    return Err(error);
+                }
+            };
+            if !joined_group {
+                destroy_window(window);
+                destroy_windows(&windows);
+                return Err(io::Error::other(
+                    "session window could not join its native view group",
+                ));
+            }
         }
         apply_icons(window);
         if animated {
@@ -1130,6 +1169,23 @@ fn open_product_session_window(
         destroy_window(window);
         return Err(error);
     }
+    let joined_group = match registry::register_ui_session_window(window) {
+        Ok(Some(joined)) => joined,
+        Ok(None) => false,
+        Err(error) => {
+            destroy_window(window);
+            return Err(error);
+        }
+    };
+    if !joined_group {
+        // The group membership must exist before the first window can be
+        // shown. Destroying the just-registered view releases the product
+        // group, which in turn performs its ordinary verified-child cleanup.
+        destroy_window(window);
+        return Err(io::Error::other(
+            "product session window could not join its native view group",
+        ));
+    }
     product_tile::note_window(window);
     apply_icons(window);
     // SAFETY: the window was just created on this thread's message queue and
@@ -1139,6 +1195,96 @@ fn open_product_session_window(
     }
     show_and_update(window);
     Ok(())
+}
+
+/// Opens one committed secondary view for an already-known session group.
+///
+/// This is deliberately private host lifecycle code. The request was produced
+/// by the portable group's take-once handoff; it creates, enters both native
+/// registries, and commits that handoff before the window is shown. Failure at
+/// any earlier point rolls the pending logical view back without exposing a
+/// native cause to the waiting worker.
+fn open_session_secondary_window(
+    request: session_window_group::SessionWindowOpenRequest,
+) -> io::Result<()> {
+    let instance = match module_handle() {
+        Ok(instance) => instance,
+        Err(error) => {
+            let _ = request.fail();
+            return Err(error);
+        }
+    };
+    let class_name = to_wide_null("Anodrel.DirectWindowsHost");
+    if let Err(error) = ensure_window_class(instance, &class_name) {
+        let _ = request.fail();
+        return Err(error);
+    }
+    let scale = primary_scale();
+    let definition = WindowDefinition {
+        title: request.caption(),
+        width: (920.0 * scale) as i32,
+        height: (660.0 * scale) as i32,
+        view: View::UiSession(Box::new(ui_session_view::UiSessionView::for_group_member(
+            request.resources(),
+            request.member(),
+        ))),
+    };
+    let window = match create_window(instance, &class_name, &definition) {
+        Ok(window) => window,
+        Err(error) => {
+            let _ = request.fail();
+            return Err(error);
+        }
+    };
+    if let Err(error) = registry::insert(window, definition.view) {
+        destroy_window(window);
+        let _ = request.fail();
+        return Err(error);
+    }
+    let joined_group = match registry::register_ui_session_window(window) {
+        Ok(Some(joined)) => joined,
+        Ok(None) => false,
+        Err(error) => {
+            destroy_window(window);
+            let _ = request.fail();
+            return Err(error);
+        }
+    };
+    if !joined_group {
+        destroy_window(window);
+        let _ = request.fail();
+        return Err(io::Error::other(
+            "secondary session window could not join its native view group",
+        ));
+    }
+    if !request.complete() {
+        // The worker timed out or group shutdown won the race. The native
+        // window was registered only so WM_DESTROY can remove that exact
+        // private mapping; it must never be shown after a failed commit.
+        destroy_window(window);
+        return Ok(());
+    }
+    apply_icons(window);
+    // SAFETY: this newly created registered view owns its low-frequency
+    // session poll; WM_DESTROY stops the timer on the same UI thread.
+    unsafe {
+        SetTimer(window, UI_SESSION_TIMER, UI_SESSION_POLL_INTERVAL_MILLIS, 0);
+    }
+    show_and_update(window);
+    Ok(())
+}
+
+/// Services one pending group-owned secondary creation handoff.
+///
+/// A timer on any member may reach this function, but the portable group hands
+/// a request out only once. The failure path already rolls back and replies to
+/// the worker with its safe portable category, so a native creation failure is
+/// intentionally not logged or surfaced to an application.
+fn service_session_window_open(window: Hwnd) {
+    let Some(request) = registry::take_secondary_open_request(window).ok().flatten() else {
+        return;
+    };
+    let _ = open_session_secondary_window(request);
 }
 
 /// Maps a window's current layout into hierarchical accessibility elements.
@@ -1920,6 +2066,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                     raise_accessibility_structure_changed(window);
                 }
             }
+            service_session_window_open(window);
             service_notification(window);
             service_menu(window);
             service_window_title(window);

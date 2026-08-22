@@ -105,9 +105,15 @@ Status: **Direct Windows host in progress**
   take-once request, commit-only snapshot publication, and rollback of failed
   or timed-out native creation. The core, authenticated transport, and
   registered Windows-session composition now use the group for the existing
-  primary view without copying its mailboxes. Protocol, direct Windows-host,
-  and group-lifetime integration remain in progress; no released protocol
-  version lets an application create or target another view yet.
+  primary view without copying its mailboxes. **Completed for the direct
+  Windows-host group lifecycle:** each opaque view maps to one registered
+  native view before it is shown, carries independent document and input state,
+  closes through an idempotent mapping removal, and retains a verified product
+  session until the final group view leaves. Primary close and `session.close`
+  are group-wide (Decision 0093); an in-flight creation cancels safely during
+  shutdown. Protocol, installed policy, SDK, mock-host, and compatibility work
+  remain in progress; no released protocol version lets an application create
+  or target another view yet.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
   non-mutating save picker while implementing an independent, one-use

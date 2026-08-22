@@ -246,10 +246,14 @@ transport before the client connects. The session receives the notification
 mailbox rather than the Shell32 adapter, so a worker never holds anything that
 can reach the notification area; the owning UI thread performs that call and
 the adapter's entry lives as long as its view. See `docs/NOTIFICATIONS.md` and
-Decision 0062. The Windows host must still consume the group through its
-internal authenticated-session window entry point; it cannot be selected or
-assembled by an application. The group has no process-launch or native-handle
-authority. See Decisions 0058 and 0092.
+Decision 0062. The direct Windows host now consumes the group through its
+internal authenticated-session window entry point: it maps each opaque logical
+view to one privately registered Win32 window, creates and registers a
+secondary before showing it, and keeps each secondary's document and semantic
+input mailboxes separate. Its native group retains the verified product session
+until the final view leaves the registry. The application cannot select or
+assemble that group, and the group has no application-visible process-launch or
+native-handle authority. See Decisions 0058, 0092, and 0093.
 
 The product-session adapter creates the group before bootstrap delivery, starts
 the pipe only on a worker, and observes the tracked child on a separate worker.
@@ -318,8 +322,11 @@ while retaining every targetless document and event operation as primary-only;
 it never drains a secondary view on that compatibility path. The group has no
 native authority, and its creation handoff stops at the owning UI thread. The
 authenticated transport now composes this mode without a duplicate legacy
-document mailbox; the direct Windows host must still service it before Protocol
-1.25 can be released.
+document mailbox. The direct Windows host services its creation handoff on the
+owning UI thread, while Decision 0093 latches a primary close or session-close
+request across the native group and retains a product lifetime through the last
+view. Protocol 1.25 remains unavailable until its protocol, policy, SDK,
+mock-host, and compatibility work land together.
 
 `anodrel-menu` is a separate portable module for one authenticated session's
 complete bounded menu model, monotonic revision, enabled-command revalidation,

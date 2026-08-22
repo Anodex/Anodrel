@@ -10,7 +10,7 @@ use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::UiEvent;
 use anodrel_ui_session::{
     UiDocumentMailbox, UiDocumentRevision, UiFieldMailbox, UiFieldRequest, UiInputCandidate,
-    UiInputMailbox,
+    UiInputMailbox, UiWindowId, UiWindowResources,
 };
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSize,
@@ -23,6 +23,7 @@ use anodrel_windows_product_session::RunningProductSession;
 use super::{
     Hwnd, Lparam, Wparam,
     menu::{MenuBar, UnattachedMenu},
+    session_window_group::{SessionWindowMember, SessionWindowOpenRequest},
     ui_lab::{AccessibilityFocusResult, UiLab},
 };
 
@@ -93,15 +94,12 @@ pub(super) struct UiSessionView {
     /// it may read.
     field_reads: Option<UiFieldMailbox>,
     revision: UiDocumentRevision,
-    /// The product session whose resources this view consumes, when the window
-    /// owns one.
+    /// The private membership of this view in a native session-window group.
     ///
-    /// Holding it here ties the verified child, pipe worker, and exit watcher to
-    /// this window's lifetime: removing the view when the window is destroyed
-    /// drops the last reference, and `RunningProductSession` then performs the
-    /// same shutdown and worker joins its explicit `finish` would. A diagnostic
-    /// session view holds `None`.
-    product_session: Option<Arc<RunningProductSession>>,
+    /// It is absent for the legacy one-window diagnostic. When present, it
+    /// keeps the verified product lifetime with the group rather than this one
+    /// view and lets the UI thread poll group-wide close and open handoffs.
+    session_window: Option<SessionWindowMember>,
 }
 
 impl UiSessionView {
@@ -134,7 +132,7 @@ impl UiSessionView {
             display_name: None,
             field_reads: None,
             revision: UiDocumentRevision::INITIAL,
-            product_session: None,
+            session_window: None,
         }
     }
 
@@ -397,29 +395,94 @@ impl UiSessionView {
     /// Every resource comes from that same session's group, so this window can
     /// never poll another session's mailbox.
     pub(super) fn for_product_session(session: RunningProductSession) -> Self {
-        let ui = session.ui();
-        let mut view = Self::new(
-            ui.document_mailbox(),
-            ui.input_mailbox(),
-            ui.close_signal(),
-            ui.file_dialog_mailbox(),
-            ui.file_text_service(),
-            ui.notification_mailbox(),
+        let (
+            mailbox,
+            input_mailbox,
+            close_signal,
+            file_dialog_mailbox,
+            file_text,
+            notifications,
+            window_title,
+            display_name,
+            menu,
+            window_state,
+            window_focus,
+            window_fullscreen,
+            window_size,
+            field_reads,
+        ) = {
+            let ui = session.ui();
+            (
+                ui.document_mailbox(),
+                ui.input_mailbox(),
+                ui.close_signal(),
+                ui.file_dialog_mailbox(),
+                ui.file_text_service(),
+                ui.notification_mailbox(),
+                ui.window_title_mailbox(),
+                ui.display_name().to_owned(),
+                ui.menu_mailbox(),
+                ui.window_state_mailbox(),
+                ui.window_focus_mailbox(),
+                ui.window_fullscreen_mailbox(),
+                ui.window_size_mailbox(),
+                ui.field_mailbox(),
+            )
+        };
+        let group = super::session_window_group::SessionWindowGroup::for_product_session(session);
+        Self::new(
+            mailbox,
+            input_mailbox,
+            close_signal,
+            file_dialog_mailbox,
+            file_text,
+            notifications,
         )
-        .with_window_title(ui.window_title_mailbox(), ui.display_name())
-        .with_menu(ui.menu_mailbox())
-        .with_window_state(ui.window_state_mailbox())
-        .with_window_focus(ui.window_focus_mailbox())
-        .with_window_fullscreen(ui.window_fullscreen_mailbox())
-        .with_window_size(ui.window_size_mailbox())
-        .with_field_reads(ui.field_mailbox());
-        view.product_session = Some(Arc::new(session));
-        view
+        .with_window_title(window_title, display_name)
+        .with_menu(menu)
+        .with_window_state(window_state)
+        .with_window_focus(window_focus)
+        .with_window_fullscreen(window_fullscreen)
+        .with_window_size(window_size)
+        .with_field_reads(field_reads)
+        .with_session_window(group.member(UiWindowId::primary()))
+    }
+
+    /// Creates the deliberately limited native view for one group member.
+    ///
+    /// It receives only its own document mailbox, semantic-input mailbox, and
+    /// group-close state. New empty bridges are private unavailable sentinels,
+    /// not inherited services: no pipe route references them, so a secondary
+    /// cannot use a primary dialog, file, notification, menu, title, state,
+    /// focus, fullscreen, size, or field-read bridge.
+    pub(super) fn for_group_member(
+        resources: UiWindowResources,
+        session_window: SessionWindowMember,
+    ) -> Self {
+        Self::new(
+            resources.document_mailbox(),
+            resources.input_mailbox(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_session_window(session_window)
+    }
+
+    /// Attaches one host-only native-group member to this view.
+    #[must_use]
+    fn with_session_window(mut self, session_window: SessionWindowMember) -> Self {
+        self.session_window = Some(session_window);
+        self
     }
 
     /// Applies at most one newer accepted snapshot from this view's mailbox.
     pub(super) fn poll(&mut self) -> (bool, bool) {
-        let close_requested = self.close_signal.take();
+        let close_requested = self.session_window.as_ref().map_or_else(
+            || self.close_signal.take(),
+            SessionWindowMember::observe_shutdown,
+        );
         let Some(snapshot) = self.mailbox.take() else {
             return (false, close_requested);
         };
@@ -429,6 +492,39 @@ impl UiSessionView {
         self.revision = snapshot.revision();
         self.lab.replace_document(snapshot.document().clone());
         (true, close_requested)
+    }
+
+    /// Registers this view's host-owned logical identity before the window is
+    /// shown. Legacy diagnostic views return `false` because they are not part
+    /// of an authenticated session group.
+    pub(super) fn register_native_window(&self, window: Hwnd) -> bool {
+        self.session_window
+            .as_ref()
+            .is_some_and(|member| member.register_native_window(window))
+    }
+
+    /// Returns whether this view belongs to a session-owned native group.
+    pub(super) const fn is_group_member(&self) -> bool {
+        self.session_window.is_some()
+    }
+
+    /// Removes this view's native mapping after Windows has destroyed it.
+    ///
+    /// This runs only for the real view removed from the registry, never for a
+    /// paint snapshot clone. See `SessionWindowMember::on_native_destroy`.
+    pub(super) fn on_native_destroy(&self, window: Hwnd) {
+        if let Some(member) = &self.session_window {
+            member.on_native_destroy(window);
+        }
+    }
+
+    /// Takes one secondary creation handoff for this group, if this view belongs
+    /// to one. The host creates and registers the resulting native window on
+    /// this same UI thread before it completes the portable request.
+    pub(super) fn take_secondary_open_request(&self) -> Option<SessionWindowOpenRequest> {
+        self.session_window
+            .as_ref()
+            .and_then(SessionWindowMember::take_open_request)
     }
 
     /// Takes a pending modal request for the host UI thread.

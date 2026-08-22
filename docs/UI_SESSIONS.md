@@ -97,8 +97,11 @@ The owning UI thread can take that request exactly once, create and register
 its native window, then complete it. Only a successful completion commits the
 logical view and publishes its first document snapshot. A failed creation, or
 a five-second unanswered request, aborts the pending view and leaves no
-identity or mailbox routable. If a native host finishes after that timeout,
-completion reports failure and the host must destroy its late-created window.
+identity or mailbox routable. Host group shutdown also cancels an outstanding
+handoff immediately, so a worker never waits for a UI thread that is already
+dismantling its session. If a native host finishes after a timeout or that
+cancellation, completion reports failure and the host must destroy its
+late-created window.
 
 This is an internal portable handoff, not a native-window abstraction: the
 context contains no application-selected handle or topology data, and the UI
@@ -117,8 +120,14 @@ session mode: those existing targetless operations resolve only the group's
 or validate any secondary input, and group delivery has no second legacy
 mailbox that can publish a duplicate snapshot. The Windows registered-session
 and pipe-composition adapters now create and retain this same group before
-authentication. Direct Windows dynamic-view ownership is still in progress, so
-no released application protocol can select or create a view.
+authentication. The direct Windows host now owns the other side of the
+boundary: it maps each group member to one native view, registers that mapping
+before showing a secondary, routes independent document and semantic-input
+mailboxes to it, and removes the portable secondary only after Windows destroys
+that native view. It retains a verified product session through the final group
+view rather than the first view that leaves. Per Decision 0093, destroying
+`main` requests group-wide shutdown; closing a secondary leaves its siblings
+alone. No released application protocol can yet select or create a view.
 
 ## Latest-document delivery
 

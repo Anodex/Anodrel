@@ -120,6 +120,34 @@ pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<(bool, bool)>> 
     }
 }
 
+/// Registers a group-owned session view against the just-created native window.
+///
+/// The caller performs this before it shows the window. A legacy diagnostic
+/// session returns `Some(false)`: it deliberately has no logical group mapping
+/// to register.
+pub(super) fn register_ui_session_window(window: Hwnd) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.register_native_window(window))),
+        _ => Ok(None),
+    }
+}
+
+/// Takes one group-owned secondary-view creation handoff on the UI thread.
+///
+/// Any member may receive the timer message, but the portable group makes the
+/// handoff take-once. The request retains neither a native handle nor an
+/// application-visible mapping.
+pub(super) fn take_secondary_open_request(
+    window: Hwnd,
+) -> io::Result<Option<super::session_window_group::SessionWindowOpenRequest>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_secondary_open_request()),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending modal dialog request only from its associated UI session.
 pub(super) fn take_file_dialog_request(window: Hwnd) -> io::Result<Option<FileDialogRequest>> {
     let mut views = lock_views()?;
@@ -540,6 +568,12 @@ pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
         let removed = views.remove(&window);
         (removed, views.len())
     };
+    // A group member must learn about native destruction before its final
+    // view drops, but after the registry lock is free. A product group may then
+    // release its child and join workers without blocking unrelated messages.
+    if let Some(View::UiSession(session)) = &removed {
+        session.on_native_destroy(window);
+    }
     drop(removed);
     Ok(remaining)
 }
@@ -560,6 +594,11 @@ pub(super) fn clear() -> io::Result<usize> {
         std::mem::take(&mut *views)
     };
     let count = remaining.len();
+    for (window, view) in &remaining {
+        if let View::UiSession(session) = view {
+            session.on_native_destroy(*window);
+        }
+    }
     drop(remaining);
     Ok(count)
 }
