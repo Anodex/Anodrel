@@ -44,8 +44,8 @@ pub use window_group::{
 };
 pub use window_id::{MAX_SECONDARY_WINDOW_IDENTITIES, UiWindowId, UiWindowIdError};
 pub use windows::{
-    MAX_SESSION_WINDOWS, PendingUiWindow, UiWindowResources, UiWindowSessionError,
-    UiWindowSessions, UiWindowSnapshot,
+    MAX_SESSION_WINDOWS, PendingUiWindow, UiWindowInputBatch, UiWindowResources,
+    UiWindowSessionError, UiWindowSessions, UiWindowSnapshot,
 };
 
 #[cfg(test)]

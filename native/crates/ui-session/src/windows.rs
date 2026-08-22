@@ -10,7 +10,7 @@ use anodrel_ui::UiEvent;
 
 use crate::{
     UiApplicationEvent, UiDocumentMailbox, UiDocumentRevision, UiDocumentSession,
-    UiDocumentSnapshot, UiInputMailbox, UiSessionError, UiWindowId,
+    UiDocumentSnapshot, UiInputBatch, UiInputMailbox, UiSessionError, UiWindowId,
 };
 
 /// The maximum number of concurrently open logical views in one UI session.
@@ -29,6 +29,31 @@ pub struct UiWindowResources {
     id: UiWindowId,
     document_mailbox: UiDocumentMailbox,
     input_mailbox: UiInputMailbox,
+}
+
+/// One view's bounded native semantic-input batch.
+///
+/// This is a host-internal grouping value. It does not provide application
+/// window enumeration: a protocol operation decides separately whether and how
+/// it exposes an accepted event.
+#[derive(Debug)]
+pub struct UiWindowInputBatch {
+    id: UiWindowId,
+    batch: UiInputBatch,
+}
+
+impl UiWindowInputBatch {
+    /// Returns the session-owned view that produced this input batch.
+    #[must_use]
+    pub const fn id(&self) -> &UiWindowId {
+        &self.id
+    }
+
+    /// Splits the batch into its private logical identity and input values.
+    #[must_use]
+    pub fn into_parts(self) -> (UiWindowId, UiInputBatch) {
+        (self.id, self.batch)
+    }
 }
 
 impl UiWindowResources {
@@ -174,7 +199,21 @@ impl UiWindowSessions {
     /// Creates a group containing exactly the empty primary `main` view.
     #[must_use]
     pub fn new() -> Self {
-        let primary = UiWindowState::new(UiWindowId::Primary);
+        Self::with_primary_resources(UiDocumentMailbox::new(), UiInputMailbox::new())
+    }
+
+    /// Creates a group whose primary view uses caller-created mailboxes.
+    ///
+    /// This lets a host bind its already-known primary native view and its
+    /// authenticated session core to one portable group without cloning
+    /// document or input state into a parallel session.
+    #[must_use]
+    pub fn with_primary_resources(
+        document_mailbox: UiDocumentMailbox,
+        input_mailbox: UiInputMailbox,
+    ) -> Self {
+        let primary =
+            UiWindowState::with_resources(UiWindowId::Primary, document_mailbox, input_mailbox);
         Self {
             windows: BTreeMap::from([(UiWindowId::Primary, primary)]),
             next_secondary: NonZeroU16::new(1),
@@ -347,6 +386,22 @@ impl UiWindowSessions {
             .map_err(UiWindowSessionError::EventRejected)
     }
 
+    /// Drains each open view's bounded native input queue.
+    ///
+    /// Batches are returned in logical-identity order for deterministic host
+    /// processing. Their contents retain only per-view input order; no caller
+    /// may infer a global desktop order across different views.
+    #[must_use]
+    pub fn drain_input_batches(&self) -> Vec<UiWindowInputBatch> {
+        self.windows
+            .iter()
+            .map(|(id, state)| UiWindowInputBatch {
+                id: id.clone(),
+                batch: state.input_mailbox.drain(),
+            })
+            .collect()
+    }
+
     /// Removes one secondary view after its host-owned native view has closed.
     ///
     /// A closed identity remains unavailable even when capacity later permits a
@@ -373,11 +428,19 @@ struct UiWindowState {
 
 impl UiWindowState {
     fn new(id: UiWindowId) -> Self {
+        Self::with_resources(id, UiDocumentMailbox::new(), UiInputMailbox::new())
+    }
+
+    fn with_resources(
+        id: UiWindowId,
+        document_mailbox: UiDocumentMailbox,
+        input_mailbox: UiInputMailbox,
+    ) -> Self {
         Self {
             id,
             document_session: UiDocumentSession::new(),
-            document_mailbox: UiDocumentMailbox::new(),
-            input_mailbox: UiInputMailbox::new(),
+            document_mailbox,
+            input_mailbox,
         }
     }
 

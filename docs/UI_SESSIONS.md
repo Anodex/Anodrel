@@ -105,6 +105,12 @@ context contains no application-selected handle or topology data, and the UI
 thread remains the only code that can create or destroy an operating-system
 window.
 
+When an existing authenticated primary view adopts the group model, the group
+is constructed with that view's already-created document and input mailboxes.
+It does not copy primary state into another session. The host can therefore
+migrate its internal lifetime ownership without changing the meaning of the
+legacy targetless document and event operations.
+
 ## Latest-document delivery
 
 `UiDocumentMailbox` is a portable, per-view handoff for a host that must move

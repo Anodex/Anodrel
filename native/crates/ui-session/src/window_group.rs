@@ -14,7 +14,8 @@ use anodrel_ui::UiEvent;
 
 use crate::{
     PendingUiWindow, UiApplicationEvent, UiDocumentRevision, UiSessionError, UiWindowId,
-    UiWindowResources, UiWindowSessionError, UiWindowSessions, UiWindowSnapshot,
+    UiWindowInputBatch, UiWindowResources, UiWindowSessionError, UiWindowSessions,
+    UiWindowSnapshot,
 };
 
 /// Maximum time a worker may wait for its host UI thread to create one view.
@@ -137,6 +138,24 @@ impl<T> UiWindowGroup<T> {
         }
     }
 
+    /// Creates a group whose primary view uses caller-created mailboxes.
+    ///
+    /// A host uses this when an authenticated primary view already has its
+    /// native resources before it opts into the session-owned group model.
+    #[must_use]
+    pub fn with_primary_resources(
+        document_mailbox: crate::UiDocumentMailbox,
+        input_mailbox: crate::UiInputMailbox,
+    ) -> Self {
+        Self {
+            state: Arc::new(Mutex::new(State {
+                windows: UiWindowSessions::with_primary_resources(document_mailbox, input_mailbox),
+                next_request_id: 0,
+                active: None,
+            })),
+        }
+    }
+
     /// Returns resources for one currently open session-owned view.
     #[must_use]
     pub fn resources(&self, id: &UiWindowId) -> Option<UiWindowResources> {
@@ -184,6 +203,15 @@ impl<T> UiWindowGroup<T> {
         event: UiEvent,
     ) -> Result<UiApplicationEvent, UiWindowSessionError> {
         lock(&self.state).windows.accept_event(id, revision, event)
+    }
+
+    /// Drains the bounded semantic-input queue for each currently open view.
+    ///
+    /// The result is for an authenticated session core, not a protocol
+    /// enumeration surface. It contains no native handle or desktop state.
+    #[must_use]
+    pub fn drain_input_batches(&self) -> Vec<UiWindowInputBatch> {
+        lock(&self.state).windows.drain_input_batches()
     }
 
     /// Removes one secondary view after its native window is gone.
@@ -379,8 +407,10 @@ fn lock<T>(value: &Mutex<T>) -> MutexGuard<'_, T> {
 mod tests {
     use std::{sync::mpsc, thread, time::Duration};
 
+    use anodrel_ui::{ElementId, UiEvent};
+
     use super::{UiWindowGroup, UiWindowGroupError};
-    use crate::UiWindowId;
+    use crate::{UiDocumentMailbox, UiInputCandidate, UiInputMailbox, UiWindowId};
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"text","value":"Secondary","fontSize":16,"tone":"primary"}}"#;
 
@@ -500,5 +530,42 @@ mod tests {
             Err(UiWindowGroupError::DocumentRejected(_))
         ));
         assert!(group.take_open_request().is_none());
+    }
+
+    #[test]
+    fn binds_the_existing_primary_mailboxes_into_the_group_without_copying_state() {
+        let document_mailbox = UiDocumentMailbox::new();
+        let input_mailbox = UiInputMailbox::new();
+        let group = UiWindowGroup::<()>::with_primary_resources(
+            document_mailbox.clone(),
+            input_mailbox.clone(),
+        );
+        let primary = UiWindowId::primary();
+
+        let snapshot = group
+            .replace_document(&primary, DOCUMENT)
+            .expect("the primary document validates");
+        assert_eq!(
+            document_mailbox
+                .take()
+                .expect("the caller-owned mailbox receives the primary snapshot")
+                .revision(),
+            snapshot.snapshot().revision()
+        );
+
+        input_mailbox.push(UiInputCandidate::new(
+            snapshot.snapshot().revision(),
+            UiEvent::ActionInvoked(ElementId::new("root").expect("fixed action ID is valid")),
+        ));
+        let batches = group.drain_input_batches();
+        assert_eq!(batches.len(), 1);
+        let (id, batch) = batches
+            .into_iter()
+            .next()
+            .expect("the primary batch is present")
+            .into_parts();
+        assert_eq!(id, primary);
+        assert_eq!(batch.dropped(), 0);
+        assert_eq!(batch.into_candidates().len(), 1);
     }
 }
