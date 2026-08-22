@@ -30,6 +30,8 @@ pub const CONTROL_TYPE_WINDOW: i32 = 50_032;
 
 /// `UIA_AutomationFocusChangedEventId`.
 pub const UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID: i32 = 20_005;
+/// `UIA_LiveRegionChangedEventId`.
+pub const UIA_LIVE_REGION_CHANGED_EVENT_ID: i32 = 20_024;
 /// A whole child subtree was replaced and must be refreshed.
 pub const STRUCTURE_CHANGE_CHILDREN_INVALIDATED: i32 = 2;
 
@@ -152,6 +154,16 @@ impl Variant {
         Some((self.value[0] as u16 as i16) == VARIANT_TRUE)
     }
 
+    /// Returns a signed integer value for internal tests without exposing the
+    /// VARIANT union layout to the provider's other modules.
+    #[cfg(test)]
+    pub(crate) const fn int_value(&self) -> Option<i32> {
+        if self.vt != VT_I4 {
+            return None;
+        }
+        Some(self.value[0] as u32 as i32)
+    }
+
     /// Returns a floating-point value for internal tests.
     #[cfg(test)]
     pub(crate) const fn double_value(&self) -> Option<f64> {
@@ -257,8 +269,8 @@ unsafe extern "system" {
 mod tests {
     use super::{
         E_FAIL, E_NOINTERFACE, E_POINTER, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, S_OK,
-        STRUCTURE_CHANGE_CHILDREN_INVALIDATED, UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, VARIANT_TRUE,
-        VT_BOOL, VT_EMPTY, VT_I4, VT_R8, Variant,
+        STRUCTURE_CHANGE_CHILDREN_INVALIDATED, UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID,
+        UIA_LIVE_REGION_CHANGED_EVENT_ID, VARIANT_TRUE, VT_BOOL, VT_EMPTY, VT_I4, VT_R8, Variant,
     };
 
     #[test]
@@ -310,6 +322,11 @@ mod tests {
     #[test]
     fn focus_change_event_identifier_matches_ui_automation() {
         assert_eq!(UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, 20_005);
+    }
+
+    #[test]
+    fn live_region_event_identifier_matches_ui_automation() {
+        assert_eq!(UIA_LIVE_REGION_CHANGED_EVENT_ID, 20_024);
     }
 
     #[test]

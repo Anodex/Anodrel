@@ -198,6 +198,21 @@ impl<T> UiWindowGroup<T> {
             .map_err(map_window_error)
     }
 
+    /// Replaces one current view's explicit v3 document and publishes it.
+    ///
+    /// This remains an internal portable route until its matching explicit
+    /// protocol operations select the exact version-3 document format.
+    pub fn replace_document_v3(
+        &self,
+        id: &UiWindowId,
+        encoded_document: &str,
+    ) -> Result<UiWindowSnapshot, UiWindowGroupError> {
+        lock(&self.state)
+            .windows
+            .replace_document_v3(id, encoded_document)
+            .map_err(map_window_error)
+    }
+
     /// Validates one view-local semantic candidate against its own document.
     pub fn accept_event(
         &self,
@@ -320,13 +335,29 @@ impl<T: Clone> UiWindowGroup<T> {
         self.open_secondary_within(context, encoded_document, UI_WINDOW_OPEN_RESPONSE_TIMEOUT)
     }
 
+    /// Sends one validated version-3 secondary-view creation request to the UI
+    /// thread. Its lifecycle is identical to [`Self::open_secondary`], but the
+    /// document is decoded through the explicit status-aware format.
+    pub fn open_secondary_v3(
+        &self,
+        context: T,
+        encoded_document: &str,
+    ) -> Result<UiWindowId, UiWindowGroupError> {
+        self.open_secondary_inner(
+            context,
+            encoded_document,
+            UI_WINDOW_OPEN_RESPONSE_TIMEOUT,
+            true,
+        )
+    }
+
     fn open_secondary_within(
         &self,
         context: T,
         encoded_document: &str,
         timeout: Duration,
     ) -> Result<UiWindowId, UiWindowGroupError> {
-        self.open_secondary_inner(context, encoded_document, timeout)
+        self.open_secondary_inner(context, encoded_document, timeout, false)
     }
 
     fn open_secondary_inner(
@@ -334,6 +365,7 @@ impl<T: Clone> UiWindowGroup<T> {
         context: T,
         encoded_document: &str,
         timeout: Duration,
+        version_three: bool,
     ) -> Result<UiWindowId, UiWindowGroupError> {
         let response = Arc::new(ResponseSlot::default());
         let request_id = {
@@ -341,10 +373,12 @@ impl<T: Clone> UiWindowGroup<T> {
             if state.active.is_some() {
                 return Err(UiWindowGroupError::Busy);
             }
-            let pending = state
-                .windows
-                .prepare_secondary(encoded_document)
-                .map_err(map_window_error)?;
+            let pending = if version_three {
+                state.windows.prepare_secondary_v3(encoded_document)
+            } else {
+                state.windows.prepare_secondary(encoded_document)
+            }
+            .map_err(map_window_error)?;
             state.next_request_id = state.next_request_id.checked_add(1).unwrap_or(1);
             let request_id = state.next_request_id;
             state.active = Some(ActiveOpen {

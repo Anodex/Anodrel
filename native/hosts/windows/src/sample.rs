@@ -43,6 +43,7 @@ enum SampleDialogRequest {
     WindowSizeWhileFullscreen,
     FieldRead,
     Menu,
+    LiveStatus,
 }
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
@@ -53,6 +54,17 @@ pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
 /// authenticated document mailbox.
 pub fn run_ui_session(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::None)
+}
+
+/// Runs the UI-session diagnostic through two visible v3 live-status updates.
+///
+/// The existing document-write and semantic-action grants are sufficient. The
+/// child cannot discover whether Windows announced either update.
+pub fn run_ui_session_with_live_status(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::LiveStatus)
 }
 
 /// Runs the UI session diagnostic and asks its client to show one open picker.
@@ -357,6 +369,7 @@ fn run_with_optional_session_view(
             }
             SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
             SampleDialogRequest::Menu => command.arg("--request-native-menu")?,
+            SampleDialogRequest::LiveStatus => command.arg("--request-live-status")?,
         }
     } else {
         BootstrapCommand::new(node_path)?.arg(client_path)?
@@ -512,5 +525,13 @@ mod tests {
         assert!(combined.contains(&Capability::WindowFullscreen));
         assert!(combined.contains(&Capability::WindowSize));
         assert_eq!(combined.len(), ordinary.len() + 2);
+    }
+
+    #[test]
+    fn live_status_uses_the_existing_document_and_action_grants() {
+        assert_eq!(
+            sample_capabilities(SampleDialogRequest::LiveStatus),
+            sample_capabilities(SampleDialogRequest::None)
+        );
     }
 }

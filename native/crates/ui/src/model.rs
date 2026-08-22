@@ -261,6 +261,94 @@ impl Text {
     }
 }
 
+/// The urgency an accessible visible status communicates.
+///
+/// This is semantic UI data, not a native property or delivery request. A
+/// platform adapter may map it to its own assistive-technology vocabulary only
+/// after the status is rendered as part of a validated document.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UiStatusPoliteness {
+    /// Let assistive technology speak after its current utterance.
+    Polite,
+    /// Mark the visible result as urgent to assistive technology.
+    Assertive,
+}
+
+/// One visible, non-interactive semantic status result.
+///
+/// A document may contain at most one status. It is ordinary text a host
+/// renders, not a hidden announcement or application-selected accessibility
+/// property. See `docs/UI_LIVE_ANNOUNCEMENTS.md`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Status {
+    pub(crate) id: ElementId,
+    pub(crate) value: String,
+    pub(crate) font_size: u16,
+    pub(crate) tone: UiTextTone,
+    pub(crate) politeness: UiStatusPoliteness,
+}
+
+impl Status {
+    /// Builds one validated visible status with an explicit urgency.
+    pub fn new(
+        id: ElementId,
+        value: impl Into<String>,
+        font_size: u16,
+        politeness: UiStatusPoliteness,
+    ) -> Result<Self, UiError> {
+        let value = value.into();
+        validate_text(&value)?;
+        validate_font_size(font_size)?;
+        Ok(Self {
+            id,
+            value,
+            font_size,
+            tone: UiTextTone::default(),
+            politeness,
+        })
+    }
+
+    /// Returns this status's element ID.
+    #[must_use]
+    pub fn id(&self) -> &ElementId {
+        &self.id
+    }
+
+    /// Returns the validated visible status text.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    /// Returns the requested logical-pixel font size.
+    #[must_use]
+    pub const fn font_size(&self) -> u16 {
+        self.font_size
+    }
+
+    /// Returns the requested host-rendered text prominence.
+    #[must_use]
+    pub const fn tone(&self) -> UiTextTone {
+        self.tone
+    }
+
+    /// Returns the semantic urgency of this visible status.
+    #[must_use]
+    pub const fn politeness(&self) -> UiStatusPoliteness {
+        self.politeness
+    }
+
+    /// Requests a host-rendered text prominence for this status.
+    ///
+    /// The tone changes no status semantics, accessibility urgency, native
+    /// authority, or event delivery rule.
+    #[must_use]
+    pub fn with_tone(mut self, tone: UiTextTone) -> Self {
+        self.tone = tone;
+        self
+    }
+}
+
 /// A semantic, optionally enabled action.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Action {
@@ -468,6 +556,8 @@ pub enum UiNode {
     Scroll(Scroll),
     /// A non-interactive text run.
     Text(Text),
+    /// One visible semantic status result.
+    Status(Status),
     /// A semantic action.
     Action(Action),
     /// A single-line field a person can type into.
@@ -482,6 +572,7 @@ impl UiNode {
             Self::Stack(stack) => stack.id(),
             Self::Scroll(scroll) => scroll.id(),
             Self::Text(text) => text.id(),
+            Self::Status(status) => status.id(),
             Self::Action(action) => action.id(),
             Self::Field(field) => field.id(),
         }
@@ -509,6 +600,23 @@ impl UiDocument {
     #[must_use]
     pub fn root(&self) -> &UiNode {
         &self.root
+    }
+
+    /// Returns this document's one semantic status, when it has one.
+    ///
+    /// Validation guarantees there is never a second result to choose between.
+    #[must_use]
+    pub fn status(&self) -> Option<&Status> {
+        status_in_node(&self.root)
+    }
+}
+
+fn status_in_node(node: &UiNode) -> Option<&Status> {
+    match node {
+        UiNode::Status(status) => Some(status),
+        UiNode::Stack(stack) => stack.children.iter().find_map(status_in_node),
+        UiNode::Scroll(scroll) => status_in_node(scroll.child()),
+        UiNode::Text(_) | UiNode::Action(_) | UiNode::Field(_) => None,
     }
 }
 
@@ -538,6 +646,7 @@ struct DocumentValidator {
     ids: BTreeSet<ElementId>,
     node_count: usize,
     text_bytes: usize,
+    status_count: usize,
 }
 
 impl DocumentValidator {
@@ -561,6 +670,13 @@ impl DocumentValidator {
             }
             UiNode::Scroll(scroll) => self.visit(scroll.child(), depth + 1)?,
             UiNode::Text(text) => self.add_text(text.value.len())?,
+            UiNode::Status(status) => {
+                self.status_count += 1;
+                if self.status_count > 1 {
+                    return Err(UiError::StatusLimitExceeded);
+                }
+                self.add_text(status.value.len())?;
+            }
             UiNode::Action(action) => self.add_text(action.label.len())?,
             // Every string a field carries counts towards the document budget,
             // including its starting value: a document that arrives with 512
@@ -779,5 +895,34 @@ mod tests {
             action.with_tone(UiActionTone::Accent).tone(),
             UiActionTone::Accent
         );
+    }
+
+    #[test]
+    fn one_visible_status_is_preserved_but_a_second_is_rejected() {
+        let first = Status::new(id("status"), "Saved", 14, UiStatusPoliteness::Polite)
+            .expect("status is valid")
+            .with_tone(UiTextTone::Accent);
+        let document = UiDocument::new(UiNode::Status(first.clone())).expect("one status is valid");
+        assert_eq!(document.status(), Some(&first));
+        assert_eq!(first.tone(), UiTextTone::Accent);
+
+        let second = Status::new(
+            id("other-status"),
+            "Synced",
+            14,
+            UiStatusPoliteness::Assertive,
+        )
+        .expect("second status is valid");
+        let tree = UiNode::Stack(
+            Stack::new(
+                id("root"),
+                Axis::Vertical,
+                Insets::zero(),
+                0,
+                vec![UiNode::Status(first), UiNode::Status(second)],
+            )
+            .expect("stack is valid"),
+        );
+        assert_eq!(UiDocument::new(tree), Err(UiError::StatusLimitExceeded));
     }
 }

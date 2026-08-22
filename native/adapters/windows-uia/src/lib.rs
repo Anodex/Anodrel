@@ -58,7 +58,7 @@ use raw6::{
 use raw7::{IID_ISCROLL_ITEM_PROVIDER, UIA_SCROLL_ITEM_PATTERN_ID};
 use tree::Tree;
 
-pub use events::{raise_focus_changed, raise_structure_changed};
+pub use events::{raise_focus_changed, raise_live_region_changed, raise_structure_changed};
 pub use focus::{
     UiAutomationFocusMailbox, UiAutomationFocusRequest, UiAutomationFocusRoute,
     UiAutomationFocusSink,

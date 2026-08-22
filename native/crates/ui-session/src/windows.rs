@@ -247,6 +247,25 @@ impl UiWindowSessions {
         &mut self,
         encoded_document: &str,
     ) -> Result<PendingUiWindow, UiWindowSessionError> {
+        self.prepare_secondary_with(encoded_document, false)
+    }
+
+    /// Validates an initial v3 document and reserves the next secondary view.
+    ///
+    /// The version is selected before a native creation request exists, so a
+    /// v1 route cannot accidentally accept a document with status semantics.
+    pub fn prepare_secondary_v3(
+        &mut self,
+        encoded_document: &str,
+    ) -> Result<PendingUiWindow, UiWindowSessionError> {
+        self.prepare_secondary_with(encoded_document, true)
+    }
+
+    fn prepare_secondary_with(
+        &mut self,
+        encoded_document: &str,
+        version_three: bool,
+    ) -> Result<PendingUiWindow, UiWindowSessionError> {
         if self.windows.len() == MAX_SESSION_WINDOWS {
             return Err(UiWindowSessionError::OpenLimitReached);
         }
@@ -257,10 +276,12 @@ impl UiWindowSessions {
             .next_secondary
             .ok_or(UiWindowSessionError::IdentityExhausted)?;
         let mut state = UiWindowState::new(UiWindowId::Secondary(number));
-        let revision = state
-            .document_session
-            .replace_document(encoded_document)
-            .map_err(UiWindowSessionError::DocumentRejected)?;
+        let replacement = if version_three {
+            state.document_session.replace_document_v3(encoded_document)
+        } else {
+            state.document_session.replace_document(encoded_document)
+        };
+        let revision = replacement.map_err(UiWindowSessionError::DocumentRejected)?;
         let snapshot = state
             .document_session
             .snapshot()
@@ -359,6 +380,34 @@ impl UiWindowSessions {
         state
             .document_session
             .replace_document_v2(encoded_document)
+            .map_err(UiWindowSessionError::DocumentRejected)?;
+        let snapshot = state
+            .document_session
+            .snapshot()
+            .expect("accepted UI document has a snapshot");
+        state.document_mailbox.publish(snapshot.clone());
+        Ok(UiWindowSnapshot {
+            id: id.clone(),
+            snapshot,
+        })
+    }
+
+    /// Replaces one currently open view's explicit v3 document and publishes it.
+    ///
+    /// This preserves the exact versioned document boundary for live-status
+    /// semantics; v1 and v2 replacement remain unchanged.
+    pub fn replace_document_v3(
+        &mut self,
+        id: &UiWindowId,
+        encoded_document: &str,
+    ) -> Result<UiWindowSnapshot, UiWindowSessionError> {
+        let state = self
+            .windows
+            .get_mut(id)
+            .ok_or(UiWindowSessionError::WindowUnavailable)?;
+        state
+            .document_session
+            .replace_document_v3(encoded_document)
             .map_err(UiWindowSessionError::DocumentRejected)?;
         let snapshot = state
             .document_session

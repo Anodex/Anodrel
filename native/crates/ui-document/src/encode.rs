@@ -4,12 +4,13 @@ use std::collections::BTreeMap;
 
 use anodrel_json::JsonValue;
 use anodrel_ui::{
-    Action, Axis, Field, Scroll, Stack, Text, UiActionTone, UiDocument, UiNode, UiSurfaceTone,
-    UiTextTone,
+    Action, Axis, Field, Scroll, Stack, Status, Text, UiActionTone, UiDocument, UiNode,
+    UiStatusPoliteness, UiSurfaceTone, UiTextTone,
 };
 
 use crate::{
-    MAX_ENCODED_DOCUMENT_BYTES, UI_DOCUMENT_FORMAT_V1, UI_DOCUMENT_FORMAT_V2, UiDocumentError,
+    MAX_ENCODED_DOCUMENT_BYTES, UI_DOCUMENT_FORMAT_V1, UI_DOCUMENT_FORMAT_V2,
+    UI_DOCUMENT_FORMAT_V3, UiDocumentError,
 };
 
 /// Encodes a validated document as deterministic version 1 JSON.
@@ -17,22 +18,31 @@ use crate::{
 /// A valid in-memory tree can still exceed this format's fixed encoded limit.
 /// In that case no interchange document is returned.
 pub fn encode(document: &UiDocument) -> Result<String, UiDocumentError> {
-    encode_format(document, UI_DOCUMENT_FORMAT_V1, false)
+    encode_format(document, UI_DOCUMENT_FORMAT_V1, false, false)
 }
 
 /// Encodes a validated document as deterministic version 2 JSON.
 pub fn encode_v2(document: &UiDocument) -> Result<String, UiDocumentError> {
-    encode_format(document, UI_DOCUMENT_FORMAT_V2, true)
+    encode_format(document, UI_DOCUMENT_FORMAT_V2, true, false)
+}
+
+/// Encodes a validated document as deterministic version 3 JSON.
+pub fn encode_v3(document: &UiDocument) -> Result<String, UiDocumentError> {
+    encode_format(document, UI_DOCUMENT_FORMAT_V3, true, true)
 }
 
 fn encode_format(
     document: &UiDocument,
     format: &str,
     allows_scroll: bool,
+    allows_status: bool,
 ) -> Result<String, UiDocumentError> {
     let mut fields = BTreeMap::new();
     fields.insert("format".to_owned(), JsonValue::String(format.to_owned()));
-    fields.insert("root".to_owned(), node(document.root(), allows_scroll)?);
+    fields.insert(
+        "root".to_owned(),
+        node(document.root(), allows_scroll, allows_status)?,
+    );
     let encoded = JsonValue::Object(fields).to_json();
     if encoded.len() > MAX_ENCODED_DOCUMENT_BYTES {
         Err(UiDocumentError::EncodedLimitExceeded)
@@ -41,18 +51,30 @@ fn encode_format(
     }
 }
 
-fn node(node: &UiNode, allows_scroll: bool) -> Result<JsonValue, UiDocumentError> {
+fn node(
+    node: &UiNode,
+    allows_scroll: bool,
+    allows_status: bool,
+) -> Result<JsonValue, UiDocumentError> {
     match node {
-        UiNode::Stack(stack) => stack_value(stack, allows_scroll),
-        UiNode::Scroll(scroll) if allows_scroll => scroll_value(scroll, allows_scroll),
+        UiNode::Stack(stack) => stack_value(stack, allows_scroll, allows_status),
+        UiNode::Scroll(scroll) if allows_scroll => {
+            scroll_value(scroll, allows_scroll, allows_status)
+        }
         UiNode::Scroll(_) => Err(UiDocumentError::UnsupportedFormat),
         UiNode::Text(text) => Ok(text_value(text)),
+        UiNode::Status(status) if allows_status => Ok(status_value(status)),
+        UiNode::Status(_) => Err(UiDocumentError::UnsupportedFormat),
         UiNode::Action(action) => Ok(action_value(action)),
         UiNode::Field(field) => Ok(field_value(field)),
     }
 }
 
-fn stack_value(stack: &Stack, allows_scroll: bool) -> Result<JsonValue, UiDocumentError> {
+fn stack_value(
+    stack: &Stack,
+    allows_scroll: bool,
+    allows_status: bool,
+) -> Result<JsonValue, UiDocumentError> {
     let mut fields = common_fields(stack.id().as_str(), "stack");
     fields.insert(
         "axis".to_owned(),
@@ -82,16 +104,23 @@ fn stack_value(stack: &Stack, allows_scroll: bool) -> Result<JsonValue, UiDocume
             stack
                 .children()
                 .iter()
-                .map(|child| node(child, allows_scroll))
+                .map(|child| node(child, allows_scroll, allows_status))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
     );
     Ok(JsonValue::Object(fields))
 }
 
-fn scroll_value(scroll: &Scroll, allows_scroll: bool) -> Result<JsonValue, UiDocumentError> {
+fn scroll_value(
+    scroll: &Scroll,
+    allows_scroll: bool,
+    allows_status: bool,
+) -> Result<JsonValue, UiDocumentError> {
     let mut fields = common_fields(scroll.id().as_str(), "scroll");
-    fields.insert("child".to_owned(), node(scroll.child(), allows_scroll)?);
+    fields.insert(
+        "child".to_owned(),
+        node(scroll.child(), allows_scroll, allows_status)?,
+    );
     Ok(JsonValue::Object(fields))
 }
 
@@ -109,6 +138,37 @@ fn text_value(text: &Text) -> JsonValue {
                 UiTextTone::Primary => "primary",
                 UiTextTone::Secondary => "secondary",
                 UiTextTone::Accent => "accent",
+            }
+            .to_owned(),
+        ),
+    );
+    JsonValue::Object(fields)
+}
+
+fn status_value(status: &Status) -> JsonValue {
+    let mut fields = common_fields(status.id().as_str(), "status");
+    fields.insert(
+        "value".to_owned(),
+        JsonValue::String(status.value().to_owned()),
+    );
+    fields.insert("fontSize".to_owned(), number(status.font_size()));
+    fields.insert(
+        "tone".to_owned(),
+        JsonValue::String(
+            match status.tone() {
+                UiTextTone::Primary => "primary",
+                UiTextTone::Secondary => "secondary",
+                UiTextTone::Accent => "accent",
+            }
+            .to_owned(),
+        ),
+    );
+    fields.insert(
+        "politeness".to_owned(),
+        JsonValue::String(
+            match status.politeness() {
+                UiStatusPoliteness::Polite => "polite",
+                UiStatusPoliteness::Assertive => "assertive",
             }
             .to_owned(),
         ),

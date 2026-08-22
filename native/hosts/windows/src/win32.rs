@@ -1406,6 +1406,16 @@ fn raise_accessibility_structure_changed(window: Hwnd) {
     anodrel_windows_uia::raise_structure_changed(window, accessible_elements_for(window));
 }
 
+/// Raises one best-effort live-status notification after a later changed
+/// authenticated-session document was applied.
+///
+/// The UI session poll has compared semantic status data only. The adapter
+/// additionally filters the requested ID against this current, visible
+/// immutable publication before it makes the Windows call.
+fn raise_accessibility_live_region_changed(window: Hwnd, status: &anodrel_ui::ElementId) {
+    anodrel_windows_uia::raise_live_region_changed(window, accessible_elements_for(window), status);
+}
+
 /// Applies a pending host-only UI Automation focus request and repaints only
 /// when a current validated target became focused.
 fn service_accessibility_focus(window: Hwnd) {
@@ -2145,18 +2155,19 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             0
         }
         WM_TIMER if wparam == UI_SESSION_TIMER => {
-            if let Some((changed, close_requested)) =
-                registry::poll_ui_session(window).ok().flatten()
-            {
-                if close_requested {
+            if let Some(poll) = registry::poll_ui_session(window).ok().flatten() {
+                if poll.close_requested {
                     // SAFETY: the request is consumed only by this window's UI
                     // thread, which owns the host-created native handle.
                     unsafe { DestroyWindow(window) };
                     return 0;
                 }
-                if changed {
+                if poll.document_changed {
                     invalidate(window);
                     raise_accessibility_structure_changed(window);
+                    if let Some(status) = poll.changed_status.as_ref() {
+                        raise_accessibility_live_region_changed(window, status);
+                    }
                 }
             }
             service_session_window_open(window);

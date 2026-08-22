@@ -10,6 +10,7 @@ use super::{
     Hwnd, StartupLab, View,
     menu::UnattachedMenu,
     ui_lab::{AccessibilityFocusResult, AccessibilityScrollResult, UiLab},
+    ui_session_view::UiSessionPoll,
 };
 use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
@@ -117,7 +118,7 @@ pub(super) fn with_ui_lab<R>(
 }
 
 /// Polls one session view's explicitly supplied mailbox on the UI thread.
-pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<(bool, bool)>> {
+pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<UiSessionPoll>> {
     let mut views = lock_views()?;
     match views.get_mut(&window) {
         Some(View::UiSession(session)) => Ok(Some(session.poll())),

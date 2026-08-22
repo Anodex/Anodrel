@@ -1,17 +1,17 @@
 # Anodrel Windows accessibility
 
-**Status:** **UI Automation reading, host-owned vertical scrolling, and bounded
-scroll-item reveal are implemented. Narrator and Inspect verified the earlier
-flat semantic surface; manual hierarchy, scrolling and item reveal, button
-invocation, focus, focus-event, field-value, and structure-event screen-reader
-checks remain open.**
+**Status:** **UI Automation reading, host-owned vertical scrolling, bounded
+scroll-item reveal, and live-status events are implemented. Narrator and Inspect
+verified the earlier flat semantic surface; manual hierarchy, scrolling and item
+reveal, button invocation, focus, focus-event, field-value, structure-event,
+and live-status screen-reader checks remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 pre-hierarchy mapping table passed with no failures.
 
 Reading, one bounded action, focus reporting and control, one host-raised
-focus-change event, one host-raised document-replacement structure event,
-read-only field values, one host-owned vertical ScrollPattern, and its bounded
+focus-change event, one host-raised document-replacement structure event, one
+host-raised live-status event, read-only field values, one host-owned vertical ScrollPattern, and its bounded
 ScrollItem companions are the implemented surface.
 Assistive technology can read this surface, obtain a visible field's current
 value, invoke an enabled button in an authenticated UI session, move to a
@@ -19,7 +19,7 @@ visible enabled field or button through the host's existing focus state, and
 ask the selected host-owned scroll viewport to reveal one of its bounded
 off-screen descendants. An
 application cannot edit a field through automation, raise or receive an
-automation event, receive a live announcement, or observe focus. The published
+automation event, learn whether a live announcement was delivered, or observe focus. The published
 tree preserves the document's direct semantic parent/child structure. Anything
 beyond these routes is deferred and listed at the end of this document.
 
@@ -93,6 +93,7 @@ The adapter is a pure function from one snapshot node to Windows values.
 | --- | --- | --- |
 | `Group` | `Group` (50026) | no |
 | `StaticText` | `Text` (50020) | no |
+| `Status` | `Text` (50020) | no |
 | `Edit` | `Edit` (50004) | yes |
 | `Button` | `Button` (50000) | yes |
 
@@ -150,6 +151,7 @@ defines this boundary.
 | `IsControlElement` (30016) | Always true for a bounded semantic node, whether currently clipped or visible. |
 | `IsContentElement` (30017) | Always true, for the same reason. |
 | `BoundingRectangle` (30001) | Converted as below. |
+| `LiveSetting` (30135) | `Off` except a semantic `Status`, which maps to its declared `Polite` or `Assertive` setting. |
 
 `IsEnabled` deserves its exception. UI Automation reads it as "can be interacted
 with", and a screen reader announces a disabled element as unavailable. Only an
@@ -414,8 +416,16 @@ route. The unit and host checks prove off-screen tree retention, interface and
 pattern gates, nested refusal, nearest-edge geometry, timeout safety, and reuse
 of the existing scroll state. See `docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
 
-Also deferred, each needing its own contract and decision: Invoke,
-property/value/text/selection events, live announcements, selection
+**Slice 12 — semantic live status. Implemented; manual announcement check
+pending.** A visible changed `Status` in an established authenticated v3
+session document maps to UI Automation `Text` plus its `LiveSetting`, then
+raises one `UIA_LiveRegionChangedEventId` from a fresh provider. Initial,
+unchanged, removed, clipped, stale, diagnostic, and non-session values are
+silent. There is no listener check, callback, result, or application event.
+See `docs/UI_LIVE_ANNOUNCEMENTS.md` and Decision 0100.
+
+Also deferred, each needing its own contract and decision: property/value/text/selection events beyond
+the implemented live-status event, selection
 and caret reporting, text patterns and ranges, labelled-by or described-by
 relations, automation editing, horizontal or nested scroll automation, scroll
 events, and non-Windows accessibility adapters.

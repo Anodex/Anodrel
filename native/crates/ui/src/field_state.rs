@@ -222,7 +222,7 @@ fn seed_node(node: &UiNode, states: &mut BTreeMap<ElementId, UiFieldState>) {
             }
         }
         UiNode::Scroll(scroll) => seed_node(scroll.child(), states),
-        UiNode::Text(_) | UiNode::Action(_) => {}
+        UiNode::Text(_) | UiNode::Status(_) | UiNode::Action(_) => {}
     }
 }
 

@@ -2,7 +2,10 @@
 
 use std::collections::BTreeMap;
 
-use crate::{Action, ElementId, Field, Text, UiDocument, UiLayout, UiNode, UiRect};
+use crate::{
+    Action, ElementId, Field, Status, Text, UiDocument, UiLayout, UiNode, UiRect,
+    UiStatusPoliteness,
+};
 
 /// The semantic role of a UI node.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -11,6 +14,8 @@ pub enum UiAccessibilityRole {
     Group,
     /// A non-interactive text value.
     StaticText,
+    /// One visible semantic status result.
+    Status,
     /// A semantic action that may be enabled or disabled.
     Button,
     /// A single-line field a person can type into.
@@ -19,6 +24,23 @@ pub enum UiAccessibilityRole {
     /// portable snapshot: the Windows provider separately copies host-owned
     /// field state into its narrow read-only Value pattern (Decision 0071).
     Edit,
+}
+
+/// The live-setting semantics one accessible node declares.
+///
+/// This is portable semantic data. A native accessibility adapter maps it to
+/// its own fixed property vocabulary; it has no listener, recipient, or
+/// delivery result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UiAccessibilityLiveSetting {
+    /// Ordinary nodes are not live regions.
+    Off,
+    /// A later visible status update is politely announced when an adapter
+    /// supports that bounded behavior.
+    Polite,
+    /// A later visible urgent status update is assertively announced when an
+    /// adapter supports that bounded behavior.
+    Assertive,
 }
 
 /// One accessible semantic element from a layout pass.
@@ -30,6 +52,7 @@ pub struct UiAccessibilityNode {
     name: Option<String>,
     bounds: UiRect,
     enabled: bool,
+    live_setting: UiAccessibilityLiveSetting,
 }
 
 impl UiAccessibilityNode {
@@ -78,6 +101,12 @@ impl UiAccessibilityNode {
     #[must_use]
     pub const fn enabled(&self) -> bool {
         self.enabled
+    }
+
+    /// Returns the semantic live setting for this node.
+    #[must_use]
+    pub const fn live_setting(&self) -> UiAccessibilityLiveSetting {
+        self.live_setting
     }
 }
 
@@ -128,7 +157,7 @@ fn collect_node(
     let Some(bounds) = visible_bounds.get(node.id()).copied() else {
         return;
     };
-    let (role, name, enabled) = semantic_fields(node);
+    let (role, name, enabled, live_setting) = semantic_fields(node);
     let index = output.len();
     output.push(UiAccessibilityNode {
         id: node.id().clone(),
@@ -137,6 +166,7 @@ fn collect_node(
         name,
         bounds,
         enabled,
+        live_setting,
     });
     match node {
         UiNode::Stack(stack) => {
@@ -147,14 +177,27 @@ fn collect_node(
         UiNode::Scroll(scroll) => {
             collect_node(scroll.child(), Some(index), visible_bounds, output);
         }
-        UiNode::Text(_) | UiNode::Action(_) | UiNode::Field(_) => {}
+        UiNode::Text(_) | UiNode::Status(_) | UiNode::Action(_) | UiNode::Field(_) => {}
     }
 }
 
-fn semantic_fields(node: &UiNode) -> (UiAccessibilityRole, Option<String>, bool) {
+fn semantic_fields(
+    node: &UiNode,
+) -> (
+    UiAccessibilityRole,
+    Option<String>,
+    bool,
+    UiAccessibilityLiveSetting,
+) {
     match node {
-        UiNode::Stack(_) | UiNode::Scroll(_) => (UiAccessibilityRole::Group, None, false),
+        UiNode::Stack(_) | UiNode::Scroll(_) => (
+            UiAccessibilityRole::Group,
+            None,
+            false,
+            UiAccessibilityLiveSetting::Off,
+        ),
         UiNode::Text(text) => text_fields(text),
+        UiNode::Status(status) => status_fields(status),
         UiNode::Action(action) => action_fields(action),
         UiNode::Field(field) => field_fields(field),
     }
@@ -166,35 +209,78 @@ fn semantic_fields(node: &UiNode) -> (UiAccessibilityRole, Option<String>, bool)
 /// The Windows provider separately accepts a host-owned value snapshot above
 /// this layer, so no portable document or application protocol path can infer
 /// the live field text. See Decisions 0067 and 0071.
-fn field_fields(field: &Field) -> (UiAccessibilityRole, Option<String>, bool) {
+fn field_fields(
+    field: &Field,
+) -> (
+    UiAccessibilityRole,
+    Option<String>,
+    bool,
+    UiAccessibilityLiveSetting,
+) {
     (
         UiAccessibilityRole::Edit,
         Some(field.label().to_owned()),
         field.enabled(),
+        UiAccessibilityLiveSetting::Off,
     )
 }
 
-fn text_fields(text: &Text) -> (UiAccessibilityRole, Option<String>, bool) {
+fn text_fields(
+    text: &Text,
+) -> (
+    UiAccessibilityRole,
+    Option<String>,
+    bool,
+    UiAccessibilityLiveSetting,
+) {
     (
         UiAccessibilityRole::StaticText,
         Some(text.value().to_owned()),
         false,
+        UiAccessibilityLiveSetting::Off,
     )
 }
 
-fn action_fields(action: &Action) -> (UiAccessibilityRole, Option<String>, bool) {
+fn status_fields(
+    status: &Status,
+) -> (
+    UiAccessibilityRole,
+    Option<String>,
+    bool,
+    UiAccessibilityLiveSetting,
+) {
+    (
+        UiAccessibilityRole::Status,
+        Some(status.value().to_owned()),
+        false,
+        match status.politeness() {
+            UiStatusPoliteness::Polite => UiAccessibilityLiveSetting::Polite,
+            UiStatusPoliteness::Assertive => UiAccessibilityLiveSetting::Assertive,
+        },
+    )
+}
+
+fn action_fields(
+    action: &Action,
+) -> (
+    UiAccessibilityRole,
+    Option<String>,
+    bool,
+    UiAccessibilityLiveSetting,
+) {
     (
         UiAccessibilityRole::Button,
         Some(action.label().to_owned()),
         action.enabled(),
+        UiAccessibilityLiveSetting::Off,
     )
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        Action, Axis, ElementId, Insets, Stack, Text, TextMeasurer, UiDocument, UiNode, UiRect,
-        UiSize,
+        Action, Axis, ElementId, Insets, Stack, Status, Text, TextMeasurer, UiDocument, UiNode,
+        UiRect, UiSize, UiStatusPoliteness,
     };
 
     use super::UiAccessibilityRole;
@@ -263,5 +349,24 @@ mod tests {
         assert_eq!(ids, vec!["root", "first", "second"]);
         assert!(snapshot.nodes()[2].bounds().is_empty());
         assert_eq!(snapshot.nodes()[2].parent_index(), Some(0));
+    }
+
+    #[test]
+    fn status_carries_its_semantic_live_setting_without_an_event_mechanism() {
+        let document = UiDocument::new(UiNode::Status(
+            Status::new(id("status"), "Saved", 12, UiStatusPoliteness::Assertive)
+                .expect("status is valid"),
+        ))
+        .expect("document is valid");
+        let layout = document.layout(UiRect::from_size(0.0, 0.0, 200.0, 100.0), &FixedMeasurer);
+        let snapshot = document.accessibility_snapshot(&layout);
+        let status = &snapshot.nodes()[0];
+
+        assert_eq!(status.role(), UiAccessibilityRole::Status);
+        assert_eq!(status.name(), Some("Saved"));
+        assert_eq!(
+            status.live_setting(),
+            super::UiAccessibilityLiveSetting::Assertive
+        );
     }
 }

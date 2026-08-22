@@ -19,10 +19,12 @@
 mod geometry;
 mod uia;
 
-use anodrel_ui::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
+use anodrel_ui::{
+    UiAccessibilityLiveSetting, UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot,
+};
 
 pub use geometry::{ClientOrigin, ScreenRect, screen_rect};
-pub use uia::{UIA_APPEND_RUNTIME_ID, control_type, property};
+pub use uia::{UIA_APPEND_RUNTIME_ID, control_type, live_setting, property};
 
 /// One snapshot node expressed in UI Automation terms.
 ///
@@ -37,6 +39,7 @@ pub struct AccessibleElement {
     control_type: i32,
     enabled: bool,
     keyboard_focusable: bool,
+    live_setting: i32,
     bounds: ScreenRect,
     runtime_id: [i32; 2],
 }
@@ -86,6 +89,12 @@ impl AccessibleElement {
     #[must_use]
     pub const fn keyboard_focusable(&self) -> bool {
         self.keyboard_focusable
+    }
+
+    /// The `UIA_LiveSettingPropertyId` value for this semantic element.
+    #[must_use]
+    pub const fn live_setting(&self) -> i32 {
+        self.live_setting
     }
 
     /// The `UIA_BoundingRectanglePropertyId` value in physical screen pixels.
@@ -139,6 +148,7 @@ pub fn accessible_element(
         control_type: control_type_for(node.role()),
         enabled: is_enabled(node),
         keyboard_focusable: keyboard_focusable(node.role()),
+        live_setting: live_setting_for(node.live_setting()),
         bounds: screen_rect(node.bounds(), origin),
         runtime_id: [UIA_APPEND_RUNTIME_ID, runtime_index(index)],
     }
@@ -149,7 +159,7 @@ pub fn accessible_element(
 pub const fn control_type_for(role: UiAccessibilityRole) -> i32 {
     match role {
         UiAccessibilityRole::Group => control_type::GROUP,
-        UiAccessibilityRole::StaticText => control_type::TEXT,
+        UiAccessibilityRole::StaticText | UiAccessibilityRole::Status => control_type::TEXT,
         UiAccessibilityRole::Button => control_type::BUTTON,
         UiAccessibilityRole::Edit => control_type::EDIT,
     }
@@ -166,7 +176,21 @@ pub const fn control_type_for(role: UiAccessibilityRole) -> i32 {
 pub fn is_enabled(node: &UiAccessibilityNode) -> bool {
     match node.role() {
         UiAccessibilityRole::Button | UiAccessibilityRole::Edit => node.enabled(),
-        UiAccessibilityRole::Group | UiAccessibilityRole::StaticText => true,
+        UiAccessibilityRole::Group
+        | UiAccessibilityRole::StaticText
+        | UiAccessibilityRole::Status => true,
+    }
+}
+
+/// Maps a portable semantic live setting to Windows UI Automation's fixed
+/// values. This publishes no event; the native host has a separate, one-way
+/// event gate for a later changed visible status.
+#[must_use]
+pub const fn live_setting_for(setting: UiAccessibilityLiveSetting) -> i32 {
+    match setting {
+        UiAccessibilityLiveSetting::Off => live_setting::OFF,
+        UiAccessibilityLiveSetting::Polite => live_setting::POLITE,
+        UiAccessibilityLiveSetting::Assertive => live_setting::ASSERTIVE,
     }
 }
 
@@ -201,10 +225,11 @@ mod tests {
 
     use super::{
         AccessibleElement, ClientOrigin, ScreenRect, UIA_APPEND_RUNTIME_ID, accessible_elements,
-        control_type, control_type_for, keyboard_focusable, property, runtime_index,
+        control_type, control_type_for, keyboard_focusable, live_setting, property, runtime_index,
     };
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":0,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"},{"id":"blocked","kind":"action","label":"Unavailable","fontSize":16,"enabled":false,"tone":"accent"}]}}"#;
+    const STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"status","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"assertive"}}"#;
 
     /// A deterministic stand-in for host text measurement.
     struct FixedMeasurer;
@@ -226,10 +251,19 @@ mod tests {
         accessible_elements(&snapshot, ClientOrigin::new(100, 50, 1.0))
     }
 
+    fn status_element() -> AccessibleElement {
+        let document = anodrel_ui_document::decode_v3(STATUS_DOCUMENT)
+            .expect("the status fixture document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let snapshot = document.accessibility_snapshot(&layout);
+        super::accessible_element(&snapshot.nodes()[0], 0, ClientOrigin::new(0, 0, 1.0))
+    }
+
     #[test]
     fn every_role_maps_to_its_published_control_type() {
         assert_eq!(control_type_for(UiAccessibilityRole::Group), 50_026);
         assert_eq!(control_type_for(UiAccessibilityRole::StaticText), 50_020);
+        assert_eq!(control_type_for(UiAccessibilityRole::Status), 50_020);
         assert_eq!(control_type_for(UiAccessibilityRole::Button), 50_000);
         assert_eq!(control_type::GROUP, 50_026);
     }
@@ -254,6 +288,7 @@ mod tests {
         assert_eq!(property::IS_KEYBOARD_FOCUSABLE, 30_009);
         assert_eq!(property::IS_CONTROL_ELEMENT, 30_016);
         assert_eq!(property::IS_CONTENT_ELEMENT, 30_017);
+        assert_eq!(property::LIVE_SETTING, 30_135);
     }
 
     #[test]
@@ -335,5 +370,15 @@ mod tests {
         assert_ne!(mapped[1].bounds(), ScreenRect::EMPTY);
         assert!(mapped[1].bounds().left >= 100.0);
         assert!(mapped[1].bounds().top >= 50.0);
+    }
+
+    #[test]
+    fn a_status_maps_to_text_with_its_fixed_live_setting() {
+        let status = status_element();
+        assert_eq!(status.control_type(), control_type::TEXT);
+        assert_eq!(status.name(), "Saved");
+        assert_eq!(status.live_setting(), live_setting::ASSERTIVE);
+        assert!(!status.keyboard_focusable());
+        assert!(status.enabled(), "visible status text is not unavailable");
     }
 }

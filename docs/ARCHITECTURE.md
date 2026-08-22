@@ -204,6 +204,13 @@ enumerates, looks up, or observes a native window. See
 `docs/WINDOW_FOCUS.md`, `docs/WINDOW_FULLSCREEN.md`, `docs/WINDOW_SIZE.md`,
 and Decisions 0066, 0072, 0085, 0086, 0088, 0092, and 0093.
 
+Protocol 1.26 adds parallel exact-v3 document operations for the primary and
+these session-owned views. A v3 document may carry one visible semantic status.
+The Windows host may emit one best-effort accessibility event after a later
+changed visible status reaches an established view, but that is never a
+protocol response or application-observable delivery channel. See Decision
+0100.
+
 ## Modularity and performance
 
 The dependency direction is one-way: protocol types sit at the center; SDKs and
@@ -336,8 +343,9 @@ authenticated transport now composes this mode without a duplicate legacy
 document mailbox. The direct Windows host services its creation handoff on the
 owning UI thread, while Decision 0093 latches a primary close or session-close
 request across the native group and retains a product lifetime through the last
-view. Protocol 1.25 now exposes only the group’s explicit creation, secondary
-close, strict-v1 per-view replacement, and tagged semantic-event routes; all
+view. Protocol 1.25 exposes the group’s explicit creation, secondary close,
+strict-v1 per-view replacement, and tagged semantic-event routes. Protocol
+1.26 adds separately named exact-v3 replacement and creation routes. All
 native mapping and presentation state remain on the host side of this seam.
 
 `anodrel-menu` is a separate portable module for one authenticated session's
@@ -362,9 +370,13 @@ screen-space rectangles. It performs no operating-system call and cannot fail.
 `anodrel-windows-uia` publishes that mapping through `WM_GETOBJECT`, a root,
 immutable hierarchical parent/child/sibling navigation, properties, and hit
 testing. It preserves every bounded semantic node, including a fully clipped
-node with an empty rectangle and `IsOffscreen=true`, but adds no
-accessibility-specific document data, callback, or live view lookup (Decision
-0075). An enabled visible button in a current authenticated UI session
+node with an empty rectangle and `IsOffscreen=true`, but adds no arbitrary
+accessibility-specific data, callback, or live view lookup (Decision 0075).
+One visible v3 status supplies its declared `LiveSetting`; after a later
+changed visible status reaches an established authenticated view, the host may
+raise one best-effort live-region event from a fresh provider without listener
+inspection or application readback (Decision 0100). An enabled visible button
+in a current authenticated UI session
 also exposes the one `Invoke` pattern: it offers the exact revision-bound
 semantic action candidate to the existing session mailbox, with no native input
 message, application callback, focus movement, or accessibility-specific queue

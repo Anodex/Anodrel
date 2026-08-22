@@ -18,6 +18,7 @@ const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.ui-client-test";
 const SESSION_ID: &str = "ui-client-test-session";
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"action","label":"Complete","fontSize":16,"enabled":true,"tone":"accent"}}"#;
+const STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"status","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}"#;
 const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete menu template session","enabled":true,"shortcut":"Ctrl+Shift+M"}]}]}"#;
 
 type WriteLog = Arc<Mutex<Vec<Vec<u8>>>>;
@@ -292,6 +293,53 @@ fn multi_window_session_uses_only_the_fixed_protocol_1_25_surface() {
             JsonValue::String(DOCUMENT.to_owned()).to_json()
         ))
         .expect("expected open payload is JSON")
+    );
+}
+
+#[test]
+fn live_status_documents_use_only_the_explicit_protocol_1_26_surface() {
+    let (mut session, written) = session_with_responses([
+        response("anodrel-ui-1", r#"{"revision":"1"}"#),
+        response("anodrel-ui-2", r#"{"windowId":"window-1"}"#),
+        response("anodrel-ui-3", r#"{"revision":"2"}"#),
+    ]);
+
+    assert_eq!(
+        session
+            .replace_document_v3(STATUS_DOCUMENT)
+            .expect("primary status update is accepted")
+            .value(),
+        1
+    );
+    let secondary = session
+        .open_window_v3("Status", STATUS_DOCUMENT)
+        .expect("status secondary is accepted");
+    assert_eq!(
+        session
+            .replace_window_document_v3(secondary, STATUS_DOCUMENT)
+            .expect("status secondary update is accepted")
+            .value(),
+        2
+    );
+
+    let messages = messages(&written);
+    assert_eq!(
+        messages
+            .iter()
+            .skip(1)
+            .map(|message| request_field(message, "operation"))
+            .collect::<Vec<_>>(),
+        [
+            Some("ui.document.replace.v3".to_owned()),
+            Some("window.open.v3".to_owned()),
+            Some("ui.document.replace.window.v3".to_owned()),
+        ]
+    );
+    assert!(
+        messages
+            .iter()
+            .skip(1)
+            .all(|message| request_protocol_minor(message) == Some(26))
     );
 }
 

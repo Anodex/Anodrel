@@ -1,7 +1,7 @@
 //! In-memory state for one caller-selected UI document session.
 
 use anodrel_ui::{ElementId, UiDocument, UiEvent, UiNode};
-use anodrel_ui_document::{decode, decode_v2};
+use anodrel_ui_document::{decode, decode_v2, decode_v3};
 
 use crate::{UiApplicationEvent, UiDocumentRevision, UiDocumentSnapshot, UiSessionError};
 
@@ -61,6 +61,19 @@ impl UiDocumentSession {
         encoded_document: &str,
     ) -> Result<UiDocumentRevision, UiSessionError> {
         self.replace_decoded(decode_v2(encoded_document))
+    }
+
+    /// Validates and atomically replaces the current document from exact v3 data.
+    ///
+    /// This explicit opt-in accepts the version 3 visible-status format only.
+    /// It preserves the same revision and failure behavior as the earlier
+    /// document formats, so an older operation cannot silently ignore status
+    /// semantics.
+    pub fn replace_document_v3(
+        &mut self,
+        encoded_document: &str,
+    ) -> Result<UiDocumentRevision, UiSessionError> {
+        self.replace_decoded(decode_v3(encoded_document))
     }
 
     fn replace_decoded(
@@ -130,6 +143,6 @@ fn contains_enabled_action(node: &UiNode, expected: &ElementId) -> bool {
         // so a delivered event can never name a field — which also means an
         // application cannot use the event path to learn that a field was
         // touched. See Decision 0067.
-        UiNode::Text(_) | UiNode::Field(_) => false,
+        UiNode::Text(_) | UiNode::Status(_) | UiNode::Field(_) => false,
     }
 }

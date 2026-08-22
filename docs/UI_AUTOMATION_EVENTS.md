@@ -11,9 +11,10 @@ result, but a screen reader also needs an ordinary UI Automation notification
 when a person moves focus with a pointer or keyboard, or a UI Automation client
 successfully moves it through the bounded route.
 
-This document defines the first event only: `UIA_AutomationFocusChangedEventId`
-(`20005`). It is an outbound host-to-Windows signal, not an application event
-system. See Decisions 0074, 0073, and 0070.
+This document defines the focus-change event. The separately bounded
+live-status event is defined in `docs/UI_LIVE_ANNOUNCEMENTS.md`. Both are
+outbound host-to-Windows signals, not an application event system. See
+Decisions 0074, 0073, 0070, and 0100.
 
 ## Exact event
 
@@ -58,9 +59,9 @@ and safer behaviour.
   field, or reveal the focused element to an application.
 - It contains no application-supplied event text, data, or identifier beyond
   the ordinary immutable provider values already visible to Windows.
-- There are no Invoke, property-change, value-change, text, live-region,
-  notification, structure, or selection events in this slice. Each needs its
-  own contract and decision.
+- There are no Invoke, property-change, value-change, text, notification, or
+  selection events in this slice. Structure and live-status events have their
+  own narrow contracts and decisions.
 
 ## Verification
 

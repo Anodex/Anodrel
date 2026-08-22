@@ -1,10 +1,10 @@
-# Anodrel UI document interchange v1
+# Anodrel UI document interchange
 
 **Status:** Foundation contract. This format can be decoded into the portable
 `anodrel-ui` model. The Windows UI Lab decodes one compiled-in host fixture to
 exercise the contract, and the separate explicit Windows developer preview can
 render one bounded operator-selected file. The authenticated
-`ui.document.replace` and `ui.document.replace.v2` protocol operations accept
+`ui.document.replace`, `ui.document.replace.v2`, and version-3 protocol operations accept
 more tightly bounded documents for one authenticated session. The development
 Windows UI Session Lab consumes that session's latest snapshot and returns only
 revision-bound semantic actions through a separate bounded pull operation.
@@ -163,8 +163,8 @@ non-semantic.
 ## Version 2 scroll extension
 
 `anodrel.ui.document.v2` is the next exact format identifier. It retains the
-v1 envelope and the `stack`, `text`, and `action` objects unchanged. It adds
-only this node object:
+v1 envelope and the `stack`, `text`, `action`, and `field` objects unchanged.
+It adds only this node object:
 
 ### Scroll
 
@@ -182,10 +182,39 @@ only. A v2 decoder rejects unknown or missing fields exactly as v1 does; a v1
 decoder continues to reject `scroll`. Document-session compatibility is a
 separate opt-in step under Decision 0039.
 
+## Version 3 live-status extension
+
+`anodrel.ui.document.v3` retains the v2 envelope plus every v1 and v2 node
+object unchanged. It adds one visible semantic node:
+
+### Status
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `id` | string | Valid, document-unique element ID. |
+| `kind` | string | `status` |
+| `value` | string | Valid bounded single-line visible text. |
+| `fontSize` | integer | 8 through 96 |
+| `tone` | string | `primary`, `secondary`, or `accent` |
+| `politeness` | string | `polite` or `assertive` |
+
+A v3 document has at most one `status` node, including inside a `Scroll`. It
+is painted and clipped as text; it carries no callback, event ID, target,
+recipient, native operation, or hidden accessibility field. `politeness`
+describes the urgency of the visible result, not a caller-selectable Windows
+property.
+
+`decode_v3` and `encode_v3` implement this exact form. Version-1 and
+version-2 decoders reject `status`, and their encoders reject an in-memory
+document containing one. The Protocol 1.26 v3 operations are the only
+authenticated acceptance path; their existing `ui.document.write` grant does
+not create a listener, delivery, or readback surface. See
+`docs/UI_LIVE_ANNOUNCEMENTS.md` and Decision 0100.
+
 ## Verification
 
-`anodrel-ui-document` tests known version 1 and version 2 round trips, every
-version 1 node kind and appearance role, exact scroll objects, unknown and
+`anodrel-ui-document` tests known version 1, version 2, and version 3 round
+trips, every node kind and appearance role, exact scroll and status objects, unknown and
 missing fields, malformed values, unsupported format identifiers, size limits,
 and model-level document limits. It has only
 first-party `anodrel-ui` and `anodrel-json` dependencies and no operating-

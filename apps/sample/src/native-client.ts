@@ -8,6 +8,10 @@ import {
   FIELD_SESSION_ACTION,
   FIELD_SESSION_DOCUMENT,
   FIELD_SESSION_IDS,
+  LIVE_STATUS_ACTION,
+  LIVE_STATUS_ASSERTIVE_DOCUMENT,
+  LIVE_STATUS_INITIAL_DOCUMENT,
+  LIVE_STATUS_POLITE_DOCUMENT,
   MENU_SESSION_ACTION,
   MENU_SESSION_DOCUMENT,
   fieldEchoDocument,
@@ -31,6 +35,8 @@ process.on("unhandledRejection", () => {
  * its own.
  */
 const ECHO_VISIBLE_MILLISECONDS = 8_000;
+/** Time to hear each manual live-status update before the diagnostic closes. */
+const LIVE_STATUS_VISIBLE_MILLISECONDS = 3_000;
 
 async function run(): Promise<number> {
   let invitation;
@@ -55,9 +61,12 @@ async function run(): Promise<number> {
     const scrollDiagnostic = process.argv.includes("--request-scroll-document");
     const fieldDiagnostic = process.argv.includes("--request-field-read");
     const menuDiagnostic = process.argv.includes("--request-native-menu");
+    const liveStatusDiagnostic = process.argv.includes("--request-live-status");
     let update;
     if (scrollDiagnostic) {
       update = await client.replaceUiDocumentV2(SCROLL_SESSION_DOCUMENT);
+    } else if (liveStatusDiagnostic) {
+      update = await client.replaceUiDocumentV3(LIVE_STATUS_INITIAL_DOCUMENT);
     } else if (fieldDiagnostic) {
       update = await client.replaceUiDocument(FIELD_SESSION_DOCUMENT);
     } else if (menuDiagnostic) {
@@ -313,6 +322,8 @@ async function run(): Promise<number> {
         expectedAction = SCROLL_SESSION_ACTION;
       } else if (fieldDiagnostic) {
         expectedAction = FIELD_SESSION_ACTION;
+      } else if (liveStatusDiagnostic) {
+        expectedAction = LIVE_STATUS_ACTION;
       }
       const eventResult = await waitForSampleAction(client, update.revision, expectedAction);
       if (eventResult !== 0) {
@@ -330,6 +341,22 @@ async function run(): Promise<number> {
         // the application, on the surface the person is already looking at.
         await client.replaceUiDocument(fieldEchoDocument(after.fields));
         await new Promise((resolve) => setTimeout(resolve, ECHO_VISIBLE_MILLISECONDS));
+      }
+
+      if (liveStatusDiagnostic) {
+        // Each replacement carries ordinary visible text. The application gets
+        // only the accepted revision; it cannot inspect a listener or learn
+        // whether Windows announced either value.
+        const polite = await client.replaceUiDocumentV3(LIVE_STATUS_POLITE_DOCUMENT);
+        if (polite.revision !== "2") {
+          return 34;
+        }
+        await delay(LIVE_STATUS_VISIBLE_MILLISECONDS);
+        const assertive = await client.replaceUiDocumentV3(LIVE_STATUS_ASSERTIVE_DOCUMENT);
+        if (assertive.revision !== "3") {
+          return 34;
+        }
+        await delay(LIVE_STATUS_VISIBLE_MILLISECONDS);
       }
 
       const close = await client.closeSession();

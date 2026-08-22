@@ -332,6 +332,22 @@ authenticated `ui.events.read` round trip. The sample then requests
 The action carries only its revision and semantic ID; it cannot invoke a native
 operation. See `docs/UI_SESSION_LAB.md`.
 
+### Live-status screen-reader check
+
+The same client has a deliberate v3 status diagnostic. Start the window, then
+start Narrator **after** it opens. Activate **Publish visible result**. Narrator
+should announce the later polite result and then the later assertive result;
+the sample closes after each has remained visible for three seconds.
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-live-status-client $nodePath $clientPath
+~~~
+
+Inspect or Accessibility Insights should show the status as a `Text` element
+with `LiveSetting` `Polite` first and `Assertive` second. The application
+receives only accepted document revisions and cannot learn whether either
+announcement was delivered. See `docs/UI_LIVE_ANNOUNCEMENTS.md`.
+
 To exercise the direct Windows session-menu path, run:
 
 ~~~powershell

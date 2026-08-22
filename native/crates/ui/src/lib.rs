@@ -25,7 +25,9 @@ mod model;
 mod scroll;
 mod text_wrap;
 
-pub use accessibility::{UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot};
+pub use accessibility::{
+    UiAccessibilityLiveSetting, UiAccessibilityNode, UiAccessibilityRole, UiAccessibilitySnapshot,
+};
 pub use appearance::{UiActionTone, UiSurfaceTone, UiTextTone};
 pub use error::UiError;
 pub use field_state::{UiFieldState, UiFieldStates};
@@ -38,8 +40,8 @@ pub use layout::{
     UiLayout, UiLayoutItem, UiLayoutKind, UiScrollMetrics, UiScrollOffsets,
 };
 pub use model::{
-    Action, Axis, Field, Insets, MAX_FIELD_LENGTH, MIN_FIELD_LENGTH, Scroll, Stack, Text,
-    UiDocument, UiNode,
+    Action, Axis, Field, Insets, MAX_FIELD_LENGTH, MIN_FIELD_LENGTH, Scroll, Stack, Status, Text,
+    UiDocument, UiNode, UiStatusPoliteness,
 };
 pub use scroll::{DEFAULT_SCROLL_LINE, UiScrollState, UiScrollWheel, WHEEL_DELTA_PER_LINE};
 pub use text_wrap::{MAX_TEXT_LINES, wrap_text, wrapped_height};

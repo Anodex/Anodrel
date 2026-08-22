@@ -130,6 +130,14 @@ secondary, while `ui.events.read.window` returns only revision-checked semantic
 events tagged by their logical view. Installed record version 1.13 adds the
 two new optional grants. See `docs/MULTI_WINDOW.md`.
 
+Protocol 1.26 adds an exact version-3 UI document with one visible semantic
+status result. Authenticated primary and secondary session views can use
+explicit v3 replacement operations under their existing document-write grant;
+the direct Windows host maps a later changed visible status to one best-effort
+outbound UI Automation live-region notification. Applications receive no
+listener, delivery, focus, or accessibility-presence result. See
+`docs/UI_LIVE_ANNOUNCEMENTS.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The

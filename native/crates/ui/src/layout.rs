@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    Action, Axis, ElementId, Field, Scroll, Stack, Text, UiDocument, UiNode, UiPoint, UiRect,
+    Action, Axis, ElementId, Field, Scroll, Stack, UiDocument, UiNode, UiPoint, UiRect,
     UiScrollState, UiSize, wrap_text, wrapped_height,
 };
 
@@ -42,6 +42,8 @@ pub enum UiLayoutKind {
     Scroll,
     /// A non-interactive text run.
     Text,
+    /// A visible non-interactive semantic status result.
+    Status,
     /// A semantic action.
     Action,
     /// A single-line field a person can type into.
@@ -273,7 +275,12 @@ impl UiDocument {
 
 fn root_bounds(node: &UiNode, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiRect {
     match node {
-        UiNode::Text(text) => bounded_text_bounds(text, client_bounds, measurer),
+        UiNode::Text(text) => {
+            bounded_text_bounds(text.value(), text.font_size(), client_bounds, measurer)
+        }
+        UiNode::Status(status) => {
+            bounded_text_bounds(status.value(), status.font_size(), client_bounds, measurer)
+        }
         UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
             client_bounds
         }
@@ -325,6 +332,13 @@ fn layout_node(
             kind: UiLayoutKind::Text,
             enabled: false,
         }),
+        UiNode::Status(status) => layout.items.push(UiLayoutItem {
+            id: status.id.clone(),
+            bounds: visible_bounds,
+            paint_bounds: bounds,
+            kind: UiLayoutKind::Status,
+            enabled: false,
+        }),
         UiNode::Action(action) => layout.items.push(UiLayoutItem {
             id: action.id.clone(),
             bounds: visible_bounds,
@@ -365,7 +379,7 @@ fn layout_stack_children(
                 // it is the same width the child is then laid out in.
                 let intrinsic = intrinsic_size(child, content.width(), measurer);
                 let width = match child {
-                    UiNode::Text(_) => intrinsic.width.min(content.width()),
+                    UiNode::Text(_) | UiNode::Status(_) => intrinsic.width.min(content.width()),
                     UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
                         content.width()
                     }
@@ -392,7 +406,7 @@ fn layout_stack_children(
                 let remaining = (content.right - cursor).max(0.0);
                 let intrinsic = intrinsic_size(child, remaining, measurer);
                 let height = match child {
-                    UiNode::Text(_) => intrinsic.height.min(content.height()),
+                    UiNode::Text(_) | UiNode::Status(_) => intrinsic.height.min(content.height()),
                     UiNode::Stack(_) | UiNode::Scroll(_) | UiNode::Action(_) | UiNode::Field(_) => {
                         content.height()
                     }
@@ -461,6 +475,12 @@ fn intrinsic_size(node: &UiNode, available_width: f32, measurer: &dyn TextMeasur
         UiNode::Text(text) => {
             measured_wrapped_text(text.value(), text.font_size(), available_width, measurer)
         }
+        UiNode::Status(status) => measured_wrapped_text(
+            status.value(),
+            status.font_size(),
+            available_width,
+            measurer,
+        ),
         UiNode::Action(action) => intrinsic_action_size(action, measurer),
         UiNode::Field(field) => intrinsic_field_size(field, measurer),
         UiNode::Stack(stack) => intrinsic_stack_size(stack, available_width, measurer),
@@ -551,13 +571,13 @@ fn intrinsic_stack_size(
     }
 }
 
-fn bounded_text_bounds(text: &Text, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiRect {
-    let size = measured_wrapped_text(
-        text.value(),
-        text.font_size(),
-        client_bounds.width(),
-        measurer,
-    );
+fn bounded_text_bounds(
+    value: &str,
+    font_size: u16,
+    client_bounds: UiRect,
+    measurer: &dyn TextMeasurer,
+) -> UiRect {
+    let size = measured_wrapped_text(value, font_size, client_bounds.width(), measurer);
     UiRect::from_size(
         client_bounds.left,
         client_bounds.top,

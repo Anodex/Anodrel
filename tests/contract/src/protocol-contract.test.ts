@@ -98,6 +98,35 @@ test("SDK and host expose version two UI document replacement separately", async
   assert.deepEqual(await client.replaceUiDocumentV2(document), { revision: "1" });
 });
 
+test("SDK and host keep version three status documents on their explicit operations", async () => {
+  const document =
+    '{"format":"anodrel.ui.document.v3","root":{"id":"result","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}';
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.open", "ui.document.write"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.replaceUiDocumentV3(document), { revision: "1" });
+  const opened = await client.openWindowV3("Result", document);
+  assert.deepEqual(opened, { windowId: "window-1" });
+  assert.deepEqual(await client.replaceUiDocumentV3InWindow(opened.windowId, document), {
+    revision: "2",
+  });
+
+  const older = await host.createTransport().send({
+    protocolVersion: { major: 1, minor: 25 },
+    kind: "request",
+    requestId: "status-before-protocol-1.26",
+    operation: "ui.document.replace.v3",
+    payload: { document },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
 test("UI document replacement requires a host-issued grant", async () => {
   const host = new MockHost({ applicationId: "test.application" });
   const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());

@@ -74,6 +74,44 @@ const MENU_ACTION_EVENT_SCHEMA_VERSION: ProtocolVersion = ProtocolVersion {
     minor: 18,
 };
 
+/// The exact external UI document format selected by one protocol operation.
+///
+/// This stays private to the core dispatcher: applications select only an
+/// operation name, while document decoding remains in the portable session
+/// layer.
+#[derive(Clone, Copy)]
+enum UiDocumentFormat {
+    V1,
+    V2,
+    V3,
+}
+
+impl UiDocumentFormat {
+    const fn document_operation(self) -> &'static str {
+        match self {
+            Self::V1 => "ui.document.replace",
+            Self::V2 => "ui.document.replace.v2",
+            Self::V3 => "ui.document.replace.v3",
+        }
+    }
+
+    const fn window_operation(self) -> &'static str {
+        match self {
+            Self::V1 => "ui.document.replace.window",
+            Self::V2 => "ui.document.replace.window.v2",
+            Self::V3 => "ui.document.replace.window.v3",
+        }
+    }
+
+    const fn open_operation(self) -> &'static str {
+        match self {
+            Self::V1 => "window.open",
+            Self::V2 => "window.open.v2",
+            Self::V3 => "window.open.v3",
+        }
+    }
+}
+
 /// One host-created, coalescing request to end an authenticated session.
 ///
 /// This value stores no target, payload, callback, or operating-system state.
@@ -1005,7 +1043,10 @@ impl CoreHost {
                 self.handle_window_size_set(request)
             }
             "window.open" if request.protocol_version.minor >= 25 => {
-                self.handle_window_open(request)
+                self.handle_window_open(request, UiDocumentFormat::V1)
+            }
+            "window.open.v3" if request.protocol_version.minor >= 26 => {
+                self.handle_window_open(request, UiDocumentFormat::V3)
             }
             "window.close" if request.protocol_version.minor >= 25 => {
                 self.handle_window_close(request)
@@ -1014,13 +1055,19 @@ impl CoreHost {
                 self.handle_menu_replace(request)
             }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
-                self.handle_ui_document_replace(request, false)
+                self.handle_ui_document_replace(request, UiDocumentFormat::V1)
             }
             "ui.document.replace.v2" if request.protocol_version.minor >= 4 => {
-                self.handle_ui_document_replace(request, true)
+                self.handle_ui_document_replace(request, UiDocumentFormat::V2)
+            }
+            "ui.document.replace.v3" if request.protocol_version.minor >= 26 => {
+                self.handle_ui_document_replace(request, UiDocumentFormat::V3)
             }
             "ui.document.replace.window" if request.protocol_version.minor >= 25 => {
-                self.handle_ui_document_replace_window(request)
+                self.handle_ui_document_replace_window(request, UiDocumentFormat::V1)
+            }
+            "ui.document.replace.window.v3" if request.protocol_version.minor >= 26 => {
+                self.handle_ui_document_replace_window(request, UiDocumentFormat::V3)
             }
             "ui.events.read" if request.protocol_version.minor >= 2 => {
                 self.handle_ui_events_read(request)
@@ -1205,12 +1252,12 @@ impl CoreHost {
         }
     }
 
-    fn handle_ui_document_replace(&self, request: RequestEnvelope, version_two: bool) -> JsonValue {
-        let operation = if version_two {
-            "ui.document.replace.v2"
-        } else {
-            "ui.document.replace"
-        };
+    fn handle_ui_document_replace(
+        &self,
+        request: RequestEnvelope,
+        format: UiDocumentFormat,
+    ) -> JsonValue {
+        let operation = format.document_operation();
         let Some(document) = ui_document_payload(&request.payload) else {
             return self.failure(
                 request.request_id,
@@ -1241,10 +1288,10 @@ impl CoreHost {
 
         let snapshot = if let Some(group) = &self.ui_window_group {
             let primary = UiWindowId::primary();
-            let replacement = if version_two {
-                group.replace_document_v2(&primary, document)
-            } else {
-                group.replace_document(&primary, document)
+            let replacement = match format {
+                UiDocumentFormat::V1 => group.replace_document(&primary, document),
+                UiDocumentFormat::V2 => group.replace_document_v2(&primary, document),
+                UiDocumentFormat::V3 => group.replace_document_v3(&primary, document),
             };
             replacement.ok().map(|snapshot| snapshot.snapshot().clone())
         } else {
@@ -1253,10 +1300,10 @@ impl CoreHost {
                 .as_ref()
                 .expect("legacy core has a primary document session");
             let mut session = session.borrow_mut();
-            let revision = if version_two {
-                session.replace_document_v2(document)
-            } else {
-                session.replace_document(document)
+            let revision = match format {
+                UiDocumentFormat::V1 => session.replace_document(document),
+                UiDocumentFormat::V2 => session.replace_document_v2(document),
+                UiDocumentFormat::V3 => session.replace_document_v3(document),
             };
             revision.ok().and_then(|revision| {
                 session
@@ -1289,17 +1336,18 @@ impl CoreHost {
     /// group to report that the host UI thread created and registered one
     /// private native view. A successful opaque ID is therefore never a
     /// speculative reservation or a native handle.
-    fn handle_window_open(&self, request: RequestEnvelope) -> JsonValue {
+    fn handle_window_open(&self, request: RequestEnvelope, format: UiDocumentFormat) -> JsonValue {
+        let operation = format.open_operation();
         let Some((title, document)) = window_open_payload(&request.payload) else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "window.open requires one title and one document string.",
+                format!("{operation} requires one title and one document string."),
                 None,
             );
         };
         if !self.policy.has(Capability::WindowOpen) {
-            return self.capability_denied(request.request_id, "window.open");
+            return self.capability_denied(request.request_id, operation);
         }
         if !self.policy.has(Capability::UiDocumentWrite) {
             return self.capability_denied(request.request_id, "ui.document.write");
@@ -1308,7 +1356,7 @@ impl CoreHost {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "window.open document exceeded the operation size limit.",
+                format!("{operation} document exceeded the operation size limit."),
                 None,
             );
         }
@@ -1316,7 +1364,7 @@ impl CoreHost {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::WindowTitleInvalid,
-                "window.open title is invalid.",
+                format!("{operation} title is invalid."),
                 None,
             );
         };
@@ -1328,7 +1376,19 @@ impl CoreHost {
                 None,
             );
         };
-        match group.open_secondary(title, document) {
+        let opened = match format {
+            UiDocumentFormat::V1 => group.open_secondary(title, document),
+            UiDocumentFormat::V3 => group.open_secondary_v3(title, document),
+            UiDocumentFormat::V2 => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::OperationUnsupported,
+                    "window.open.v2 is not implemented.",
+                    None,
+                );
+            }
+        };
+        match opened {
             Ok(id) => ResponseEnvelope::success(
                 request.request_id,
                 &self.policy.host_name,
@@ -1343,7 +1403,7 @@ impl CoreHost {
             Err(UiWindowGroupError::DocumentRejected(_)) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "window.open document is invalid.",
+                format!("{operation} document is invalid."),
                 None,
             ),
             Err(UiWindowGroupError::Unavailable) => self.failure(
@@ -1400,12 +1460,17 @@ impl CoreHost {
     /// `main` remains a legal target here so callers can keep one uniform
     /// document-update path after opening a secondary. Closing `main` remains
     /// forbidden: it is the group anchor rather than an ordinary target.
-    fn handle_ui_document_replace_window(&self, request: RequestEnvelope) -> JsonValue {
+    fn handle_ui_document_replace_window(
+        &self,
+        request: RequestEnvelope,
+        format: UiDocumentFormat,
+    ) -> JsonValue {
+        let operation = format.window_operation();
         let Some((id, document)) = window_document_payload(&request.payload) else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "ui.document.replace.window requires one canonical windowId and document string.",
+                format!("{operation} requires one canonical windowId and document string."),
                 None,
             );
         };
@@ -1416,7 +1481,7 @@ impl CoreHost {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "ui.document.replace.window document exceeded the operation size limit.",
+                format!("{operation} document exceeded the operation size limit."),
                 None,
             );
         }
@@ -1428,7 +1493,19 @@ impl CoreHost {
                 None,
             );
         };
-        match group.replace_document(&id, document) {
+        let replacement = match format {
+            UiDocumentFormat::V1 => group.replace_document(&id, document),
+            UiDocumentFormat::V3 => group.replace_document_v3(&id, document),
+            UiDocumentFormat::V2 => {
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::OperationUnsupported,
+                    "ui.document.replace.window.v2 is not implemented.",
+                    None,
+                );
+            }
+        };
+        match replacement {
             Ok(snapshot) => ResponseEnvelope::success(
                 request.request_id,
                 &self.policy.host_name,
@@ -1440,7 +1517,7 @@ impl CoreHost {
             Err(UiWindowGroupError::DocumentRejected(_)) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
-                "ui.document.replace.window document is invalid.",
+                format!("{operation} document is invalid."),
                 None,
             ),
             Err(UiWindowGroupError::Busy | UiWindowGroupError::Unavailable) => self.failure(
@@ -3903,6 +3980,12 @@ mod tests {
         r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}}"#
     }
 
+    fn valid_ui_document_v3(value: &str, politeness: &str) -> String {
+        format!(
+            r#"{{"format":"anodrel.ui.document.v3","root":{{"id":"status","kind":"status","value":"{value}","fontSize":16,"tone":"accent","politeness":"{politeness}"}}}}"#
+        )
+    }
+
     fn field<'a>(value: &'a JsonValue, field: &str) -> &'a JsonValue {
         &value.as_object().expect("response is an object")[field]
     }
@@ -4160,6 +4243,12 @@ mod tests {
     fn request_v1_25(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":25}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_26(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":26}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -5432,6 +5521,46 @@ mod tests {
     }
 
     #[test]
+    fn replaces_version_three_status_documents_only_through_protocol_1_26() {
+        let host = host(vec![Capability::UiDocumentWrite]);
+        let document = valid_ui_document_v3("Saved", "polite");
+
+        let accepted = JsonValue::parse(&host.handle_json(&request_v1_26(
+            "ui.document.replace.v3",
+            &ui_document_payload(&document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        let snapshot = host
+            .take_ui_document_update()
+            .expect("accepted version three document is delivered");
+        assert_eq!(
+            snapshot.document().status().map(|status| status.value()),
+            Some("Saved")
+        );
+
+        let wrong_operation = JsonValue::parse(&host.handle_json(&request_v1_4(
+            "ui.document.replace.v2",
+            &ui_document_payload(&document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&wrong_operation, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        let old_minor = JsonValue::parse(&host.handle_json(&request_v1_25(
+            "ui.document.replace.v3",
+            &ui_document_payload(&document),
+        )))
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&old_minor, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
     fn reads_only_current_enabled_ui_actions_from_the_supplied_input_mailbox() {
         let mailbox = UiInputMailbox::new();
         let host = CoreHost::with_ui_input_mailbox(
@@ -5702,6 +5831,115 @@ mod tests {
         assert_eq!(
             field(field(&unavailable, "error"), "code").as_string(),
             Some("window.unavailable")
+        );
+    }
+
+    #[test]
+    fn protocol_v1_26_keeps_status_documents_explicit_for_secondary_views() {
+        let document_mailbox = UiDocumentMailbox::new();
+        let input_mailbox = UiInputMailbox::new();
+        let group = UiWindowGroup::<WindowTitleProposal>::with_primary_resources(
+            document_mailbox,
+            input_mailbox,
+        );
+        let host = CoreHost::with_session_window_group_and_service_bundle(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::WindowOpen, Capability::UiDocumentWrite],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            group.clone(),
+            SessionCloseSignal::default(),
+            HostServices::unavailable(),
+        );
+        let initial = valid_ui_document_v3("Saved", "polite");
+        let opening_group = group.clone();
+        let native_creator = thread::spawn(move || {
+            loop {
+                if let Some(request) = opening_group.take_open_request() {
+                    assert!(opening_group.complete_open(request.id(), true));
+                    break;
+                }
+                thread::yield_now();
+            }
+        });
+
+        let opened = JsonValue::parse(
+            &host.handle_json(&request_v1_26(
+                "window.open.v3",
+                &object([
+                    ("document", JsonValue::String(initial.clone())),
+                    ("title", JsonValue::String("Status".to_owned())),
+                ])
+                .to_json(),
+            )),
+        )
+        .expect("open response is JSON");
+        native_creator
+            .join()
+            .expect("native group creator does not panic");
+        let window_id = field(field(&opened, "result"), "windowId")
+            .as_string()
+            .expect("open result carries an identity");
+        let secondary = UiWindowId::parse(window_id).expect("fixed secondary ID parses");
+        let resources = group
+            .resources(&secondary)
+            .expect("secondary is registered");
+        let initial_snapshot = resources
+            .document_mailbox()
+            .take()
+            .expect("initial v3 snapshot is published");
+        assert_eq!(
+            initial_snapshot
+                .document()
+                .status()
+                .map(|status| status.value()),
+            Some("Saved")
+        );
+
+        let updated = valid_ui_document_v3("Save failed", "assertive");
+        let replacement = JsonValue::parse(
+            &host.handle_json(&request_v1_26(
+                "ui.document.replace.window.v3",
+                &object([
+                    ("document", JsonValue::String(updated)),
+                    ("windowId", JsonValue::String(window_id.to_owned())),
+                ])
+                .to_json(),
+            )),
+        )
+        .expect("replacement response is JSON");
+        assert_eq!(
+            field(field(&replacement, "result"), "revision").as_string(),
+            Some("2")
+        );
+        let replacement_snapshot = resources
+            .document_mailbox()
+            .take()
+            .expect("updated v3 snapshot is published");
+        assert_eq!(
+            replacement_snapshot
+                .document()
+                .status()
+                .map(|status| status.value()),
+            Some("Save failed")
+        );
+
+        let v1_refusal = JsonValue::parse(
+            &host.handle_json(&request_v1_25(
+                "window.open.v3",
+                &object([
+                    ("document", JsonValue::String(initial)),
+                    ("title", JsonValue::String("Status".to_owned())),
+                ])
+                .to_json(),
+            )),
+        )
+        .expect("old-version response is JSON");
+        assert_eq!(
+            field(field(&v1_refusal, "error"), "code").as_string(),
+            Some("operation.unsupported")
         );
     }
 

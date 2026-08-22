@@ -7,7 +7,7 @@ import { canonicalBase64UrlDecodedLength } from "./base64url.js";
 
 export { encodeCanonicalBase64Url } from "./base64url.js";
 
-export const PROTOCOL_VERSION = { major: 1, minor: 25 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 26 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -256,6 +256,11 @@ export interface PlatformOperationMap {
     readonly payload: { readonly title: string; readonly document: string };
     readonly result: { readonly windowId: SecondarySessionWindowId };
   };
+  /** Opens one exact v3 document in a bounded secondary session view. */
+  "window.open.v3": {
+    readonly payload: { readonly title: string; readonly document: string };
+    readonly result: { readonly windowId: SecondarySessionWindowId };
+  };
   /** Requests a close for one previously issued secondary view. */
   "window.close": {
     readonly payload: { readonly windowId: SecondarySessionWindowId };
@@ -296,8 +301,17 @@ export interface PlatformOperationMap {
     readonly payload: { readonly document: string };
     readonly result: { readonly revision: string };
   };
+  "ui.document.replace.v3": {
+    readonly payload: { readonly document: string };
+    readonly result: { readonly revision: string };
+  };
   /** Replaces the strict v1 document of one known session view. */
   "ui.document.replace.window": {
+    readonly payload: { readonly windowId: SessionWindowId; readonly document: string };
+    readonly result: { readonly revision: string };
+  };
+  /** Replaces one known session view with an exact v3 document. */
+  "ui.document.replace.window.v3": {
     readonly payload: { readonly windowId: SessionWindowId; readonly document: string };
     readonly result: { readonly revision: string };
   };

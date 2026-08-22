@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 
 use anodrel_client::{Client, ProtocolVersion};
 use anodrel_json::JsonValue;
-use anodrel_ui_document::decode;
+use anodrel_ui_document::{decode, decode_v3};
 use anodrel_window::WindowTitleProposal;
 
 use crate::{
@@ -20,6 +20,8 @@ const UI_FIELD_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(15);
 const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(24);
 /// The first protocol version with bounded session-owned secondary views.
 const UI_MULTI_WINDOW_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(25);
+/// The first protocol version with explicit visible live-status documents.
+const UI_LIVE_STATUS_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(26);
 /// The operation-level document input limit inside one Wire v1 message.
 const MAX_SESSION_DOCUMENT_BYTES: usize = 24 * 1024;
 /// The initial request sequence. Zero remains unavailable as an internal guard.
@@ -65,6 +67,24 @@ where
                 .into_iter()
                 .collect(),
             ),
+        )?;
+        parse_document_revision(&result)
+    }
+
+    /// Replaces this session's primary surface with one strict v3 document.
+    ///
+    /// The document is locally checked before transport, including the exact
+    /// one-status rule. The host validates it again and never reports whether
+    /// Windows delivered a live announcement.
+    pub fn replace_document_v3(
+        &mut self,
+        document: &str,
+    ) -> Result<DocumentRevision, UiClientError> {
+        validate_document_v3(document)?;
+        let result = self.request(
+            UI_LIVE_STATUS_PROTOCOL,
+            "ui.document.replace.v3",
+            document_payload(document),
         )?;
         parse_document_revision(&result)
     }
@@ -162,6 +182,28 @@ where
             .and_then(SecondaryWindowId::parse_response)
     }
 
+    /// Opens one bounded secondary view from a strict version-3 document.
+    pub fn open_window_v3(
+        &mut self,
+        title: &str,
+        document: &str,
+    ) -> Result<SecondaryWindowId, UiClientError> {
+        validate_document_v3(document)?;
+        let title =
+            WindowTitleProposal::new(title).map_err(|_| UiClientError::WindowTitleInvalid)?;
+        let result = self.request(
+            UI_LIVE_STATUS_PROTOCOL,
+            "window.open.v3",
+            window_document_payload(title.as_str(), document),
+        )?;
+        result
+            .as_object()
+            .and_then(|fields| fields.get("windowId"))
+            .and_then(JsonValue::as_string)
+            .ok_or(UiClientError::ResponseInvalid)
+            .and_then(SecondaryWindowId::parse_response)
+    }
+
     /// Replaces a strict v1 document in one secondary view this facade opened.
     ///
     /// `SecondaryWindowId` has no primary variant, so the ordinary primary
@@ -189,6 +231,21 @@ where
                 .into_iter()
                 .collect(),
             ),
+        )?;
+        parse_document_revision(&result)
+    }
+
+    /// Replaces one opened secondary view with a strict version-3 document.
+    pub fn replace_window_document_v3(
+        &mut self,
+        window: SecondaryWindowId,
+        document: &str,
+    ) -> Result<DocumentRevision, UiClientError> {
+        validate_document_v3(document)?;
+        let result = self.request(
+            UI_LIVE_STATUS_PROTOCOL,
+            "ui.document.replace.window.v3",
+            targeted_document_payload(window, document),
         )?;
         parse_document_revision(&result)
     }
@@ -287,6 +344,56 @@ fn validate_document(document: &str) -> Result<(), UiClientError> {
     } else {
         Ok(())
     }
+}
+
+fn validate_document_v3(document: &str) -> Result<(), UiClientError> {
+    if document.len() > MAX_SESSION_DOCUMENT_BYTES || decode_v3(document).is_err() {
+        Err(UiClientError::DocumentInvalid)
+    } else {
+        Ok(())
+    }
+}
+
+fn document_payload(document: &str) -> JsonValue {
+    JsonValue::Object(
+        [(
+            "document".to_owned(),
+            JsonValue::String(document.to_owned()),
+        )]
+        .into_iter()
+        .collect(),
+    )
+}
+
+fn window_document_payload(title: &str, document: &str) -> JsonValue {
+    JsonValue::Object(
+        [
+            ("title".to_owned(), JsonValue::String(title.to_owned())),
+            (
+                "document".to_owned(),
+                JsonValue::String(document.to_owned()),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    )
+}
+
+fn targeted_document_payload(window: SecondaryWindowId, document: &str) -> JsonValue {
+    JsonValue::Object(
+        [
+            (
+                "windowId".to_owned(),
+                JsonValue::String(window.protocol_string()),
+            ),
+            (
+                "document".to_owned(),
+                JsonValue::String(document.to_owned()),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    )
 }
 
 fn parse_document_revision(result: &JsonValue) -> Result<DocumentRevision, UiClientError> {

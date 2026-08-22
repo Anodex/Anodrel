@@ -153,6 +153,16 @@ requires `ui.events.read` and returns only revision-checked semantic actions
 tagged with their `windowId`; order across different views has no desktop-time
 meaning. See `docs/MULTI_WINDOW.md`.
 
+### Semantic live-status documents
+
+Protocol 1.26 adds `replaceUiDocumentV3(document)`, `openWindowV3(title,
+document)`, and `replaceUiDocumentV3InWindow(windowId, document)`. Each accepts
+only an exact version-3 document; the replacement methods retain the existing
+`ui.document.write` grant and opening a secondary view additionally requires
+`window.open`. A response confirms only accepted document state. It never
+reports whether Windows announced a visible status or whether anyone heard it.
+See `docs/UI_LIVE_ANNOUNCEMENTS.md`.
+
 ### Native session menus
 
 `replaceMenu(menus)` continues to require the separate `menu.write` grant and

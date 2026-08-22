@@ -10,7 +10,9 @@ use std::{
 };
 
 use anodrel_ui::ElementId;
-use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, control_type, property};
+use anodrel_windows_accessibility::{
+    AccessibleElement, ScreenRect, control_type, live_setting, property,
+};
 
 use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
 use crate::raw2::{UiaRect, direction};
@@ -242,6 +244,7 @@ impl Tree {
             property::IS_ENABLED => Some(Variant::boolean(element.enabled())),
             property::IS_OFFSCREEN => Some(Variant::boolean(!self.is_visible(index))),
             property::IS_KEYBOARD_FOCUSABLE => Some(Variant::boolean(element.keyboard_focusable())),
+            property::LIVE_SETTING => Some(Variant::int(element.live_setting())),
             UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => {
                 Some(Variant::boolean(self.focused() == Some(index)))
             }
@@ -315,6 +318,23 @@ impl Tree {
             .focused
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Returns the current visible semantic status that may source one
+    /// live-region notification. The ID came from the host's comparison of
+    /// accepted documents; this method still validates that the fresh provider
+    /// contains an on-screen live node before Windows receives it.
+    #[must_use]
+    pub(crate) fn live_region(&self, id: &ElementId) -> Option<usize> {
+        self.elements
+            .iter()
+            .enumerate()
+            .find(|(index, element)| {
+                element.automation_id() == id.as_str()
+                    && element.live_setting() != live_setting::OFF
+                    && self.is_visible(*index)
+            })
+            .map(|(index, _)| index)
     }
 
     /// Whether one published element exposes a read-only field-value snapshot.
@@ -536,6 +556,7 @@ mod tests {
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"},{"id":"blocked","kind":"action","label":"Unavailable","fontSize":16,"enabled":false,"tone":"accent"}]}}"#;
     const FIELD_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"name","kind":"field","label":"Name","value":"","maxLength":64,"fontSize":16,"enabled":true},{"id":"locked","kind":"field","label":"Locked","value":"","maxLength":64,"fontSize":16,"enabled":false},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
+    const STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"result","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}"#;
     const NESTED_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"section","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"detail","kind":"text","value":"Nested","fontSize":16,"tone":"primary"},{"id":"go","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]},{"id":"footer","kind":"text","value":"Done","fontSize":16,"tone":"primary"}]}}"#;
 
     struct FixedMeasurer;
@@ -556,6 +577,16 @@ mod tests {
 
     fn mapped_document(source: &str) -> Vec<AccessibleElement> {
         let document = anodrel_ui_document::decode(source).expect("the fixture document is valid");
+        map_document(document)
+    }
+
+    fn mapped_document_v3(source: &str) -> Vec<AccessibleElement> {
+        let document =
+            anodrel_ui_document::decode_v3(source).expect("the v3 fixture document is valid");
+        map_document(document)
+    }
+
+    fn map_document(document: anodrel_ui::UiDocument) -> Vec<AccessibleElement> {
         let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
         accessible_elements(
             &document.accessibility_snapshot(&layout),
@@ -687,6 +718,23 @@ mod tests {
         assert!(tree.property(Some(1), 30_006).is_none());
         // An index past the end is not a panic and not a guess.
         assert!(tree.property(Some(99), super::property::NAME).is_none());
+    }
+
+    #[test]
+    fn a_status_publishes_its_declared_live_setting() {
+        let tree = Tree::new(
+            Vec::new(),
+            mapped_document_v3(STATUS_DOCUMENT),
+            Vec::new(),
+            None,
+            None,
+            None,
+        );
+
+        let live_setting = tree
+            .property(Some(0), super::property::LIVE_SETTING)
+            .expect("a status supplies its live setting");
+        assert_eq!(live_setting.int_value(), Some(super::live_setting::POLITE));
     }
 
     #[test]

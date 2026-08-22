@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.25, including bounded session-owned
-secondary views documented in `docs/MULTI_WINDOW.md`.
+**Status:** Implemented through version 1.26, including bounded semantic
+live-status documents for primary and session-owned secondary views.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.25 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 25}`.
+the host's. Version 1.26 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 26}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -73,11 +73,14 @@ The implemented operations are:
 | `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
 | `window.size.set` | `{ "width": integer, "height": integer }` | `{ "status": "applied" }` | `window.size` |
 | `window.open` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
+| `window.open.v3` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
 | `window.close` | `{ "windowId": string }` | `{ "status": "requested" }` | `window.close` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean, "shortcut"?: "Ctrl+<A-Z0-9>" \| "Ctrl+Shift+<A-Z0-9>" }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
+| `ui.document.replace.v3` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.window` | `{ "windowId": string, "document": string }` | accepted view document revision | `ui.document.write` |
+| `ui.document.replace.window.v3` | `{ "windowId": string, "document": string }` | accepted view document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
 | `ui.events.read.window` | `{}` | bounded per-view tagged UI events | `ui.events.read` |
 | `session.close` | `{}` | accepted close request | `session.close` |
@@ -192,6 +195,22 @@ contains at most 128 tagged actions. It promises order only within an
 individual view; it never exposes native handles, geometry, lifecycle events,
 view enumeration, or desktop timing. See `docs/MULTI_WINDOW.md` and Decisions
 0092–0093.
+
+### Semantic live-status documents
+
+Protocol 1.26 adds `ui.document.replace.v3`, `window.open.v3`, and
+`ui.document.replace.window.v3`. Their payloads and successful revision or
+window-ID results are identical to their v1 counterparts, but each requires an
+exact `anodrel.ui.document.v3` value. They retain the existing
+`ui.document.write` and, for opening a view, `window.open` grants. No new
+grant, callback, recipient, accessibility field, or result status is created.
+
+Version 3 adds a visible semantic `status` node to the v2 document format. The
+Windows host may publish one best-effort UI Automation live-region event after
+a later changed visible status is applied to an established authenticated
+session view. That delivery is intentionally not a protocol outcome: the
+response acknowledges only document acceptance. See
+`docs/UI_LIVE_ANNOUNCEMENTS.md` and Decision 0100.
 
 ### Native session menus
 

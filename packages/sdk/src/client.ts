@@ -144,6 +144,14 @@ export class PlatformClient {
     return this.request("window.open", { title, document });
   }
 
+  /** Opens a secondary view from one exact version-3 UI document. */
+  openWindowV3(
+    title: string,
+    document: string,
+  ): Promise<ResultFor<"window.open.v3">> {
+    return this.request("window.open.v3", { title, document });
+  }
+
   /**
    * Asks the host to close one secondary view issued to this session.
    *
@@ -178,6 +186,11 @@ export class PlatformClient {
     return this.request("ui.document.replace.v2", { document });
   }
 
+  /** Replaces the primary surface with one exact version-3 UI document. */
+  replaceUiDocumentV3(document: string): Promise<ResultFor<"ui.document.replace.v3">> {
+    return this.request("ui.document.replace.v3", { document });
+  }
+
   /**
    * Replaces the strict v1 document of `main` or one secondary view this
    * session received from `openWindow`. Every view keeps its own revision.
@@ -187,6 +200,14 @@ export class PlatformClient {
     document: string,
   ): Promise<ResultFor<"ui.document.replace.window">> {
     return this.request("ui.document.replace.window", { windowId, document });
+  }
+
+  /** Replaces `main` or one issued secondary view with an exact v3 document. */
+  replaceUiDocumentV3InWindow(
+    windowId: SessionWindowId,
+    document: string,
+  ): Promise<ResultFor<"ui.document.replace.window.v3">> {
+    return this.request("ui.document.replace.window.v3", { windowId, document });
   }
 
   /**

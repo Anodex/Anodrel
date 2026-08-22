@@ -7,7 +7,7 @@ use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
 use anodrel_menu::{MenuMailbox, MenuRequest};
 use anodrel_notifications::{NotificationMailbox, NotificationRequest};
-use anodrel_ui::UiEvent;
+use anodrel_ui::{ElementId, Status, UiEvent};
 use anodrel_ui_session::{
     UiDocumentMailbox, UiDocumentRevision, UiFieldMailbox, UiFieldRequest, UiInputCandidate,
     UiInputMailbox, UiWindowId, UiWindowResources,
@@ -94,12 +94,29 @@ pub(super) struct UiSessionView {
     /// it may read.
     field_reads: Option<UiFieldMailbox>,
     revision: UiDocumentRevision,
+    /// The semantic status from the last accepted session document.
+    ///
+    /// It establishes the event baseline only; it is not a delivery record,
+    /// listener state, or application-visible value.
+    last_status: Option<Status>,
     /// The private membership of this view in a native session-window group.
     ///
     /// It is absent for the legacy one-window diagnostic. When present, it
     /// keeps the verified product lifetime with the group rather than this one
     /// view and lets the UI thread poll group-wide close and open handoffs.
     session_window: Option<SessionWindowMember>,
+}
+
+/// The one host-only outcome from polling a session document mailbox.
+///
+/// A status ID means only that a later accepted document changed its declared
+/// status. The window procedure still verifies visible current publication
+/// before it raises any outbound Windows event.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct UiSessionPoll {
+    pub(super) document_changed: bool,
+    pub(super) close_requested: bool,
+    pub(super) changed_status: Option<ElementId>,
 }
 
 impl UiSessionView {
@@ -132,6 +149,7 @@ impl UiSessionView {
             display_name: None,
             field_reads: None,
             revision: UiDocumentRevision::INITIAL,
+            last_status: None,
             session_window: None,
         }
     }
@@ -498,20 +516,40 @@ impl UiSessionView {
     }
 
     /// Applies at most one newer accepted snapshot from this view's mailbox.
-    pub(super) fn poll(&mut self) -> (bool, bool) {
+    pub(super) fn poll(&mut self) -> UiSessionPoll {
         let close_requested = self.session_window.as_ref().map_or_else(
             || self.close_signal.take(),
             SessionWindowMember::observe_shutdown,
         );
         let Some(snapshot) = self.mailbox.take() else {
-            return (false, close_requested);
+            return UiSessionPoll {
+                document_changed: false,
+                close_requested,
+                changed_status: None,
+            };
         };
         if snapshot.revision() <= self.revision {
-            return (false, close_requested);
+            return UiSessionPoll {
+                document_changed: false,
+                close_requested,
+                changed_status: None,
+            };
         }
+        let established = self.revision != UiDocumentRevision::INITIAL;
+        let next_status = snapshot.document().status().cloned();
+        let changed_status = if established && next_status.as_ref() != self.last_status.as_ref() {
+            next_status.as_ref().map(|status| status.id().clone())
+        } else {
+            None
+        };
         self.revision = snapshot.revision();
         self.lab.replace_document(snapshot.document().clone());
-        (true, close_requested)
+        self.last_status = next_status;
+        UiSessionPoll {
+            document_changed: true,
+            close_requested,
+            changed_status,
+        }
     }
 
     /// Registers this view's host-owned logical identity before the window is
@@ -772,20 +810,31 @@ mod tests {
     use anodrel_core::SessionCloseSignal;
     use anodrel_file_dialog::FileDialogMailbox;
     use anodrel_notifications::NotificationMailbox;
-    use anodrel_ui::UiEvent;
+    use anodrel_ui::{ElementId, UiEvent};
     use anodrel_ui_session::{
         SessionInteractionCandidate, UiDocumentMailbox, UiDocumentSession, UiInputMailbox,
     };
     use anodrel_windows_file_access::WindowsFileTextService;
 
     use super::{
-        UiSessionView, WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode,
-        WindowSize, WindowSizeMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox,
+        UiSessionPoll, UiSessionView, WindowFocusMailbox, WindowFullscreenMailbox,
+        WindowFullscreenMode, WindowSize, WindowSizeMailbox, WindowState, WindowStateMailbox,
+        WindowTitleMailbox,
     };
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
     const ACTION_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.action","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}"#;
     const SCROLL_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v2","root":{"id":"session.viewport","kind":"scroll","child":{"id":"session.content","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":0,"surfaceTone":"plain","children":[{"id":"session.one","kind":"action","label":"One","fontSize":16,"enabled":true,"tone":"accent"},{"id":"session.two","kind":"action","label":"Two","fontSize":16,"enabled":true,"tone":"accent"},{"id":"session.three","kind":"action","label":"Three","fontSize":16,"enabled":true,"tone":"accent"}]}}}"#;
+    const STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"session.status","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}"#;
+    const UPDATED_STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"session.status","kind":"status","value":"Save failed","fontSize":16,"tone":"accent","politeness":"assertive"}}"#;
+
+    fn poll(document_changed: bool, close_requested: bool) -> UiSessionPoll {
+        UiSessionPoll {
+            document_changed,
+            close_requested,
+            changed_status: None,
+        }
+    }
 
     #[test]
     fn applies_only_a_newer_snapshot_from_its_own_mailbox() {
@@ -804,8 +853,53 @@ mod tests {
             .expect("document is valid");
         mailbox.publish(session.snapshot().expect("snapshot is available"));
 
-        assert_eq!(view.poll(), (true, false));
-        assert_eq!(view.poll(), (false, false));
+        assert_eq!(view.poll(), poll(true, false));
+        assert_eq!(view.poll(), poll(false, false));
+    }
+
+    #[test]
+    fn live_status_is_silent_initially_and_reports_only_a_later_change() {
+        let mailbox = UiDocumentMailbox::new();
+        let mut view = UiSessionView::new(
+            mailbox.clone(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        let mut session = UiDocumentSession::new();
+
+        session
+            .replace_document_v3(STATUS_DOCUMENT)
+            .expect("initial status is valid");
+        mailbox.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(view.poll(), poll(true, false), "initial content is silent");
+
+        session
+            .replace_document_v3(STATUS_DOCUMENT)
+            .expect("same status is valid");
+        mailbox.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(view.poll(), poll(true, false), "same status is silent");
+
+        session
+            .replace_document_v3(UPDATED_STATUS_DOCUMENT)
+            .expect("updated status is valid");
+        mailbox.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(
+            view.poll(),
+            UiSessionPoll {
+                document_changed: true,
+                close_requested: false,
+                changed_status: Some(ElementId::new("session.status").expect("fixed ID is valid")),
+            }
+        );
+
+        session
+            .replace_document(DOCUMENT)
+            .expect("status removal document is valid");
+        mailbox.publish(session.snapshot().expect("snapshot is available"));
+        assert_eq!(view.poll(), poll(true, false), "removal is silent");
     }
 
     #[test]
@@ -826,7 +920,7 @@ mod tests {
             .replace_document(ACTION_DOCUMENT)
             .expect("document is valid");
         documents.publish(session.snapshot().expect("snapshot is available"));
-        assert_eq!(view.poll(), (true, false));
+        assert_eq!(view.poll(), poll(true, false));
         assert!(view.accessibility_action_sink().is_some());
     }
 
@@ -976,7 +1070,7 @@ mod tests {
             .replace_document(FIELD_DOCUMENT)
             .expect("document is valid");
         documents.publish(session.snapshot().expect("snapshot is available"));
-        assert_eq!(view.poll(), (true, false));
+        assert_eq!(view.poll(), poll(true, false));
 
         let width = 920.0;
         let height = 660.0;
@@ -1240,10 +1334,10 @@ mod tests {
             NotificationMailbox::new(),
         );
 
-        assert_eq!(view.poll(), (false, false));
+        assert_eq!(view.poll(), poll(false, false));
         signal.request();
-        assert_eq!(view.poll(), (false, true));
-        assert_eq!(view.poll(), (false, false));
+        assert_eq!(view.poll(), poll(false, true));
+        assert_eq!(view.poll(), poll(false, false));
     }
 
     #[test]
@@ -1263,7 +1357,7 @@ mod tests {
             .replace_document(ACTION_DOCUMENT)
             .expect("document is valid");
         mailbox.publish(session.snapshot().expect("snapshot is available"));
-        assert_eq!(view.poll(), (true, false));
+        assert_eq!(view.poll(), poll(true, false));
 
         assert!(view.focus_next(920.0, 660.0));
         assert!(view.activate_focused(920.0, 660.0));
@@ -1299,7 +1393,7 @@ mod tests {
             .replace_document_v2(SCROLL_DOCUMENT)
             .expect("version two document is valid");
         mailbox.publish(session.snapshot().expect("snapshot is available"));
-        assert_eq!(view.poll(), (true, false));
+        assert_eq!(view.poll(), poll(true, false));
 
         assert!(view.scroll_page(920.0, 70.0, true));
         assert_eq!(view.revision.value(), 1);

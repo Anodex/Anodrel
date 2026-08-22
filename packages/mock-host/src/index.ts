@@ -436,11 +436,12 @@ export class MockHost {
         return this.success("window.size.set", request.requestId, { status: "applied" });
 
       case "window.open":
-        if (request.protocolVersion.minor < 25) {
+      case "window.open.v3":
+        if (request.protocolVersion.minor < (request.operation === "window.open.v3" ? 26 : 25)) {
           return this.failure(
             request.requestId,
             "operation.unsupported",
-            "window.open requires protocol 1.25 or later.",
+            `${request.operation} requires a supported protocol version.`,
           );
         }
         if (
@@ -453,21 +454,21 @@ export class MockHost {
           return this.failure(
             request.requestId,
             "request.payload_invalid",
-            "window.open requires one exact title and bounded document.",
+            `${request.operation} requires one exact title and bounded document.`,
           );
         }
         if (!isWindowOpenPayload(request.payload) || !isWindowTitleProposal(request.payload.title)) {
           return this.failure(
             request.requestId,
             "window.title_invalid",
-            "window.open title is invalid.",
+            `${request.operation} title is invalid.`,
           );
         }
         if (!this.hasCapability(sessionId, "window.open")) {
           return this.failure(
             request.requestId,
             "capability.denied",
-            "window.open requires the window.open capability.",
+            `${request.operation} requires the window.open capability.`,
             { capability: "window.open" },
           );
         }
@@ -475,7 +476,7 @@ export class MockHost {
           return this.failure(
             request.requestId,
             "capability.denied",
-            "window.open requires the ui.document.write capability.",
+            `${request.operation} requires the ui.document.write capability.`,
             { capability: "ui.document.write" },
           );
         }
@@ -490,7 +491,7 @@ export class MockHost {
           const windowId = `window-${sessionWindows.nextSecondaryId}` as SecondarySessionWindowId;
           sessionWindows.nextSecondaryId += 1;
           sessionWindows.revisions.set(windowId, 1);
-          return this.success("window.open", request.requestId, { windowId });
+          return this.success(request.operation, request.requestId, { windowId });
         }
 
       case "window.close":
@@ -572,7 +573,8 @@ export class MockHost {
 
       case "ui.document.replace":
       case "ui.document.replace.v2":
-        if (request.protocolVersion.minor < (request.operation === "ui.document.replace.v2" ? 4 : 1)) {
+      case "ui.document.replace.v3":
+        if (request.protocolVersion.minor < (request.operation === "ui.document.replace.v3" ? 26 : request.operation === "ui.document.replace.v2" ? 4 : 1)) {
           return this.failure(
             request.requestId,
             "operation.unsupported",
@@ -583,14 +585,14 @@ export class MockHost {
           return this.failure(
             request.requestId,
             "request.payload_invalid",
-            "ui.document.replace requires one bounded document string.",
+            `${request.operation} requires one bounded document string.`,
           );
         }
         if (!this.hasCapability(sessionId, "ui.document.write")) {
           return this.failure(
             request.requestId,
             "capability.denied",
-            "ui.document.replace requires the ui.document.write capability.",
+            `${request.operation} requires the ui.document.write capability.`,
             { capability: "ui.document.write" },
           );
         }
@@ -601,25 +603,26 @@ export class MockHost {
         });
 
       case "ui.document.replace.window":
-        if (request.protocolVersion.minor < 25) {
+      case "ui.document.replace.window.v3":
+        if (request.protocolVersion.minor < (request.operation === "ui.document.replace.window.v3" ? 26 : 25)) {
           return this.failure(
             request.requestId,
             "operation.unsupported",
-            "ui.document.replace.window requires protocol 1.25 or later.",
+            `${request.operation} requires a supported protocol version.`,
           );
         }
         if (!isUiDocumentReplaceWindowPayload(request.payload)) {
           return this.failure(
             request.requestId,
             "request.payload_invalid",
-            "ui.document.replace.window requires one canonical windowId and bounded document.",
+            `${request.operation} requires one canonical windowId and bounded document.`,
           );
         }
         if (!this.hasCapability(sessionId, "ui.document.write")) {
           return this.failure(
             request.requestId,
             "capability.denied",
-            "ui.document.replace.window requires the ui.document.write capability.",
+            `${request.operation} requires the ui.document.write capability.`,
             { capability: "ui.document.write" },
           );
         }
@@ -634,7 +637,7 @@ export class MockHost {
           }
           const next = revision + 1;
           sessionWindows.revisions.set(request.payload.windowId, next);
-          return this.success("ui.document.replace.window", request.requestId, {
+          return this.success(request.operation, request.requestId, {
             revision: next.toString(),
           });
         }

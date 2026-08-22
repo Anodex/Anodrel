@@ -55,7 +55,7 @@ fn find_field<'a>(node: &'a UiNode, id: &ElementId) -> Option<&'a Field> {
             .iter()
             .find_map(|child| find_field(child, id)),
         UiNode::Scroll(scroll) => find_field(scroll.child(), id),
-        UiNode::Field(_) | UiNode::Text(_) | UiNode::Action(_) => None,
+        UiNode::Field(_) | UiNode::Text(_) | UiNode::Status(_) | UiNode::Action(_) => None,
     }
 }
 
@@ -88,7 +88,7 @@ fn collect_scroll_item_ids(
             laid_out,
             output,
         ),
-        UiNode::Text(_) | UiNode::Action(_) | UiNode::Field(_) => {}
+        UiNode::Text(_) | UiNode::Status(_) | UiNode::Action(_) | UiNode::Field(_) => {}
     }
 }
 
@@ -1100,13 +1100,31 @@ fn draw_node(
             canvas.draw_canvas_clipped(&content, 0, 0, 1.0, surface.to_canvas_rect(item.bounds()));
         }
         UiNode::Text(text_node) => {
+            // A lab replacement is not the value layout measured, so a longer
+            // result could paint past this box. The lab uses only short fixed
+            // results; a document's own text is never substituted.
+            let value = if status_target.is_some_and(|target| target == text_node.id()) {
+                status.unwrap_or(text_node.value())
+            } else {
+                text_node.value()
+            };
             draw_text(
                 canvas,
-                text_node,
-                bounds,
+                TextRender::new(value, text_node.font_size(), text_node.tone(), bounds),
                 surface,
-                status_target,
-                status,
+                palette,
+            );
+        }
+        UiNode::Status(status_node) => {
+            draw_text(
+                canvas,
+                TextRender::new(
+                    status_node.value(),
+                    status_node.font_size(),
+                    status_node.tone(),
+                    bounds,
+                ),
+                surface,
                 palette,
             );
         }
@@ -1218,21 +1236,36 @@ fn draw_field(
     );
 }
 
+/// One fully resolved text run ready for the native canvas.
+///
+/// Keeping the text facts together makes text and semantic status rendering
+/// use one short drawing boundary without giving the renderer a document-wide
+/// status lookup.
+struct TextRender<'a> {
+    value: &'a str,
+    font_size: u16,
+    tone: UiTextTone,
+    bounds: UiRect,
+}
+
+impl<'a> TextRender<'a> {
+    const fn new(value: &'a str, font_size: u16, tone: UiTextTone, bounds: UiRect) -> Self {
+        Self {
+            value,
+            font_size,
+            tone,
+            bounds,
+        }
+    }
+}
+
 fn draw_text(
     canvas: &mut Canvas,
-    text_node: &Text,
-    bounds: UiRect,
+    text_run: TextRender<'_>,
     surface: Surface,
-    status_target: Option<&ElementId>,
-    status: Option<&str>,
     palette: UiLabPalette,
 ) {
-    let value = if status_target.is_some_and(|target| target == text_node.id()) {
-        status.unwrap_or(text_node.value())
-    } else {
-        text_node.value()
-    };
-    let color = match text_node.tone() {
+    let color = match text_run.tone {
         UiTextTone::Primary => palette.ink,
         UiTextTone::Secondary => palette.ink_soft,
         UiTextTone::Accent => palette.accent_shell,
@@ -1243,23 +1276,19 @@ fn draw_text(
     // layout measured. `bounds` is the widest line, and greedy breaking gives
     // the same result at that width as at the column it was wrapped against.
     //
-    // A status value substituted here is not the value the layout measured, so
-    // a status longer than the text it replaces may paint past its box. Status
-    // is a lab affordance and its strings are short; a document's own text is
-    // never substituted.
     let lines = wrap_text(
-        value,
-        text_node.font_size(),
-        bounds.width(),
+        text_run.value,
+        text_run.font_size,
+        text_run.bounds.width(),
         &WindowsTextMeasurer,
     );
     // Advancing by the measured block height divided by its line count keeps
     // the run inside the box the layout reserved, instead of accumulating a
     // per-line rounding difference down a paragraph.
-    let step = (bounds.height() * surface.scale) / lines.len() as f32;
-    let font = surface.font(text_node.font_size());
-    let left = bounds.left * surface.scale;
-    let top = bounds.top * surface.scale;
+    let step = (text_run.bounds.height() * surface.scale) / lines.len() as f32;
+    let font = surface.font(text_run.font_size);
+    let left = text_run.bounds.left * surface.scale;
+    let top = text_run.bounds.top * surface.scale;
     for (index, line) in lines.iter().enumerate() {
         if line.is_empty() {
             continue;

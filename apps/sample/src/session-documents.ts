@@ -5,6 +5,86 @@ export const STANDARD_SESSION_ACTION = "sample.session.action";
 export const STANDARD_SESSION_DOCUMENT =
   '{"format":"anodrel.ui.document.v1","root":{"id":"sample.session.root","kind":"stack","axis":"vertical","padding":{"left":56,"top":56,"right":56,"bottom":56},"gap":16,"surfaceTone":"plain","children":[{"id":"sample.session.eyebrow","kind":"text","value":"AUTHENTICATED ANODREL SESSION","fontSize":14,"tone":"accent"},{"id":"sample.session.title","kind":"text","value":"Native document delivered","fontSize":28,"tone":"primary"},{"id":"sample.session.detail","kind":"text","value":"This view came through the private pipe and remains free of native action authority.","fontSize":16,"tone":"secondary"},{"id":"sample.session.action","kind":"action","label":"Visual-only semantic action","fontSize":16,"enabled":true,"tone":"accent"}]}}';
 
+/** The single semantic action that starts the live-status demonstration. */
+export const LIVE_STATUS_ACTION = "sample.live-status.publish";
+
+/**
+ * The fixed initial v3 status view.
+ *
+ * This status establishes the silent baseline. Only the two later complete
+ * document replacements in the diagnostic can produce a live-region event.
+ */
+export const LIVE_STATUS_INITIAL_DOCUMENT = liveStatusDocument(
+  "Ready to publish a visible result.",
+  "polite",
+);
+
+/** The first later result asks assistive technology to speak politely. */
+export const LIVE_STATUS_POLITE_DOCUMENT = liveStatusDocument(
+  "Verification is complete.",
+  "polite",
+);
+
+/** The second later result demonstrates an urgent visible status. */
+export const LIVE_STATUS_ASSERTIVE_DOCUMENT = liveStatusDocument(
+  "Verification succeeded.",
+  "assertive",
+);
+
+function liveStatusDocument(value: string, politeness: "polite" | "assertive"): string {
+  return JSON.stringify({
+    format: "anodrel.ui.document.v3",
+    root: {
+      id: "sample.live-status.root",
+      kind: "stack",
+      axis: "vertical",
+      padding: { left: 56, top: 56, right: 56, bottom: 56 },
+      gap: 16,
+      surfaceTone: "plain",
+      children: [
+        {
+          id: "sample.live-status.eyebrow",
+          kind: "text",
+          value: "AUTHENTICATED ANODREL SESSION",
+          fontSize: 14,
+          tone: "accent",
+        },
+        {
+          id: "sample.live-status.title",
+          kind: "text",
+          value: "One-way accessible result",
+          fontSize: 28,
+          tone: "primary",
+        },
+        {
+          id: "sample.live-status.detail",
+          kind: "text",
+          value:
+            "Start Narrator after this window opens, then activate the action to publish two visible status results.",
+          fontSize: 16,
+          tone: "secondary",
+        },
+        {
+          id: "sample.live-status.result",
+          kind: "status",
+          value,
+          fontSize: 16,
+          tone: "accent",
+          politeness,
+        },
+        {
+          id: LIVE_STATUS_ACTION,
+          kind: "action",
+          label: "Publish visible result",
+          fontSize: 16,
+          enabled: true,
+          tone: "accent",
+        },
+      ],
+    },
+  });
+}
+
 /** The sole semantic command emitted by the native-menu diagnostic. */
 export const MENU_SESSION_ACTION = "sample.menu.complete";
 

@@ -38,6 +38,18 @@ pub mod property {
     pub const IS_CONTROL_ELEMENT: i32 = 30_016;
     /// `UIA_IsContentElementPropertyId`.
     pub const IS_CONTENT_ELEMENT: i32 = 30_017;
+    /// `UIA_LiveSettingPropertyId`.
+    pub const LIVE_SETTING: i32 = 30_135;
+}
+
+/// UI Automation live-setting values.
+pub mod live_setting {
+    /// `Off`.
+    pub const OFF: i32 = 0;
+    /// `Polite`.
+    pub const POLITE: i32 = 1;
+    /// `Assertive`.
+    pub const ASSERTIVE: i32 = 2;
 }
 
 /// Prefix telling Windows to append this provider's runtime ID to the host

@@ -6,6 +6,8 @@
 
 use std::{ffi::c_void, sync::Arc};
 
+use anodrel_ui::ElementId;
+
 use crate::{Provider, Tree, UiAutomationPublication, raw, release_provider, window_title};
 
 /// Raises the standard focus-changed event for a current host publication.
@@ -53,6 +55,31 @@ pub fn raise_structure_changed(window: raw::Handle, publication: UiAutomationPub
     }
 }
 
+/// Raises one best-effort live-region event from a changed visible status.
+///
+/// The host has already established that a later authenticated document changed
+/// its semantic status. This function rechecks that the fresh immutable tree
+/// contains that status as a visible live element. It stores no listener or
+/// delivery state and discards Windows' best-effort result.
+pub fn raise_live_region_changed(
+    window: raw::Handle,
+    publication: UiAutomationPublication,
+    status: &ElementId,
+) {
+    let Some((tree, element)) = live_region_event_tree(window_title(window), publication, status)
+    else {
+        return;
+    };
+    let provider = Provider::create(window, Some(element), tree);
+    // SAFETY: `provider` is live and the standard event call may retain a
+    // reference while Windows handles the outbound notification.
+    unsafe {
+        let simple = (&raw mut (*provider).simple).cast::<c_void>();
+        let _ = raw::UiaRaiseAutomationEvent(simple, raw::UIA_LIVE_REGION_CHANGED_EVENT_ID);
+        release_provider(provider);
+    }
+}
+
 fn focus_event_tree(
     title: Vec<u16>,
     publication: UiAutomationPublication,
@@ -70,16 +97,27 @@ fn structure_event_tree(
     (!tree.is_empty()).then_some(tree)
 }
 
+fn live_region_event_tree(
+    title: Vec<u16>,
+    publication: UiAutomationPublication,
+    status: &ElementId,
+) -> Option<(Arc<Tree>, usize)> {
+    let tree = publication.into_tree(title);
+    let element = tree.live_region(status)?;
+    Some((tree, element))
+}
+
 #[cfg(test)]
 mod tests {
     use anodrel_ui::{ElementId, UiRect};
-    use anodrel_ui_document::decode;
+    use anodrel_ui_document::{decode, decode_v3};
     use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
 
-    use super::{focus_event_tree, structure_event_tree};
+    use super::{focus_event_tree, live_region_event_tree, structure_event_tree};
     use crate::UiAutomationPublication;
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
+    const STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"status","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}"#;
 
     struct FixedMeasurer;
 
@@ -127,6 +165,45 @@ mod tests {
                 UiAutomationPublication::new(elements, Vec::new(), None, None, None),
             )
             .is_some()
+        );
+    }
+
+    #[test]
+    fn a_current_visible_status_is_the_live_event_source() {
+        let document = decode_v3(STATUS_DOCUMENT).expect("the status document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        );
+        let status = ElementId::new("status").expect("fixed ID is valid");
+        let (_, element) = live_region_event_tree(
+            Vec::new(),
+            UiAutomationPublication::new(elements, Vec::new(), None, None, None),
+            &status,
+        )
+        .expect("the visible live status is published");
+
+        assert_eq!(element, 0);
+    }
+
+    #[test]
+    fn a_non_live_or_missing_status_never_creates_an_event_source() {
+        let document = decode(DOCUMENT).expect("the fixed document is valid");
+        let layout = document.layout(UiRect::new(0.0, 0.0, 400.0, 300.0), &FixedMeasurer);
+        let elements = accessible_elements(
+            &document.accessibility_snapshot(&layout),
+            ClientOrigin::new(0, 0, 1.0),
+        );
+        let status = ElementId::new("heading").expect("fixed ID is valid");
+
+        assert!(
+            live_region_event_tree(
+                Vec::new(),
+                UiAutomationPublication::new(elements, Vec::new(), None, None, None),
+                &status,
+            )
+            .is_none()
         );
     }
 }

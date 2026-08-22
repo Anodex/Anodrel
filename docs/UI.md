@@ -21,7 +21,7 @@ back-pressure, cancellation, focus, accessibility, and lifecycle behavior.
 
 ## Tree model
 
-`UiDocument` owns one validated root node. Its in-memory Rust model has five
+`UiDocument` owns one validated root node. Its in-memory Rust model has six
 node kinds:
 
 | Node | Fields | Meaning |
@@ -29,6 +29,7 @@ node kinds:
 | `Stack` | element ID, vertical or horizontal axis, padding, gap, semantic surface tone, children | Places child nodes in source order. |
 | `Scroll` | element ID, one child | A vertical viewport that clips and translates its one child. |
 | `Text` | element ID, plain text, font size, semantic text tone | A non-interactive text run. |
+| `Status` | element ID, plain text, font size, semantic text tone, politeness | One visible semantic operation result; a document has at most one. |
 | `Action` | element ID, plain label, font size, enabled state, semantic action tone | A semantic, hit-testable action. |
 | `Field` | element ID, label, initial value, optional placeholder, maximum length, font size, enabled state | A host-owned single-line text field. |
 
@@ -37,6 +38,13 @@ it starts and ends with a letter or digit. IDs must be unique throughout a
 document. Text and labels are non-empty, bounded single-line UTF-8 without control
 characters. An `Action` uses its element ID as the semantic event identity;
 there is no second command or native operation field.
+
+A `Status` is ordinary visible text, not application-supplied UI Automation
+metadata. Its `polite` or `assertive` value names the urgency of a visible
+result; it cannot make an announcement by itself, observe assistive technology,
+or add an event/callback route. The document validator permits at most one so
+one replacement has one unambiguous status result. Windows live-event behavior
+is separately defined in `docs/UI_LIVE_ANNOUNCEMENTS.md` and Decision 0100.
 
 The foundation accepts at most 512 nodes, depth 32, 32 KiB of text and labels
 combined, a font size from 8 through 96 logical pixels, and padding or gaps no
@@ -151,15 +159,16 @@ plain-text accessible name for text, actions, or fields.
 | `Stack` | `Group` | none | false |
 | `Scroll` | `Group` | none | false |
 | `Text` | `StaticText` | text value | false |
+| `Status` | `Status` | status value | false |
 | `Action` | `Button` | action label | action enabled state |
 | `Field` | `Edit` | field label | field enabled state |
 
-The snapshot contains no invisible or fully clipped node. It does not expose a
-native UI Automation, AT-SPI, NSAccessibility, or Assistive Technology Service
-API; it does not set focus, manage keyboard navigation, make announcements, or
-invoke an action. A future operating-system accessibility adapter must consume
-this bounded snapshot through its own documented lifecycle and permission
-boundary.
+The snapshot preserves a fully clipped node with empty bounds, but no invisible
+node. It does not expose a native UI Automation, AT-SPI, NSAccessibility, or
+Assistive Technology Service API; it does not set focus, manage keyboard
+navigation, make announcements, or invoke an action. A future operating-system
+accessibility adapter must consume this bounded snapshot through its own
+documented lifecycle and permission boundary.
 
 ## Compatibility
 

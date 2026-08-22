@@ -23,6 +23,8 @@ pub enum UiError {
     TextLimitExceeded,
     /// A field's maximum length is outside the supported character range.
     InvalidFieldLength,
+    /// A document contains more than one semantic status node.
+    StatusLimitExceeded,
 }
 
 impl fmt::Display for UiError {
@@ -37,6 +39,7 @@ impl fmt::Display for UiError {
             Self::DepthLimitExceeded => "document exceeds the nesting-depth limit",
             Self::TextLimitExceeded => "document exceeds the combined text limit",
             Self::InvalidFieldLength => "field maximum length is outside the supported range",
+            Self::StatusLimitExceeded => "document contains more than one status node",
         };
         formatter.write_str(message)
     }
