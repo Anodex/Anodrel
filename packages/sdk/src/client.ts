@@ -132,8 +132,9 @@ export class PlatformClient {
    * Replaces this session's complete native menu bar.
    *
    * Items are semantic display commands only. The host owns every native menu
-   * identifier and accepts no accelerator, callback, target, handle, or
-   * command payload through this method.
+   * identifier. Protocol 1.24 items can name only a canonical local semantic
+   * shortcut; this method accepts no native accelerator, callback, target,
+   * handle, or command payload.
    */
   replaceMenu(
     menus: readonly NativeSessionMenu[],

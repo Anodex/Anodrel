@@ -5,7 +5,7 @@
 //! validated whole-model replacement. It has no protocol, queue, renderer,
 //! operating-system call, native handle, callback, or application identity. A
 //! host owns all of those seams.
-//! See `docs/MENUS.md` and Decision 0080.
+//! See `docs/MENUS.md` and Decisions 0080 and 0089.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -16,6 +16,7 @@ mod model;
 mod revision;
 mod service;
 mod session;
+mod shortcut;
 
 pub use error::MenuError;
 pub use mailbox::{MENU_RESPONSE_TIMEOUT, MenuMailbox, MenuRequest};
@@ -26,3 +27,4 @@ pub use model::{
 pub use revision::MenuRevision;
 pub use service::{MenuService, MenuServiceError, UnavailableMenuService};
 pub use session::{MenuActionEvent, MenuSession};
+pub use shortcut::MenuShortcut;

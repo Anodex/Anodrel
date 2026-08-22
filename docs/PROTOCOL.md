@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.23, including separately granted,
-bounded session-window client sizing documented in `docs/WINDOW_SIZE.md`.
+**Status:** Implemented through version 1.24, including bounded local native
+menu shortcuts documented in `docs/MENUS.md`.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.23 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 23}`.
+the host's. Version 1.24 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 24}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -72,7 +72,7 @@ The implemented operations are:
 | `window.focus.request` | `{}` | `{ "status": "requested" }` | `window.focus` |
 | `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
 | `window.size.set` | `{ "width": integer, "height": integer }` | `{ "status": "applied" }` | `window.size` |
-| `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
+| `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean, "shortcut"?: "Ctrl+<A-Z0-9>" \| "Ctrl+Shift+<A-Z0-9>" }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
@@ -163,11 +163,17 @@ result reveals native geometry or current presentation. See
 ### Native session menus
 
 Protocol 1.18 implements the strict portable `menu.replace` boundary and its
-separate `menu.write` grant. A core with no attached native menu service returns
-only `menu.unavailable`; the direct Windows UI-thread bridge and interactive
-delivery are implemented. The development template's remaining check is a real
-desktop menu click. `docs/MENUS.md` defines the exact model, menu-action event,
-and Windows ownership rule.
+separate `menu.write` grant. Protocol 1.24 optionally adds one canonical local
+`shortcut` field to an item: `Ctrl+<key>` or `Ctrl+Shift+<key>`, with an
+uppercase ASCII letter or digit as `<key>`. Version 1.18 through 1.23 requests
+retain the original exact three-item-field grammar. No shortcut grants a new
+capability or changes event shape; a current enabled action still arrives only
+through the revision-checked `ui.events.read` route. A core with no attached
+native menu service returns only `menu.unavailable`; the direct Windows
+UI-thread bridge and interactive delivery are implemented. The development
+diagnostic's remaining checks are a real desktop menu click and local shortcut.
+`docs/MENUS.md` defines the exact model, menu-action event, and Windows
+ownership rule.
 
 ### Diagnostic entries
 
@@ -526,6 +532,8 @@ Protocol 1.21 adds no error code; its fullscreen request reuses the same safe
 `window.unavailable` and `window.busy` categories.
 Protocol 1.23 adds no error code; its client-size request reuses the same safe
 `window.unavailable` and `window.busy` categories.
+Protocol 1.24 adds no error code; malformed, duplicate, or premature menu
+shortcuts reuse `request.payload_invalid`.
 Protocol 1.22 adds `file.binary_too_large`; malformed binary encodings reuse
 the existing `request.payload_invalid` category.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and

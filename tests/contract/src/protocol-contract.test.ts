@@ -1033,7 +1033,14 @@ test("a native session menu is complete, separately granted, and untargetable", 
   const menu = [
     {
       label: "File",
-      items: [{ id: "document.new", label: "New document", enabled: true }],
+      items: [
+        {
+          id: "document.new",
+          label: "New document",
+          enabled: true,
+          shortcut: "Ctrl+Shift+N",
+        },
+      ],
     },
   ] as const;
 
@@ -1055,6 +1062,25 @@ test("a native session menu is complete, separately granted, and untargetable", 
   const transport = host.createTransport();
   for (const payload of [
     { menus: [] },
+    {
+      menus: [
+        {
+          label: "File",
+          items: [{ id: "document.new", label: "New document", enabled: true, shortcut: "Ctrl+n" }],
+        },
+      ],
+    },
+    {
+      menus: [
+        {
+          label: "File",
+          items: [
+            { id: "document.primary", label: "Primary", enabled: true, shortcut: "Ctrl+N" },
+            { id: "document.secondary", label: "Secondary", enabled: false, shortcut: "Ctrl+N" },
+          ],
+        },
+      ],
+    },
     {
       menus: [
         {
@@ -1104,6 +1130,25 @@ test("a native session menu is complete, separately granted, and untargetable", 
       `${JSON.stringify(payload)} was accepted`,
     );
   }
+
+  const olderShortcut = await transport.send({
+    protocolVersion: { major: 1, minor: 23 },
+    kind: "request",
+    requestId: "menu-shortcut-before-protocol-1.24",
+    operation: "menu.replace",
+    payload: {
+      menus: [
+        {
+          label: "File",
+          items: [{ id: "document.new", label: "New document", enabled: true, shortcut: "Ctrl+N" }],
+        },
+      ],
+    } as never,
+  });
+  assert.equal(
+    olderShortcut.status === "failure" ? olderShortcut.error.code : undefined,
+    "request.payload_invalid",
+  );
 
   const items = Array.from({ length: 16 }, (_, item) => ({
     id: `command${item}`,

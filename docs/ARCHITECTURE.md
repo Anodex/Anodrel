@@ -309,17 +309,19 @@ and focus adapters, and every capability decision. See `docs/UI.md`,
 `docs/SCROLLING.md`, and Decisions 0025 through 0039.
 
 `anodrel-menu` is a separate portable module for one authenticated session's
-complete bounded menu model, monotonic revision, and enabled-command
-revalidation. Its one-way service seam transfers only a validated model and
-host-owned revision; it carries no window, native identifier, callback, or
-operating-system authority. Its one-request mailbox gives the model to one
-owning UI thread without moving a native resource to the pipe worker.
-`anodrel-core` applies the `menu.write` policy and
-commits that portable state only after the host service accepts the complete
-replacement. The Windows adapter owns direct native menu construction, numeric
-command mapping, direct UI-thread attachment, and the strict normal-menu
-`WM_COMMAND` filter. See
-`docs/MENUS.md` and Decision 0080.
+complete bounded menu model, monotonic revision, enabled-command revalidation,
+and optional canonical local shortcut declaration. Its one-way service seam
+transfers only a validated model and host-owned revision; it carries no window,
+native identifier, callback, keyboard state, or operating-system authority.
+Its one-request mailbox gives the model to one owning UI thread without moving
+a native resource to the pipe worker. `anodrel-core` applies the `menu.write`
+policy and commits that portable state only after the host service accepts the
+complete replacement. The Windows adapter owns direct native menu construction,
+numeric command mapping, host-derived shortcut display, direct UI-thread
+attachment, the strict normal-menu `WM_COMMAND` filter, and the equally narrow
+first-key-down local `WM_KEYDOWN` route. Both activations create the same
+revision-bound candidate for the shared session mailbox. See `docs/MENUS.md`
+and Decisions 0080 and 0089.
 
 `anodrel-windows-accessibility` sits directly above that snapshot. It is a pure
 mapping from one visible snapshot to the values Microsoft UI Automation asks
@@ -399,9 +401,11 @@ Decision 0083 adds a separate constrained Windows native-menu template to
 that development path. Its `init-menu` command emits a fixed typed-client
 project, and the explicit `--native-menu-template-client` route grants exactly
 document write, semantic-event read, menu write, and self-close. The ordinary
-template remains three-grant. Neither generated project can select an identity,
-capability, window, native command, shortcut, endpoint, or process; the host
-retains the menu mailbox, User32 mapping, child lifecycle, and window. See
+template remains three-grant. A generated menu project may declare only the
+Protocol 1.24 canonical local shortcut that its bounded menu model allows; it
+cannot select an identity, capability, window, native command, keyboard state,
+endpoint, or process. The host retains the menu mailbox, User32 mapping, child
+lifecycle, and window. See
 `docs/NATIVE_MENU_TEMPLATE.md` and Decision 0083.
 
 Decision 0084 reserves the first direct network data seam without turning the

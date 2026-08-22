@@ -13,7 +13,7 @@ use std::{
     },
 };
 
-use anodrel_menu::{MenuActionId, MenuRequest, MenuRevision};
+use anodrel_menu::{MenuActionId, MenuRequest, MenuRevision, MenuShortcut};
 use anodrel_ui_session::MenuInputCandidate;
 
 use super::{
@@ -37,6 +37,7 @@ pub(super) struct UnattachedMenu {
     handle: Hmenu,
     revision: MenuRevision,
     actions: BTreeMap<u16, MenuActionId>,
+    shortcuts: BTreeMap<MenuShortcut, MenuActionId>,
 }
 
 impl UnattachedMenu {
@@ -55,6 +56,7 @@ impl UnattachedMenu {
             handle,
             revision: request.revision(),
             actions: BTreeMap::new(),
+            shortcuts: BTreeMap::new(),
         };
         let mut next_command = FIRST_COMMAND_ID;
         for menu in request.model().menus() {
@@ -73,7 +75,10 @@ impl UnattachedMenu {
                     unsafe { DestroyMenu(popup) };
                     return None;
                 };
-                let label = to_wide_null(&escape_mnemonics(action.label().as_str()));
+                let label = to_wide_null(&display_action_label(
+                    action.label().as_str(),
+                    action.shortcut(),
+                ));
                 let flags = if action.enabled() { 0 } else { MF_GRAYED };
                 // SAFETY: `popup` is this thread's new menu, `command` is a
                 // host-private value, and `label` is live null-terminated UTF-16.
@@ -83,6 +88,17 @@ impl UnattachedMenu {
                     return None;
                 }
                 built.actions.insert(command, action.id().clone());
+                if action.enabled()
+                    && let Some(shortcut) = action.shortcut()
+                {
+                    let previous = built
+                        .shortcuts
+                        .insert(shortcut.clone(), action.id().clone());
+                    debug_assert!(
+                        previous.is_none(),
+                        "portable duplicate shortcut reached User32"
+                    );
+                }
                 next_command = next;
             }
             let label = to_wide_null(&escape_mnemonics(menu.label().as_str()));
@@ -120,6 +136,7 @@ impl UnattachedMenu {
                 handle,
                 revision: self.revision,
                 actions: mem::take(&mut self.actions),
+                shortcuts: mem::take(&mut self.shortcuts),
                 destroyed: AtomicBool::new(false),
             }),
         })
@@ -150,6 +167,7 @@ struct MenuBarInner {
     handle: Hmenu,
     revision: MenuRevision,
     actions: BTreeMap<u16, MenuActionId>,
+    shortcuts: BTreeMap<MenuShortcut, MenuActionId>,
     destroyed: AtomicBool,
 }
 
@@ -167,6 +185,27 @@ impl MenuBar {
         }
         let command = u16::try_from(wparam & usize::from(u16::MAX)).ok()?;
         let action = self.inner.actions.get(&command)?.clone();
+        Some(MenuInputCandidate::new(self.inner.revision, action))
+    }
+
+    /// Derives one candidate only from a current enabled canonical local key.
+    pub(super) fn candidate_from_shortcut(
+        &self,
+        key: Wparam,
+        control_down: bool,
+        shift_down: bool,
+        alt_down: bool,
+    ) -> Option<MenuInputCandidate> {
+        let key = u8::try_from(key).ok()?;
+        let action = self
+            .inner
+            .shortcuts
+            .iter()
+            .find(|(shortcut, _)| {
+                shortcut.matches_key_press(key, control_down, shift_down, alt_down)
+            })?
+            .1
+            .clone();
         Some(MenuInputCandidate::new(self.inner.revision, action))
     }
 
@@ -189,13 +228,22 @@ fn escape_mnemonics(value: &str) -> String {
     value.replace('&', "&&")
 }
 
+/// Appends only the host-derived canonical shortcut display text to a label.
+fn display_action_label(value: &str, shortcut: Option<&MenuShortcut>) -> String {
+    let label = escape_mnemonics(value);
+    match shortcut {
+        Some(shortcut) => format!("{label}\t{}", shortcut.display_text()),
+        None => label,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
-    use anodrel_menu::{MenuActionId, MenuRevision};
+    use anodrel_menu::{MenuActionId, MenuRevision, MenuShortcut};
 
-    use super::{FIRST_COMMAND_ID, MenuBar, escape_mnemonics};
+    use super::{FIRST_COMMAND_ID, MenuBar, display_action_label, escape_mnemonics};
 
     fn bar() -> MenuBar {
         MenuBar {
@@ -208,6 +256,10 @@ mod tests {
                     FIRST_COMMAND_ID,
                     MenuActionId::new("document.new").expect("fixed ID is valid"),
                 )]),
+                shortcuts: BTreeMap::from([(
+                    MenuShortcut::parse("Ctrl+Shift+M").expect("fixed shortcut is valid"),
+                    MenuActionId::new("document.complete").expect("fixed ID is valid"),
+                )]),
                 destroyed: std::sync::atomic::AtomicBool::new(false),
             }),
         }
@@ -217,6 +269,16 @@ mod tests {
     fn escapes_application_ampersands_without_claiming_a_mnemonic() {
         assert_eq!(escape_mnemonics("Save & close"), "Save && close");
         assert_eq!(escape_mnemonics("&&"), "&&&&");
+    }
+
+    #[test]
+    fn displays_only_host_derived_canonical_shortcuts() {
+        let shortcut = MenuShortcut::parse("Ctrl+Shift+M").expect("fixed shortcut is valid");
+        assert_eq!(
+            display_action_label("Complete & close", Some(&shortcut)),
+            "Complete && close\tCtrl+Shift+M"
+        );
+        assert_eq!(display_action_label("Complete", None), "Complete");
     }
 
     #[test]
@@ -241,5 +303,33 @@ mod tests {
                 .is_none()
         );
         assert!(bar.candidate_from_command(0x7FFF, 0).is_none());
+    }
+
+    #[test]
+    fn accepts_only_current_enabled_local_shortcuts() {
+        let candidate = bar()
+            .candidate_from_shortcut(b'M'.into(), true, true, false)
+            .expect("the current enabled shortcut is mapped");
+        let (revision, action) = candidate.into_parts();
+        assert_eq!(revision.value(), 1);
+        assert_eq!(action.as_str(), "document.complete");
+
+        let bar = bar();
+        assert!(
+            bar.candidate_from_shortcut(b'M'.into(), true, false, false)
+                .is_none()
+        );
+        assert!(
+            bar.candidate_from_shortcut(b'M'.into(), true, true, true)
+                .is_none()
+        );
+        assert!(
+            bar.candidate_from_shortcut(b'M'.into(), false, true, false)
+                .is_none()
+        );
+        assert!(
+            bar.candidate_from_shortcut(b'N'.into(), true, true, false)
+                .is_none()
+        );
     }
 }

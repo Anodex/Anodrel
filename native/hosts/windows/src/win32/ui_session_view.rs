@@ -233,6 +233,25 @@ impl UiSessionView {
         true
     }
 
+    /// Offers a candidate only for this bar's current enabled local shortcut.
+    pub(super) fn offer_menu_shortcut(
+        &self,
+        key: Wparam,
+        control_down: bool,
+        shift_down: bool,
+        alt_down: bool,
+    ) -> bool {
+        let Some(candidate) = self
+            .menu_bar
+            .as_ref()
+            .and_then(|bar| bar.candidate_from_shortcut(key, control_down, shift_down, alt_down))
+        else {
+            return false;
+        };
+        self.input_mailbox.push(candidate);
+        true
+    }
+
     /// Takes a pending title proposal and composes the caption to apply.
     ///
     /// Composition happens here, on the side that holds the validated name, so
@@ -922,6 +941,7 @@ mod tests {
         assert!(view.take_menu_request().is_none());
         assert!(!view.complete_menu_request(1, true));
         assert!(!view.offer_menu_command(0x7000, 0));
+        assert!(!view.offer_menu_shortcut(b'M'.into(), true, true, false));
     }
 
     #[test]

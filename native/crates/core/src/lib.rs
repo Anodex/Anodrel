@@ -32,7 +32,7 @@ use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
 use anodrel_menu::{
-    Menu, MenuAction, MenuActionId, MenuModel, MenuService, MenuSession, MenuText,
+    Menu, MenuAction, MenuActionId, MenuModel, MenuService, MenuSession, MenuShortcut, MenuText,
     UnavailableMenuService,
 };
 use anodrel_network::{NetworkTextService, NetworkTextServiceError, NetworkUrl};
@@ -1223,7 +1223,9 @@ impl CoreHost {
     }
 
     fn handle_menu_replace(&self, request: RequestEnvelope) -> JsonValue {
-        let Some(model) = menu_replace_payload(&request.payload) else {
+        let Some(model) =
+            menu_replace_payload(&request.payload, request.protocol_version.minor >= 24)
+        else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
@@ -2685,7 +2687,7 @@ fn file_binary_write_payload(value: &JsonValue) -> Option<(SaveReference, &str)>
     Some((reference, encoded))
 }
 
-fn menu_replace_payload(value: &JsonValue) -> Option<MenuModel> {
+fn menu_replace_payload(value: &JsonValue, shortcuts_allowed: bool) -> Option<MenuModel> {
     if value.to_json().len() > MAX_MENU_REPLACE_REQUEST_BYTES {
         return None;
     }
@@ -2711,7 +2713,10 @@ fn menu_replace_payload(value: &JsonValue) -> Option<MenuModel> {
                 .iter()
                 .map(|item| {
                     let fields = item.as_object()?;
-                    if fields.len() != 3 {
+                    let shortcut = fields.get("shortcut");
+                    if fields.len() != 3 + usize::from(shortcut.is_some())
+                        || (!shortcuts_allowed && shortcut.is_some())
+                    {
                         return None;
                     }
                     let id = MenuActionId::new(fields.get("id")?.as_string()?.to_owned()).ok()?;
@@ -2719,7 +2724,13 @@ fn menu_replace_payload(value: &JsonValue) -> Option<MenuModel> {
                     let JsonValue::Bool(enabled) = fields.get("enabled")? else {
                         return None;
                     };
-                    Some(MenuAction::new(id, label, *enabled))
+                    let action = MenuAction::new(id, label, *enabled);
+                    match shortcut {
+                        Some(shortcut) => Some(
+                            action.with_shortcut(MenuShortcut::parse(shortcut.as_string()?).ok()?),
+                        ),
+                        None => Some(action),
+                    }
                 })
                 .collect::<Option<Vec<_>>>()?;
             Menu::new(label, items).ok()
@@ -3701,6 +3712,12 @@ mod tests {
         )
     }
 
+    fn request_v1_24(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":24}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
     fn request_v1_19(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":19}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
@@ -4423,6 +4440,50 @@ mod tests {
             field(field(&unavailable, "error"), "code").as_string(),
             Some("menu.unavailable")
         );
+    }
+
+    #[test]
+    fn a_v1_24_menu_shortcut_is_canonical_unique_and_version_gated() {
+        let service = RecordingMenu::default();
+        let replacements = Arc::clone(&service.replacements);
+        let host = host_with_menu(service);
+        let payload = r#"{"menus":[{"label":"File","items":[{"id":"document.complete","label":"Complete","enabled":true,"shortcut":"Ctrl+Shift+M"}]}]}"#;
+        let accepted = JsonValue::parse(&host.handle_json(&request_v1_24("menu.replace", payload)))
+            .expect("response JSON is valid");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        let replacements = replacements
+            .lock()
+            .expect("menu recorder lock is available");
+        assert_eq!(
+            replacements[0].1.menus()[0].items()[0]
+                .shortcut()
+                .expect("shortcut is retained")
+                .display_text(),
+            "Ctrl+Shift+M"
+        );
+        drop(replacements);
+
+        let old_version =
+            JsonValue::parse(&host.handle_json(&request_v1_18("menu.replace", payload)))
+                .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&old_version, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+
+        for invalid in [
+            r#"{"menus":[{"label":"File","items":[{"id":"document.complete","label":"Complete","enabled":true,"shortcut":"Ctrl+m"}]}]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"document.primary","label":"Primary","enabled":true,"shortcut":"Ctrl+M"},{"id":"document.secondary","label":"Secondary","enabled":false,"shortcut":"Ctrl+M"}]}]}"#,
+        ] {
+            let response =
+                JsonValue::parse(&host.handle_json(&request_v1_24("menu.replace", invalid)))
+                    .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{invalid} was accepted"
+            );
+        }
     }
 
     #[test]

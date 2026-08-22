@@ -133,6 +133,18 @@ DPI of the one session-bound window. There is no window argument, target,
 position, outer bounds, monitor, DPI readback, state readback, resize event,
 constraint, or native handle. See `docs/WINDOW_SIZE.md`.
 
+### Native session menus
+
+`replaceMenu(menus)` continues to require the separate `menu.write` grant and
+returns only a host-owned revision. Protocol 1.24 lets an item include an
+optional `shortcut`: exactly `Ctrl+<key>` or `Ctrl+Shift+<key>`, where `<key>`
+is one uppercase ASCII letter or digit. A shortcut describes only a local
+semantic menu action; it is not a native virtual-key code, global registration,
+input listener, callback, target, handle, or shortcut readback. The host may
+deliver one current enabled action through the existing granted
+`readUiEvents()` route, with the same revision revalidation as a menu click.
+See `docs/MENUS.md`.
+
 ## Windows development transport
 
 `@anodrel/windows-transport` is a separate development-only Node-core adapter

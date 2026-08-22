@@ -409,6 +409,29 @@ pub(super) fn offer_menu_command(
     }
 }
 
+/// Offers one current local menu shortcut to its shared session queue.
+///
+/// The caller has already limited this to one first `WM_KEYDOWN` and copied the
+/// current modifier state. No keyboard value crosses the registry boundary.
+pub(super) fn offer_menu_shortcut(
+    window: Hwnd,
+    key: usize,
+    control_down: bool,
+    shift_down: bool,
+    alt_down: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.offer_menu_shortcut(
+            key,
+            control_down,
+            shift_down,
+            alt_down,
+        ))),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending field read only from its associated UI session.
 pub(super) fn take_field_read(window: Hwnd) -> io::Result<Option<u64>> {
     let views = lock_views()?;

@@ -7,7 +7,7 @@ import { canonicalBase64UrlDecodedLength } from "./base64url.js";
 
 export { encodeCanonicalBase64Url } from "./base64url.js";
 
-export const PROTOCOL_VERSION = { major: 1, minor: 23 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 24 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -89,11 +89,24 @@ export type WindowState = "minimized" | "maximized" | "restored";
 /** The only reversible fullscreen modes an application may request. */
 export type WindowFullscreenMode = "fullscreen" | "windowed";
 
+/** One ASCII key permitted in a canonical local native-menu shortcut. */
+export type NativeMenuShortcutKey =
+  | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L"
+  | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X"
+  | "Y" | "Z" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+
+/** A canonical local shortcut for one semantic native-menu command. */
+export type NativeMenuShortcut =
+  | `Ctrl+${NativeMenuShortcutKey}`
+  | `Ctrl+Shift+${NativeMenuShortcutKey}`;
+
 /** One enabled or disabled semantic command in a native session menu. */
 export interface NativeMenuItem {
   readonly id: string;
   readonly label: string;
   readonly enabled: boolean;
+  /** Optional Protocol 1.24 local semantic shortcut. */
+  readonly shortcut?: NativeMenuShortcut;
 }
 
 /** One top-level native session menu with its complete ordered item set. */
@@ -804,6 +817,7 @@ export function isFileBinaryWritePayload(
 /** Validates one exact bounded native-session menu replacement. */
 export function isMenuReplacePayload(
   value: unknown,
+  shortcutsAllowed = true,
 ): value is PayloadFor<"menu.replace"> {
   if (
     !isRecord(value) ||
@@ -817,10 +831,16 @@ export function isMenuReplacePayload(
   }
 
   const actionIds = new Set<string>();
-  return value.menus.every((menu) => isNativeSessionMenu(menu, actionIds));
+  const shortcuts = new Set<string>();
+  return value.menus.every((menu) => isNativeSessionMenu(menu, actionIds, shortcuts, shortcutsAllowed));
 }
 
-function isNativeSessionMenu(value: unknown, actionIds: Set<string>): boolean {
+function isNativeSessionMenu(
+  value: unknown,
+  actionIds: Set<string>,
+  shortcuts: Set<string>,
+  shortcutsAllowed: boolean,
+): boolean {
   if (
     !isRecord(value) ||
     Object.keys(value).length !== 2 ||
@@ -833,9 +853,12 @@ function isNativeSessionMenu(value: unknown, actionIds: Set<string>): boolean {
   }
 
   for (const item of value.items) {
+    if (!isRecord(item)) {
+      return false;
+    }
+    const hasShortcut = Object.prototype.hasOwnProperty.call(item, "shortcut");
     if (
-      !isRecord(item) ||
-      Object.keys(item).length !== 3 ||
+      Object.keys(item).length !== 3 + Number(hasShortcut) ||
       !isMenuActionId(item.id) ||
       !isMenuText(item.label, MAX_MENU_ITEM_LABEL_BYTES) ||
       typeof item.enabled !== "boolean" ||
@@ -843,9 +866,20 @@ function isNativeSessionMenu(value: unknown, actionIds: Set<string>): boolean {
     ) {
       return false;
     }
+    if (hasShortcut) {
+      const shortcut = item.shortcut;
+      if (!shortcutsAllowed || !isMenuShortcut(shortcut) || shortcuts.has(shortcut)) {
+        return false;
+      }
+      shortcuts.add(shortcut);
+    }
     actionIds.add(item.id);
   }
   return true;
+}
+
+function isMenuShortcut(value: unknown): value is NativeMenuShortcut {
+  return typeof value === "string" && /^Ctrl\+(?:Shift\+)?[A-Z0-9]$/.test(value);
 }
 
 function isMenuActionId(value: unknown): value is string {

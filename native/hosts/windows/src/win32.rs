@@ -102,6 +102,8 @@ const SWP_NOZORDER: Uint = 0x0004;
 const SWP_NOACTIVATE: Uint = 0x0010;
 const HTCLIENT: isize = 1;
 const VK_SHIFT: i32 = 0x10;
+const VK_CONTROL: i32 = 0x11;
+const VK_MENU: i32 = 0x12;
 const VK_TAB: Wparam = 0x09;
 const VK_RETURN: Wparam = 0x0D;
 const VK_PRIOR: Wparam = 0x21;
@@ -122,6 +124,10 @@ const WM_CHAR: Uint = 0x0102;
 /// Backspace arrives as a control character through `WM_CHAR`, not as an edit
 /// key, so it is named here to be recognised and routed as one.
 const CHAR_BACKSPACE: u32 = 0x08;
+
+/// Bit 30 in a `WM_KEYDOWN` `lParam`: the key was already down before this
+/// message, so the message is an auto-repeat rather than a fresh activation.
+const KEY_WAS_DOWN: Lparam = 1_isize << 30;
 
 /// Private message telling the Startup Lab that a product-session start
 /// attempt has finished. It carries no payload: the started session, if any, is
@@ -2089,16 +2095,34 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             0
         }
         WM_KEYDOWN => {
+            // The menu route is deliberately before local text and focus
+            // handling, but accepts only a first ordinary key-down. The three
+            // state queries describe this key message's input queue state;
+            // none reaches an application or protocol response.
+            let shift_down = unsafe { GetKeyState(VK_SHIFT) } < 0;
+            if lparam & KEY_WAS_DOWN == 0 {
+                let control_down = unsafe { GetKeyState(VK_CONTROL) } < 0;
+                let alt_down = unsafe { GetKeyState(VK_MENU) } < 0;
+                let handled = registry::offer_menu_shortcut(
+                    window,
+                    wparam,
+                    control_down,
+                    shift_down,
+                    alt_down,
+                )
+                .ok()
+                .flatten()
+                .unwrap_or(false);
+                if handled {
+                    return 0;
+                }
+            }
             if !matches!(wparam, VK_TAB | VK_RETURN | VK_PRIOR | VK_NEXT) {
                 // SAFETY: an unsupported key is forwarded unchanged to the
                 // documented default Win32 procedure.
                 return unsafe { DefWindowProcW(window, message, wparam, lparam) };
             }
             let rect = client_rect(window);
-            // SAFETY: querying one documented virtual-key state has no side
-            // effect and returns a value owned by the current thread's input
-            // state.
-            let shift_down = unsafe { GetKeyState(VK_SHIFT) } < 0;
             if matches!(wparam, VK_PRIOR | VK_NEXT) {
                 let changed = registry::with_ui_lab(window, |lab| {
                     lab.scroll_page(rect.width() as f32, rect.height() as f32, wparam == VK_NEXT)

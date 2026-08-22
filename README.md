@@ -57,10 +57,11 @@ Protocol 1.18 now provides the bounded portable foundation for a native
 session menu: a separately granted complete semantic model, host-owned
 revisions, an installed-record grant, SDK support, and contract coverage. The
 direct Windows UI-thread bridge, User32 menu bar, and bounded activation
-delivery are also implemented. A development diagnostic waits for one real
-menu click through the authenticated pull path; its manual verification is the
-remaining acceptance step. An unattached host still returns only
-`menu.unavailable`.
+delivery are also implemented. Protocol 1.24 optionally adds a canonical local
+shortcut to the same semantic activation path. A development diagnostic waits
+for one real menu click or local shortcut through the authenticated pull path;
+its manual verification is the remaining acceptance step. An unattached host
+still returns only `menu.unavailable`.
 
 Protocol 1.19 adds one direct, host-authorized HTTPS text-fetch boundary. It
 uses strict URLs, an exact host-selected origin policy, a 32 KiB UTF-8 response
@@ -106,6 +107,14 @@ DPI and preserves position, activation, and z-order; the request exposes no
 target, handle, monitor, position, bounds, DPI, or geometry readback. Record
 version 1.12 carries the optional grant; its Windows scaling and fullscreen
 interaction checks remain manual. See `docs/WINDOW_SIZE.md`.
+
+Protocol 1.24 adds optional bounded local keyboard shortcuts to the existing
+native session-menu model. A menu item can declare only `Ctrl+<key>` or
+`Ctrl+Shift+<key>` for one uppercase ASCII letter or digit. The direct Windows
+host recognizes those declarations only in its own active session window and
+delivers the same revision-checked semantic event as a menu click. It exposes
+no global hotkey, raw keyboard data, native accelerator, callback, or shortcut
+readback. See `docs/MENUS.md`.
 
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
@@ -289,8 +298,8 @@ UI-session host; legacy save selection remains non-mutating.
 output boundary implemented in Protocol 1.22 for that same direct Windows
 UI-session host.
 `docs/MENUS.md` defines the bounded native session-menu contract and records
-the implemented direct Windows adapter, its explicit ownership boundary, and
-the remaining manual verification.
+the implemented direct Windows adapter, canonical local keyboard shortcuts,
+its explicit ownership boundary, and the remaining manual verification.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

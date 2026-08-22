@@ -322,13 +322,15 @@ cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host --
 ~~~
 
 The **Anodrel UI Session Lab** publishes a document with no ordinary action,
-then shows a native **File & actions** menu. Choose **Complete & close**. The
-window closes only after the User32 `WM_COMMAND` reached the host's current
-private mapping, crossed the shared mailbox, and returned as the exact
-`menu.action.invoked` pull event. The literal ampersands must remain visible:
-the application cannot declare an `Alt` mnemonic. This is the manual acceptance
-check for the direct menu adapter; the client learns no menu handle, command
-number, focus, opening, or dismissal state.
+then shows a native **File & actions** menu. First choose **Complete & close**.
+In a second run, press **Ctrl+Shift+M** instead. Each run should close only
+after its current User32 route reached the host's private mapping, crossed the
+shared mailbox, and returned as the exact `menu.action.invoked` pull event.
+The literal ampersands must remain visible: the application cannot declare an
+`Alt` mnemonic. The shortcut must not trigger while held, with a different
+modifier state, or outside the window. This is the manual acceptance check for
+the direct menu adapter; the client learns no menu handle, command number,
+keyboard state, focus, opening, or dismissal state.
 
 To exercise the actual host-owned open or save picker in that same session,
 replace `--sample-ui-client` with `--sample-ui-file-client` or

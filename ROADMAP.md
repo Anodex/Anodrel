@@ -176,14 +176,19 @@ Status: **Direct Windows host in progress**
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
    `docs/UI_AUTOMATION_EVENTS.md`, and
    `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
-   The next desktop command surface is a bounded native session menu: Decision
-   0080 and `docs/MENUS.md` define a separate `menu.write` grant, a complete
-   model, and delivery through the existing revision-checked interaction path.
+   The desktop command surface is a bounded native session menu: Decision 0080
+   and `docs/MENUS.md` define a separate `menu.write` grant, a complete model,
+   and delivery through the existing revision-checked interaction path.
    **Completed:** portable model and revision state, Protocol 1.18 core
    boundary, installed-record 1.8 grant, SDK, mock host, contract tests, and
    the shared interaction mailbox refactor, one-request UI-thread bridge,
    direct User32 adapter, private numeric mapping, and development diagnostic.
-   **Pending:** manual verification of the real native menu bar and pull event.
+   Protocol 1.24 and Decision 0089 now add one optional unique canonical local
+   `Ctrl+<A-Z0-9>` or `Ctrl+Shift+<A-Z0-9>` declaration. The direct User32
+   route ignores repeats and nonmatching modifier state, registers no global
+   hotkey, and creates the same revision-bound semantic candidate as a menu
+   click. **Pending:** manual verification of the real native menu bar, click,
+   shortcut, and pull event.
    Decision 0084 now defines the next direct data-egress boundary: one
    host-authorized, origin-bound HTTPS text fetch without a browser runtime,
    headers, bodies, redirects, cookies, credentials, or proxy discovery. Its
@@ -263,7 +268,9 @@ Status: **Direct Windows host in progress**
   one-use retained object (Decision 0087). The legacy save picker stays
   non-mutating. Protocol 1.18 additionally
   implements the bounded `menu.replace` model behind its separate `menu.write`
-  grant through the direct Windows menu attachment and delivery path. Signed product launch,
+  grant through the direct Windows menu attachment and delivery path; Protocol
+  1.24 adds optional local canonical shortcuts to that same revalidated route.
+  Signed product launch,
   atomic replacement, and non-Windows adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows

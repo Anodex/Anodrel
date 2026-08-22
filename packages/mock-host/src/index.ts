@@ -436,7 +436,7 @@ export class MockHost {
             "menu.replace requires protocol 1.18 or later.",
           );
         }
-        if (!isMenuReplacePayload(request.payload)) {
+        if (!isMenuReplacePayload(request.payload, request.protocolVersion.minor >= 24)) {
           return this.failure(
             request.requestId,
             "request.payload_invalid",

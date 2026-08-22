@@ -82,6 +82,7 @@ async function run(): Promise<number> {
               id: MENU_SESSION_ACTION,
               label: "Complete & close",
               enabled: true,
+              shortcut: "Ctrl+Shift+M",
             },
           ],
         },

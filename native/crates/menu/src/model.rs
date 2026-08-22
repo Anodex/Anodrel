@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::MenuError;
+use crate::{MenuError, MenuShortcut};
 
 /// Maximum top-level menus in one complete model.
 pub const MAX_MENUS: usize = 8;
@@ -95,13 +95,26 @@ pub struct MenuAction {
     id: MenuActionId,
     label: MenuText,
     enabled: bool,
+    shortcut: Option<MenuShortcut>,
 }
 
 impl MenuAction {
     /// Creates one command from prevalidated identity and display text.
     #[must_use]
     pub const fn new(id: MenuActionId, label: MenuText, enabled: bool) -> Self {
-        Self { id, label, enabled }
+        Self {
+            id,
+            label,
+            enabled,
+            shortcut: None,
+        }
+    }
+
+    /// Adds one already validated local semantic shortcut to this command.
+    #[must_use]
+    pub fn with_shortcut(mut self, shortcut: MenuShortcut) -> Self {
+        self.shortcut = Some(shortcut);
+        self
     }
 
     /// Returns the semantic action identity.
@@ -120,6 +133,12 @@ impl MenuAction {
     #[must_use]
     pub const fn enabled(&self) -> bool {
         self.enabled
+    }
+
+    /// Returns this command's optional canonical local shortcut.
+    #[must_use]
+    pub const fn shortcut(&self) -> Option<&MenuShortcut> {
+        self.shortcut.as_ref()
     }
 }
 
@@ -181,6 +200,18 @@ impl MenuModel {
             .any(|(index, action)| actions[..index].contains(action))
         {
             return Err(MenuError::DuplicateActionId);
+        }
+        let shortcuts = menus
+            .iter()
+            .flat_map(Menu::items)
+            .filter_map(MenuAction::shortcut)
+            .collect::<Vec<_>>();
+        if shortcuts
+            .iter()
+            .enumerate()
+            .any(|(index, shortcut)| shortcuts[..index].contains(shortcut))
+        {
+            return Err(MenuError::DuplicateShortcut);
         }
         Ok(Self { menus })
     }

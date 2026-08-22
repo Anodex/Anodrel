@@ -100,7 +100,7 @@ impl MenuSession {
 mod tests {
     use crate::{
         MAX_MENU_ITEM_LABEL_BYTES, Menu, MenuAction, MenuActionId, MenuError, MenuModel,
-        MenuRevision, MenuSession, MenuText,
+        MenuRevision, MenuSession, MenuShortcut, MenuText,
     };
 
     fn text(value: &str) -> MenuText {
@@ -144,6 +144,20 @@ mod tests {
             Menu::new(text("Edit"), vec![action("same", true)]).expect("test menu is valid"),
         ]);
         assert_eq!(duplicate, Err(MenuError::DuplicateActionId));
+        let shortcut = MenuShortcut::parse("Ctrl+S").expect("shortcut is valid");
+        let duplicate_shortcut = MenuModel::new(vec![
+            Menu::new(
+                text("File"),
+                vec![action("save.primary", true).with_shortcut(shortcut.clone())],
+            )
+            .expect("test menu is valid"),
+            Menu::new(
+                text("Edit"),
+                vec![action("save.secondary", false).with_shortcut(shortcut)],
+            )
+            .expect("test menu is valid"),
+        ]);
+        assert_eq!(duplicate_shortcut, Err(MenuError::DuplicateShortcut));
         assert_eq!(
             Menu::new(
                 MenuText::new("x".repeat(33)).expect("label is valid"),
