@@ -7,6 +7,7 @@ name = "anodrel-application"
 version = "0.1.0"
 dependencies = [
  "anodrel-json",
+ "anodrel-network",
  "anodrel-protocol",
 ]
 
@@ -512,6 +513,7 @@ dependencies = [
  "anodrel-windows-credentials",
  "anodrel-windows-external-links",
  "anodrel-windows-file-access",
+ "anodrel-windows-network",
  "anodrel-windows-paths",
  "anodrel-windows-pipe",
  "anodrel-windows-policy",

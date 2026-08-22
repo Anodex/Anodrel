@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0099: Installed network origins remain machine-selected.
+
 - 0098: Windows UI Automation scroll items remain host-owned.
 
 - 0097: Windows UI Automation scrolling remains host-owned.

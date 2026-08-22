@@ -1,6 +1,6 @@
 # Decision 0084: HTTPS text fetch is host-authorized, origin-bound, and direct
 
-**Status:** Accepted
+**Status:** Accepted; extended by Decision 0099
 
 **Date:** 2026-08-21
 
@@ -56,9 +56,10 @@ text and size rules.
 
 The first slice does not grant this service to the regular development
 templates or product fixture. A development diagnostic may use a host-compiled
-fixed origin. Production use requires a separately versioned installed-record
-origin policy after the signing and packaging decision; this decision does not
-invent one.
+fixed origin. Decision 0099 separately defines and implements the strict
+version 1.14 installed-record policy that composes the same service for a
+validated registered session. Production signing, packaging, installation, and
+updates remain separate work.
 
 ## Consequences
 
@@ -78,5 +79,5 @@ binary content, streaming, redirect following, cookies, authentication,
 proxies, DNS/IP literals, local-network destinations, client certificates,
 custom TLS policy, caching, an application-selected origin list, concurrent or
 background requests, another operating-system adapter, a development-template
-grant, or a production installed-record origin format. Each changes the
-security or compatibility boundary.
+grant, or a change to Decision 0099's installed-record origin format. Each
+changes the security or compatibility boundary.

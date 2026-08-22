@@ -14,11 +14,12 @@ use std::{
 };
 
 use anodrel_json::JsonValue;
+use anodrel_network::NetworkOriginPolicy;
 use anodrel_protocol::Capability;
 
 use crate::{
     ApplicationError, ApplicationIdentity, ApplicationPackage, MAX_EXECUTABLE_BYTES,
-    MAX_INSTALL_RECORD_BYTES, manifest, sha256,
+    MAX_INSTALL_RECORD_BYTES, manifest, network_policy, sha256,
 };
 
 const PACKAGE_MANIFEST_NAME: &str = "anodrel.application.json";
@@ -50,6 +51,7 @@ pub struct InstalledApplication {
     executable_digest: [u8; 32],
     publisher_fingerprint: PublisherFingerprint,
     capabilities: Vec<Capability>,
+    network_policy: Option<NetworkOriginPolicy>,
 }
 
 impl InstalledApplication {
@@ -128,6 +130,17 @@ impl InstalledApplication {
         &self.capabilities
     }
 
+    /// Returns the exact machine-selected HTTPS policy, when this record
+    /// deliberately grants bounded text fetches.
+    ///
+    /// This is private host-composition data. It is never serialized into a
+    /// protocol response or renderer value, and an application cannot inspect
+    /// or change it.
+    #[must_use]
+    pub fn network_origin_policy(&self) -> Option<&NetworkOriginPolicy> {
+        self.network_policy.as_ref()
+    }
+
     /// Rechecks an executable path and hashes bytes read from a caller-held
     /// file handle against this record's expected digest.
     ///
@@ -202,6 +215,7 @@ fn validate_record(
         executable_digest: record.executable_digest,
         publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
         capabilities: record.capabilities,
+        network_policy: record.network_policy,
     })
 }
 
@@ -277,6 +291,7 @@ struct ParsedRecord {
     executable_digest: [u8; 32],
     publisher_fingerprint: [u8; 32],
     capabilities: Vec<Capability>,
+    network_policy: Option<NetworkOriginPolicy>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -295,6 +310,7 @@ enum RecordVersion {
     V1_11,
     V1_12,
     V1_13,
+    V1_14,
 }
 
 impl RecordVersion {
@@ -346,6 +362,16 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
             "packageRoot",
             "executable",
             "publisher",
+        ][..]
+    } else if version == RecordVersion::V1_14 {
+        &[
+            "recordVersion",
+            "applicationId",
+            "packageRoot",
+            "executable",
+            "publisher",
+            "capabilities",
+            "networkOrigins",
         ][..]
     } else {
         &[
@@ -400,6 +426,14 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
         }
         grants
     };
+    let network_policy = if version == RecordVersion::V1_14 {
+        network_policy::parse_network_policy(
+            fields,
+            capabilities.contains(&Capability::NetworkFetch),
+        )?
+    } else {
+        None
+    };
 
     Ok(ParsedRecord {
         application_id: application_id.to_owned(),
@@ -408,6 +442,7 @@ fn parse_record(input: &str) -> Result<ParsedRecord, InstalledApplicationError> 
         executable_digest,
         publisher_fingerprint,
         capabilities,
+        network_policy,
     })
 }
 
@@ -455,8 +490,9 @@ fn capability_for_record_version(
             Some(Capability::FileWriteBinary)
         }
         "window.size" if version.accepts(RecordVersion::V1_12) => Some(Capability::WindowSize),
-        "window.open" if version == RecordVersion::V1_13 => Some(Capability::WindowOpen),
-        "window.close" if version == RecordVersion::V1_13 => Some(Capability::WindowClose),
+        "window.open" if version.accepts(RecordVersion::V1_13) => Some(Capability::WindowOpen),
+        "window.close" if version.accepts(RecordVersion::V1_13) => Some(Capability::WindowClose),
+        "network.fetch" if version == RecordVersion::V1_14 => Some(Capability::NetworkFetch),
         _ => None,
     }
 }
@@ -512,7 +548,7 @@ fn read_limited(path: &Path, maximum: usize) -> Result<String, InstalledApplicat
     }
 }
 
-fn exact_fields(
+pub(super) fn exact_fields(
     fields: &BTreeMap<String, JsonValue>,
     expected: &[&str],
 ) -> Result<(), InstalledApplicationError> {
@@ -523,7 +559,7 @@ fn exact_fields(
     }
 }
 
-fn required_string<'a>(
+pub(super) fn required_string<'a>(
     fields: &'a BTreeMap<String, JsonValue>,
     field: &str,
 ) -> Result<&'a str, InstalledApplicationError> {
@@ -570,6 +606,7 @@ fn validate_version(
         (1, 11) => Ok(RecordVersion::V1_11),
         (1, 12) => Ok(RecordVersion::V1_12),
         (1, 13) => Ok(RecordVersion::V1_13),
+        (1, 14) => Ok(RecordVersion::V1_14),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -1156,6 +1193,145 @@ mod tests {
                 anodrel_protocol::Capability::WindowClose,
             ]
         );
+        fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_14_couples_network_fetch_to_machine_selected_exact_origins() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 14")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"window.open\", \"window.close\", \"network.fetch\"], \"networkOrigins\": [{\"host\": \"Api.Example.Test\", \"port\": 443}, {\"host\": \"status.example.test\", \"port\": 8443}], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.14 network record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::WindowOpen,
+                anodrel_protocol::Capability::WindowClose,
+                anodrel_protocol::Capability::NetworkFetch,
+            ]
+        );
+        let policy = installed
+            .network_origin_policy()
+            .expect("network grant carries an exact origin policy");
+        assert_eq!(policy.origins().len(), 2);
+        assert_eq!(policy.origins()[0].hostname(), "api.example.test");
+        assert_eq!(policy.origins()[0].port(), 443);
+        assert_eq!(policy.origins()[1].hostname(), "status.example.test");
+        assert_eq!(policy.origins()[1].port(), 8443);
+        fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_14_requires_network_grant_and_origin_policy_to_agree() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 14")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [], \"networkOrigins\": [], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, &record).expect("record is updated");
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("a network-free v1.14 record is valid");
+        assert!(installed.network_origin_policy().is_none());
+
+        let unused_origin = record.replace(
+            "\"networkOrigins\": []",
+            "\"networkOrigins\": [{\"host\": \"api.example.test\", \"port\": 443}]",
+        );
+        fs::write(&fixture.record_path, unused_origin).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
+
+        let missing_origin = record.replace(
+            "\"capabilities\": []",
+            "\"capabilities\": [\"network.fetch\"]",
+        );
+        fs::write(&fixture.record_path, missing_origin).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
+        fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_14_rejects_noncanonical_duplicate_and_malformed_network_origins() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 14")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"network.fetch\"], \"networkOrigins\": [{\"host\": \"api.example.test\", \"port\": 443}, {\"host\": \"API.EXAMPLE.TEST\", \"port\": 443}], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, &record).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
+
+        let malformed = record.replace(
+            "\"API.EXAMPLE.TEST\", \"port\": 443",
+            "\"api.example.test\", \"port\": 0",
+        );
+        fs::write(&fixture.record_path, malformed).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
+
+        let unexpected_field = record.replace(
+            "\"host\": \"api.example.test\", \"port\": 443}, {\"host\": \"API.EXAMPLE.TEST\", \"port\": 443}",
+            "\"host\": \"api.example.test\", \"port\": 443, \"path\": \"/status\"}",
+        );
+        fs::write(&fixture.record_path, unexpected_field).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_network_fetch_or_network_origins() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 13")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"network.fetch\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
+
+        let network_origins = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace(
+                "\"publisher\": {",
+                "\"networkOrigins\": [], \"publisher\": {",
+            )
+            .replace("\"network.fetch\"", "\"diagnostics.read\"");
+        fs::write(&fixture.record_path, network_origins).expect("record is updated");
+        assert!(matches!(
+            InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+            Err(InstalledApplicationError::InvalidRecord)
+        ));
         fixture.remove();
     }
 

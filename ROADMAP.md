@@ -223,8 +223,12 @@ Status: **Direct Windows host in progress**
    headers, bodies, redirects, cookies, credentials, or proxy discovery. Its
    **Completed:** its portable Protocol 1.19 core, strict URL and exact-origin
    policy values, SDK, mock host, contract coverage, direct WinHTTP adapter,
-   and a fixed-origin compiled Windows development diagnostic. **Pending:** a
-   production installed-record origin policy.
+   and a fixed-origin compiled Windows development diagnostic. **Completed for
+   the installed-session policy:** record version 1.14 couples the existing
+   `network.fetch` grant to one through eight exact machine-selected origins;
+   the registered Windows-session adapter composes that validated policy into
+   the same direct WinHTTP service. Production signing, installation, and
+   update policy remain separate decisions.
 - Establish repeatable native performance measurements. **Completed for the
   owned in-process transport and Windows named-pipe loopback paths:** a
   first-party release performance lab measures 1 KiB and 64 KiB payload latency

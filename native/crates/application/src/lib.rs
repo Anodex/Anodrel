@@ -10,6 +10,7 @@
 mod authoring;
 mod installed;
 mod manifest;
+mod network_policy;
 mod package;
 pub mod sha256;
 

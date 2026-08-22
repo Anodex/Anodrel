@@ -22,6 +22,7 @@ anodrel-windows-credentials = { path = "../windows-credentials" }
 anodrel-windows-clipboard = { path = "../windows-clipboard" }
 anodrel-windows-external-links = { path = "../windows-external-links" }
 anodrel-windows-file-access = { path = "../windows-file-access" }
+anodrel-windows-network = { path = "../windows-network" }
 
 [dev-dependencies]
 anodrel-protocol = { path = "../../crates/protocol" }

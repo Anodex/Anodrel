@@ -67,8 +67,11 @@ Protocol 1.19 adds one direct, host-authorized HTTPS text-fetch boundary. It
 uses strict URLs, an exact host-selected origin policy, a 32 KiB UTF-8 response
 limit, and WinHTTP without a browser runtime, proxy discovery, cookies,
 redirects, or automatic authentication. A separate compiled Windows diagnostic
-tests only the fixed `example.com:443` origin; templates, product fixtures, and
-installed application sessions still receive no network service.
+tests only the fixed `example.com:443` origin. A validated installed record at
+version 1.14 can separately grant `network.fetch` with one to eight exact
+machine-selected HTTPS origins; the registered Windows session then receives
+the same bounded direct service. Templates and the product fixture still do not
+receive it.
 
 Protocol 1.20 adds a deliberately narrow session-window attention request. An
 authenticated session carrying the separate `window.focus` grant can ask the
@@ -297,8 +300,8 @@ provisioning contract, and host activation routes that exercise it.
 `docs/EXTERNAL_LINKS.md` defines the validated HTTPS external-link foundation.
 `docs/NETWORK.md` defines the implemented portable host-authorized HTTPS
 text-fetch contract, SDK, mock-host boundary, direct WinHTTP adapter, and
-fixed-origin Windows development diagnostic. Its production origin policy
-remains unimplemented.
+fixed-origin Windows development diagnostic. Decision 0099 adds the exact
+machine-selected origin policy for version 1.14 installed records.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.

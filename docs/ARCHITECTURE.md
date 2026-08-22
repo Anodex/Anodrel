@@ -242,10 +242,12 @@ authority; platform adapters select the record before calling it. A version
 that policy and the owner-restricted named-pipe adapter. Before creating the
 endpoint it composes a fixed `HostServices` bundle: identity-derived Windows
 state storage and Credential Manager, plus bounded clipboard and HTTPS-link
-services. UI-bound file and document services remain unavailable. It returns
-an endpoint and a separate sensitive invitation, but does not start a process,
-deliver the invitation, or perform pipe I/O. Those remain explicit caller-owned
-lifecycle steps.
+services. A version 1.14 record carrying the coupled `network.fetch` grant and
+exact origin list additionally supplies the direct WinHTTP text service; every
+other record leaves it unavailable. UI-bound file and document services remain
+unavailable. It returns an endpoint and a separate sensitive invitation, but
+does not start a process, deliver the invitation, or perform pipe I/O. Those
+remain explicit caller-owned lifecycle steps.
 
 For an interactive registered session, the same boundary creates one
 session-owned view group containing the real primary document and input
@@ -354,13 +356,15 @@ revision-bound candidate for the shared session mailbox. See `docs/MENUS.md`
 and Decisions 0080 and 0089.
 
 `anodrel-windows-accessibility` sits directly above that snapshot. It is a pure
-mapping from one visible snapshot to the values Microsoft UI Automation asks
-for: control types, property values, runtime IDs, and screen-space rectangles.
-It performs no operating-system call and cannot fail. `anodrel-windows-uia`
-publishes that mapping through `WM_GETOBJECT`, a root, immutable hierarchical
-parent/child/sibling navigation, properties, and hit testing. It preserves each
-visible group from the owned semantic tree but adds no accessibility-specific
-document data, callback, or live view lookup (Decision 0075). An enabled button in a current authenticated UI session
+mapping from one bounded semantic snapshot to the values Microsoft UI
+Automation asks for: control types, property values, runtime IDs, and
+screen-space rectangles. It performs no operating-system call and cannot fail.
+`anodrel-windows-uia` publishes that mapping through `WM_GETOBJECT`, a root,
+immutable hierarchical parent/child/sibling navigation, properties, and hit
+testing. It preserves every bounded semantic node, including a fully clipped
+node with an empty rectangle and `IsOffscreen=true`, but adds no
+accessibility-specific document data, callback, or live view lookup (Decision
+0075). An enabled visible button in a current authenticated UI session
 also exposes the one `Invoke` pattern: it offers the exact revision-bound
 semantic action candidate to the existing session mailbox, with no native input
 message, application callback, focus movement, or accessibility-specific queue
@@ -382,10 +386,15 @@ does not read the tree back or
 reveal that assistive technology is present. Narrator and an Inspect
 cross-check verified the earlier flat read provider on Windows 11; the new
 hierarchy, manual screen-reader activation, focus control and event, and
-field-value and structure-event verification remain open.
+field-value and structure-event verification remain open. The selected first
+visible overflowing viewport exposes one host-controlled vertical ScrollPattern;
+its eligible bounded descendants expose ScrollItemPattern, which can reveal an
+off-screen item through the same revision-bound route without moving focus or
+adding a protocol capability (Decisions 0097 and 0098).
 See `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
-`docs/UI_AUTOMATION_EVENTS.md`, `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`, and
-Decisions 0063, 0069 through 0071, 0073 through 0076.
+`docs/UI_AUTOMATION_EVENTS.md`, `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`,
+`docs/UI_AUTOMATION_SCROLL.md`, `docs/UI_AUTOMATION_SCROLL_ITEMS.md`, and
+Decisions 0063, 0069 through 0071, 0073 through 0076, 0097, and 0098.
 
 ## Communication model
 
@@ -486,9 +495,12 @@ or a native handle. The portable protocol core, strict URL and exact-origin
 values, SDK, and mock host are implemented; its direct no-proxy WinHTTP
 adapter and a separate fixed-origin compiled Windows diagnostic are
 implemented. That diagnostic grants only `network.fetch` and composes only
-`example.com:443` before authentication; it is not a template, fixture, or
-installed-application path. A production installed-record origin policy
-remains separate work. See `docs/NETWORK.md`.
+`example.com:443` before authentication; it is not a template or fixture path.
+Decision 0099 additionally lets a version 1.14 machine record couple that
+grant to one through eight exact origins, which the registered Windows-session
+adapter composes into the same service before authentication. The policy stays
+outside application authority and is never returned through the protocol. See
+`docs/NETWORK.md`.
 
 Every request should have:
 

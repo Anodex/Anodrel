@@ -29,6 +29,7 @@ use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_network::WindowsNetworkTextService;
 use anodrel_windows_paths::{WindowsPathsError, application_directories};
 use anodrel_windows_pipe::{SessionInvitation, WindowsPipeServer};
 use anodrel_windows_policy::{PolicyStoreError, load_installed_application};
@@ -302,13 +303,20 @@ fn registered_services(
 ) -> Result<HostServices, RegisteredSessionError> {
     let directories = application_directories(application.identity())
         .map_err(RegisteredSessionError::Directories)?;
-    Ok(HostServices::unavailable()
+    let services = HostServices::unavailable()
         .with_clipboard(WindowsClipboard::new(0))
         .with_external_links(WindowsExternalLinks)
         .with_storage(WindowsStorageService::new(&directories))
         .with_credentials(WindowsCredentialService::new(
             application.identity().clone(),
-        )))
+        ));
+    // The direct WinHTTP adapter receives only a policy that was parsed from
+    // the trusted installed record. No installed session has a network service
+    // merely because it carries another capability or a package requests one.
+    Ok(match application.network_origin_policy() {
+        Some(policy) => services.with_network(WindowsNetworkTextService::new(policy.clone())),
+        None => services,
+    })
 }
 
 fn registered_interactive_services(

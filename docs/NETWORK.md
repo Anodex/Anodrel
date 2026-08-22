@@ -2,8 +2,9 @@
 
 **Status:** The portable Protocol 1.19 core, strict URL and exact-origin
 values, TypeScript SDK, deterministic mock host, direct WinHTTP adapter, and a
-fixed-origin compiled Windows development diagnostic are implemented. An
-installed-application origin policy is not implemented.
+fixed-origin compiled Windows development diagnostic are implemented. Decision
+0099 also implements the exact machine-selected origin policy for installed
+Windows sessions.
 
 ## Purpose and boundary
 
@@ -123,13 +124,48 @@ receive this service. The external request needs ordinary outbound Internet
 access; a failure is a safe diagnostic failure rather than evidence that an
 application session has network authority.
 
+## Installed application origin policy
+
+Decision 0099 defines record version 1.14 for the first installed-session
+network policy. The record keeps its existing machine-selected
+`network.fetch` capability and adds one required top-level `networkOrigins`
+array:
+
+~~~json
+{
+  "recordVersion": { "major": 1, "minor": 14 },
+  "capabilities": ["network.fetch"],
+  "networkOrigins": [
+    { "host": "api.example.test", "port": 443 },
+    { "host": "status.example.test", "port": 8443 }
+  ]
+}
+~~~
+
+Every origin is an exact DNS `host` plus an explicit `port` from 1 through
+65,535. The portable record parser canonicalizes hosts through the same
+`NetworkOrigin` value as every other host-selected service policy, rejects
+duplicates, and accepts at most eight origins. A version 1.14 record granting
+`network.fetch` requires one through eight origins. A version 1.14 record
+without that grant requires an empty array, so a dormant list cannot become
+network authority in a later configuration change.
+
+The record is still selected only from the machine-wide Windows policy store.
+Neither the record contents nor its effective origins are returned to an
+application; a request outside the list remains indistinguishable from an
+unavailable service. The registered-session adapter attaches the same direct
+WinHTTP service only after this policy validates. This is not an
+application-supplied configuration mechanism, a way to select a request path,
+or a new protocol operation.
+
 ## Deferred work
 
 POST, headers, binary data, streams, uploads, multipart data, redirects,
 cookies, authentication, client certificates, proxies, cache, HTTP/3 policy,
 web sockets, local and private-network access, response metadata, request
 cancellation after execution begins, concurrent requests, reusable connections,
-application-selected origin policy, production installed-record policy, and
-non-Windows adapters are all deferred.
+application-selected origin policy, production network policy changes, and
+non-Windows adapters are all deferred. Decision 0099's exact installed-record
+policy is the only installed-session policy format in this first slice.
 
-See Decision 0084 and `docs/THREAT_MODEL.md`.
+See Decisions 0084 and 0099 and `docs/THREAT_MODEL.md`.

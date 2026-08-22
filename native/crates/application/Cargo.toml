@@ -6,4 +6,5 @@ license.workspace = true
 
 [dependencies]
 anodrel-json = { path = "../json" }
+anodrel-network = { path = "../network" }
 anodrel-protocol = { path = "../protocol" }
