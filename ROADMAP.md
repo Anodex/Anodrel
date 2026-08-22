@@ -105,8 +105,10 @@ Status: **Direct Windows host in progress**
   retained-output-object flow for Protocol 1.17 `file.write_text` and Protocol
   1.22 `file.write_binary`. The latter has its own grant, first-party canonical
   base64url decoder, and 32 KiB decoded bound. Its picker diagnostic remains a
-  manual desktop check. Atomic replacement and persistent file grants remain
-  separate gates.
+  manual desktop check. Decision 0091 records and defers atomic replacement:
+  the direct Windows experiment proved that the available rename path cannot
+  preserve the existing retained-target race boundary. Persistent file grants
+  remain a separate gate.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and

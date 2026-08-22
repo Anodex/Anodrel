@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0091: Atomic selected-file replacement keeps private identities.
+
 - 0090: Development native menu templates use one fixed canonical shortcut.
 
 - 0089: Session menu shortcuts are local, canonical, and semantic.
