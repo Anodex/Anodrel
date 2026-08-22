@@ -22,6 +22,12 @@ const UI_GRANTS: [Capability; 3] = [
     Capability::UiEventsRead,
     Capability::SessionClose,
 ];
+const FORM_GRANTS: [Capability; 4] = [
+    Capability::UiDocumentWrite,
+    Capability::UiEventsRead,
+    Capability::UiFieldsRead,
+    Capability::SessionClose,
+];
 const MENU_GRANTS: [Capability; 4] = [
     Capability::UiDocumentWrite,
     Capability::UiEventsRead,
@@ -39,6 +45,7 @@ const MULTI_WINDOW_GRANTS: [Capability; 5] = [
 #[derive(Clone, Copy)]
 enum DevelopmentUiSessionKind {
     Document,
+    Form,
     Menu,
     MultiWindow,
 }
@@ -68,6 +75,23 @@ impl DevelopmentUiSessionConfig {
             display_name,
             completion_message,
             kind: DevelopmentUiSessionKind::Document,
+        }
+    }
+
+    /// Creates a configuration for the explicit whole-surface field-read
+    /// route. The other templates do not acquire this inward-facing authority.
+    pub(crate) const fn with_form(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::Form,
         }
     }
 
@@ -110,6 +134,7 @@ impl DevelopmentUiSessionConfig {
     const fn grants(self) -> &'static [Capability] {
         match self.kind {
             DevelopmentUiSessionKind::Document => &UI_GRANTS,
+            DevelopmentUiSessionKind::Form => &FORM_GRANTS,
             DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
         }
@@ -117,6 +142,10 @@ impl DevelopmentUiSessionConfig {
 
     const fn supports_menu(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::Menu)
+    }
+
+    const fn supports_fields(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::Form)
     }
 
     const fn supports_multi_window(self) -> bool {
@@ -160,6 +189,17 @@ pub(crate) fn run(
                 ui.input.clone(),
                 ui.close.clone(),
                 HostServices::unavailable().with_menu(ui.menu.clone()),
+            )?;
+        (server, invitation, None)
+    } else if config.supports_fields() {
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                HostServices::unavailable().with_ui_fields(ui.fields.clone()),
             )?;
         (server, invitation, None)
     } else {
@@ -240,7 +280,9 @@ pub(crate) fn run(
 mod tests {
     use anodrel_protocol::Capability;
 
-    use super::{DevelopmentUiSessionConfig, MENU_GRANTS, MULTI_WINDOW_GRANTS, UI_GRANTS};
+    use super::{
+        DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS, MULTI_WINDOW_GRANTS, UI_GRANTS,
+    };
 
     #[test]
     fn development_routes_use_only_their_exact_closed_grant_sets() {
@@ -256,6 +298,12 @@ mod tests {
             "Anodrel Menu Test",
             "completed menu",
         );
+        let form = DevelopmentUiSessionConfig::with_form(
+            "anodrel.test-form",
+            "test-form-session",
+            "Anodrel Form Test",
+            "completed form",
+        );
         let multi_window = DevelopmentUiSessionConfig::with_multi_window(
             "anodrel.test-multi-window",
             "test-multi-window-session",
@@ -268,6 +316,10 @@ mod tests {
         assert_eq!(document.completion_message, "completed");
         assert_eq!(document.grants(), UI_GRANTS);
         assert!(!document.supports_menu());
+        assert!(!document.supports_fields());
+        assert_eq!(form.grants(), FORM_GRANTS);
+        assert!(form.supports_fields());
+        assert!(!form.supports_menu());
         assert_eq!(menu.grants(), MENU_GRANTS);
         assert!(menu.supports_menu());
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
@@ -278,6 +330,15 @@ mod tests {
             [
                 Capability::UiDocumentWrite,
                 Capability::UiEventsRead,
+                Capability::SessionClose,
+            ]
+        );
+        assert_eq!(
+            FORM_GRANTS,
+            [
+                Capability::UiDocumentWrite,
+                Capability::UiEventsRead,
+                Capability::UiFieldsRead,
                 Capability::SessionClose,
             ]
         );

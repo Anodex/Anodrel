@@ -380,6 +380,10 @@ existing bounded menu protocol without changing the regular template's grants.
 multi-window template. Its generator and fixed five-grant Windows route
 exercise the bounded Protocol 1.25 lifecycle without broadening either earlier
 template's grants.
+`docs/NATIVE_FORM_TEMPLATE.md` defines the separate development-native form
+template. Its generator and fixed four-grant Windows route demonstrate
+submit-time whole-surface field snapshots without broadening the regular, menu,
+or multi-window templates.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.
@@ -419,6 +423,13 @@ first-party multi-window template and exercise a typed secondary window open,
 targeted document replacement, tagged action pull, exact secondary close, and
 whole-session close. It uses no Node.js, webview, product package, or
 machine-policy change.
+
+Double-click `start-form-template.bat` to build a temporary first-party native
+form template. Enter text and select **Submit form** to exercise host-owned
+native entry, semantic submit, one typed whole-surface field snapshot, and
+clean close. The generated app does not echo or persist the entered value, and
+the walkthrough uses no Node.js, webview, product package, or machine-policy
+change.
 
 Double-click `start-network-diagnostic.bat` to build and run the no-window
 native HTTPS diagnostic. It tests the complete direct WinHTTP path only against

@@ -426,7 +426,13 @@ Status: **First starter-package slice in progress**
   a real-pipe test: primary action, secondary creation handoff, independent
   targeted document replacement, tagged secondary actions, exact secondary
   close, and whole-session close. The remaining acceptance check is the
-  documented visual Windows walkthrough.
+  documented visual Windows walkthrough. Decision 0095 now adds a fourth,
+  separately selected native template: its `init-form` generator and fixed
+  four-grant Windows route exercise one submit-time `ui.fields.read` snapshot
+  without widening any earlier template. A generated child has completed a real
+  pipe session that supplies the form document, submits it, reads the one fixed
+  whole-surface snapshot, and closes cleanly. The remaining acceptance check is
+  the documented visual Windows walkthrough.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

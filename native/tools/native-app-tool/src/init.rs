@@ -6,8 +6,8 @@ use crate::{
     arguments::TemplateKind,
     paths::{anodrel_root, relative_path, resolve_new_project, write_new_file},
     template::{
-        TemplateContext, cargo_toml, main_source, menu_main_source, menu_readme,
-        multi_window_main_source, multi_window_readme, readme,
+        TemplateContext, cargo_toml, form_main_source, form_readme, main_source, menu_main_source,
+        menu_readme, multi_window_main_source, multi_window_readme, readme,
     },
     validation::{validate_display_label, validate_project_slug},
 };
@@ -35,6 +35,14 @@ pub fn initialize(
     display_label: &str,
 ) -> Result<(), InitError> {
     initialize_template(TemplateKind::Ui, destination, project_slug, display_label)
+}
+
+pub fn initialize_form(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(TemplateKind::Form, destination, project_slug, display_label)
 }
 
 pub fn initialize_menu(
@@ -75,6 +83,11 @@ fn initialize_template(
             main_source(display_label),
             readme(&context),
             "Created Anodrel native UI project.",
+        ),
+        TemplateKind::Form => (
+            form_main_source(display_label),
+            form_readme(&context),
+            "Created Anodrel native form project.",
         ),
         TemplateKind::Menu => (
             menu_main_source(display_label),
@@ -126,7 +139,7 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    use super::{initialize, initialize_menu, initialize_multi_window};
+    use super::{initialize, initialize_form, initialize_menu, initialize_multi_window};
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
 
@@ -216,6 +229,24 @@ mod tests {
         assert!(source.contains("replace_menu_v1"));
         assert!(source.contains("template.menu.complete"));
         assert!(!source.contains("template.complete"));
+    }
+
+    #[test]
+    fn form_project_is_separate_from_the_other_templates() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-form-app");
+        initialize_form(&destination, "generated-form-app", "Generated Form App")
+            .expect("generate a native form project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated form instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated form source");
+        assert!(readme.contains("--native-form-template-client"));
+        assert!(source.contains("read_fields"));
+        assert!(source.contains("template.form.name"));
+        assert!(source.contains("template.form.submit"));
+        assert!(!source.contains("replace_menu_v1"));
     }
 
     #[test]

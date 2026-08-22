@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0095: Development native form templates keep typing host-owned.
+
 - 0094: Development native multi-window templates keep window authority fixed.
 
 - 0093: Closing the primary session view ends its whole group.

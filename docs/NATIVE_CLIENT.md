@@ -135,3 +135,8 @@ decision. Decision 0094 extends that preview facade only for the separate
 fixed-grant multi-window template: it returns opaque secondary identities and
 tagged action batches, but exposes no native mapping or raw protocol surface.
 See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
+
+Decision 0095 extends that preview facade only for the separate fixed-grant
+native form template. Its `read_fields` method returns one strictly parsed,
+whole-surface ordered snapshot after an explicit request; it has no selector,
+live change route, or input-state metadata. See `docs/NATIVE_FORM_TEMPLATE.md`.

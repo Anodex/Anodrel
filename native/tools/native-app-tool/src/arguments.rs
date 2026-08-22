@@ -5,6 +5,7 @@ use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TemplateKind {
     Ui,
+    Form,
     Menu,
     MultiWindow,
 }
@@ -21,6 +22,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
     let mut arguments = arguments.into_iter();
     let template_kind = match arguments.next().as_deref() {
         Some("init") => TemplateKind::Ui,
+        Some("init-form") => TemplateKind::Form,
         Some("init-menu") => TemplateKind::Menu,
         Some("init-multi-window") => TemplateKind::MultiWindow,
         _ => return Err(()),
@@ -54,6 +56,15 @@ mod tests {
                 destination: PathBuf::from("out/example"),
                 project_slug: "example-app".to_owned(),
                 display_label: "Example App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(["init-form", "out/form", "form-app", "Form App"].map(String::from)),
+            Ok(InitCommand {
+                template_kind: TemplateKind::Form,
+                destination: PathBuf::from("out/form"),
+                project_slug: "form-app".to_owned(),
+                display_label: "Form App".to_owned(),
             })
         );
         assert_eq!(

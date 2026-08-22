@@ -14,11 +14,12 @@ mod validation;
 use std::env;
 
 use arguments::{TemplateKind, parse};
-use init::{initialize, initialize_menu, initialize_multi_window};
+use init::{initialize, initialize_form, initialize_menu, initialize_multi_window};
 
 const USAGE: &str = concat!(
     "usage:\n",
     "  anodrel-native-app-tool init <destination> <project-slug> <display-label>\n",
+    "  anodrel-native-app-tool init-form <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-menu <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-multi-window <destination> <project-slug> <display-label>"
 );
@@ -27,6 +28,11 @@ fn main() {
     let result = match parse(env::args().skip(1)) {
         Ok(command) => match command.template_kind {
             TemplateKind::Ui => initialize(
+                &command.destination,
+                &command.project_slug,
+                &command.display_label,
+            ),
+            TemplateKind::Form => initialize_form(
                 &command.destination,
                 &command.project_slug,
                 &command.display_label,

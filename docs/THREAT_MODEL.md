@@ -230,12 +230,15 @@ probe, or an explicitly selected executable created by one of the native-templat
 generators. The UI probe and regular generated-template route receive only
 document replacement, semantic-event pull, and their own close grant. The
 separate menu route adds only `menu.write`; the separate multi-window route adds
-only `window.open` and `window.close`. Neither route lets a template supply
-grants, identity, title, a session ID, a native handle, or operating-system
-authority. In particular, a multi-window executable receives an opaque logical
-secondary identity only after the host has validated, created, and registered
-the private native view. None has executable identity verification and all end
-with the host process, so none creates production application-launch authority.
+only `window.open` and `window.close`; the separate form route adds only
+`ui.fields.read`. Neither route lets a template supply grants, identity, title,
+a session ID, a native handle, field selector, keyboard source, or
+operating-system authority. In particular, a multi-window executable receives
+an opaque logical secondary identity only after the host has validated, created,
+and registered the private native view, while a form executable receives one
+complete current-field snapshot only after it requests the host-owned
+field-read bridge. None has executable identity verification and all end with
+the host process, so none creates production application-launch authority.
 Their output is intentionally discarded; an exit status is the only result used
 by the host.
 

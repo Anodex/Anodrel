@@ -167,6 +167,15 @@ primary, **Replace this window** in the secondary, and **Close secondary and
 finish** in that same secondary. It creates no certificate, package, installer,
 or machine policy. See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
 
+To exercise submit-time native form entry, double-click
+`start-form-template.bat` in the repository root. It generates and builds a
+disposable first-party Rust executable, then opens it through the fixed
+development route. Enter any non-secret test text in **Name**, then activate
+**Submit form**. The app takes one whole-surface snapshot only after that
+semantic action and closes without displaying, writing, or retaining the value.
+It creates no certificate, package, installer, or machine policy. See
+`docs/NATIVE_FORM_TEMPLATE.md`.
+
 `start.bat` builds in release. The Startup Lab composes every frame in software,
 and an unoptimised build is roughly ten times slower — far too slow to hold the
 reveal's frame rate. When running the host by hand for a visual check, pass

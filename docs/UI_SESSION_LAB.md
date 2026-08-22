@@ -44,6 +44,15 @@ grants exactly document replacement, tagged semantic-action reading, secondary
 open, secondary close, and self-close. It does not give the project a native
 handle, geometry, title readback, enumeration, or product-launch authority.
 
+The separate constrained native form template uses the same authenticated
+session mechanics but demonstrates host-owned text entry and one intentional
+field snapshot. Follow `docs/NATIVE_FORM_TEMPLATE.md` to create, build, and
+run it through `--native-form-template-client`. Its explicit development route
+grants exactly document replacement, semantic-action reading, whole-surface
+field reading, and self-close. It does not give the project keystrokes, input
+timing, a field selector, focus/caret/selection state, native control, handle,
+or product-launch authority.
+
 To exercise Protocol 1.7's UI-thread-routed open picker in the same
 authenticated session, use `--sample-ui-file-client` in place of
 `--sample-ui-client`. Select a `.txt`, `.json`, or `.md` file or cancel the

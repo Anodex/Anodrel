@@ -116,6 +116,11 @@ identically, because the difference between them is behaviour, not content.
 Installed record version **1.5** adds `ui.fields.read` as a strict superset of
 1.4. A record written for an earlier version that names the grant stays invalid.
 
+The separate `init-form` development template exercises that contract with one
+fixed field. Its generated app asks for a snapshot only after the person
+activates its fixed submit action, does not echo or retain the value, and closes
+its own session. See `docs/NATIVE_FORM_TEMPLATE.md` and Decision 0095.
+
 ## What a field must never become
 
 - A key logger. No node reports individual keystrokes, and no operation returns

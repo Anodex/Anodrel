@@ -451,6 +451,19 @@ endpoint. The host retains the group map, native views, title composition,
 creation handoff, child lifecycle, and shutdown. See
 `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md` and Decision 0094.
 
+Decision 0095 adds a fourth constrained Windows development template for
+Protocol 1.15's host-owned field snapshots. Its `init-form` command emits a
+fixed typed-client project, and the explicit
+`--native-form-template-client` route grants exactly document write,
+semantic-event read, whole-surface field read, and self-close. The child
+publishes one fixed field and action, then reads the entire current form only
+after the submit action. It cannot select a field, observe typing, receive
+keyboard input, read focus/caret/selection, republish the entered value, choose
+an identity, title, window, handle, host command, process, or endpoint. The
+host retains the field states, field-read bridge, native view, title
+composition, child lifecycle, and shutdown. See
+`docs/NATIVE_FORM_TEMPLATE.md` and Decision 0095.
+
 Decision 0084 reserves the first direct network data seam without turning the
 host into a browser runtime. Its host-selected HTTPS origins and bounded
 text-only `GET` result sit behind a separate capability; an application cannot

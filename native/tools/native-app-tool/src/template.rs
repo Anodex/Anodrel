@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+mod form;
 mod menu;
 mod multi_window;
 
@@ -39,6 +40,14 @@ pub fn readme(context: &TemplateContext) -> String {
 
 pub fn menu_main_source(display_label: &str) -> String {
     menu::main_source(display_label)
+}
+
+pub fn form_main_source(display_label: &str) -> String {
+    form::main_source(display_label)
+}
+
+pub fn form_readme(context: &TemplateContext) -> String {
+    form::readme(context)
 }
 
 pub fn menu_readme(context: &TemplateContext) -> String {
@@ -202,8 +211,8 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        TemplateContext, cargo_toml, document_json, main_source, menu_main_source,
-        multi_window_main_source,
+        TemplateContext, cargo_toml, document_json, form_main_source, main_source,
+        menu_main_source, multi_window_main_source,
     };
 
     #[test]
@@ -240,6 +249,15 @@ mod tests {
         assert!(source.contains("read_events"));
         assert!(source.contains("template.menu.complete"));
         assert!(!source.contains("template.complete\""));
+    }
+
+    #[test]
+    fn form_source_is_closed_over_one_fixed_submit_time_snapshot() {
+        let source = form_main_source("Form \"Template\" \\ App");
+        assert!(source.contains("read_fields"));
+        assert!(source.contains("template.form.name"));
+        assert!(source.contains("template.form.submit"));
+        assert_eq!(source.matches("replace_document_v1(").count(), 1);
     }
 
     #[test]

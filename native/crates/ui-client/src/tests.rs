@@ -125,6 +125,51 @@ fn the_typed_session_uses_only_its_three_documented_operations() {
 }
 
 #[test]
+fn field_snapshots_use_one_exact_protocol_1_15_whole_surface_read() {
+    let (mut session, written) = session_with_responses([response(
+        "anodrel-ui-1",
+        &field_snapshot(&[("template.form.name", "Ada")]),
+    )]);
+
+    let snapshot = session.read_fields().expect("field snapshot is typed");
+    let [field] = snapshot.fields() else {
+        panic!("the fixed response has one field");
+    };
+    assert_eq!(field.id().as_str(), "template.form.name");
+    assert_eq!(field.value(), "Ada");
+
+    let messages = messages(&written);
+    assert_eq!(
+        request_field(&messages[1], "operation"),
+        Some("ui.fields.read".to_owned())
+    );
+    assert_eq!(request_protocol_minor(&messages[1]), Some(15));
+    let request = JsonValue::parse(&messages[1]).expect("field read request is JSON");
+    assert_eq!(
+        request.as_object().and_then(|fields| fields.get("payload")),
+        Some(&JsonValue::Object(Default::default()))
+    );
+}
+
+#[test]
+fn malformed_or_out_of_order_field_snapshots_fail_closed() {
+    for result in [
+        r#"{"fields":[{"id":"template.form.name","value":"Ada"},{"id":"template.form.name","value":"Grace"}]}"#,
+        r#"{"fields":[{"id":"zeta","value":"Ada"},{"id":"alpha","value":"Grace"}]}"#,
+        r#"{"fields":[{"id":"template.form.name","value":"one\ntwo"}]}"#,
+        r#"{"fields":[{"id":"template.form.name","value":"Ada","edited":true}]}"#,
+        r#"{"fields":[],"focus":"template.form.name"}"#,
+    ] {
+        let (mut session, _) = session_with_responses([response("anodrel-ui-1", result)]);
+        assert_eq!(
+            session.read_fields(),
+            Err(UiClientError::ResponseInvalid),
+            "invalid field response must not become a typed snapshot: {result}"
+        );
+    }
+}
+
+#[test]
 fn native_menu_session_uses_the_fixed_protocol_1_24_surface() {
     let (mut session, written) = session_with_responses([
         response("anodrel-ui-1", r#"{"revision":"1"}"#),
@@ -445,6 +490,21 @@ fn menu_event_batch(action: &str, revision: &str) -> String {
     format!(
         r#"{{"events":[{{"kind":"event","eventName":"menu.action.invoked","source":"native.menu","protocolVersion":{{"major":1,"minor":18}},"schemaVersion":{{"major":1,"minor":18}},"payload":{{"menuRevision":"{revision}","action":"{action}"}}}}],"dropped":0,"discarded":0}}"#
     )
+}
+
+fn field_snapshot(fields: &[(&str, &str)]) -> String {
+    let fields = fields
+        .iter()
+        .map(|(id, value)| {
+            format!(
+                r#"{{"id":{},"value":{}}}"#,
+                JsonValue::String((*id).to_owned()).to_json(),
+                JsonValue::String((*value).to_owned()).to_json(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(r#"{{"fields":[{fields}]}}"#)
 }
 
 fn window_event_batch(window: &str, action: &str, revision: &str) -> String {

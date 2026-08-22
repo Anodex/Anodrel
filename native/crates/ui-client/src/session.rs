@@ -9,11 +9,13 @@ use anodrel_window::WindowTitleProposal;
 
 use crate::{
     DocumentRevision, MenuRevision, SecondaryWindowId, UiActionBatch, UiClientError, UiEventBatch,
-    WindowUiActionBatch, menu_model::decode_menu_model,
+    UiFieldSnapshot, WindowUiActionBatch, menu_model::decode_menu_model,
 };
 
 /// The smallest protocol version that provides every typed UI-session operation.
 const UI_DOCUMENT_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(3);
+/// The first protocol version with explicit whole-surface field snapshots.
+const UI_FIELD_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(15);
 /// The first protocol version that also carries canonical local menu shortcuts.
 const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(24);
 /// The first protocol version with bounded session-owned secondary views.
@@ -75,6 +77,20 @@ where
             JsonValue::Object(Default::default()),
         )
         .and_then(|result| UiActionBatch::parse(&result))
+    }
+
+    /// Reads every current field value on this authenticated session surface.
+    ///
+    /// The request has no field selector and returns no typing metadata. The
+    /// host owns input, focus, caret, selection, and history; this method
+    /// receives only one explicit whole-surface snapshot.
+    pub fn read_fields(&mut self) -> Result<UiFieldSnapshot, UiClientError> {
+        self.request(
+            UI_FIELD_PROTOCOL,
+            "ui.fields.read",
+            JsonValue::Object(Default::default()),
+        )
+        .and_then(|result| UiFieldSnapshot::parse(&result))
     }
 
     /// Replaces this session's complete strict native menu model.

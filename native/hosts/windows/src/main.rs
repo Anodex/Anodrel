@@ -1,6 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod development_ui_session;
+mod native_form_template;
 mod native_menu_template;
 mod native_multi_window_template;
 mod native_network_probe;
@@ -54,6 +55,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         && command == "--native-template-client"
     {
         return native_template::run(client_path);
+    }
+    if let [command, client_path] = arguments.as_slice()
+        && command == "--native-form-template-client"
+    {
+        return native_form_template::run(client_path);
     }
     if let [command, client_path] = arguments.as_slice()
         && command == "--native-menu-template-client"

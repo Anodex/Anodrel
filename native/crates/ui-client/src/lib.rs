@@ -11,6 +11,7 @@
 
 mod error;
 mod events;
+mod fields;
 mod menu_model;
 mod menu_revision;
 mod revision;
@@ -22,6 +23,7 @@ pub use events::{
     MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, UiAction, UiActionBatch, UiEvent,
     UiEventBatch, UiMenuAction, WindowUiAction, WindowUiActionBatch,
 };
+pub use fields::{UiFieldSnapshot, UiFieldValue};
 pub use menu_revision::MenuRevision;
 pub use revision::DocumentRevision;
 pub use session::UiSession;
