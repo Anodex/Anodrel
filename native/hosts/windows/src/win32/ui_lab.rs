@@ -18,6 +18,7 @@ use anodrel_ui_session::UiFieldSnapshot;
 use anodrel_windows_appearance::{Rgb, SystemAppearance, SystemColors};
 use anodrel_windows_uia::{UiAutomationFocusMailbox, UiAutomationFocusRoute};
 
+use super::scrollbar::{Scrollbar, ScrollbarHit};
 use super::text;
 use super::text::{Align, TextSpec};
 
@@ -61,6 +62,10 @@ pub(super) struct UiLab {
     focus: UiFocus,
     scroll_offsets: UiScrollOffsets,
     wheel: UiScrollWheel,
+    scrollbar_drag: Option<ScrollbarDrag>,
+    /// A thumb press remains a scrollbar gesture until its matching release,
+    /// even if a newer document removes the viewport while it is captured.
+    scrollbar_release_pending: bool,
     /// What a person has typed into this view's fields.
     ///
     /// Host-owned and never sent anywhere. A document seeds it; after that only
@@ -73,6 +78,13 @@ pub(super) struct UiLab {
     automation_focus: UiAutomationFocusMailbox,
     pub(super) hovered: Option<ElementId>,
     pub(super) last_action: Option<ElementId>,
+}
+
+/// Private state retained only while Windows has captured one scrollbar thumb.
+#[derive(Clone)]
+struct ScrollbarDrag {
+    id: ElementId,
+    grab_offset_y: f32,
 }
 
 /// The local result of one UI Automation focus request.
@@ -159,6 +171,7 @@ impl UiLab {
         self.focus = UiFocus::new();
         self.scroll_offsets.clear();
         self.wheel.clear();
+        self.scrollbar_drag = None;
         self.hovered = None;
         self.last_action = None;
     }
@@ -234,6 +247,8 @@ impl UiLab {
             focus: UiFocus::new(),
             scroll_offsets: UiScrollOffsets::new(),
             wheel: UiScrollWheel::default(),
+            scrollbar_drag: None,
+            scrollbar_release_pending: false,
             fields,
             automation_focus: UiAutomationFocusMailbox::new(),
             hovered: None,
@@ -243,6 +258,9 @@ impl UiLab {
 
     /// Updates hover state from one Windows client-area pointer position.
     pub(super) fn update_hover(&mut self, width: f32, height: f32, at: Point) -> bool {
+        if self.scrollbar_drag.is_some() {
+            return false;
+        }
         let hovered = self.action_at(width, height, at);
         let changed = self.hovered != hovered;
         self.hovered = hovered;
@@ -376,6 +394,97 @@ impl UiLab {
         (0..lines.unsigned_abs()).any(|_| self.scroll_line(width, height, forward))
     }
 
+    /// Begins one host-local scrollbar thumb drag when the pointer is on it.
+    ///
+    /// The returned state contains no raw pointer data after the caller's
+    /// current message. The Win32 owner uses it only to decide whether to
+    /// capture the pointer for this native window.
+    pub(super) fn begin_scrollbar_drag(&mut self, width: f32, height: f32, at: Point) -> bool {
+        let surface = Surface::new(width, height);
+        let Some((scrollbar, _)) = self.first_scrollbar(width, height) else {
+            return false;
+        };
+        let Some(ScrollbarHit::Thumb { grab_offset_y }) =
+            scrollbar.hit_test(surface.to_ui_point(at))
+        else {
+            return false;
+        };
+        self.scrollbar_drag = Some(ScrollbarDrag {
+            id: scrollbar.id().clone(),
+            grab_offset_y,
+        });
+        self.scrollbar_release_pending = true;
+        self.hovered = None;
+        true
+    }
+
+    /// Applies one captured pointer position to the retained scrollbar offset.
+    pub(super) fn drag_scrollbar(&mut self, width: f32, height: f32, at: Point) -> bool {
+        let Some(drag) = self.scrollbar_drag.clone() else {
+            return false;
+        };
+        let Some((scrollbar, metrics)) = self.first_scrollbar(width, height) else {
+            return false;
+        };
+        if scrollbar.id() != &drag.id {
+            return false;
+        }
+        let surface = Surface::new(width, height);
+        let requested =
+            scrollbar.offset_for_thumb_grab(surface.to_ui_point(at).y, drag.grab_offset_y);
+        let changed = self
+            .scroll_offsets
+            .entry(metrics.id().clone())
+            .or_default()
+            .scroll_to(
+                requested,
+                metrics.viewport_height(),
+                metrics.content_height(),
+            );
+        if changed {
+            self.hovered = None;
+        }
+        changed
+    }
+
+    /// Stops a host-local thumb drag after a release or capture loss.
+    pub(super) fn end_scrollbar_drag(&mut self) -> bool {
+        let ended = self.scrollbar_drag.take().is_some() || self.scrollbar_release_pending;
+        self.scrollbar_release_pending = false;
+        ended
+    }
+
+    /// Moves one host-owned scrollbar by a page when its track was pressed.
+    ///
+    /// A thumb hit is also consumed, so an opaque overlay cannot activate an
+    /// action that happens to be painted beneath it.
+    pub(super) fn page_scrollbar_at(&mut self, width: f32, height: f32, at: Point) -> bool {
+        let surface = Surface::new(width, height);
+        let Some((scrollbar, metrics)) = self.first_scrollbar(width, height) else {
+            return false;
+        };
+        let Some(hit) = scrollbar.hit_test(surface.to_ui_point(at)) else {
+            return false;
+        };
+        let changed = match hit {
+            ScrollbarHit::Thumb { .. } => false,
+            ScrollbarHit::TrackBefore => self
+                .scroll_offsets
+                .entry(metrics.id().clone())
+                .or_default()
+                .scroll_page(false, metrics.viewport_height(), metrics.content_height()),
+            ScrollbarHit::TrackAfter => self
+                .scroll_offsets
+                .entry(metrics.id().clone())
+                .or_default()
+                .scroll_page(true, metrics.viewport_height(), metrics.content_height()),
+        };
+        if changed {
+            self.hovered = None;
+        }
+        true
+    }
+
     /// Clamps retained scroll positions after a native size change.
     pub(super) fn clamp_scroll_offsets(&mut self, width: f32, height: f32) {
         let metrics = self.layout(width, height).scroll_metrics().to_vec();
@@ -482,6 +591,29 @@ impl UiLab {
             &self.scroll_offsets,
         )
     }
+
+    fn first_scrollbar(
+        &self,
+        width: f32,
+        height: f32,
+    ) -> Option<(Scrollbar, anodrel_ui::UiScrollMetrics)> {
+        let layout = self.layout(width, height);
+        self.first_scrollbar_in_layout(&layout)
+    }
+
+    fn first_scrollbar_in_layout(
+        &self,
+        layout: &UiLayout,
+    ) -> Option<(Scrollbar, anodrel_ui::UiScrollMetrics)> {
+        let metrics = layout.scroll_metrics().first()?.clone();
+        let viewport = layout.bounds(metrics.id())?;
+        let offset = self
+            .scroll_offsets
+            .get(metrics.id())
+            .copied()
+            .map_or(0.0, |state| state.offset_y());
+        Scrollbar::from_metric(&metrics, viewport, offset).map(|scrollbar| (scrollbar, metrics))
+    }
 }
 
 /// Draws the UI Lab into one full Anodrel canvas.
@@ -505,6 +637,9 @@ fn draw_with_palette(canvas: &mut Canvas, lab: &UiLab, palette: UiLabPalette) {
         status.as_deref(),
         palette,
     );
+    if let Some((scrollbar, _)) = lab.first_scrollbar_in_layout(&layout) {
+        draw_scrollbar(canvas, &scrollbar, surface, palette);
+    }
 }
 
 /// Concrete host colours for one UI-Lab paint pass.
@@ -525,6 +660,8 @@ struct UiLabPalette {
     accent_ipc: Color,
     accent_text: Color,
     button_text: Color,
+    scrollbar_track: Color,
+    scrollbar_thumb: Color,
 }
 
 impl UiLabPalette {
@@ -546,6 +683,8 @@ impl UiLabPalette {
             accent_ipc: palette::ACCENT_IPC,
             accent_text: palette::INK,
             button_text: palette::INK,
+            scrollbar_track: palette::PANEL_EDGE,
+            scrollbar_thumb: palette::INK_MUTED,
         }
     }
 
@@ -569,6 +708,8 @@ impl UiLabPalette {
             accent_ipc: highlight_text,
             accent_text: highlight_text,
             button_text,
+            scrollbar_track: button_face,
+            scrollbar_thumb: window_text,
         }
     }
 }
@@ -703,6 +844,21 @@ fn draw_node(
         UiNode::Action(action) => draw_action(canvas, lab, action, bounds, surface, palette),
         UiNode::Field(field) => draw_field(canvas, lab, field, bounds, surface, palette),
     }
+}
+
+/// Draws the one host-owned scrollbar overlay after its clipped document content.
+fn draw_scrollbar(
+    canvas: &mut Canvas,
+    scrollbar: &Scrollbar,
+    surface: Surface,
+    palette: UiLabPalette,
+) {
+    let track = surface.to_canvas_rect(scrollbar.track());
+    let thumb = surface.to_canvas_rect(scrollbar.thumb());
+    let track_radius = (track.width().min(track.height()) / 2.0).max(1.0);
+    let thumb_radius = (thumb.width().min(thumb.height()) / 2.0).max(1.0);
+    canvas.fill_rounded_rect(track, track_radius, &Paint::solid(palette.scrollbar_track));
+    canvas.fill_rounded_rect(thumb, thumb_radius, &Paint::solid(palette.scrollbar_thumb));
 }
 
 /// Draws one field's box, its current host-owned text, and the caret.
@@ -1210,6 +1366,8 @@ mod tests {
         assert_eq!(palette.accent_shell, Color::rgb(13, 14, 15));
         assert_eq!(palette.accent_text, Color::rgb(16, 17, 18));
         assert_eq!(palette.button_text, Color::rgb(10, 11, 12));
+        assert_eq!(palette.scrollbar_track, Color::rgb(7, 8, 9));
+        assert_eq!(palette.scrollbar_thumb, Color::rgb(4, 5, 6));
     }
 
     #[test]
@@ -1368,6 +1526,85 @@ mod tests {
                 .bounds(&id("ui.lab.scroll.exercise-9"))
                 .is_some()
         );
+    }
+
+    #[test]
+    fn scrollbar_track_and_thumb_change_only_the_local_scroll_position() {
+        let mut lab = UiLab::new();
+        let focus_before = lab.focus.focused().cloned();
+        let action_before = lab.last_action.clone();
+        let (scrollbar, _) = lab
+            .first_scrollbar(BASE_WIDTH, BASE_HEIGHT)
+            .expect("the fixed Lab viewport overflows");
+        let track_point = Point {
+            x: (scrollbar.track().left + scrollbar.track().right) / 2.0,
+            y: scrollbar.track().bottom - 1.0,
+        };
+
+        assert!(lab.page_scrollbar_at(BASE_WIDTH, BASE_HEIGHT, track_point));
+        assert!(lab.scroll_offsets[&id("ui.lab.viewport")].offset_y() > 0.0);
+        assert_eq!(lab.focus.focused().cloned(), focus_before);
+        assert_eq!(lab.last_action, action_before);
+
+        let (scrollbar, metrics) = lab
+            .first_scrollbar(BASE_WIDTH, BASE_HEIGHT)
+            .expect("the viewport still overflows after paging");
+        let thumb = scrollbar.thumb();
+        let thumb_point = Point {
+            x: (thumb.left + thumb.right) / 2.0,
+            y: (thumb.top + thumb.bottom) / 2.0,
+        };
+        assert!(lab.begin_scrollbar_drag(BASE_WIDTH, BASE_HEIGHT, thumb_point));
+        assert!(lab.drag_scrollbar(
+            BASE_WIDTH,
+            BASE_HEIGHT,
+            Point {
+                x: thumb_point.x,
+                y: scrollbar.track().top - 50.0,
+            }
+        ));
+        assert!(lab.drag_scrollbar(
+            BASE_WIDTH,
+            BASE_HEIGHT,
+            Point {
+                x: thumb_point.x,
+                y: scrollbar.track().bottom + 50.0,
+            }
+        ));
+        assert!(lab.end_scrollbar_drag());
+        assert_eq!(
+            lab.scroll_offsets[metrics.id()].offset_y(),
+            anodrel_ui::UiScrollState::maximum_offset(
+                metrics.viewport_height(),
+                metrics.content_height()
+            )
+        );
+        assert_eq!(lab.focus.focused().cloned(), focus_before);
+        assert_eq!(lab.last_action, action_before);
+    }
+
+    #[test]
+    fn a_document_replacement_cannot_turn_a_captured_thumb_release_into_an_action() {
+        let mut lab = UiLab::new();
+        let (scrollbar, _) = lab
+            .first_scrollbar(BASE_WIDTH, BASE_HEIGHT)
+            .expect("the fixed Lab viewport overflows");
+        let thumb = scrollbar.thumb();
+        assert!(lab.begin_scrollbar_drag(
+            BASE_WIDTH,
+            BASE_HEIGHT,
+            Point {
+                x: (thumb.left + thumb.right) / 2.0,
+                y: (thumb.top + thumb.bottom) / 2.0,
+            }
+        ));
+
+        // A session worker may replace a document while Windows still owns the
+        // pointer capture. The old gesture must remain consumed until release.
+        lab.replace_document(UiLab::waiting_for_session().document);
+        assert!(lab.end_scrollbar_drag());
+        assert!(!lab.end_scrollbar_drag());
+        assert_eq!(lab.last_action, None);
     }
 
     #[test]

@@ -660,6 +660,26 @@ impl UiSessionView {
         self.lab.clamp_scroll_offsets(width, height);
     }
 
+    /// Begins one private host-local scrollbar thumb drag.
+    pub(super) fn begin_scrollbar_drag(&mut self, width: f32, height: f32, at: Point) -> bool {
+        self.lab.begin_scrollbar_drag(width, height, at)
+    }
+
+    /// Applies one captured private pointer position to a local scrollbar.
+    pub(super) fn drag_scrollbar(&mut self, width: f32, height: f32, at: Point) -> bool {
+        self.lab.drag_scrollbar(width, height, at)
+    }
+
+    /// Stops a private host-local scrollbar thumb drag.
+    pub(super) fn end_scrollbar_drag(&mut self) -> bool {
+        self.lab.end_scrollbar_drag()
+    }
+
+    /// Pages one local scrollbar track without queuing a semantic action.
+    pub(super) fn page_scrollbar_at(&mut self, width: f32, height: f32, at: Point) -> bool {
+        self.lab.page_scrollbar_at(width, height, at)
+    }
+
     /// Queues one current pointer-derived semantic action candidate.
     pub(super) fn invoke(&mut self, width: f32, height: f32, at: Point) -> bool {
         let Some(event) = self.lab.event_at(width, height, at) else {

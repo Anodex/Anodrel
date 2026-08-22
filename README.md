@@ -362,8 +362,8 @@ See `docs/UI_AUTOMATION_FOCUS.md`, `docs/UI_AUTOMATION_EVENTS.md`, and
 `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
-`docs/SCROLLING.md` defines the owned scroll-container boundary and its Windows
-development diagnostic.
+`docs/SCROLLING.md` defines the owned scroll-container boundary, direct
+first-viewport Windows scrollbar, and development diagnostic.
 `docs/UI_SESSIONS.md` defines bounded revision and semantic-event state used by
 the first capability-checked authenticated UI document replacement path.
 `docs/UI_PREVIEW.md` defines the bounded Windows developer preview command.

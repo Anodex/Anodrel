@@ -1,8 +1,8 @@
 # Anodrel scroll-container contract
 
-**Status:** Owned model, layout, version 2 interchange, and bounded Windows
-host-input contract. The Windows UI Session Lab has an end-to-end development
-diagnostic for the complete path.
+**Status:** Owned model, layout, version 2 interchange, bounded Windows
+host-input, and one direct-rendered first-viewport scrollbar. The Windows UI
+Session Lab has an end-to-end development diagnostic for the complete path.
 
 ## Boundary
 
@@ -29,11 +29,20 @@ scroll viewport starts at zero. Layout never mutates caller-owned positions;
 it independently clamps each input before translating the child.
 
 The first container is vertical only. Horizontal scrolling, overscroll,
-inertia, scrollbars, gesture input, scroll events, and persistence are
-intentionally outside this contract. The portable `UiScrollWheel` translates
+inertia, gesture input, scroll events, and persistence are intentionally
+outside this contract. The portable `UiScrollWheel` translates
 signed input units into owned whole-line steps without retaining device state;
 the Windows diagnostic and session hosts use it to accumulate partial wheel
 reports locally. It is not an application input event.
+
+The direct Windows host also overlays one scrollbar for the first visible
+overflowing viewport in source order. Its track and thumb are derived from the
+same current layout metrics and host-retained offset; clicking the track moves
+one viewport and dragging the thumb changes only that local offset. It does not
+change layout, consume a document field, move application focus, emit a
+semantic event, expose a handle, or cross the protocol. Nested-scrollbar
+arbitration and an assistive-technology scrolling surface are not established
+by this first slice. See Decision 0096.
 
 The `--sample-ui-scroll-client` Windows development command sends one exact v2
 tree whose only enabled action begins below the initial viewport. An operator

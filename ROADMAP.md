@@ -150,7 +150,7 @@ Status: **Direct Windows host in progress**
   each viewport position and accepts only local wheel and page input, while the
   client completes a semantic action revealed at the bottom. It has no product
   lifecycle. Operating-system accessibility adapters, public window lifecycle,
-  subscriptions, scrollbars, gestures, and broader action-event transport remain
+  subscriptions, gestures, and broader action-event transport remain
   separate gates.
   The direct Windows UI Lab and session view now also substitute the user's
   fixed high-contrast system colours for their host palette without changing
@@ -196,6 +196,11 @@ Status: **Direct Windows host in progress**
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
    `docs/UI_AUTOMATION_EVENTS.md`, and
    `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
+   Decision 0096 now adds a direct-rendered first-viewport scrollbar to the
+   Windows UI Lab and authenticated UI-session view. Its track paging and
+   captured thumb dragging change only host-retained scroll state, not a
+   document or application event; nested arbitration and accessibility scroll
+   control remain separate gates.
    The desktop command surface is a bounded native session menu: Decision 0080
    and `docs/MENUS.md` define a separate `menu.write` grant, a complete model,
    and delivery through the existing revision-checked interaction path.

@@ -594,11 +594,13 @@ To exercise a version 2 scroll document through that same session, run:
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-scroll-client $nodePath $clientPath
 ~~~
 
-Use the mouse wheel or Page Down until **Complete scroll diagnostic** becomes
-visible, then activate it. The document carries no position: the host retains,
-clamps, and applies the vertical offset locally before the normal authenticated
-semantic-action round trip closes the session. The development client waits at
-most two minutes for the action.
+Use the mouse wheel, Page Down, the scrollbar track, or its draggable thumb
+until **Complete scroll diagnostic** becomes visible, then activate it. The
+document carries no position: the host retains, clamps, and applies the
+vertical offset locally before the normal authenticated semantic-action round
+trip closes the session. The scrollbar interaction must not focus another
+element or emit an action by itself. The development client waits at most two
+minutes for the action.
 
 ### Development Windows product fixture
 

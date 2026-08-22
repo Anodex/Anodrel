@@ -19,6 +19,7 @@ mod menu;
 mod present;
 mod product_tile;
 mod registry;
+mod scrollbar;
 mod session_window_group;
 mod size;
 mod startup_lab;
@@ -87,7 +88,9 @@ const WM_GETOBJECT: Uint = 0x003D;
 const WM_KEYDOWN: Uint = 0x0100;
 const WM_MOUSEWHEEL: Uint = 0x020A;
 const WM_MOUSEMOVE: Uint = 0x0200;
+const WM_LBUTTONDOWN: Uint = 0x0201;
 const WM_LBUTTONUP: Uint = 0x0202;
+const WM_CAPTURECHANGED: Uint = 0x0215;
 const WM_MOUSELEAVE: Uint = 0x02A3;
 const WM_TIMER: Uint = 0x0113;
 const WM_DPICHANGED: Uint = 0x02E0;
@@ -405,6 +408,8 @@ unsafe extern "system" {
     fn ClientToScreen(window: Hwnd, point: *mut Point) -> Bool;
     fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
     fn SetCursor(cursor: Hcursor) -> Hcursor;
+    fn SetCapture(window: Hwnd) -> Hwnd;
+    fn ReleaseCapture() -> Bool;
     fn GetKeyState(virtual_key: i32) -> i16;
     fn InvalidateRect(window: Hwnd, rectangle: *const Rect, erase: Bool) -> Bool;
     fn SendMessageW(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) -> Lresult;
@@ -2416,6 +2421,30 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         WM_MOUSEMOVE => {
             let (x, y) = mouse_position(lparam);
             let rect = client_rect(window);
+            let scrollbar_changed = registry::with_ui_lab(window, |lab| {
+                lab.drag_scrollbar(
+                    rect.width() as f32,
+                    rect.height() as f32,
+                    point(x as f32, y as f32),
+                )
+            })
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| {
+                registry::with_ui_session(window, |session| {
+                    session.drag_scrollbar(
+                        rect.width() as f32,
+                        rect.height() as f32,
+                        point(x as f32, y as f32),
+                    )
+                })
+                .ok()
+                .flatten()
+                .unwrap_or(false)
+            });
+            if scrollbar_changed {
+                invalidate(window);
+            }
             let changed = registry::with_ui_lab(window, |lab| {
                 lab.update_hover(
                     rect.width() as f32,
@@ -2520,11 +2549,79 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             }
             1
         }
+        WM_LBUTTONDOWN => {
+            let (x, y) = mouse_position(lparam);
+            let rect = client_rect(window);
+            let began_drag = registry::with_ui_lab(window, |lab| {
+                lab.begin_scrollbar_drag(
+                    rect.width() as f32,
+                    rect.height() as f32,
+                    point(x as f32, y as f32),
+                )
+            })
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| {
+                registry::with_ui_session(window, |session| {
+                    session.begin_scrollbar_drag(
+                        rect.width() as f32,
+                        rect.height() as f32,
+                        point(x as f32, y as f32),
+                    )
+                })
+                .ok()
+                .flatten()
+                .unwrap_or(false)
+            });
+            if began_drag {
+                // SAFETY: this message belongs to the registered native window
+                // that owns the local thumb-drag state. Capture lasts only
+                // until that state is cleared below.
+                unsafe {
+                    SetCapture(window);
+                }
+                invalidate(window);
+            }
+            0
+        }
         WM_LBUTTONUP => {
             let (x, y) = mouse_position(lparam);
             let rect = client_rect(window);
             let (width, height) = (rect.width() as f32, rect.height() as f32);
             let at = point(x as f32, y as f32);
+            let ended_drag = registry::with_ui_lab(window, ui_lab::UiLab::end_scrollbar_drag)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| {
+                    registry::with_ui_session(window, |session| session.end_scrollbar_drag())
+                        .ok()
+                        .flatten()
+                        .unwrap_or(false)
+                });
+            if ended_drag {
+                // SAFETY: only this window starts the matching capture above,
+                // and the call merely releases the current thread's capture.
+                unsafe {
+                    ReleaseCapture();
+                }
+                return 0;
+            }
+            let scrollbar_consumed =
+                registry::with_ui_lab(window, |lab| lab.page_scrollbar_at(width, height, at))
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        registry::with_ui_session(window, |session| {
+                            session.page_scrollbar_at(width, height, at)
+                        })
+                        .ok()
+                        .flatten()
+                        .unwrap_or(false)
+                    });
+            if scrollbar_consumed {
+                invalidate(window);
+                return 0;
+            }
             // Focus first, then invoke. A click on a field only moves focus,
             // and a click on an action does both — pressing a control is also
             // how a person expects to focus it. Treating these as alternatives
@@ -2579,6 +2676,17 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                     let _ = open_document_window(&title, document);
                 }
             }
+            0
+        }
+        WM_CAPTURECHANGED => {
+            let _ = registry::with_ui_lab(window, ui_lab::UiLab::end_scrollbar_drag)
+                .ok()
+                .flatten()
+                .or_else(|| {
+                    registry::with_ui_session(window, |session| session.end_scrollbar_drag())
+                        .ok()
+                        .flatten()
+                });
             0
         }
         WM_ANODREL_PRODUCT_SESSION => {

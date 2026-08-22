@@ -464,6 +464,15 @@ host retains the field states, field-read bridge, native view, title
 composition, child lifecycle, and shutdown. See
 `docs/NATIVE_FORM_TEMPLATE.md` and Decision 0095.
 
+Decision 0096 adds one direct-rendered Windows scrollbar to the first visible
+overflowing v2 scroll viewport. Its pure host module derives finite track and
+thumb geometry from existing layout metrics and retained scroll state; the UI
+thread maps direct pointer paging and captured thumb dragging back into that
+same state. The control changes no portable document data, protocol field,
+application focus, action event, native handle, or input authority. Nested
+scrollbar arbitration and UI Automation scroll control remain separate
+decisions. See `docs/SCROLLING.md` and Decision 0096.
+
 Decision 0084 reserves the first direct network data seam without turning the
 host into a browser runtime. Its host-selected HTTPS origins and bounded
 text-only `GET` result sit behind a separate capability; an application cannot
