@@ -98,6 +98,34 @@ test("SDK and host expose version two UI document replacement separately", async
   assert.deepEqual(await client.replaceUiDocumentV2(document), { revision: "1" });
 });
 
+test("SDK and host keep secondary scroll documents on their explicit operations", async () => {
+  const document =
+    '{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"text","value":"Hello","fontSize":16,"tone":"primary"}}}';
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.open", "ui.document.write"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  const opened = await client.openWindowV2("Scrollable notes", document);
+  assert.deepEqual(opened, { windowId: "window-1" });
+  assert.deepEqual(await client.replaceUiDocumentV2InWindow(opened.windowId, document), {
+    revision: "2",
+  });
+
+  const older = await host.createTransport().send({
+    protocolVersion: { major: 1, minor: 26 },
+    kind: "request",
+    requestId: "scroll-before-protocol-1.27",
+    operation: "window.open.v2",
+    payload: { title: "Scrollable notes", document },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
 test("SDK and host keep version three status documents on their explicit operations", async () => {
   const document =
     '{"format":"anodrel.ui.document.v3","root":{"id":"result","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}';

@@ -88,7 +88,9 @@ operations still mean the primary view. Protocol 1.25 adds explicit view
 identity only through `window.open`, `window.close`,
 `ui.document.replace.window`, and `ui.events.read.window`; it does not change
 the legacy operations' meaning or allow them to consume secondary traffic.
-See `docs/MULTI_WINDOW.md`.
+Protocol 1.27 adds separate v2 opening and targeted replacement operations;
+they use the same per-view session and mailbox state while selecting the exact
+scroll document decoder. See `docs/MULTI_WINDOW.md` and Decision 0102.
 
 ### Native-creation handoff
 

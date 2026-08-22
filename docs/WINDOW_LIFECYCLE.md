@@ -135,8 +135,9 @@ cargo run --manifest-path native/Cargo.toml -p anodrel-windows-host -- --window-
 ~~~
 
 Confirm that **Anodrel Window Group Lab** opens first and then a separately
-captioned secondary window opens. Close the secondary: the primary remains.
-Run it again and close the primary: the secondary closes shortly afterwards and
-the process exits. This proves only host-owned group lifecycle and per-view
-routing; it is not an application-driven Protocol 1.25 or signed
-product-session test.
+captioned, scrollable secondary window opens. Scroll the secondary with the
+mouse wheel or Page Down: the primary must not move or change. Close the
+secondary: the primary remains. Run it again and close the primary: the
+secondary closes shortly afterwards and the process exits. This proves only
+host-owned group lifecycle, per-view v2 scrolling, and per-view routing; it is
+not an application-driven Protocol 1.27 or signed product-session test.

@@ -138,6 +138,11 @@ outbound UI Automation live-region notification. Applications receive no
 listener, delivery, focus, or accessibility-presence result. See
 `docs/UI_LIVE_ANNOUNCEMENTS.md`.
 
+Protocol 1.27 adds exact v2 opening and replacement operations for scroll-only
+secondary session views. Their scroll positions and native input stay local to
+each host-owned view; applications receive no position, event, callback, or
+native handle. See `docs/SCROLLING.md` and `docs/MULTI_WINDOW.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The

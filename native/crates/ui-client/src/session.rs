@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 
 use anodrel_client::{Client, ProtocolVersion};
 use anodrel_json::JsonValue;
-use anodrel_ui_document::{decode, decode_v3};
+use anodrel_ui_document::{decode, decode_v2, decode_v3};
 use anodrel_window::WindowTitleProposal;
 
 use crate::{
@@ -22,6 +22,8 @@ const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(24);
 const UI_MULTI_WINDOW_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(25);
 /// The first protocol version with explicit visible live-status documents.
 const UI_LIVE_STATUS_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(26);
+/// The first protocol version with explicit scroll documents in secondary views.
+const UI_MULTI_WINDOW_SCROLL_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(27);
 /// The operation-level document input limit inside one Wire v1 message.
 const MAX_SESSION_DOCUMENT_BYTES: usize = 24 * 1024;
 /// The initial request sequence. Zero remains unavailable as an internal guard.
@@ -182,6 +184,28 @@ where
             .and_then(SecondaryWindowId::parse_response)
     }
 
+    /// Opens one bounded secondary view from a strict version-2 scroll document.
+    pub fn open_window_v2(
+        &mut self,
+        title: &str,
+        document: &str,
+    ) -> Result<SecondaryWindowId, UiClientError> {
+        validate_document_v2(document)?;
+        let title =
+            WindowTitleProposal::new(title).map_err(|_| UiClientError::WindowTitleInvalid)?;
+        let result = self.request(
+            UI_MULTI_WINDOW_SCROLL_PROTOCOL,
+            "window.open.v2",
+            window_document_payload(title.as_str(), document),
+        )?;
+        result
+            .as_object()
+            .and_then(|fields| fields.get("windowId"))
+            .and_then(JsonValue::as_string)
+            .ok_or(UiClientError::ResponseInvalid)
+            .and_then(SecondaryWindowId::parse_response)
+    }
+
     /// Opens one bounded secondary view from a strict version-3 document.
     pub fn open_window_v3(
         &mut self,
@@ -231,6 +255,21 @@ where
                 .into_iter()
                 .collect(),
             ),
+        )?;
+        parse_document_revision(&result)
+    }
+
+    /// Replaces one opened secondary view with a strict version-2 scroll document.
+    pub fn replace_window_document_v2(
+        &mut self,
+        window: SecondaryWindowId,
+        document: &str,
+    ) -> Result<DocumentRevision, UiClientError> {
+        validate_document_v2(document)?;
+        let result = self.request(
+            UI_MULTI_WINDOW_SCROLL_PROTOCOL,
+            "ui.document.replace.window.v2",
+            targeted_document_payload(window, document),
         )?;
         parse_document_revision(&result)
     }
@@ -340,6 +379,14 @@ where
 
 fn validate_document(document: &str) -> Result<(), UiClientError> {
     if document.len() > MAX_SESSION_DOCUMENT_BYTES || decode(document).is_err() {
+        Err(UiClientError::DocumentInvalid)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_document_v2(document: &str) -> Result<(), UiClientError> {
+    if document.len() > MAX_SESSION_DOCUMENT_BYTES || decode_v2(document).is_err() {
         Err(UiClientError::DocumentInvalid)
     } else {
         Ok(())

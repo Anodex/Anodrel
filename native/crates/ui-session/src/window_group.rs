@@ -58,6 +58,13 @@ struct ResponseSlot {
     ready: Condvar,
 }
 
+#[derive(Clone, Copy)]
+enum SecondaryDocumentFormat {
+    V1,
+    V2,
+    V3,
+}
+
 /// A host-owned request to create one already-validated secondary view.
 ///
 /// The request contains neither a native handle nor a way to select another
@@ -185,8 +192,8 @@ impl<T> UiWindowGroup<T> {
 
     /// Replaces one current view's explicit v2 document and publishes it.
     ///
-    /// Protocol 1.25 intentionally does not reach this method. It exists so a
-    /// future exact v2 view operation can preserve the strict v1 boundary.
+    /// Protocol 1.27 reaches only this exact v2 route, preserving the strict
+    /// v1 boundary.
     pub fn replace_document_v2(
         &self,
         id: &UiWindowId,
@@ -332,7 +339,28 @@ impl<T: Clone> UiWindowGroup<T> {
         context: T,
         encoded_document: &str,
     ) -> Result<UiWindowId, UiWindowGroupError> {
-        self.open_secondary_within(context, encoded_document, UI_WINDOW_OPEN_RESPONSE_TIMEOUT)
+        self.open_secondary_inner(
+            context,
+            encoded_document,
+            UI_WINDOW_OPEN_RESPONSE_TIMEOUT,
+            SecondaryDocumentFormat::V1,
+        )
+    }
+
+    /// Sends one validated version-2 secondary-view creation request to the UI
+    /// thread. Its lifecycle is identical to [`Self::open_secondary`], but the
+    /// document is decoded through the explicit scroll-aware format.
+    pub fn open_secondary_v2(
+        &self,
+        context: T,
+        encoded_document: &str,
+    ) -> Result<UiWindowId, UiWindowGroupError> {
+        self.open_secondary_inner(
+            context,
+            encoded_document,
+            UI_WINDOW_OPEN_RESPONSE_TIMEOUT,
+            SecondaryDocumentFormat::V2,
+        )
     }
 
     /// Sends one validated version-3 secondary-view creation request to the UI
@@ -347,17 +375,23 @@ impl<T: Clone> UiWindowGroup<T> {
             context,
             encoded_document,
             UI_WINDOW_OPEN_RESPONSE_TIMEOUT,
-            true,
+            SecondaryDocumentFormat::V3,
         )
     }
 
+    #[cfg(test)]
     fn open_secondary_within(
         &self,
         context: T,
         encoded_document: &str,
         timeout: Duration,
     ) -> Result<UiWindowId, UiWindowGroupError> {
-        self.open_secondary_inner(context, encoded_document, timeout, false)
+        self.open_secondary_inner(
+            context,
+            encoded_document,
+            timeout,
+            SecondaryDocumentFormat::V1,
+        )
     }
 
     fn open_secondary_inner(
@@ -365,7 +399,7 @@ impl<T: Clone> UiWindowGroup<T> {
         context: T,
         encoded_document: &str,
         timeout: Duration,
-        version_three: bool,
+        format: SecondaryDocumentFormat,
     ) -> Result<UiWindowId, UiWindowGroupError> {
         let response = Arc::new(ResponseSlot::default());
         let request_id = {
@@ -373,10 +407,10 @@ impl<T: Clone> UiWindowGroup<T> {
             if state.active.is_some() {
                 return Err(UiWindowGroupError::Busy);
             }
-            let pending = if version_three {
-                state.windows.prepare_secondary_v3(encoded_document)
-            } else {
-                state.windows.prepare_secondary(encoded_document)
+            let pending = match format {
+                SecondaryDocumentFormat::V1 => state.windows.prepare_secondary(encoded_document),
+                SecondaryDocumentFormat::V2 => state.windows.prepare_secondary_v2(encoded_document),
+                SecondaryDocumentFormat::V3 => state.windows.prepare_secondary_v3(encoded_document),
             }
             .map_err(map_window_error)?;
             state.next_request_id = state.next_request_id.checked_add(1).unwrap_or(1);

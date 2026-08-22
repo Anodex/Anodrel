@@ -1,7 +1,8 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.26, including bounded semantic
-live-status documents for primary and session-owned secondary views.
+**Status:** Implemented through version 1.27, including bounded semantic
+live-status documents and exact scroll documents for session-owned secondary
+views.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +30,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.26 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 26}`.
+the host's. Version 1.27 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 27}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -73,6 +74,7 @@ The implemented operations are:
 | `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
 | `window.size.set` | `{ "width": integer, "height": integer }` | `{ "status": "applied" }` | `window.size` |
 | `window.open` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
+| `window.open.v2` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
 | `window.open.v3` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
 | `window.close` | `{ "windowId": string }` | `{ "status": "requested" }` | `window.close` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean, "shortcut"?: "Ctrl+<A-Z0-9>" \| "Ctrl+Shift+<A-Z0-9>" }] }] }` | current menu revision | `menu.write` |
@@ -80,6 +82,7 @@ The implemented operations are:
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v3` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.window` | `{ "windowId": string, "document": string }` | accepted view document revision | `ui.document.write` |
+| `ui.document.replace.window.v2` | `{ "windowId": string, "document": string }` | accepted view document revision | `ui.document.write` |
 | `ui.document.replace.window.v3` | `{ "windowId": string, "document": string }` | accepted view document revision | `ui.document.write` |
 | `ui.events.read` | `{}` | bounded current UI events | `ui.events.read` |
 | `ui.events.read.window` | `{}` | bounded per-view tagged UI events | `ui.events.read` |
@@ -195,6 +198,17 @@ contains at most 128 tagged actions. It promises order only within an
 individual view; it never exposes native handles, geometry, lifecycle events,
 view enumeration, or desktop timing. See `docs/MULTI_WINDOW.md` and Decisions
 0092–0093.
+
+### Secondary scroll documents
+
+Protocol 1.27 adds `window.open.v2` and
+`ui.document.replace.window.v2`. Their payloads and successful window-ID or
+revision results are identical to their version-1 counterparts, but each
+requires an exact `anodrel.ui.document.v2` document. They retain the existing
+`window.open` and `ui.document.write` grants. The host keeps each view's scroll
+position and all local scrolling behavior; no position, listener, event,
+callback, handle, or result is added. See `docs/SCROLLING.md`,
+`docs/MULTI_WINDOW.md`, and Decision 0102.
 
 ### Semantic live-status documents
 

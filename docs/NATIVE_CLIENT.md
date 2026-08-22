@@ -145,3 +145,9 @@ Decision 0101 uses the already-typed `replace_document_v3` method only in the
 separate fixed-grant native live-status template. Its three fixed documents
 demonstrate outbound visible status changes, not an accessibility callback,
 listener check, or delivery API. See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md`.
+
+Decision 0102 adds the preview facade's `open_window_v2` and
+`replace_window_document_v2` methods for exact scroll documents in an existing
+session-owned group. They share the existing window and document grants and
+expose no scroll position, callback, native view, or automation route. See
+`docs/MULTI_WINDOW.md`.

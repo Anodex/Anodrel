@@ -144,6 +144,14 @@ export class PlatformClient {
     return this.request("window.open", { title, document });
   }
 
+  /** Opens a secondary view from one exact version-2 scroll document. */
+  openWindowV2(
+    title: string,
+    document: string,
+  ): Promise<ResultFor<"window.open.v2">> {
+    return this.request("window.open.v2", { title, document });
+  }
+
   /** Opens a secondary view from one exact version-3 UI document. */
   openWindowV3(
     title: string,
@@ -200,6 +208,14 @@ export class PlatformClient {
     document: string,
   ): Promise<ResultFor<"ui.document.replace.window">> {
     return this.request("ui.document.replace.window", { windowId, document });
+  }
+
+  /** Replaces `main` or one issued secondary view with an exact v2 scroll document. */
+  replaceUiDocumentV2InWindow(
+    windowId: SessionWindowId,
+    document: string,
+  ): Promise<ResultFor<"ui.document.replace.window.v2">> {
+    return this.request("ui.document.replace.window.v2", { windowId, document });
   }
 
   /** Replaces `main` or one issued secondary view with an exact v3 document. */

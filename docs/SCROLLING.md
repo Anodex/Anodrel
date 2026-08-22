@@ -66,3 +66,9 @@ Decision 0039 defines `anodrel.ui.document.v2` as the first exact external
 scroll-container form. Its codec, explicit session replacement path, and
 authenticated `ui.document.replace.v2` operation are implemented. It will
 never serialize a scroll position.
+
+Decision 0102 extends the same exact v2 form to bounded secondary session views
+through Protocol 1.27 `window.open.v2` and
+`ui.document.replace.window.v2`. A secondary's retained position, pointer,
+keyboard, and automation scrolling remain local to that one host-owned view;
+there is no cross-view or application-observable scroll route.

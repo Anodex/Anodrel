@@ -211,6 +211,11 @@ changed visible status reaches an established view, but that is never a
 protocol response or application-observable delivery channel. See Decision
 0100.
 
+Protocol 1.27 adds parallel exact-v2 opening and replacement operations for
+scroll-only secondary views. Each view retains its own host-local position and
+Windows scrolling behavior; no position, callback, event, or native mapping
+crosses the protocol. See Decision 0102.
+
 ## Modularity and performance
 
 The dependency direction is one-way: protocol types sit at the center; SDKs and
@@ -345,8 +350,9 @@ owning UI thread, while Decision 0093 latches a primary close or session-close
 request across the native group and retains a product lifetime through the last
 view. Protocol 1.25 exposes the group’s explicit creation, secondary close,
 strict-v1 per-view replacement, and tagged semantic-event routes. Protocol
-1.26 adds separately named exact-v3 replacement and creation routes. All
-native mapping and presentation state remain on the host side of this seam.
+1.26 adds separately named exact-v3 replacement and creation routes, while
+Protocol 1.27 adds their exact-v2 scroll counterparts. All native mapping and
+presentation state remain on the host side of this seam.
 
 `anodrel-menu` is a separate portable module for one authenticated session's
 complete bounded menu model, monotonic revision, enabled-command revalidation,

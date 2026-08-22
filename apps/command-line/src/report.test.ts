@@ -18,6 +18,6 @@ test("command-line report uses only public host facts", async () => {
     applicationId: "org.example.command-line",
     grantedCapabilities: ["diagnostics.read", "clipboard.read"],
     hostName: "anodrel-mock-host",
-    protocolVersion: "1.26",
+    protocolVersion: "1.27",
   });
 });

@@ -3,11 +3,11 @@
 **Status:** The portable session-owned state, worker-to-UI creation handoff,
 and direct Windows session-group lifecycle are implemented. The development
 Group Lab manually exercises dynamic secondary creation and primary-driven
-group shutdown. Protocol 1.25's public surface, installed capability policy,
-SDK, mock host, and compatibility work are implemented and contract-tested.
-The direct Windows host resolves every application-visible identity through its
-private group map; no released operation exposes a native handle or desktop
-state.
+group shutdown plus per-view v2 scrolling. Protocol 1.25 through 1.27's public
+surface, installed capability policy, SDK, mock host, and compatibility work
+are implemented and contract-tested. The direct Windows host resolves every
+application-visible identity through its private group map; no released
+operation exposes a native handle or desktop state.
 
 ## Purpose
 
@@ -44,16 +44,21 @@ operation on a closed or unknown identity returns the existing safe
 `window.unavailable` category; it does not reveal whether a person closed a
 window or why the host no longer has it.
 
-## Protocol 1.25 surface
+## Protocol 1.25, 1.26, and 1.27 surface
 
-Protocol 1.25 introduces the following exact operations. Earlier protocol
-versions reject them as unsupported.
+Protocol 1.25 introduces the v1 operations below; later protocol versions add
+the v2 and v3 rows. Every operation is rejected as unsupported before its
+listed minimum protocol version.
 
 | Operation | Exact payload | Exact success result | Required grants |
 | --- | --- | --- | --- |
 | `window.open` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
+| `window.open.v2` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
+| `window.open.v3` | `{ "title": string, "document": string }` | `{ "windowId": string }` | `window.open`, `ui.document.write` |
 | `window.close` | `{ "windowId": string }` | `{ "status": "requested" }` | `window.close` |
 | `ui.document.replace.window` | `{ "windowId": string, "document": string }` | `{ "revision": string }` | `ui.document.write` |
+| `ui.document.replace.window.v2` | `{ "windowId": string, "document": string }` | `{ "revision": string }` | `ui.document.write` |
+| `ui.document.replace.window.v3` | `{ "windowId": string, "document": string }` | `{ "revision": string }` | `ui.document.write` |
 | `ui.events.read.window` | `{}` | bounded per-view semantic events | `ui.events.read` |
 
 `window.open.title` follows the same 96 UTF-16-code-unit and no-control-
@@ -64,9 +69,18 @@ application string verbatim. `document` is one 24 KiB-or-smaller
 only after the document validates completely. A rejected document or failed
 native creation leaves no logical view behind.
 
-The initial release intentionally accepts only document format v1. A future
-scroll-capable view update needs a new exact operation rather than silently
-making `ui.document.replace.window` accept v2 data.
+Protocol 1.25's initial release accepts only document format v1. Protocol 1.26
+adds `window.open.v3` and `ui.document.replace.window.v3` for exact v3
+documents. Protocol 1.27 adds `window.open.v2` and
+`ui.document.replace.window.v2` for exact scroll-capable v2 documents. No
+operation accepts another version, and the v1 operation names continue to
+reject v2 and v3 data.
+
+A v2 view keeps its scroll state in the host exactly like the primary v2 view:
+wheel, keyboard, pointer-scrollbar, and UI Automation scroll movement are
+local to that view. Neither a position nor an observation crosses the protocol.
+Because v2 has no `status` node, v2 replacement never raises a live-region
+event.
 
 `window.close` accepts only a currently issued secondary identity. It cannot
 name `main`; `session.close` remains the one operation that asks the host to
@@ -74,10 +88,10 @@ end the entire authenticated session. Its success acknowledges that the host
 accepted the close request, not that a native window was destroyed or that a
 person saw anything.
 
-`ui.document.replace.window` accepts `main` or a currently issued secondary
-identity. It is the uniform strict-v1 update route for applications that need
-to address a known view; it is not a lookup, enumeration, or a way to retarget
-the existing primary-only window services.
+Each `ui.document.replace.window` version accepts `main` or a currently issued
+secondary identity. It is a version-specific update route for applications that
+need to address a known view; it is not a lookup, enumeration, or a way to
+retarget the existing primary-only window services.
 
 `ui.events.read.window` returns no document data. Each accepted UI action is
 tagged with the logical `windowId` that produced its revision-bound semantic
@@ -152,6 +166,6 @@ This contract deliberately excludes application-selected bounds, positions,
 monitors, native menus on secondary views, modal relationships, dialog owners,
 window enumeration, event subscriptions, restoration, background execution,
 and cross-session control. It also does not make a production packaging or
-signed-launch decision.
+signed-launch decision. See Decision 0102 for the explicit v2 extension.
 
 See Decision 0092, `docs/WINDOW_LIFECYCLE.md`, and `docs/UI_SESSIONS.md`.

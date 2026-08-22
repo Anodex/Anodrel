@@ -153,6 +153,15 @@ requires `ui.events.read` and returns only revision-checked semantic actions
 tagged with their `windowId`; order across different views has no desktop-time
 meaning. See `docs/MULTI_WINDOW.md`.
 
+### Secondary scroll documents
+
+Protocol 1.27 adds `openWindowV2(title, document)` and
+`replaceUiDocumentV2InWindow(windowId, document)`. Each accepts only an exact
+version-2 scroll document. They retain the existing `window.open` and
+`ui.document.write` grants, but provide no scroll position, event, callback,
+or observation. Scrolling remains local to the host-owned view. See
+`docs/SCROLLING.md` and Decision 0102.
+
 ### Semantic live-status documents
 
 Protocol 1.26 adds `replaceUiDocumentV3(document)`, `openWindowV3(title,

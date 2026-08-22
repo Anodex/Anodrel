@@ -116,7 +116,12 @@ Status: **Direct Windows host in progress**
   SDK, mock-host, installed-record 1.13 policy, native host routing, and
   compatibility coverage. The direct Windows host still retains all native
   mapping and presentation decisions; the public API exposes no handles,
-  geometry, enumeration, or lifecycle observation.
+  geometry, enumeration, or lifecycle observation. **Completed for Protocol
+  1.27:** explicit v2 opening and targeted replacement now let an existing
+  session group use the exact host-owned scroll document without silently
+  widening its v1 or v3 routes. The existing per-view local scroll state,
+  pointer, keyboard, and Windows accessibility paths stay private to the native
+  view; no position, event, callback, or capability was added (Decision 0102).
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
   non-mutating save picker while implementing an independent, one-use

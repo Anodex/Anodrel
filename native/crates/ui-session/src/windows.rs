@@ -13,6 +13,13 @@ use crate::{
     UiDocumentSnapshot, UiInputBatch, UiInputMailbox, UiSessionError, UiWindowId,
 };
 
+#[derive(Clone, Copy)]
+enum InitialDocumentFormat {
+    V1,
+    V2,
+    V3,
+}
+
 /// The maximum number of concurrently open logical views in one UI session.
 ///
 /// This includes the primary `main` view and therefore permits at most three
@@ -247,7 +254,18 @@ impl UiWindowSessions {
         &mut self,
         encoded_document: &str,
     ) -> Result<PendingUiWindow, UiWindowSessionError> {
-        self.prepare_secondary_with(encoded_document, false)
+        self.prepare_secondary_with(encoded_document, InitialDocumentFormat::V1)
+    }
+
+    /// Validates an initial v2 document and reserves the next secondary view.
+    ///
+    /// The version is selected before a native creation request exists, so a
+    /// v1 or v3 route cannot accidentally accept a scroll document.
+    pub fn prepare_secondary_v2(
+        &mut self,
+        encoded_document: &str,
+    ) -> Result<PendingUiWindow, UiWindowSessionError> {
+        self.prepare_secondary_with(encoded_document, InitialDocumentFormat::V2)
     }
 
     /// Validates an initial v3 document and reserves the next secondary view.
@@ -258,13 +276,13 @@ impl UiWindowSessions {
         &mut self,
         encoded_document: &str,
     ) -> Result<PendingUiWindow, UiWindowSessionError> {
-        self.prepare_secondary_with(encoded_document, true)
+        self.prepare_secondary_with(encoded_document, InitialDocumentFormat::V3)
     }
 
     fn prepare_secondary_with(
         &mut self,
         encoded_document: &str,
-        version_three: bool,
+        format: InitialDocumentFormat,
     ) -> Result<PendingUiWindow, UiWindowSessionError> {
         if self.windows.len() == MAX_SESSION_WINDOWS {
             return Err(UiWindowSessionError::OpenLimitReached);
@@ -276,10 +294,14 @@ impl UiWindowSessions {
             .next_secondary
             .ok_or(UiWindowSessionError::IdentityExhausted)?;
         let mut state = UiWindowState::new(UiWindowId::Secondary(number));
-        let replacement = if version_three {
-            state.document_session.replace_document_v3(encoded_document)
-        } else {
-            state.document_session.replace_document(encoded_document)
+        let replacement = match format {
+            InitialDocumentFormat::V1 => state.document_session.replace_document(encoded_document),
+            InitialDocumentFormat::V2 => {
+                state.document_session.replace_document_v2(encoded_document)
+            }
+            InitialDocumentFormat::V3 => {
+                state.document_session.replace_document_v3(encoded_document)
+            }
         };
         let revision = replacement.map_err(UiWindowSessionError::DocumentRejected)?;
         let snapshot = state
@@ -366,8 +388,8 @@ impl UiWindowSessions {
 
     /// Replaces one currently open view's explicit v2 document and publishes it.
     ///
-    /// This portable method exists for a later exact protocol operation. It
-    /// does not widen the reserved v1 multi-window request contract.
+    /// Its exact v2 protocol route remains separate from the v1 and v3
+    /// multi-window request contracts.
     pub fn replace_document_v2(
         &mut self,
         id: &UiWindowId,

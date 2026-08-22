@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0102: Secondary scroll documents stay explicit and host-owned.
+
 - 0101: Development native live-status templates keep status delivery one-way.
 
 - 0100: Live status is visible, semantic, and outbound-only.

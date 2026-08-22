@@ -436,8 +436,9 @@ export class MockHost {
         return this.success("window.size.set", request.requestId, { status: "applied" });
 
       case "window.open":
+      case "window.open.v2":
       case "window.open.v3":
-        if (request.protocolVersion.minor < (request.operation === "window.open.v3" ? 26 : 25)) {
+        if (request.protocolVersion.minor < secondaryDocumentOperationMinor(request.operation)) {
           return this.failure(
             request.requestId,
             "operation.unsupported",
@@ -603,8 +604,9 @@ export class MockHost {
         });
 
       case "ui.document.replace.window":
+      case "ui.document.replace.window.v2":
       case "ui.document.replace.window.v3":
-        if (request.protocolVersion.minor < (request.operation === "ui.document.replace.window.v3" ? 26 : 25)) {
+        if (request.protocolVersion.minor < secondaryDocumentOperationMinor(request.operation)) {
           return this.failure(
             request.requestId,
             "operation.unsupported",
@@ -1134,6 +1136,28 @@ export class MockHost {
 interface UiWindowState {
   nextSecondaryId: number;
   readonly revisions: Map<string, number>;
+}
+
+function secondaryDocumentOperationMinor(
+  operation:
+    | "window.open"
+    | "window.open.v2"
+    | "window.open.v3"
+    | "ui.document.replace.window"
+    | "ui.document.replace.window.v2"
+    | "ui.document.replace.window.v3",
+): number {
+  switch (operation) {
+    case "window.open":
+    case "ui.document.replace.window":
+      return 25;
+    case "window.open.v3":
+    case "ui.document.replace.window.v3":
+      return 26;
+    case "window.open.v2":
+    case "ui.document.replace.window.v2":
+      return 27;
+  }
 }
 
 function createUiWindowState(): UiWindowState {

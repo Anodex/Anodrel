@@ -182,6 +182,12 @@ only. A v2 decoder rejects unknown or missing fields exactly as v1 does; a v1
 decoder continues to reject `scroll`. Document-session compatibility is a
 separate opt-in step under Decision 0039.
 
+Protocol 1.27 extends that same exact v2 choice to a session-owned secondary
+view through `window.open.v2` and `ui.document.replace.window.v2`. Those
+operations retain per-view host-owned scroll state; they do not encode or return
+a position. The earlier v1 and later v3 operations remain exact. See
+`docs/MULTI_WINDOW.md` and Decision 0102.
+
 ## Version 3 live-status extension
 
 `anodrel.ui.document.v3` retains the v2 envelope plus every v1 and v2 node
