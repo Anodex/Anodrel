@@ -1,6 +1,8 @@
 import {
+  MAX_FILE_BINARY_WRITE_BYTES,
   PROTOCOL_VERSION,
   createRequest,
+  encodeCanonicalBase64Url,
   type CancellationEnvelope,
   type PayloadFor,
   type PlatformOperation,
@@ -222,6 +224,29 @@ export class PlatformClient {
     text: string,
   ): Promise<ResultFor<"file.write_text">> {
     return this.request("file.write_text", { saveReference, text });
+  }
+
+  /**
+   * Replaces one selected destination with bounded binary data.
+   *
+   * The SDK uses Anodrel's first-party canonical base64url encoder and rejects
+   * data above the Protocol 1.22 limit before constructing a transport frame.
+   * The host still consumes the one-use save reference and provides the final
+   * filesystem boundary; no path, offset, stream, or MIME value is accepted.
+   */
+  writeSelectedFileBinary(
+    saveReference: string,
+    bytes: Uint8Array,
+  ): Promise<ResultFor<"file.write_binary">> {
+    if (bytes.byteLength > MAX_FILE_BINARY_WRITE_BYTES) {
+      return Promise.reject(
+        new RangeError(`Binary output exceeds the ${MAX_FILE_BINARY_WRITE_BYTES}-byte protocol limit.`),
+      );
+    }
+    return this.request("file.write_binary", {
+      saveReference,
+      bytesBase64Url: encodeCanonicalBase64Url(bytes),
+    });
   }
 
   readStorageState(): Promise<ResultFor<"storage.state.read">> {

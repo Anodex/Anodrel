@@ -89,6 +89,15 @@ direct User32 and monitor adapter, and development diagnostic are implemented;
 its desktop entry-and-restore check remains manual. See
 `docs/WINDOW_FULLSCREEN.md`.
 
+Protocol 1.22 adds a separately granted bounded binary-output path to the
+direct Windows UI-session host. A `dialog.save_file.v2` selection can be
+consumed once by either the existing text writer or `file.write_binary`, whose
+first-party canonical base64url boundary accepts at most 32 KiB of decoded
+bytes. It exposes no path, handle, MIME type, streaming, readback, or general
+filesystem API. Record version 1.11 carries the optional grant; its Windows
+picker diagnostic remains a manual desktop verification. See
+`docs/FILE_BINARY_WRITE.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
@@ -267,6 +276,9 @@ boundary.
 `docs/FILE_WRITE.md` defines the separately scoped retained-output-object
 text-write boundary implemented in Protocol 1.17 for the direct Windows
 UI-session host; legacy save selection remains non-mutating.
+`docs/FILE_BINARY_WRITE.md` defines the separately granted bounded binary
+output boundary implemented in Protocol 1.22 for that same direct Windows
+UI-session host.
 `docs/MENUS.md` defines the bounded native session-menu contract and records
 the implemented direct Windows adapter, its explicit ownership boundary, and
 the remaining manual verification.

@@ -347,6 +347,19 @@ through it; inspect the file after the session closes. Cancelling leaves no new
 file behind. This route is deliberately distinct from `--sample-ui-save-client`,
 which remains a non-mutating selection test.
 
+To exercise the separately granted bounded binary-output route, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-file-binary-write-client $nodePath $clientPath
+~~~
+
+Choose a new temporary `.bin` filename in the host-controlled save picker. The
+client writes exactly the fixed bytes `41 6E 6F 64 72 65 6C 00 FF` through one
+opaque save reference; inspect the file after the session closes. Cancelling
+leaves no new file behind. This route has its own `file.write_binary` grant and
+does not accept a path, type, handle, offset, stream, or readback request. This
+manual check is not yet recorded as passed; see `docs/FILE_BINARY_WRITE.md`.
+
 To exercise the bounded application-state service through the same authenticated
 session, run:
 

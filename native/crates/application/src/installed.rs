@@ -292,6 +292,7 @@ enum RecordVersion {
     V1_8,
     V1_9,
     V1_10,
+    V1_11,
 }
 
 impl RecordVersion {
@@ -311,6 +312,7 @@ impl RecordVersion {
                 | Self::V1_8
                 | Self::V1_9
                 | Self::V1_10
+                | Self::V1_11
         )
     }
 
@@ -326,6 +328,7 @@ impl RecordVersion {
                 | Self::V1_8
                 | Self::V1_9
                 | Self::V1_10
+                | Self::V1_11
         )
     }
 
@@ -340,6 +343,7 @@ impl RecordVersion {
                 | Self::V1_8
                 | Self::V1_9
                 | Self::V1_10
+                | Self::V1_11
         )
     }
 
@@ -347,7 +351,13 @@ impl RecordVersion {
     const fn accepts_v1_5_grants(self) -> bool {
         matches!(
             self,
-            Self::V1_5 | Self::V1_6 | Self::V1_7 | Self::V1_8 | Self::V1_9 | Self::V1_10
+            Self::V1_5
+                | Self::V1_6
+                | Self::V1_7
+                | Self::V1_8
+                | Self::V1_9
+                | Self::V1_10
+                | Self::V1_11
         )
     }
 }
@@ -472,6 +482,7 @@ fn capability_for_record_version(
                     | RecordVersion::V1_8
                     | RecordVersion::V1_9
                     | RecordVersion::V1_10
+                    | RecordVersion::V1_11
             ) =>
         {
             Some(Capability::WindowState)
@@ -483,6 +494,7 @@ fn capability_for_record_version(
                     | RecordVersion::V1_8
                     | RecordVersion::V1_9
                     | RecordVersion::V1_10
+                    | RecordVersion::V1_11
             ) =>
         {
             Some(Capability::FileWriteText)
@@ -490,17 +502,26 @@ fn capability_for_record_version(
         "menu.write"
             if matches!(
                 version,
-                RecordVersion::V1_8 | RecordVersion::V1_9 | RecordVersion::V1_10
+                RecordVersion::V1_8
+                    | RecordVersion::V1_9
+                    | RecordVersion::V1_10
+                    | RecordVersion::V1_11
             ) =>
         {
             Some(Capability::MenuWrite)
         }
-        "window.focus" if matches!(version, RecordVersion::V1_9 | RecordVersion::V1_10) => {
+        "window.focus"
+            if matches!(
+                version,
+                RecordVersion::V1_9 | RecordVersion::V1_10 | RecordVersion::V1_11
+            ) =>
+        {
             Some(Capability::WindowFocus)
         }
-        "window.fullscreen" if version == RecordVersion::V1_10 => {
+        "window.fullscreen" if matches!(version, RecordVersion::V1_10 | RecordVersion::V1_11) => {
             Some(Capability::WindowFullscreen)
         }
+        "file.write_binary" if version == RecordVersion::V1_11 => Some(Capability::FileWriteBinary),
         _ => None,
     }
 }
@@ -611,6 +632,7 @@ fn validate_version(
         (1, 8) => Ok(RecordVersion::V1_8),
         (1, 9) => Ok(RecordVersion::V1_9),
         (1, 10) => Ok(RecordVersion::V1_10),
+        (1, 11) => Ok(RecordVersion::V1_11),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -1123,6 +1145,55 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_11_adds_binary_file_write_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 11")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"file.write_text\", \"window.fullscreen\", \"file.write_binary\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.11 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::FileWriteText,
+                anodrel_protocol::Capability::WindowFullscreen,
+                anodrel_protocol::Capability::FileWriteBinary,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_binary_file_write_grant() {
+        for minor in ["7", "8", "9", "10"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"file.write_binary\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.11 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

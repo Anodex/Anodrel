@@ -14,6 +14,8 @@ import {
   isExternalOpenPayload,
   isNetworkFetchTextPayload,
   isFileDialogOpenPayload,
+  classifyFileBinaryWritePayload,
+  isFileBinaryWritePayloadShape,
   isFileTextReadPayload,
   isFileTextWritePayload,
   isEmptyPayload,
@@ -797,6 +799,51 @@ export class MockHost {
           "file.unavailable",
           "selected output is unavailable.",
         );
+
+      case "file.write_binary": {
+        if (request.protocolVersion.minor < 22) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "file.write_binary requires protocol 1.22 or later.",
+          );
+        }
+        if (!isFileBinaryWritePayloadShape(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "file.write_binary requires one exact save reference and base64url data.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "file.write_binary")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "file.write_binary requires the file.write_binary capability.",
+            { capability: "file.write_binary" },
+          );
+        }
+        const binaryStatus = classifyFileBinaryWritePayload(request.payload);
+        if (binaryStatus === "invalid") {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "file.write_binary requires canonical base64url data.",
+          );
+        }
+        if (binaryStatus === "too_large") {
+          return this.failure(
+            request.requestId,
+            "file.binary_too_large",
+            "selected output binary data is too large.",
+          );
+        }
+        return this.failure(
+          request.requestId,
+          "file.unavailable",
+          "selected output is unavailable.",
+        );
+      }
 
       case "storage.state.read":
         if (request.protocolVersion.minor < 10) {

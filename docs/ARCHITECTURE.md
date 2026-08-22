@@ -220,9 +220,11 @@ an application.
 record into the identity and machine-selected grants for one `anodrel-core`
 host session. It has no operating-system store, launch, pipe, bootstrap, or UI
 authority; platform adapters select the record before calling it. A version
-1.0 record produces no grants, version 1.1 uses its original strict capability
-array, and version 1.2 adds the existing storage, credential, and file grant
-names. See Decisions 0023 and 0057.
+  1.0 record produces no grants, version 1.1 uses its original strict capability
+  array, and version 1.2 adds the existing storage, credential, and file grant
+  names. Later strict supersets add each new capability explicitly; version 1.11
+  adds `file.write_binary`, never retroactively widening an older record. See
+  Decisions 0023, 0057, and 0087.
 
 `anodrel-windows-registered-session` is the Windows composition boundary for
 that policy and the owner-restricted named-pipe adapter. Before creating the

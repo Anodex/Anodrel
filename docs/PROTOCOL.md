@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.21, including the separately granted
-session-window fullscreen request documented in `docs/WINDOW_FULLSCREEN.md`.
+**Status:** Implemented through version 1.22, including separately granted,
+bounded binary file output documented in `docs/FILE_BINARY_WRITE.md`.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.21 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 21}`.
+the host's. Version 1.22 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 22}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -86,6 +86,7 @@ The implemented operations are:
 | `file.read_text` | `{ "selectionReference": string }` | bounded UTF-8 text | `file.read_text` |
 | `dialog.save_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus save reference, or cancellation | `dialog.save_file` |
 | `file.write_text` | `{ "saveReference": string, "text": string }` | accepted bounded text replacement | `file.write_text` |
+| `file.write_binary` | `{ "saveReference": string, "bytesBase64Url": string }` | accepted bounded binary replacement | `file.write_binary` |
 | `storage.state.read` | `{}` | bounded saved snapshot or absence | `storage.state.read` |
 | `storage.state.replace` | `{ "snapshot": string }` | accepted replacement | `storage.state.replace` |
 | `storage.state.clear` | `{}` | accepted clear | `storage.state.clear` |
@@ -237,7 +238,7 @@ cancellation before work begins. A retained-file read performs one fixed,
 bounded synchronous read once started; it does not retain a background transfer
 after returning. Session shutdown revokes all outstanding references.
 
-### `dialog.save_file.v2` and `file.write_text`
+### `dialog.save_file.v2` and file output
 
 Protocol 1.17 adds a separate retained-output-object boundary.
 `dialog.save_file.v2` has the exact bounded filter payload and
@@ -258,11 +259,25 @@ is limited to 8 KiB UTF-8 source bytes. Success is `{ "status": "written" }`;
 an unavailable reference or native failure maps to `file.unavailable`, and an
 oversized value maps to `file.text_too_large`.
 
+Protocol 1.22 adds `file.write_binary` behind its distinct
+`file.write_binary` capability. It accepts exactly `{ "saveReference": string,
+"bytesBase64Url": string }`. `bytesBase64Url` is unpadded canonical base64url
+for zero through **32 KiB** of decoded bytes: only the base64url alphabet is
+valid, padding and whitespace are invalid, a remainder of one character is
+invalid, and unused trailing bits must be zero. Invalid representation returns
+`request.payload_invalid`; a canonical representation above the decoded bound
+returns `file.binary_too_large`. Success is `{ "status": "written" }`.
+After the capability check, the same one-use save reference is consumed even
+when binary decoding fails; a text and binary operation cannot both consume it.
+The operation accepts no path, name, type, handle, length claim, offset,
+append, streaming, callback, or readback field.
+
 The operation is synchronous and cancellation is observed only before it
 starts. It makes one non-atomic replacement attempt through the retained native
 object: a failure after mutation begins can leave partial content. Success is
-not a durability or atomicity guarantee. `docs/FILE_WRITE.md` and Decision
-0079 define capture, cleanup, and recovery limits.
+not a durability or atomicity guarantee. `docs/FILE_WRITE.md`,
+`docs/FILE_BINARY_WRITE.md`, and Decisions 0079 and 0087 define capture,
+cleanup, and recovery limits.
 
 ### `dialog.save_file`
 
@@ -490,6 +505,8 @@ Protocol 1.20 adds no error code; its window-focus request reuses the existing
 safe `window.unavailable` and `window.busy` categories.
 Protocol 1.21 adds no error code; its fullscreen request reuses the same safe
 `window.unavailable` and `window.busy` categories.
+Protocol 1.22 adds `file.binary_too_large`; malformed binary encodings reuse
+the existing `request.payload_invalid` category.
 Protocol 1.10 adds `storage.unavailable`, `storage.snapshot_invalid`, and
 `storage.snapshot_too_large`.
 

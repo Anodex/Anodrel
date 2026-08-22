@@ -94,7 +94,7 @@ impl WriteOnlyFile {
         self.identity
     }
 
-    pub(super) fn write_text(&mut self, text: &str) -> io::Result<()> {
+    pub(super) fn write_bytes(&mut self, bytes: &[u8]) -> io::Result<()> {
         if self.deletion_pending {
             set_deletion_pending(self.handle, false)?;
             self.deletion_pending = false;
@@ -109,7 +109,7 @@ impl WriteOnlyFile {
             return Err(io::Error::last_os_error());
         }
 
-        let mut remaining = text.as_bytes();
+        let mut remaining = bytes;
         while !remaining.is_empty() {
             let requested = remaining.len().min(Dword::MAX as usize) as Dword;
             let mut written = 0_u32;
@@ -354,11 +354,25 @@ mod tests {
         let path = temporary_path("write");
         std::fs::write(&path, "a longer old value").expect("fixture is written");
         let mut file = open_save_file(&path).expect("fixture is captured");
-        file.write_text("new").expect("write succeeds");
+        file.write_bytes(b"new").expect("write succeeds");
         drop(file);
         assert_eq!(
             std::fs::read_to_string(&path).expect("fixture is readable"),
             "new"
+        );
+        std::fs::remove_file(&path).expect("fixture is removed");
+    }
+
+    #[test]
+    fn writes_exact_binary_bytes_without_text_conversion() {
+        let path = temporary_path("binary");
+        let mut file = open_save_file(&path).expect("fixture is captured");
+        file.write_bytes(&[0, 255, 10, 13])
+            .expect("binary write succeeds");
+        drop(file);
+        assert_eq!(
+            std::fs::read(&path).expect("fixture is readable"),
+            [0, 255, 10, 13]
         );
         std::fs::remove_file(&path).expect("fixture is removed");
     }

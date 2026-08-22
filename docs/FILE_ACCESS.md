@@ -5,8 +5,9 @@ Windows retained regular-file registry, and Windows UI-session capture path are
 implemented. Protocol 1.9 `dialog.open_file.v2` and `file.read_text` are
 available only when a host explicitly wires that session-bound capture path;
 the default host services remain unavailable. The separately scoped Protocol
-1.17 write contract is implemented through its own retained-output-object
-service; it does not extend a read-side selection reference.
+1.17 text-write and Protocol 1.22 binary-write contracts are implemented
+through their own retained-output-object services; neither extends a read-side
+selection reference.
 
 ## Purpose
 
@@ -75,9 +76,10 @@ strict UTF-8, and reads only the retained regular-file handle. Public Protocol
 is single-use and the portable store
 holds at most 32 live references per session. Binary reads, directories,
 multiple selection, persistent grants, bookmarks, drag-and-drop, and
-cross-session sharing remain deferred. Text writes have their own
-retained-output-object contract rather than extending a read-side selection
-reference; see `docs/FILE_WRITE.md` and Decision 0079.
+cross-session sharing remain deferred. Text and bounded binary writes have
+their own retained-output-object contracts rather than extending a read-side
+selection reference; see `docs/FILE_WRITE.md`, `docs/FILE_BINARY_WRITE.md`,
+and Decisions 0079 and 0087.
 
 ## Development verification
 
@@ -103,6 +105,10 @@ native\\target\\release\\anodrel-windows-host.exe --sample-ui-file-write-client 
 
 It cannot write a later path or reuse the reference; the legacy save diagnostic
 remains selection-only.
+
+The separate binary diagnostic uses that same one-use output-object capture
+but requires its own `file.write_binary` grant and writes only a fixed 9-byte
+sequence. See `docs/FILE_BINARY_WRITE.md` for its command and manual check.
 
 ## Security invariants
 

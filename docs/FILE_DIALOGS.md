@@ -6,7 +6,9 @@ session-bound `dialog.open_file` capability and Protocol 1.8 exposes the
 independent `dialog.save_file` capability through that bridge. The same
 one-request bridge also carries the capture requests required before
 `dialog.open_file.v2` can return a read-side selection reference or Protocol
-1.17 `dialog.save_file.v2` can return a write-side save reference.
+1.17 `dialog.save_file.v2` can return a write-side save reference. Protocol
+1.17 text writing and Protocol 1.22 binary writing consume that same reference
+through separately granted operations.
 
 ## Boundary
 
@@ -25,7 +27,7 @@ or process launch. The Windows UI-session host routes open, save, and
 selection-capture requests through that one mailbox, selecting the host window
 as the native owner. Write capture remains separate from the legacy save
 operation: only the v2 route may retain a native output object. See
-`docs/FILE_WRITE.md`.
+`docs/FILE_WRITE.md` and `docs/FILE_BINARY_WRITE.md`.
 
 ## Portable values
 
@@ -44,5 +46,5 @@ operation: only the v2 route may retain a native output object. See
 Initial-directory policy, folder dialogs, multiple selection, additional
 confirmation UI, and non-Windows adapters need separate decisions.
 `docs/FILE_ACCESS.md` defines the accepted read-side selection-identity
-requirement. `docs/FILE_WRITE.md` defines the separately scoped write-side
-contract.
+requirement. `docs/FILE_WRITE.md` and `docs/FILE_BINARY_WRITE.md` define the
+separately scoped text and binary write contracts.

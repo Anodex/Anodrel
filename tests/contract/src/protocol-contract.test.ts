@@ -4,6 +4,7 @@ import { MockHost } from "@anodrel/mock-host";
 import {
   MAX_CLIPBOARD_TEXT_REQUEST_BYTES,
   MAX_EXTERNAL_LINK_REQUEST_BYTES,
+  MAX_FILE_BINARY_WRITE_BYTES,
   MAX_NETWORK_FETCH_REQUEST_BYTES,
   MAX_FILE_TEXT_WRITE_BYTES,
   MAX_MENU_REPLACE_REQUEST_BYTES,
@@ -451,6 +452,86 @@ test("selection-scoped file writing keeps save selection and writing separately 
     () => writeClient.writeSelectedFileText("AbCdEfGhIjKlMnOpQrStUv", "x".repeat(MAX_FILE_TEXT_WRITE_BYTES + 1)),
     (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
   );
+});
+
+test("binary output is canonical, bounded, and separately granted", async () => {
+  const denied = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.save_file"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => denied.writeSelectedFileBinary("AbCdEfGhIjKlMnOpQrStUv", new Uint8Array([0, 1, 2, 255])),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "file.write_binary",
+  );
+
+  const granted = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["file.write_binary"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => granted.writeSelectedFileBinary("AbCdEfGhIjKlMnOpQrStUv", new Uint8Array([0, 1, 2, 255])),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "file.unavailable",
+  );
+  await assert.rejects(
+    () => granted.writeSelectedFileBinary("C:/private.bin", new Uint8Array([0])),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+  );
+  await assert.rejects(
+    () => granted.writeSelectedFileBinary("AbCdEfGhIjKlMnOpQrStUv", new Uint8Array(MAX_FILE_BINARY_WRITE_BYTES + 1)),
+    (error: unknown) => error instanceof RangeError,
+  );
+
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["file.write_binary"],
+  });
+  const malformed = await host.createTransport().send({
+    protocolVersion: PROTOCOL_VERSION,
+    kind: "request",
+    requestId: "binary-noncanonical",
+    operation: "file.write_binary",
+    payload: { saveReference: "AbCdEfGhIjKlMnOpQrStUv", bytesBase64Url: "AB" },
+  });
+  assert.equal(malformed.status, "failure");
+  if (malformed.status === "failure") {
+    assert.equal(malformed.error.code, "request.payload_invalid");
+  }
+
+  const tooLarge = await host.createTransport().send({
+    protocolVersion: PROTOCOL_VERSION,
+    kind: "request",
+    requestId: "binary-too-large",
+    operation: "file.write_binary",
+    payload: {
+      saveReference: "AbCdEfGhIjKlMnOpQrStUv",
+      bytesBase64Url: "AAAA".repeat(Math.floor(MAX_FILE_BINARY_WRITE_BYTES / 3) + 1),
+    },
+  });
+  assert.equal(tooLarge.status, "failure");
+  if (tooLarge.status === "failure") {
+    assert.equal(tooLarge.error.code, "file.binary_too_large");
+  }
+
+  const older = await host.createTransport().send({
+    protocolVersion: { major: 1, minor: 21 },
+    kind: "request",
+    requestId: "binary-before-protocol-1.22",
+    operation: "file.write_binary",
+    payload: { saveReference: "AbCdEfGhIjKlMnOpQrStUv", bytesBase64Url: "AA" },
+  });
+  assert.equal(older.status, "failure");
+  if (older.status === "failure") {
+    assert.equal(older.error.code, "operation.unsupported");
+  }
 });
 
 test("storage state keeps read, replace, and clear grants separate", async () => {

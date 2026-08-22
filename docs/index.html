@@ -47,8 +47,9 @@
           Anodrel is shared infrastructure, not a single application. Today it
           includes a direct Win32 host, a versioned protocol, bounded framing,
           authenticated local IPC, controlled native UI surfaces, and bounded
-          native session menus. It is a reusable platform foundation—not a web
-          shell or a bundled browser engine. Future applications can use the
+          native session menus, and selection-scoped text or binary output. It
+          is a reusable platform foundation—not a web shell or a bundled browser
+          engine. Future applications can use the
           same documented security and platform-service boundaries without
           embedding a browser engine.
         </p>
@@ -64,7 +65,8 @@
           <a href="SDK.md">Application SDK <span>Typed public requests over a host-owned transport</span></a>
           <a href="NATIVE_UI_TEMPLATE.md">Native UI template <span>Generate and run a constrained first-party Rust project</span></a>
           <a href="NATIVE_MENU_TEMPLATE.md">Native menu template <span>Generate a direct Windows menu app with fixed permissions</span></a>
-          <a href="NETWORK.md">HTTPS fetch boundary <span>Accepted host-authorized direct OS data-access contract</span></a>
+           <a href="NETWORK.md">HTTPS fetch boundary <span>Accepted host-authorized direct OS data-access contract</span></a>
+           <a href="FILE_BINARY_WRITE.md">Binary file output <span>Bounded one-use export through a retained save selection</span></a>
           <a href="WINDOW_FOCUS.md">Window foreground request <span>Guarded attention request for one session-owned window</span></a>
           <a href="WINDOW_FULLSCREEN.md">Window fullscreen request <span>Reversible borderless presentation for one session-owned window</span></a>
           <a href="STARTUP_LAB.md">Startup Lab <span>Native visual foundation test</span></a>

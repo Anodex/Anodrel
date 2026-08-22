@@ -8,6 +8,9 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod binary;
+mod binary_write;
+
 use std::fmt;
 
 use anodrel_file_dialog::{
@@ -18,6 +21,10 @@ use anodrel_file_dialog::{
 pub use anodrel_file_dialog::{
     SAVE_REFERENCE_BYTES, SELECTION_REFERENCE_BYTES, SaveReference, SaveReferenceError,
     SelectionReference, SelectionReferenceError,
+};
+pub use binary::{FileBinaryData, FileBinaryDataError, MAX_FILE_BINARY_WRITE_BYTES};
+pub use binary_write::{
+    FileBinaryWriteService, FileBinaryWriteServiceError, UnavailableFileBinaryWriteService,
 };
 
 /// Maximum live file selections for one authenticated session.

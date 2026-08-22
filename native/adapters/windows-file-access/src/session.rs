@@ -5,7 +5,7 @@ use anodrel_file_access::{
     SelectionReference,
 };
 
-use crate::write_session::WindowsFileTextWriteService;
+use crate::write_session::{WindowsFileBinaryWriteService, WindowsFileTextWriteService};
 use crate::{SelectedTextReadError, WindowsSelectedFile, new_selection_reference};
 
 /// Thread-safe selected-file text service for one authenticated Windows session.
@@ -52,6 +52,15 @@ impl WindowsFileTextService {
     #[must_use]
     pub fn write_service(&self) -> WindowsFileTextWriteService {
         self.writes.clone()
+    }
+
+    /// Returns the paired but separately typed selected-output binary service.
+    ///
+    /// It shares the text writer's one-use output-object store while receiving
+    /// only decoded bounded bytes from the portable protocol core.
+    #[must_use]
+    pub fn binary_write_service(&self) -> WindowsFileBinaryWriteService {
+        self.writes.binary_service()
     }
 }
 

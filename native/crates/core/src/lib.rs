@@ -21,11 +21,12 @@ use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceEr
 use anodrel_diagnostics::{DiagnosticsService, DiagnosticsServiceError};
 use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
 use anodrel_file_access::{
+    FileBinaryData, FileBinaryDataError, FileBinaryWriteService, FileBinaryWriteServiceError,
     FileSelectionResult, FileSelectionService, FileSelectionServiceError, FileTextService,
     FileTextServiceError, FileTextWriteService, FileTextWriteServiceError, SaveReference,
     SaveSelectionResult, SaveSelectionService, SaveSelectionServiceError, SelectionReference,
-    UnavailableFileSelectionService, UnavailableFileTextService, UnavailableFileTextWriteService,
-    UnavailableSaveSelectionService,
+    UnavailableFileBinaryWriteService, UnavailableFileSelectionService, UnavailableFileTextService,
+    UnavailableFileTextWriteService, UnavailableSaveSelectionService,
 };
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
@@ -153,6 +154,7 @@ pub struct CoreHost {
     file_text: Box<dyn FileTextService>,
     file_save_selections: Box<dyn SaveSelectionService>,
     file_text_write: Box<dyn FileTextWriteService>,
+    file_binary_write: Box<dyn FileBinaryWriteService>,
     storage: Box<dyn StorageService>,
     diagnostics: Box<dyn DiagnosticsService>,
     credentials: Box<dyn CredentialService>,
@@ -182,6 +184,7 @@ pub struct HostServices {
     file_text: Box<dyn FileTextService>,
     file_save_selections: Box<dyn SaveSelectionService>,
     file_text_write: Box<dyn FileTextWriteService>,
+    file_binary_write: Box<dyn FileBinaryWriteService>,
     storage: Box<dyn StorageService>,
     diagnostics: Box<dyn DiagnosticsService>,
     credentials: Box<dyn CredentialService>,
@@ -358,6 +361,7 @@ impl HostServices {
             file_text: Box::new(UnavailableFileTextService),
             file_save_selections: Box::new(UnavailableSaveSelectionService),
             file_text_write: Box::new(UnavailableFileTextWriteService),
+            file_binary_write: Box::new(UnavailableFileBinaryWriteService),
             storage: Box::new(UnavailableStorage),
             diagnostics: Box::new(UnavailableDiagnostics),
             credentials: Box::new(UnavailableCredentials),
@@ -507,6 +511,20 @@ impl HostServices {
         self
     }
 
+    /// Replaces the session's selected-output binary writer.
+    ///
+    /// The supplied service receives only already-decoded bounded bytes and a
+    /// retained save reference. It must never reopen a path or decode a
+    /// protocol value; see `docs/FILE_BINARY_WRITE.md`.
+    #[must_use]
+    pub fn with_file_binary_write(
+        mut self,
+        service: impl FileBinaryWriteService + 'static,
+    ) -> Self {
+        self.file_binary_write = Box::new(service);
+        self
+    }
+
     /// Replaces the session's host-owned application-state service.
     #[must_use]
     pub fn with_storage(mut self, service: impl StorageService + 'static) -> Self {
@@ -576,6 +594,7 @@ impl CoreHost {
             file_text: services.file_text,
             file_save_selections: services.file_save_selections,
             file_text_write: services.file_text_write,
+            file_binary_write: services.file_binary_write,
             storage: services.storage,
             diagnostics: services.diagnostics,
             credentials: services.credentials,
@@ -815,6 +834,7 @@ impl CoreHost {
             file_text: Box::new(file_text),
             file_save_selections: Box::new(UnavailableSaveSelectionService),
             file_text_write: Box::new(UnavailableFileTextWriteService),
+            file_binary_write: Box::new(UnavailableFileBinaryWriteService),
             storage: Box::new(storage),
             diagnostics: Box::new(diagnostics),
             credentials: Box::new(credentials),
@@ -964,6 +984,9 @@ impl CoreHost {
             }
             "file.write_text" if request.protocol_version.minor >= 17 => {
                 self.handle_file_text_write(request)
+            }
+            "file.write_binary" if request.protocol_version.minor >= 22 => {
+                self.handle_file_binary_write(request)
             }
             "storage.state.read" if request.protocol_version.minor >= 10 => {
                 self.handle_storage_read(request)
@@ -2051,6 +2074,54 @@ impl CoreHost {
         }
     }
 
+    fn handle_file_binary_write(&self, request: RequestEnvelope) -> JsonValue {
+        let Some((reference, encoded)) = file_binary_write_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "file.write_binary requires one exact save reference and canonical base64url data.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::FileWriteBinary) {
+            return self.capability_denied(request.request_id, "file.write_binary");
+        }
+        let data = match FileBinaryData::decode_base64url(encoded) {
+            Ok(data) => data,
+            Err(FileBinaryDataError::Invalid) => {
+                self.file_binary_write.discard(&reference);
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::RequestPayloadInvalid,
+                    "file.write_binary requires canonical base64url data.",
+                    None,
+                );
+            }
+            Err(FileBinaryDataError::TooLarge) => {
+                self.file_binary_write.discard(&reference);
+                return self.failure(
+                    request.request_id,
+                    ProtocolErrorCode::FileBinaryTooLarge,
+                    "selected output binary data is too large.",
+                    None,
+                );
+            }
+        };
+        match self.file_binary_write.write_binary(&reference, &data) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("written".to_owned()))]),
+            ),
+            Err(FileBinaryWriteServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::FileUnavailable,
+                "selected output is unavailable.",
+                None,
+            ),
+        }
+    }
+
     fn handle_storage_read(&self, request: RequestEnvelope) -> JsonValue {
         if !is_empty_object(&request.payload) {
             return self.failure(
@@ -2517,6 +2588,17 @@ fn file_text_write_payload(value: &JsonValue) -> Option<(SaveReference, &str)> {
     Some((reference, text))
 }
 
+fn file_binary_write_payload(value: &JsonValue) -> Option<(SaveReference, &str)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    let reference =
+        SaveReference::new(fields.get("saveReference")?.as_string()?.to_owned()).ok()?;
+    let encoded = fields.get("bytesBase64Url")?.as_string()?;
+    Some((reference, encoded))
+}
+
 fn menu_replace_payload(value: &JsonValue) -> Option<MenuModel> {
     if value.to_json().len() > MAX_MENU_REPLACE_REQUEST_BYTES {
         return None;
@@ -2635,9 +2717,10 @@ mod tests {
     use anodrel_credentials::{CredentialName, CredentialService, CredentialServiceError, Secret};
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
     use anodrel_file_access::{
-        FileSelection, FileSelectionService, FileTextService, FileTextWriteService,
-        FileTextWriteServiceError, SaveReference, SaveSelection, SaveSelectionResult,
-        SaveSelectionService, SaveSelectionServiceError,
+        FileBinaryData, FileBinaryWriteService, FileBinaryWriteServiceError, FileSelection,
+        FileSelectionService, FileTextService, FileTextWriteService, FileTextWriteServiceError,
+        SaveReference, SaveSelection, SaveSelectionResult, SaveSelectionService,
+        SaveSelectionServiceError,
     };
     use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
     use anodrel_menu::{MenuModel, MenuRevision, MenuService, MenuServiceError};
@@ -2879,6 +2962,52 @@ mod tests {
     }
 
     #[derive(Clone, Debug)]
+    struct RecordingFileBinaryWrite {
+        writes: Arc<Mutex<Vec<Vec<u8>>>>,
+        discarded: Arc<Mutex<Vec<SaveReference>>>,
+        result: Result<(), FileBinaryWriteServiceError>,
+    }
+
+    impl RecordingFileBinaryWrite {
+        fn accepting() -> Self {
+            Self {
+                writes: Arc::new(Mutex::new(Vec::new())),
+                discarded: Arc::new(Mutex::new(Vec::new())),
+                result: Ok(()),
+            }
+        }
+
+        fn unavailable() -> Self {
+            Self {
+                writes: Arc::new(Mutex::new(Vec::new())),
+                discarded: Arc::new(Mutex::new(Vec::new())),
+                result: Err(FileBinaryWriteServiceError::Unavailable),
+            }
+        }
+    }
+
+    impl FileBinaryWriteService for RecordingFileBinaryWrite {
+        fn write_binary(
+            &self,
+            _reference: &SaveReference,
+            data: &FileBinaryData,
+        ) -> Result<(), FileBinaryWriteServiceError> {
+            self.writes
+                .lock()
+                .expect("binary-write recorder lock is available")
+                .push(data.as_bytes().to_vec());
+            self.result
+        }
+
+        fn discard(&self, reference: &SaveReference) {
+            self.discarded
+                .lock()
+                .expect("binary-discard recorder lock is available")
+                .push(reference.clone());
+        }
+    }
+
+    #[derive(Clone, Debug)]
     struct RecordingMenu {
         replacements: Arc<Mutex<Vec<(MenuRevision, MenuModel)>>>,
         result: Result<(), MenuServiceError>,
@@ -3056,6 +3185,16 @@ mod tests {
             HostServices::unavailable()
                 .with_file_save_selections(selections)
                 .with_file_text_write(writer),
+        )
+    }
+
+    fn file_binary_write_host(
+        grants: Vec<Capability>,
+        writer: impl FileBinaryWriteService + 'static,
+    ) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
+            HostServices::unavailable().with_file_binary_write(writer),
         )
     }
 
@@ -3490,6 +3629,12 @@ mod tests {
     fn request_v1_21(operation: &str, payload: &str) -> String {
         format!(
             r#"{{"protocolVersion":{{"major":1,"minor":21}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
+    fn request_v1_22(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":22}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
         )
     }
 
@@ -5260,6 +5405,133 @@ mod tests {
         let unsupported = JsonValue::parse(&write_host.handle_json(&request_v1_16(
             "file.write_text",
             &format!(r#"{{"saveReference":"{reference}","text":"selected text"}}"#),
+        )))
+        .expect("unsupported response is JSON");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn selected_output_binary_is_canonical_bounded_and_separately_granted() {
+        let reference = "ZyXwVuTsRqPoNmLkJiHgFe";
+        let writer = RecordingFileBinaryWrite::accepting();
+        let writes = Arc::clone(&writer.writes);
+        let accepted_host = file_binary_write_host(vec![Capability::FileWriteBinary], writer);
+        let accepted = JsonValue::parse(&accepted_host.handle_json(&request_v1_22(
+            "file.write_binary",
+            &format!(r#"{{"saveReference":"{reference}","bytesBase64Url":"AAEC_w"}}"#),
+        )))
+        .expect("binary response is JSON");
+        assert_eq!(field(&accepted, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&accepted, "result"), "status").as_string(),
+            Some("written")
+        );
+        assert_eq!(
+            writes
+                .lock()
+                .expect("binary-write recorder lock is available")
+                .as_slice(),
+            [vec![0, 1, 2, 255]]
+        );
+
+        let denied_writer = RecordingFileBinaryWrite::accepting();
+        let denied_writes = Arc::clone(&denied_writer.writes);
+        let denied_discards = Arc::clone(&denied_writer.discarded);
+        let denied = JsonValue::parse(
+            &file_binary_write_host(vec![Capability::DialogSaveFile], denied_writer).handle_json(
+                &request_v1_22(
+                    "file.write_binary",
+                    &format!(r#"{{"saveReference":"{reference}","bytesBase64Url":"AB"}}"#),
+                ),
+            ),
+        )
+        .expect("denied response is JSON");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+        assert!(
+            denied_writes
+                .lock()
+                .expect("binary-write recorder lock is available")
+                .is_empty()
+        );
+        assert!(
+            denied_discards
+                .lock()
+                .expect("binary-discard recorder lock is available")
+                .is_empty()
+        );
+
+        let malformed_writer = RecordingFileBinaryWrite::accepting();
+        let malformed_discards = Arc::clone(&malformed_writer.discarded);
+        let malformed = JsonValue::parse(
+            &file_binary_write_host(vec![Capability::FileWriteBinary], malformed_writer)
+                .handle_json(&request_v1_22(
+                    "file.write_binary",
+                    &format!(r#"{{"saveReference":"{reference}","bytesBase64Url":"AB"}}"#),
+                )),
+        )
+        .expect("malformed response is JSON");
+        assert_eq!(
+            field(field(&malformed, "error"), "code").as_string(),
+            Some("request.payload_invalid")
+        );
+        assert_eq!(
+            malformed_discards
+                .lock()
+                .expect("binary-discard recorder lock is available")
+                .as_slice(),
+            [SaveReference::new(reference).expect("reference is valid")]
+        );
+
+        let oversized_writer = RecordingFileBinaryWrite::accepting();
+        let oversized_discards = Arc::clone(&oversized_writer.discarded);
+        let oversized = JsonValue::parse(
+            &file_binary_write_host(vec![Capability::FileWriteBinary], oversized_writer)
+                .handle_json(&request_v1_22(
+                    "file.write_binary",
+                    &format!(
+                        r#"{{"saveReference":"{reference}","bytesBase64Url":"{}"}}"#,
+                        "AAAA".repeat((anodrel_file_access::MAX_FILE_BINARY_WRITE_BYTES / 3) + 1)
+                    ),
+                )),
+        )
+        .expect("oversized response is JSON");
+        assert_eq!(
+            field(field(&oversized, "error"), "code").as_string(),
+            Some("file.binary_too_large")
+        );
+        assert_eq!(
+            oversized_discards
+                .lock()
+                .expect("binary-discard recorder lock is available")
+                .as_slice(),
+            [SaveReference::new(reference).expect("reference is valid")]
+        );
+
+        let unavailable = JsonValue::parse(
+            &file_binary_write_host(
+                vec![Capability::FileWriteBinary],
+                RecordingFileBinaryWrite::unavailable(),
+            )
+            .handle_json(&request_v1_22(
+                "file.write_binary",
+                &format!(r#"{{"saveReference":"{reference}","bytesBase64Url":"AA"}}"#),
+            )),
+        )
+        .expect("unavailable response is JSON");
+        assert_eq!(
+            field(field(&unavailable, "error"), "code").as_string(),
+            Some("file.unavailable")
+        );
+
+        let unsupported = JsonValue::parse(&accepted_host.handle_json(&request_v1_21(
+            "file.write_binary",
+            &format!(r#"{{"saveReference":"{reference}","bytesBase64Url":"AA"}}"#),
         )))
         .expect("unsupported response is JSON");
         assert_eq!(

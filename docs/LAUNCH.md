@@ -37,8 +37,9 @@ Version 1.7 adds the separately scoped `file.write_text` grant defined by
 Decision 0079. Version 1.8 adds the separately scoped `menu.write` grant
 defined by Decision 0080. Version 1.9 adds the separately scoped
 `window.focus` grant defined by Decision 0085. Version 1.10 adds the separately
-scoped `window.fullscreen` grant defined by Decision 0086. Unknown, missing,
-duplicate, and wrongly typed fields are rejected.
+scoped `window.fullscreen` grant defined by Decision 0086. Version 1.11 adds
+the separately scoped `file.write_binary` grant defined by Decision 0087.
+Unknown, missing, duplicate, and wrongly typed fields are rejected.
 
 ~~~json
 {
@@ -64,7 +65,7 @@ duplicate, and wrongly typed fields are rejected.
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
-| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 adds `notification.show`; 1.4 adds `window.title`; 1.5 adds `ui.fields.read`; 1.6 adds `window.state`; 1.7 adds `file.write_text`; 1.8 adds `menu.write`; 1.9 adds `window.focus`; and 1.10 adds `window.fullscreen`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
+| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 adds `notification.show`; 1.4 adds `window.title`; 1.5 adds `ui.fields.read`; 1.6 adds `window.state`; 1.7 adds `file.write_text`; 1.8 adds `menu.write`; 1.9 adds `window.focus`; 1.10 adds `window.fullscreen`; and 1.11 adds `file.write_binary`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's

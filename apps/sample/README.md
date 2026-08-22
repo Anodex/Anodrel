@@ -27,6 +27,12 @@ is separate: it captures one host-retained output object after the save picker,
 then writes a fixed diagnostic line through its one-use save reference. Choose
 a new temporary `.txt` filename for that diagnostic, then inspect its contents.
 
+`--sample-ui-file-binary-write-client` is the separate bounded binary-output
+diagnostic. It captures one output object after the save picker and writes the
+fixed bytes `41 6E 6F 64 72 65 6C 00 FF` through its one-use save reference.
+Choose a new temporary `.bin` filename, then inspect the result. It cannot
+write a later path, attach a type, stream data, or reuse that reference.
+
 Use `--sample-ui-window-state-client` to exercise the separately granted
 `window.state.set` command. The development client asks its own session window
 to minimise, maximise, and restore; it never receives a handle, target, or

@@ -88,10 +88,11 @@ reported success, not that data is crash-proof on every storage device.
 
 ## Deferred work
 
-Atomic replacement, binary data, appending, partial or streaming writes,
+Atomic replacement, appending, partial or streaming writes,
 durability reporting, file readback, multiple selections, folder access,
 persistent permission, recovery, and non-Windows adapters are intentionally
 outside this contract. Each needs a new decision and threat-model entry.
 
 See Decision 0079, `docs/FILE_DIALOGS.md`, `docs/FILE_ACCESS.md`, and
-`docs/PROTOCOL.md`.
+`docs/FILE_BINARY_WRITE.md`; `docs/PROTOCOL.md` defines both output
+operations.

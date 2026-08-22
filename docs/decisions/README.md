@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0087: Binary output is a bounded canonical encoding.
+
 - 0086: Session window fullscreen is borderless and restorable.
 
 - 0085: Session window focus is a guarded request.

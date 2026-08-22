@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 21;
+pub const PROTOCOL_MINOR: u16 = 22;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -59,6 +59,11 @@ pub enum Capability {
     DialogSaveFile,
     FileReadText,
     FileWriteText,
+    /// Write bounded decoded binary data through one retained output object.
+    ///
+    /// The grant has no path, file handle, stream, offset, or raw protocol
+    /// byte surface; see `docs/FILE_BINARY_WRITE.md` and Decision 0087.
+    FileWriteBinary,
     StorageStateRead,
     StorageStateReplace,
     StorageStateClear,
@@ -120,6 +125,7 @@ impl Capability {
             Self::DialogSaveFile => "dialog.save_file",
             Self::FileReadText => "file.read_text",
             Self::FileWriteText => "file.write_text",
+            Self::FileWriteBinary => "file.write_binary",
             Self::StorageStateRead => "storage.state.read",
             Self::StorageStateReplace => "storage.state.replace",
             Self::StorageStateClear => "storage.state.clear",
@@ -159,6 +165,8 @@ pub enum ProtocolErrorCode {
     FileUnavailable,
     FileTextInvalid,
     FileTextTooLarge,
+    /// Canonical decoded binary output exceeded its fixed request bound.
+    FileBinaryTooLarge,
     StorageUnavailable,
     StorageSnapshotInvalid,
     StorageSnapshotTooLarge,
@@ -216,6 +224,7 @@ impl ProtocolErrorCode {
             Self::FileUnavailable => "file.unavailable",
             Self::FileTextInvalid => "file.text_invalid",
             Self::FileTextTooLarge => "file.text_too_large",
+            Self::FileBinaryTooLarge => "file.binary_too_large",
             Self::StorageUnavailable => "storage.unavailable",
             Self::StorageSnapshotInvalid => "storage.snapshot_invalid",
             Self::StorageSnapshotTooLarge => "storage.snapshot_too_large",

@@ -93,11 +93,13 @@ Status: **Direct Windows host in progress**
   every other window property remain deferred, each needing its own grant,
   decision, and threat-model entry.
 - Define safe application-controlled file output. **Completed for the direct
-  Windows UI-session host:** Decision 0079 and `docs/FILE_WRITE.md` preserve
-  the legacy non-mutating save picker while implementing an independent,
-  one-use retained-output-object flow for Protocol 1.17
-  `dialog.save_file.v2` and `file.write_text`. Atomic replacement, binary
-  data, and persistent file grants remain separate gates.
+  Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
+  non-mutating save picker while implementing an independent, one-use
+  retained-output-object flow for Protocol 1.17 `file.write_text` and Protocol
+  1.22 `file.write_binary`. The latter has its own grant, first-party canonical
+  base64url decoder, and 32 KiB decoded bound. Its picker diagnostic remains a
+  manual desktop check. Atomic replacement and persistent file grants remain
+  separate gates.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
@@ -250,10 +252,12 @@ Status: **Direct Windows host in progress**
   machine-validated application session before authentication. Protocol 1.17
   now adds separate retained-output capture and bounded one-use text writing
   through `dialog.save_file.v2` and `file.write_text` (Decision 0079), while
-  the legacy save picker stays non-mutating. Protocol 1.18 additionally
+  Protocol 1.22 adds the distinct 32 KiB binary writer through that same
+  one-use retained object (Decision 0087). The legacy save picker stays
+  non-mutating. Protocol 1.18 additionally
   implements the bounded `menu.replace` model behind its separate `menu.write`
   grant through the direct Windows menu attachment and delivery path. Signed product launch,
-  atomic replacement, binary output, and non-Windows adapters remain deferred.
+  atomic replacement, and non-Windows adapters remain deferred.
 - Implement secure credential storage through the operating system.
   **Completed for the credential-store foundation:** a host-only Windows
   Credential Manager adapter with per-application target isolation, bounded

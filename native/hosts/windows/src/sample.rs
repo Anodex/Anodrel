@@ -22,13 +22,14 @@ use crate::session_ui::DevelopmentSessionUi;
 
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SampleDialogRequest {
     None,
     OpenFile,
     OpenFileWithReference,
     SaveFile,
     SaveFileWithReference,
+    SaveFileBinaryWithReference,
     Storage,
     Scroll,
     Diagnostics,
@@ -92,6 +93,20 @@ pub fn run_ui_session_with_selected_file_write(
         node_path,
         client_path,
         SampleDialogRequest::SaveFileWithReference,
+    )
+}
+
+/// Runs the UI-session diagnostic through one selection-scoped native binary
+/// replacement. The client receives only a one-use save reference, not a path
+/// or a reusable binary file handle.
+pub fn run_ui_session_with_selected_binary_file_write(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::SaveFileBinaryWithReference,
     )
 }
 
@@ -237,40 +252,11 @@ fn run_with_optional_session_view(
     session_ui: Option<DevelopmentSessionUi>,
     dialog_request: SampleDialogRequest,
 ) -> Result<(), Box<dyn Error>> {
-    let mut capabilities = vec![
-        Capability::DiagnosticsRead,
-        Capability::UiDocumentWrite,
-        Capability::UiEventsRead,
-        Capability::SessionClose,
-        Capability::ClipboardRead,
-        Capability::ClipboardWrite,
-        Capability::ExternalOpen,
-        Capability::DialogOpenFile,
-        Capability::DialogSaveFile,
-        Capability::FileReadText,
-        Capability::FileWriteText,
-        Capability::StorageStateRead,
-        Capability::StorageStateReplace,
-        Capability::StorageStateClear,
-        Capability::CredentialRead,
-        Capability::CredentialWrite,
-        Capability::CredentialDelete,
-        Capability::NotificationShow,
-        Capability::MenuWrite,
-        Capability::WindowTitle,
-        Capability::UiFieldsRead,
-        Capability::WindowState,
-    ];
-    // New authority is never silently added to an older broad diagnostic. The
-    // focus and fullscreen routes are explicit so each manual check proves the
-    // exact grant rather than silently widening a broad diagnostic.
-    if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
-        capabilities.push(Capability::WindowFocus);
-    }
-    if matches!(dialog_request, SampleDialogRequest::WindowFullscreen) {
-        capabilities.push(Capability::WindowFullscreen);
-    }
-    let policy = HostPolicy::new("anodrel.sample", capabilities, "anodrel-windows-host")?;
+    let policy = HostPolicy::new(
+        "anodrel.sample",
+        sample_capabilities(dialog_request),
+        "anodrel-windows-host",
+    )?;
     let (server, invitation) = match session_ui.as_ref() {
         Some(ui) => {
             // Composing the bundle keeps every service named at its own call
@@ -285,6 +271,7 @@ fn run_with_optional_session_view(
                     ui.file_dialog.clone(),
                 ))
                 .with_file_text_write(ui.file_text.write_service())
+                .with_file_binary_write(ui.file_text.binary_write_service())
                 .with_storage(sample_storage()?)
                 .with_diagnostics(sample_diagnostics())
                 .with_credentials(sample_credentials()?)
@@ -322,6 +309,9 @@ fn run_with_optional_session_view(
             SampleDialogRequest::SaveFile => command.arg("--request-save-file")?,
             SampleDialogRequest::SaveFileWithReference => {
                 command.arg("--request-save-file-text")?
+            }
+            SampleDialogRequest::SaveFileBinaryWithReference => {
+                command.arg("--request-save-file-binary")?
             }
             SampleDialogRequest::Storage => command.arg("--request-storage-state")?,
             SampleDialogRequest::Scroll => command.arg("--request-scroll-document")?,
@@ -373,6 +363,49 @@ fn run_with_optional_session_view(
     Ok(())
 }
 
+fn sample_capabilities(dialog_request: SampleDialogRequest) -> Vec<Capability> {
+    let mut capabilities = vec![
+        Capability::DiagnosticsRead,
+        Capability::UiDocumentWrite,
+        Capability::UiEventsRead,
+        Capability::SessionClose,
+        Capability::ClipboardRead,
+        Capability::ClipboardWrite,
+        Capability::ExternalOpen,
+        Capability::DialogOpenFile,
+        Capability::DialogSaveFile,
+        Capability::FileReadText,
+        Capability::FileWriteText,
+        Capability::StorageStateRead,
+        Capability::StorageStateReplace,
+        Capability::StorageStateClear,
+        Capability::CredentialRead,
+        Capability::CredentialWrite,
+        Capability::CredentialDelete,
+        Capability::NotificationShow,
+        Capability::MenuWrite,
+        Capability::WindowTitle,
+        Capability::UiFieldsRead,
+        Capability::WindowState,
+    ];
+    // New authority is never silently added to an older broad diagnostic. The
+    // focus and fullscreen routes are explicit so each manual check proves the
+    // exact grant rather than silently widening a broad diagnostic.
+    if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
+        capabilities.push(Capability::WindowFocus);
+    }
+    if matches!(dialog_request, SampleDialogRequest::WindowFullscreen) {
+        capabilities.push(Capability::WindowFullscreen);
+    }
+    if matches!(
+        dialog_request,
+        SampleDialogRequest::SaveFileBinaryWithReference
+    ) {
+        capabilities.push(Capability::FileWriteBinary);
+    }
+    capabilities
+}
+
 fn sample_storage() -> Result<WindowsStorageService, Box<dyn Error>> {
     let manifest = ApplicationManifest::parse(
         r#"{"manifestVersion":{"major":1,"minor":0},"applicationId":"anodrel.sample","displayName":"Anodrel Sample","content":{"format":"anodrel.text.v1","path":"content/main.txt","sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}}"#,
@@ -396,4 +429,23 @@ fn sample_diagnostics() -> LogBook {
     log.record(Event::PipeLoopbackChecked)
         .expect("the fixed development log cannot exhaust its sequence");
     log
+}
+
+#[cfg(test)]
+mod tests {
+    use anodrel_protocol::Capability;
+
+    use super::{SampleDialogRequest, sample_capabilities};
+
+    #[test]
+    fn binary_output_grant_is_limited_to_the_explicit_binary_diagnostic() {
+        let ordinary = sample_capabilities(SampleDialogRequest::None);
+        let binary = sample_capabilities(SampleDialogRequest::SaveFileBinaryWithReference);
+
+        assert!(!ordinary.contains(&Capability::FileWriteBinary));
+        assert!(binary.contains(&Capability::FileWriteBinary));
+        assert_eq!(binary.len(), ordinary.len() + 1);
+        assert!(!binary.contains(&Capability::WindowFocus));
+        assert!(!binary.contains(&Capability::WindowFullscreen));
+    }
 }

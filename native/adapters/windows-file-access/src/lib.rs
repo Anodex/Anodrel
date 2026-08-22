@@ -11,12 +11,13 @@ mod session;
 mod write;
 mod write_session;
 
-use anodrel_file_access::{SaveReference, SelectionReference};
+use anodrel_file_access::{FileBinaryData, SaveReference, SelectionReference};
 use anodrel_file_dialog::{SaveFilePath, SelectedFilePath};
 
 pub use session::{SessionSelectionError, WindowsFileTextService, WindowsSessionSelections};
 pub use write_session::{
-    SessionSaveSelectionError, WindowsFileTextWriteService, WindowsSessionSaveSelections,
+    SessionSaveSelectionError, WindowsFileBinaryWriteService, WindowsFileTextWriteService,
+    WindowsSessionSaveSelections,
 };
 
 /// Maximum UTF-8 bytes the first selected-file text reader returns.
@@ -44,8 +45,8 @@ pub fn open_selected_file(path: &SelectedFilePath) -> Result<WindowsSelectedFile
 
 /// Opens one selected destination as an identity-retaining output object.
 ///
-/// Existing contents remain unchanged until [`WindowsSaveFile::write_text`] is
-/// called. A new destination is marked for delete-on-abandon by the private
+/// Existing contents remain unchanged until one bounded text or binary write
+/// occurs. A new destination is marked for delete-on-abandon by the private
 /// adapter before a reference can be returned.
 pub fn open_save_file(path: &SaveFilePath) -> Result<WindowsSaveFile, FileAccessError> {
     write::open_save_file(path.as_path())
@@ -104,8 +105,15 @@ impl WindowsSaveFile {
             return Err(SelectedTextWriteError::TooLarge);
         }
         self.0
-            .write_text(text)
+            .write_bytes(text.as_bytes())
             .map_err(|_| SelectedTextWriteError::Unavailable)
+    }
+
+    /// Writes one bounded decoded binary replacement through this retained object.
+    pub fn write_binary(&mut self, data: &FileBinaryData) -> Result<(), SelectedBinaryWriteError> {
+        self.0
+            .write_bytes(data.as_bytes())
+            .map_err(|_| SelectedBinaryWriteError::Unavailable)
     }
 }
 
@@ -193,3 +201,18 @@ impl std::fmt::Display for SelectedTextWriteError {
 }
 
 impl std::error::Error for SelectedTextWriteError {}
+
+/// Safe selected-output binary-write failure category.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectedBinaryWriteError {
+    /// The retained destination could not be written.
+    Unavailable,
+}
+
+impl std::fmt::Display for SelectedBinaryWriteError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("selected output binary data could not be written")
+    }
+}
+
+impl std::error::Error for SelectedBinaryWriteError {}

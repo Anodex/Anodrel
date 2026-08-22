@@ -3,7 +3,11 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 21 } as const;
+import { canonicalBase64UrlDecodedLength } from "./base64url.js";
+
+export { encodeCanonicalBase64Url } from "./base64url.js";
+
+export const PROTOCOL_VERSION = { major: 1, minor: 22 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -16,6 +20,8 @@ export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
 export const MAX_FILE_DIALOG_FILTERS = 8;
 export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
 export const MAX_FILE_TEXT_WRITE_BYTES = 8 * 1024;
+/** Maximum decoded bytes in one exact binary-output replacement. */
+export const MAX_FILE_BINARY_WRITE_BYTES = 32 * 1024;
 /** Maximum encoded JSON bytes in one complete native-menu replacement payload. */
 export const MAX_MENU_REPLACE_REQUEST_BYTES = 16 * 1024;
 export const MAX_MENUS = 8;
@@ -51,6 +57,7 @@ export type Capability =
   | "dialog.save_file"
   | "file.read_text"
   | "file.write_text"
+  | "file.write_binary"
   | "storage.state.read"
   | "storage.state.replace"
   | "storage.state.clear"
@@ -304,6 +311,10 @@ export interface PlatformOperationMap {
     readonly payload: { readonly saveReference: string; readonly text: string };
     readonly result: { readonly status: "written" };
   };
+  "file.write_binary": {
+    readonly payload: { readonly saveReference: string; readonly bytesBase64Url: string };
+    readonly result: { readonly status: "written" };
+  };
   "storage.state.read": {
     readonly payload: EmptyPayload;
     readonly result:
@@ -392,6 +403,7 @@ export type ProtocolErrorCode =
   | "file.unavailable"
   | "file.text_invalid"
   | "file.text_too_large"
+  | "file.binary_too_large"
   | "storage.unavailable"
   | "storage.snapshot_invalid"
   | "storage.snapshot_too_large"
@@ -726,6 +738,47 @@ export function isFileTextWritePayload(
     typeof value.text === "string" &&
     new TextEncoder().encode(value.text).byteLength <= MAX_FILE_TEXT_WRITE_BYTES
   );
+}
+
+/** The bounded validation outcome for one binary-output protocol payload. */
+export type FileBinaryWritePayloadStatus = "valid" | "invalid" | "too_large";
+
+/** Validates the exact non-decoding shape of a binary-output request. */
+export function isFileBinaryWritePayloadShape(
+  value: unknown,
+): value is { readonly saveReference: string; readonly bytesBase64Url: string } {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    typeof value.saveReference === "string" &&
+    value.saveReference.length === SAVE_REFERENCE_BYTES &&
+    /^[A-Za-z0-9_-]+$/.test(value.saveReference) &&
+    typeof value.bytesBase64Url === "string"
+  );
+}
+
+/**
+ * Classifies one exact binary-output payload without decoding it.
+ *
+ * This shares the Rust core's strict canonical base64url grammar so the mock
+ * can preserve the same invalid-versus-too-large protocol outcome.
+ */
+export function classifyFileBinaryWritePayload(value: unknown): FileBinaryWritePayloadStatus {
+  if (!isFileBinaryWritePayloadShape(value)) {
+    return "invalid";
+  }
+  const decodedLength = canonicalBase64UrlDecodedLength(value.bytesBase64Url);
+  if (decodedLength === undefined) {
+    return "invalid";
+  }
+  return decodedLength > MAX_FILE_BINARY_WRITE_BYTES ? "too_large" : "valid";
+}
+
+/** Validates one exact canonical bounded binary-output payload. */
+export function isFileBinaryWritePayload(
+  value: unknown,
+): value is PayloadFor<"file.write_binary"> {
+  return classifyFileBinaryWritePayload(value) === "valid";
 }
 
 /** Validates one exact bounded native-session menu replacement. */

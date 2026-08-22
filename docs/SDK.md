@@ -53,8 +53,9 @@ command or a replacement for a real authenticated native session.
 `PlatformClient` provides typed methods for the exact operations defined by
 `docs/PROTOCOL.md`, including health and capability discovery, bounded
 diagnostic reads, UI document replacement and semantic-event reads, session
-close, clipboard, HTTPS handoff, file dialog plus retained text read and write, state,
-credentials, notifications, host-authorized HTTPS text fetches, and the three
+close, clipboard, HTTPS handoff, file dialog plus retained text read and
+bounded text or binary write, state, credentials, notifications, host-authorized
+HTTPS text fetches, and the three
 narrow session-window commands. Every
 method takes only the documented payload fields; it cannot accept a native
 handle, arbitrary application identity, capability list, window target,
@@ -87,7 +88,18 @@ The host must have issued the separate `network.fetch` capability and attached
 a service whose own host-selected exact-origin policy allows the URL. A
 successful result, including a non-2xx HTTP status, says only that the bounded
 HTTP response was represented; it is not an application-level success or a
-claim about a user's network state. See `docs/NETWORK.md`.
+  claim about a user's network state. See `docs/NETWORK.md`.
+
+### Bounded binary file output
+
+Protocol 1.22 adds `writeSelectedFileBinary(saveReference, bytes)`. It accepts
+only an existing opaque save reference and a `Uint8Array` of at most 32 KiB.
+The SDK uses its own first-party canonical unpadded base64url encoder, then
+sends the exact `file.write_binary` request. A larger local byte array rejects
+before a frame is made. The host still performs all authority checks: it needs
+the separate `file.write_binary` grant and consumes the retained output object
+once, so the SDK method does not accept a path, filename, type, handle, stream,
+offset, callback, or readback option. See `docs/FILE_BINARY_WRITE.md`.
 
 ### Session-window foreground request
 

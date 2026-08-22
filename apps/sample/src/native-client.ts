@@ -139,6 +139,23 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-save-file-binary")) {
+      const selection = await client.saveFileDialogWithReference([
+        { label: "Binary export", extensions: ["bin"] },
+      ]);
+      if (selection.status === "selected") {
+        const written = await client.writeSelectedFileBinary(
+          selection.saveReference,
+          new Uint8Array([0x41, 0x6e, 0x6f, 0x64, 0x72, 0x65, 0x6c, 0x00, 0xff]),
+        );
+        if (written.status !== "written") {
+          return 31;
+        }
+      } else if (selection.status !== "cancelled") {
+        return 31;
+      }
+    }
+
     if (process.argv.includes("--request-selected-file-text")) {
       const selection = await client.openFileDialogWithReference([
         { label: "Text", extensions: ["txt", "json", "md"] },

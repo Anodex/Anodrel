@@ -1,11 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use anodrel_file_access::{
-    FileTextWriteService, FileTextWriteServiceError, SaveReference, SaveSelectionStore,
-    SaveSelectionStoreError,
+    FileBinaryData, FileBinaryWriteService, FileBinaryWriteServiceError, FileTextWriteService,
+    FileTextWriteServiceError, SaveReference, SaveSelectionStore, SaveSelectionStoreError,
 };
 
-use crate::{SelectedTextWriteError, WindowsSaveFile, new_save_reference};
+use crate::{
+    SelectedBinaryWriteError, SelectedTextWriteError, WindowsSaveFile, new_save_reference,
+};
 
 /// Thread-safe selected-output text service for one authenticated Windows session.
 ///
@@ -39,6 +41,51 @@ impl WindowsFileTextWriteService {
     pub fn clear(&self) {
         if let Ok(mut selections) = self.selections.lock() {
             selections.clear();
+        }
+    }
+
+    /// Returns the separately typed binary writer for these same selections.
+    ///
+    /// Both writers share one store, so either operation consumes a save
+    /// reference before its retained output object can be replayed.
+    #[must_use]
+    pub fn binary_service(&self) -> WindowsFileBinaryWriteService {
+        WindowsFileBinaryWriteService {
+            selections: Arc::clone(&self.selections),
+        }
+    }
+}
+
+/// Thread-safe selected-output binary service for one authenticated Windows session.
+///
+/// This service shares its retained-object registry with the text writer but
+/// receives decoded bounded bytes only. It cannot decode protocol values or
+/// reopen a selected path.
+#[derive(Clone, Debug)]
+pub struct WindowsFileBinaryWriteService {
+    selections: Arc<Mutex<WindowsSessionSaveSelections>>,
+}
+
+impl FileBinaryWriteService for WindowsFileBinaryWriteService {
+    fn write_binary(
+        &self,
+        reference: &SaveReference,
+        data: &FileBinaryData,
+    ) -> Result<(), FileBinaryWriteServiceError> {
+        let mut file = self
+            .selections
+            .lock()
+            .map_err(|_| FileBinaryWriteServiceError::Unavailable)?
+            .take(reference)
+            .ok_or(FileBinaryWriteServiceError::Unavailable)?;
+        file.write_binary(data).map_err(|error| match error {
+            SelectedBinaryWriteError::Unavailable => FileBinaryWriteServiceError::Unavailable,
+        })
+    }
+
+    fn discard(&self, reference: &SaveReference) {
+        if let Ok(mut selections) = self.selections.lock() {
+            let _ = selections.take(reference);
         }
     }
 }
@@ -138,7 +185,9 @@ impl std::error::Error for SessionSaveSelectionError {}
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use anodrel_file_access::{FileTextWriteService, FileTextWriteServiceError};
+    use anodrel_file_access::{
+        FileBinaryData, FileBinaryWriteService, FileTextWriteService, FileTextWriteServiceError,
+    };
     use anodrel_file_dialog::SaveFilePath;
 
     use crate::open_save_file;
@@ -186,6 +235,30 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&path).expect("fixture is readable"),
             "session text"
+        );
+        std::fs::remove_file(&path).expect("fixture is removed");
+    }
+
+    #[test]
+    fn binary_writer_shares_one_use_references_with_the_text_writer() {
+        let path = temporary_path("binary");
+        let value = SaveFilePath::new(path.clone()).expect("fixture path is absolute");
+        let text = WindowsFileTextWriteService::new();
+        let binary = text.binary_service();
+        let reference = text
+            .register(open_save_file(&value).expect("fixture is captured"))
+            .expect("selection is registered");
+        let data =
+            FileBinaryData::from_bytes(vec![0, 255, 10]).expect("bounded binary data is valid");
+
+        assert_eq!(binary.write_binary(&reference, &data), Ok(()));
+        assert_eq!(
+            text.write_text(&reference, "again"),
+            Err(FileTextWriteServiceError::Unavailable)
+        );
+        assert_eq!(
+            std::fs::read(&path).expect("fixture is readable"),
+            [0, 255, 10]
         );
         std::fs::remove_file(&path).expect("fixture is removed");
     }

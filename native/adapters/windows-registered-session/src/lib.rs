@@ -292,6 +292,7 @@ fn registered_interactive_services(
         .with_file_text(ui.file_text_service())
         .with_file_save_selections(SaveFileDialogMailbox::new(ui.file_dialog_mailbox()))
         .with_file_text_write(ui.file_text_service().write_service())
+        .with_file_binary_write(ui.file_text_service().binary_write_service())
         // Notifications reach Shell32 through the owning UI thread, so the
         // session gets the mailbox rather than the adapter.
         .with_notifications(ui.notification_mailbox())
