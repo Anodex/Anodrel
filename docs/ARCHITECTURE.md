@@ -178,19 +178,22 @@ ordinary drop paths perform the cleanup. The `--window-lab` diagnostic proves
 this two-window lifecycle without creating a public window-management API. See
 `docs/WINDOW_LIFECYCLE.md`.
 
-The four public session-window commands remain deliberately narrower than that
+The five public session-window commands remain deliberately narrower than that
 private lifecycle: `window.title.set` proposes a title the host composes with a
 validated application name, `window.state.set` selects one closed minimise,
 maximise, or restore action, and `window.focus.request` asks Windows to
 foreground that same session-owned window. `window.fullscreen.set` chooses only
-reversible borderless fullscreen or windowed restoration for that same window.
+reversible borderless fullscreen or windowed restoration for that same window;
+`window.size.set` chooses only a bounded logical client area for it.
 All cross a per-session, one-request bridge to the window's owning UI thread;
 none exposes a target, handle, geometry, monitor, display mode, current state,
-focus readback, input, retry, or event. The focus request does not control
+focus readback, input, retry, event, position, DPI, or bounds readback. The
+focus request does not control
 semantic UI focus or bypass Windows foreground policy; fullscreen retains its
 native placement facts privately and is not exclusive display control. See
 `docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`, `docs/WINDOW_FOCUS.md`,
-`docs/WINDOW_FULLSCREEN.md`, Decisions 0066, 0072, 0085, and 0086.
+`docs/WINDOW_FULLSCREEN.md`, `docs/WINDOW_SIZE.md`, Decisions 0066, 0072,
+0085, 0086, and 0088.
 
 ## Modularity and performance
 

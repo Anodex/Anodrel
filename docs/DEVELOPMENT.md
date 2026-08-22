@@ -508,6 +508,33 @@ This manual check is not yet recorded as passed. See `docs/WINDOW_FULLSCREEN.md`
 for the deliberately absent monitor selection, exclusive display control,
 geometry, state readback, event, and cross-window APIs.
 
+To exercise the separately granted bounded client-size command, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-size-client $nodePath $clientPath
+~~~
+
+The client requests an 800 by 520 logical client area for its own session
+window. At both 100% and a non-100% display scale, observe that the window
+resizes without moving, activating, or changing z-order; it never receives the
+outer bounds, monitor, DPI, or resulting size. Complete the normal semantic
+action to close the session. If the client stops at safe stage 32, the host
+could not safely apply the request and deliberately does not reveal why.
+
+To verify the fullscreen boundary separately, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-size-fullscreen-client $nodePath $clientPath
+~~~
+
+This route enters reversible fullscreen, expects `window.size.set` to fail
+only with `window.unavailable`, then restores the original presentation. If it
+stops at safe stage 33, the expected refusal or safe restoration did not occur.
+
+This manual check is not yet recorded as passed. See `docs/WINDOW_SIZE.md` for
+the deliberately absent target, position, monitor, DPI, bounds, constraint,
+animation, event, and readback APIs.
+
 To exercise text fields and the granted value read, run:
 
 ~~~powershell

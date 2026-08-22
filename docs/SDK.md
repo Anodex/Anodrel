@@ -55,7 +55,7 @@ command or a replacement for a real authenticated native session.
 diagnostic reads, UI document replacement and semantic-event reads, session
 close, clipboard, HTTPS handoff, file dialog plus retained text read and
 bounded text or binary write, state, credentials, notifications, host-authorized
-HTTPS text fetches, and the three
+HTTPS text fetches, and the four
 narrow session-window commands. Every
 method takes only the documented payload fields; it cannot accept a native
 handle, arbitrary application identity, capability list, window target,
@@ -122,6 +122,16 @@ window argument, monitor selection, coordinate, display mode, geometry,
 fullscreen-state readback, or event. `fullscreen` is reversible borderless
 windowed fullscreen, not exclusive display control; `windowed` asks the host to
 restore its retained presentation facts. See `docs/WINDOW_FULLSCREEN.md`.
+
+### Session-window client-size request
+
+Protocol 1.23 adds `setWindowSize(width, height)`. It requires the separate
+`window.size` grant and accepts only whole logical client-area dimensions:
+width 320 through 3840 and height 240 through 2160. The result is only
+`{ status: "applied" }`. The host derives its framed native size at the current
+DPI of the one session-bound window. There is no window argument, target,
+position, outer bounds, monitor, DPI readback, state readback, resize event,
+constraint, or native handle. See `docs/WINDOW_SIZE.md`.
 
 ## Windows development transport
 

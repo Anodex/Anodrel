@@ -39,6 +39,8 @@ enum SampleDialogRequest {
     WindowState,
     WindowFocus,
     WindowFullscreen,
+    WindowSize,
+    WindowSizeWhileFullscreen,
     FieldRead,
     Menu,
 }
@@ -205,6 +207,32 @@ pub fn run_ui_session_with_window_fullscreen(
     )
 }
 
+/// Runs the UI-session diagnostic through one bounded client-area resize.
+///
+/// The client receives acceptance only. An operator observes that the session
+/// window resizes without moving or activating; see `docs/WINDOW_SIZE.md`.
+pub fn run_ui_session_with_window_size(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowSize)
+}
+
+/// Runs the UI-session diagnostic through a fullscreen size refusal.
+///
+/// The client enters reversible fullscreen, verifies that a client-size request
+/// safely fails, and then restores the host-retained presentation.
+pub fn run_ui_session_with_window_size_while_fullscreen(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::WindowSizeWhileFullscreen,
+    )
+}
+
 /// Runs the UI session diagnostic with two fields a person can type into.
 ///
 /// The client reads the field values twice: once before anyone has typed, and
@@ -281,6 +309,7 @@ fn run_with_optional_session_view(
                 .with_window_state(ui.window_state.clone())
                 .with_window_focus(ui.window_focus.clone())
                 .with_window_fullscreen(ui.window_fullscreen.clone())
+                .with_window_size(ui.window_size.clone())
                 .with_ui_fields(ui.fields.clone());
             WindowsPipeServer::create_with_session_components_and_service_bundle(
                 policy,
@@ -322,6 +351,10 @@ fn run_with_optional_session_view(
             SampleDialogRequest::WindowState => command.arg("--request-window-state")?,
             SampleDialogRequest::WindowFocus => command.arg("--request-window-focus")?,
             SampleDialogRequest::WindowFullscreen => command.arg("--request-window-fullscreen")?,
+            SampleDialogRequest::WindowSize => command.arg("--request-window-size")?,
+            SampleDialogRequest::WindowSizeWhileFullscreen => {
+                command.arg("--request-window-size-while-fullscreen")?
+            }
             SampleDialogRequest::FieldRead => command.arg("--request-field-read")?,
             SampleDialogRequest::Menu => command.arg("--request-native-menu")?,
         }
@@ -342,6 +375,7 @@ fn run_with_optional_session_view(
             ui.window_state,
             ui.window_focus,
             ui.window_fullscreen,
+            ui.window_size,
             SAMPLE_DISPLAY_NAME,
             ui.fields,
         )?;
@@ -394,8 +428,17 @@ fn sample_capabilities(dialog_request: SampleDialogRequest) -> Vec<Capability> {
     if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
         capabilities.push(Capability::WindowFocus);
     }
-    if matches!(dialog_request, SampleDialogRequest::WindowFullscreen) {
+    if matches!(
+        dialog_request,
+        SampleDialogRequest::WindowFullscreen | SampleDialogRequest::WindowSizeWhileFullscreen
+    ) {
         capabilities.push(Capability::WindowFullscreen);
+    }
+    if matches!(
+        dialog_request,
+        SampleDialogRequest::WindowSize | SampleDialogRequest::WindowSizeWhileFullscreen
+    ) {
+        capabilities.push(Capability::WindowSize);
     }
     if matches!(
         dialog_request,
@@ -447,5 +490,27 @@ mod tests {
         assert_eq!(binary.len(), ordinary.len() + 1);
         assert!(!binary.contains(&Capability::WindowFocus));
         assert!(!binary.contains(&Capability::WindowFullscreen));
+        assert!(!binary.contains(&Capability::WindowSize));
+    }
+
+    #[test]
+    fn window_size_grant_is_limited_to_the_explicit_size_diagnostic() {
+        let ordinary = sample_capabilities(SampleDialogRequest::None);
+        let size = sample_capabilities(SampleDialogRequest::WindowSize);
+
+        assert!(!ordinary.contains(&Capability::WindowSize));
+        assert!(size.contains(&Capability::WindowSize));
+        assert_eq!(size.len(), ordinary.len() + 1);
+        assert!(!size.contains(&Capability::WindowFullscreen));
+    }
+
+    #[test]
+    fn fullscreen_size_refusal_diagnostic_has_only_its_two_window_grants() {
+        let ordinary = sample_capabilities(SampleDialogRequest::None);
+        let combined = sample_capabilities(SampleDialogRequest::WindowSizeWhileFullscreen);
+
+        assert!(combined.contains(&Capability::WindowFullscreen));
+        assert!(combined.contains(&Capability::WindowSize));
+        assert_eq!(combined.len(), ordinary.len() + 2);
     }
 }

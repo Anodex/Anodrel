@@ -145,6 +145,7 @@ pub(crate) fn run(
         ui.window_state,
         ui.window_focus,
         ui.window_fullscreen,
+        ui.window_size,
         config.display_name,
         ui.fields,
     ) {

@@ -20,7 +20,8 @@ use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
 use anodrel_window::{
-    WindowFocusMailbox, WindowFullscreenMailbox, WindowStateMailbox, WindowTitleMailbox,
+    WindowFocusMailbox, WindowFullscreenMailbox, WindowSizeMailbox, WindowStateMailbox,
+    WindowTitleMailbox,
 };
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
@@ -49,6 +50,7 @@ pub struct RegisteredSessionUi {
     window_state_mailbox: WindowStateMailbox,
     window_focus_mailbox: WindowFocusMailbox,
     window_fullscreen_mailbox: WindowFullscreenMailbox,
+    window_size_mailbox: WindowSizeMailbox,
     field_mailbox: UiFieldMailbox,
     /// The display name the host appends to any title this session proposes.
     ///
@@ -73,6 +75,7 @@ impl RegisteredSessionUi {
             window_state_mailbox: WindowStateMailbox::new(),
             window_focus_mailbox: WindowFocusMailbox::new(),
             window_fullscreen_mailbox: WindowFullscreenMailbox::new(),
+            window_size_mailbox: WindowSizeMailbox::new(),
             field_mailbox: UiFieldMailbox::new(),
             display_name: display_name.into(),
         }
@@ -157,6 +160,15 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn window_fullscreen_mailbox(&self) -> WindowFullscreenMailbox {
         self.window_fullscreen_mailbox.clone()
+    }
+
+    /// Returns this session's one-request logical client-size mailbox.
+    ///
+    /// It carries only bounded dimensions. The owning UI thread resolves the
+    /// session window and derives its own outer frame; see `docs/WINDOW_SIZE.md`.
+    #[must_use]
+    pub fn window_size_mailbox(&self) -> WindowSizeMailbox {
+        self.window_size_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread field-read mailbox.
@@ -311,6 +323,9 @@ fn registered_interactive_services(
         // Reversible fullscreen uses a distinct session-local bridge. The
         // parser admits this mailbox only for record version 1.10.
         .with_window_fullscreen(ui.window_fullscreen_mailbox())
+        // Bounded client sizing stays on the same session-local UI-thread
+        // boundary. The parser admits this mailbox only for record version 1.12.
+        .with_window_size(ui.window_size_mailbox())
         // Field values live with the window that owns them, so a read crosses
         // to the UI thread the same way. See `docs/UI_FIELDS.md`.
         .with_ui_fields(ui.field_mailbox()))
@@ -447,6 +462,28 @@ mod tests {
         }
         assert!(second.window_state_mailbox().take().is_none());
         assert!(first.window_state_mailbox().fail(1));
+        assert!(waiting.join().expect("the worker did not panic").is_err());
+    }
+
+    #[test]
+    fn each_session_carries_its_own_bounded_window_size_bridge() {
+        let first = RegisteredSessionUi::new("First Application");
+        let second = RegisteredSessionUi::new("Second Application");
+        let bridge = first.window_size_mailbox();
+        let waiting = std::thread::spawn(move || {
+            let size = anodrel_window::WindowSize::new(800, 600).expect("fixture size is valid");
+            anodrel_window::WindowSizeService::set_size(&bridge, size)
+        });
+
+        while first.window_size_mailbox().take().is_none() {
+            assert!(
+                second.window_size_mailbox().take().is_none(),
+                "a session took another session's client-size request"
+            );
+            std::thread::yield_now();
+        }
+        assert!(second.window_size_mailbox().take().is_none());
+        assert!(first.window_size_mailbox().fail(1));
         assert!(waiting.join().expect("the worker did not panic").is_err());
     }
 

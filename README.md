@@ -98,6 +98,15 @@ filesystem API. Record version 1.11 carries the optional grant; its Windows
 picker diagnostic remains a manual desktop verification. See
 `docs/FILE_BINARY_WRITE.md`.
 
+Protocol 1.23 adds a separately granted bounded client-area sizing request to
+the direct Windows UI-session host. `window.size.set` accepts only whole
+96-DPI logical width and height values for the authenticated session's own
+window. The host derives its framed native rectangle at the window's current
+DPI and preserves position, activation, and z-order; the request exposes no
+target, handle, monitor, position, bounds, DPI, or geometry readback. Record
+version 1.12 carries the optional grant; its Windows scaling and fullscreen
+interaction checks remain manual. See `docs/WINDOW_SIZE.md`.
+
 The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
@@ -305,6 +314,9 @@ desktop-control authority.
 `docs/WINDOW_FULLSCREEN.md` defines the separately granted reversible
 borderless fullscreen request for that same session-owned window, without
 exposing monitor selection, display control, geometry, or fullscreen state.
+`docs/WINDOW_SIZE.md` defines the separately granted bounded logical
+client-area request for that same session-owned window, without exposing
+position, outer geometry, monitor, DPI, or readback.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance

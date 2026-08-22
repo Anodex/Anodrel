@@ -9,6 +9,7 @@ import {
   isMenuReplacePayload,
   isNotificationShowPayload,
   isWindowFullscreenSetPayload,
+  isWindowSizeSetPayload,
   isWindowStateSetPayload,
   isWindowTitleSetPayload,
   isExternalOpenPayload,
@@ -399,6 +400,33 @@ export class MockHost {
         // that the host accepted one closed request, matching the one-way
         // contract rather than simulating monitor or geometry observation.
         return this.success("window.fullscreen.set", request.requestId, { status: "applied" });
+
+      case "window.size.set":
+        if (request.protocolVersion.minor < 23) {
+          return this.failure(
+            request.requestId,
+            "operation.unsupported",
+            "window.size.set requires protocol 1.23 or later.",
+          );
+        }
+        if (!isWindowSizeSetPayload(request.payload)) {
+          return this.failure(
+            request.requestId,
+            "request.payload_invalid",
+            "window.size.set requires one bounded logical width and height.",
+          );
+        }
+        if (!this.hasCapability(sessionId, "window.size")) {
+          return this.failure(
+            request.requestId,
+            "capability.denied",
+            "window.size.set requires the window.size capability.",
+            { capability: "window.size" },
+          );
+        }
+        // The mock has no native surface. It reports acceptance only, never a
+        // current size, position, monitor, DPI, or resulting outer rectangle.
+        return this.success("window.size.set", request.requestId, { status: "applied" });
 
       case "menu.replace":
         if (request.protocolVersion.minor < 18) {

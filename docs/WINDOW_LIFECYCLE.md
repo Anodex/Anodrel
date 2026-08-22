@@ -71,9 +71,12 @@ request names a window, handle, target, geometry, focus action, or readback.
 Protocol 1.21 separately permits `window.fullscreen.set` to choose only
 reversible borderless fullscreen or windowed restoration for that same session
 window; the host retains its native style and placement facts, and no monitor
-or display control is exposed. See `docs/WINDOW_TITLE.md`,
-`docs/WINDOW_STATE.md`, `docs/WINDOW_FULLSCREEN.md`, Decisions 0066, 0072,
-and 0086.
+or display control is exposed. Protocol 1.23 separately permits
+`window.size.set` to choose only a bounded logical client area for that same
+session window; the host derives its own framed rectangle and exposes no
+position, monitor, DPI, bounds, or geometry readback. See
+`docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`, `docs/WINDOW_FULLSCREEN.md`,
+`docs/WINDOW_SIZE.md`, Decisions 0066, 0072, 0086, and 0088.
 Everything else in this document is unchanged: the application still does not
 learn that it has a window, where it is, or how large it is.
 

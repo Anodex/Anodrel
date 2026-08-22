@@ -293,6 +293,7 @@ enum RecordVersion {
     V1_9,
     V1_10,
     V1_11,
+    V1_12,
 }
 
 impl RecordVersion {
@@ -313,6 +314,7 @@ impl RecordVersion {
                 | Self::V1_9
                 | Self::V1_10
                 | Self::V1_11
+                | Self::V1_12
         )
     }
 
@@ -329,6 +331,7 @@ impl RecordVersion {
                 | Self::V1_9
                 | Self::V1_10
                 | Self::V1_11
+                | Self::V1_12
         )
     }
 
@@ -344,6 +347,7 @@ impl RecordVersion {
                 | Self::V1_9
                 | Self::V1_10
                 | Self::V1_11
+                | Self::V1_12
         )
     }
 
@@ -358,6 +362,7 @@ impl RecordVersion {
                 | Self::V1_9
                 | Self::V1_10
                 | Self::V1_11
+                | Self::V1_12
         )
     }
 }
@@ -483,6 +488,7 @@ fn capability_for_record_version(
                     | RecordVersion::V1_9
                     | RecordVersion::V1_10
                     | RecordVersion::V1_11
+                    | RecordVersion::V1_12
             ) =>
         {
             Some(Capability::WindowState)
@@ -495,6 +501,7 @@ fn capability_for_record_version(
                     | RecordVersion::V1_9
                     | RecordVersion::V1_10
                     | RecordVersion::V1_11
+                    | RecordVersion::V1_12
             ) =>
         {
             Some(Capability::FileWriteText)
@@ -506,6 +513,7 @@ fn capability_for_record_version(
                     | RecordVersion::V1_9
                     | RecordVersion::V1_10
                     | RecordVersion::V1_11
+                    | RecordVersion::V1_12
             ) =>
         {
             Some(Capability::MenuWrite)
@@ -513,15 +521,26 @@ fn capability_for_record_version(
         "window.focus"
             if matches!(
                 version,
-                RecordVersion::V1_9 | RecordVersion::V1_10 | RecordVersion::V1_11
+                RecordVersion::V1_9
+                    | RecordVersion::V1_10
+                    | RecordVersion::V1_11
+                    | RecordVersion::V1_12
             ) =>
         {
             Some(Capability::WindowFocus)
         }
-        "window.fullscreen" if matches!(version, RecordVersion::V1_10 | RecordVersion::V1_11) => {
+        "window.fullscreen"
+            if matches!(
+                version,
+                RecordVersion::V1_10 | RecordVersion::V1_11 | RecordVersion::V1_12
+            ) =>
+        {
             Some(Capability::WindowFullscreen)
         }
-        "file.write_binary" if version == RecordVersion::V1_11 => Some(Capability::FileWriteBinary),
+        "file.write_binary" if matches!(version, RecordVersion::V1_11 | RecordVersion::V1_12) => {
+            Some(Capability::FileWriteBinary)
+        }
+        "window.size" if version == RecordVersion::V1_12 => Some(Capability::WindowSize),
         _ => None,
     }
 }
@@ -633,6 +652,7 @@ fn validate_version(
         (1, 9) => Ok(RecordVersion::V1_9),
         (1, 10) => Ok(RecordVersion::V1_10),
         (1, 11) => Ok(RecordVersion::V1_11),
+        (1, 12) => Ok(RecordVersion::V1_12),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }
@@ -1170,6 +1190,58 @@ mod tests {
             ]
         );
         fixture.remove();
+    }
+
+    #[test]
+    fn record_v1_12_adds_window_size_and_keeps_every_earlier_grant() {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", "\"minor\": 12")
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"file.write_binary\", \"window.fullscreen\", \"window.size\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+
+        let installed = InstalledApplication::load(&fixture.record_path, &fixture.policy_root)
+            .expect("v1.12 record is valid");
+        assert_eq!(
+            installed.capabilities(),
+            &[
+                anodrel_protocol::Capability::FileWriteBinary,
+                anodrel_protocol::Capability::WindowFullscreen,
+                anodrel_protocol::Capability::WindowSize,
+            ]
+        );
+        fixture.remove();
+    }
+
+    #[test]
+    fn an_earlier_record_cannot_name_the_window_size_grant() {
+        // Version 1.11 is the newest record before this grant. Keeping it
+        // invalid prevents a stale provisioning tool from silently widening a
+        // verified application's session-window authority.
+        for minor in ["8", "9", "10", "11"] {
+            let fixture = fixture();
+            let record = fs::read_to_string(&fixture.record_path)
+                .expect("record is read")
+                .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+                .replace(
+                    "\"publisher\": {",
+                    "\"capabilities\": [\"window.size\"], \"publisher\": {",
+                );
+            fs::write(&fixture.record_path, record).expect("record is updated");
+
+            assert!(
+                matches!(
+                    InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                    Err(InstalledApplicationError::InvalidRecord)
+                ),
+                "record version 1.{minor} accepted a 1.12 grant"
+            );
+            fixture.remove();
+        }
     }
 
     #[test]

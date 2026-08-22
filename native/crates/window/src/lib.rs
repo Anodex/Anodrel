@@ -17,6 +17,7 @@
 mod bridge;
 mod focus;
 mod fullscreen;
+mod size;
 mod state;
 mod title;
 
@@ -29,6 +30,9 @@ pub use fullscreen::{
     WINDOW_FULLSCREEN_RESPONSE_TIMEOUT, WindowFullscreenMailbox, WindowFullscreenRequest,
     WindowFullscreenService,
 };
+pub use size::{
+    WINDOW_SIZE_RESPONSE_TIMEOUT, WindowSizeMailbox, WindowSizeRequest, WindowSizeService,
+};
 pub use state::{
     WINDOW_STATE_RESPONSE_TIMEOUT, WindowStateMailbox, WindowStateRequest, WindowStateService,
 };
@@ -40,6 +44,15 @@ pub use title::{WINDOW_TITLE_RESPONSE_TIMEOUT, WindowTitleMailbox, WindowTitleRe
 /// never needs truncating on its way out. Long enough for a document name and
 /// short enough that the composed caption stays legible where it is shown.
 pub const MAX_PROPOSAL_UTF16_UNITS: usize = 96;
+
+/// Smallest logical client width the public session-window size request accepts.
+pub const MIN_WINDOW_CLIENT_WIDTH: u32 = 320;
+/// Largest logical client width the public session-window size request accepts.
+pub const MAX_WINDOW_CLIENT_WIDTH: u32 = 3_840;
+/// Smallest logical client height the public session-window size request accepts.
+pub const MIN_WINDOW_CLIENT_HEIGHT: u32 = 240;
+/// Largest logical client height the public session-window size request accepts.
+pub const MAX_WINDOW_CLIENT_HEIGHT: u32 = 2_160;
 
 /// Separator between the application's proposal and the host's suffix.
 ///
@@ -153,6 +166,47 @@ pub enum WindowFullscreenMode {
     Windowed,
 }
 
+/// One validated logical client area for the session's own window.
+///
+/// The dimensions use 96-DPI logical pixels. The native host alone maps them
+/// to a framed physical rectangle for the known session window; this value has
+/// no position, monitor, native frame, or protocol serialization of its own.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WindowSize {
+    width: u32,
+    height: u32,
+}
+
+impl WindowSize {
+    /// Validates one bounded logical client area.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WindowSizeInputError`] when either dimension is outside the
+    /// documented inclusive bound.
+    pub const fn new(width: u32, height: u32) -> Result<Self, WindowSizeInputError> {
+        if width < MIN_WINDOW_CLIENT_WIDTH || width > MAX_WINDOW_CLIENT_WIDTH {
+            return Err(WindowSizeInputError::WidthOutOfRange);
+        }
+        if height < MIN_WINDOW_CLIENT_HEIGHT || height > MAX_WINDOW_CLIENT_HEIGHT {
+            return Err(WindowSizeInputError::HeightOutOfRange);
+        }
+        Ok(Self { width, height })
+    }
+
+    /// Returns the bounded logical client width.
+    #[must_use]
+    pub const fn width(self) -> u32 {
+        self.width
+    }
+
+    /// Returns the bounded logical client height.
+    #[must_use]
+    pub const fn height(self) -> u32 {
+        self.height
+    }
+}
+
 /// A safe failure category returned by a session-owned window command.
 ///
 /// Both title and state commands use these categories. They deliberately do
@@ -200,6 +254,9 @@ pub type WindowFocusServiceError = WindowCommandError;
 /// Errors shared by the session fullscreen service and its host bridge.
 pub type WindowFullscreenServiceError = WindowCommandError;
 
+/// Errors shared by the session-window size service and its host bridge.
+pub type WindowSizeServiceError = WindowCommandError;
+
 /// A stable validation failure raised before any native call.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WindowTitleInputError {
@@ -210,6 +267,27 @@ pub enum WindowTitleInputError {
     /// The proposal contains a control character.
     ControlCharacter,
 }
+
+/// A stable validation failure raised before any native size request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WindowSizeInputError {
+    /// The requested logical client width was outside its inclusive bound.
+    WidthOutOfRange,
+    /// The requested logical client height was outside its inclusive bound.
+    HeightOutOfRange,
+}
+
+impl fmt::Display for WindowSizeInputError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::WidthOutOfRange => "window client width is outside its fixed limit",
+            Self::HeightOutOfRange => "window client height is outside its fixed limit",
+        };
+        formatter.write_str(message)
+    }
+}
+
+impl std::error::Error for WindowSizeInputError {}
 
 impl fmt::Display for WindowTitleInputError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -229,8 +307,9 @@ impl std::error::Error for WindowTitleInputError {}
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_PROPOSAL_UTF16_UNITS, TITLE_SEPARATOR, WindowCommandError, WindowTitleInputError,
-        WindowTitleProposal, compose,
+        MAX_PROPOSAL_UTF16_UNITS, MAX_WINDOW_CLIENT_HEIGHT, MAX_WINDOW_CLIENT_WIDTH,
+        MIN_WINDOW_CLIENT_HEIGHT, MIN_WINDOW_CLIENT_WIDTH, TITLE_SEPARATOR, WindowCommandError,
+        WindowSize, WindowSizeInputError, WindowTitleInputError, WindowTitleProposal, compose,
     };
 
     fn proposal(value: &str) -> WindowTitleProposal {
@@ -364,5 +443,30 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn size_requires_bounded_logical_client_dimensions() {
+        let size = WindowSize::new(800, 600).expect("ordinary client area is valid");
+        assert_eq!(size.width(), 800);
+        assert_eq!(size.height(), 600);
+        assert!(WindowSize::new(MIN_WINDOW_CLIENT_WIDTH, MIN_WINDOW_CLIENT_HEIGHT).is_ok());
+        assert!(WindowSize::new(MAX_WINDOW_CLIENT_WIDTH, MAX_WINDOW_CLIENT_HEIGHT).is_ok());
+        assert_eq!(
+            WindowSize::new(MIN_WINDOW_CLIENT_WIDTH - 1, MIN_WINDOW_CLIENT_HEIGHT),
+            Err(WindowSizeInputError::WidthOutOfRange)
+        );
+        assert_eq!(
+            WindowSize::new(MAX_WINDOW_CLIENT_WIDTH + 1, MIN_WINDOW_CLIENT_HEIGHT),
+            Err(WindowSizeInputError::WidthOutOfRange)
+        );
+        assert_eq!(
+            WindowSize::new(MIN_WINDOW_CLIENT_WIDTH, MIN_WINDOW_CLIENT_HEIGHT - 1),
+            Err(WindowSizeInputError::HeightOutOfRange)
+        );
+        assert_eq!(
+            WindowSize::new(MIN_WINDOW_CLIENT_WIDTH, MAX_WINDOW_CLIENT_HEIGHT + 1),
+            Err(WindowSizeInputError::HeightOutOfRange)
+        );
     }
 }

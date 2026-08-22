@@ -55,6 +55,7 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
         ui.window_state_mailbox(),
         ui.window_focus_mailbox(),
         ui.window_fullscreen_mailbox(),
+        ui.window_size_mailbox(),
         // From the identity that matched the machine-validated installed
         // record, never from the child. This is the half of a caption the
         // application cannot influence.

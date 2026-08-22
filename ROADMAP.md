@@ -91,7 +91,14 @@ Status: **Direct Windows host in progress**
   manual. Window creation, cross-session closing, geometry, enumeration,
   exclusive display control, monitor selection, state or focus readback, and
   every other window property remain deferred, each needing its own grant,
-  decision, and threat-model entry.
+  decision, and threat-model entry. Protocol 1.23 `window.size.set` is the
+  fifth narrow public capability: it chooses only a bounded logical client area
+  for that same session window, without a position, target, monitor, DPI,
+  geometry readback, or presentation-state change. The SDK, mock host, record
+  version 1.12 policy, session-local UI-thread bridge, direct DPI-aware User32
+  adapter, product-session composition, and development diagnostic are
+  implemented (Decision 0088); scaling and fullscreen-interaction checks remain
+  manual.
 - Define safe application-controlled file output. **Completed for the direct
   Windows UI-session host:** Decisions 0079 and 0087 preserve the legacy
   non-mutating save picker while implementing an independent, one-use

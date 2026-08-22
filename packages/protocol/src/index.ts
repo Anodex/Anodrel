@@ -7,7 +7,7 @@ import { canonicalBase64UrlDecodedLength } from "./base64url.js";
 
 export { encodeCanonicalBase64Url } from "./base64url.js";
 
-export const PROTOCOL_VERSION = { major: 1, minor: 22 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 23 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -37,6 +37,14 @@ export const SAVE_REFERENCE_BYTES = 22;
 export const MAX_CREDENTIAL_NAME_BYTES = 64;
 /** Maximum characters in the canonical hexadecimal representation of a secret. */
 export const MAX_CREDENTIAL_SECRET_HEX_BYTES = 4_096;
+/** Smallest logical client width accepted by `window.size.set`. */
+export const MIN_WINDOW_CLIENT_WIDTH = 320;
+/** Largest logical client width accepted by `window.size.set`. */
+export const MAX_WINDOW_CLIENT_WIDTH = 3_840;
+/** Smallest logical client height accepted by `window.size.set`. */
+export const MIN_WINDOW_CLIENT_HEIGHT = 240;
+/** Largest logical client height accepted by `window.size.set`. */
+export const MAX_WINDOW_CLIENT_HEIGHT = 2_160;
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -70,6 +78,7 @@ export type Capability =
   | "window.state"
   | "window.focus"
   | "window.fullscreen"
+  | "window.size"
   | "menu.write";
 
 export type EmptyPayload = Record<string, never>;
@@ -196,6 +205,17 @@ export interface PlatformOperationMap {
    */
   "window.fullscreen.set": {
     readonly payload: { readonly mode: WindowFullscreenMode };
+    readonly result: { readonly status: "applied" };
+  };
+  /**
+   * Requests a bounded logical client size for this session's own window.
+   *
+   * The host derives the native framed rectangle at its current DPI. There is
+   * no target, position, monitor, DPI, bounds readback, or geometry event;
+   * success means only that the host UI thread accepted the request.
+   */
+  "window.size.set": {
+    readonly payload: { readonly width: number; readonly height: number };
     readonly result: { readonly status: "applied" };
   };
   /**
@@ -912,6 +932,30 @@ export function isWindowFullscreenSetPayload(
     isRecord(value) &&
     Object.keys(value).length === 1 &&
     (value.mode === "fullscreen" || value.mode === "windowed")
+  );
+}
+
+/**
+ * Returns whether a value is exactly one bounded logical client-size request.
+ *
+ * Extra fields are a mismatch rather than a future route to a target,
+ * position, monitor, DPI, geometry readback, or native rectangle. Fractions
+ * are invalid because logical client pixels are whole 96-DPI units.
+ */
+export function isWindowSizeSetPayload(
+  value: unknown,
+): value is PayloadFor<"window.size.set"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    typeof value.width === "number" &&
+    Number.isSafeInteger(value.width) &&
+    value.width >= MIN_WINDOW_CLIENT_WIDTH &&
+    value.width <= MAX_WINDOW_CLIENT_WIDTH &&
+    typeof value.height === "number" &&
+    Number.isSafeInteger(value.height) &&
+    value.height >= MIN_WINDOW_CLIENT_HEIGHT &&
+    value.height <= MAX_WINDOW_CLIENT_HEIGHT
   );
 }
 

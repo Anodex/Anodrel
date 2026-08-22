@@ -13,8 +13,8 @@ use anodrel_ui_session::{
     UiInputMailbox,
 };
 use anodrel_window::{
-    WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowState,
-    WindowStateMailbox, WindowTitleMailbox,
+    WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSize,
+    WindowSizeMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox,
 };
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_notifications::WindowsNotifications;
@@ -70,6 +70,11 @@ pub(super) struct UiSessionView {
     /// one. The host keeps its saved native presentation facts beside this
     /// session view; neither facts nor a native handle reach the application.
     window_fullscreen: Option<WindowFullscreenMailbox>,
+    /// This session's one-request bounded client-size bridge, when it has one.
+    ///
+    /// It transfers only a validated logical client size. The owning UI thread
+    /// retains its DPI, menu, frame, and outer geometry calculations.
+    window_size: Option<WindowSizeMailbox>,
     /// The pre-fullscreen native presentation facts retained by the host.
     ///
     /// `Some` means the host has a restoration path it must preserve. It is
@@ -124,6 +129,7 @@ impl UiSessionView {
             window_state: None,
             window_focus: None,
             window_fullscreen: None,
+            window_size: None,
             fullscreen_restore: None,
             display_name: None,
             field_reads: None,
@@ -166,6 +172,13 @@ impl UiSessionView {
     #[must_use]
     pub(super) fn with_window_fullscreen(mut self, mailbox: WindowFullscreenMailbox) -> Self {
         self.window_fullscreen = Some(mailbox);
+        self
+    }
+
+    /// Attaches this session's bounded logical client-size bridge.
+    #[must_use]
+    pub(super) fn with_window_size(mut self, mailbox: WindowSizeMailbox) -> Self {
+        self.window_size = Some(mailbox);
         self
     }
 
@@ -316,6 +329,24 @@ impl UiSessionView {
         }
     }
 
+    /// Takes one bounded client-size request for this window's owning UI thread.
+    pub(super) fn take_window_size_request(&self) -> Option<(u64, WindowSize)> {
+        let request = self.window_size.as_ref()?.take()?;
+        Some((request.id(), request.size()))
+    }
+
+    /// Completes one client-size request after the native transition returns.
+    pub(super) fn complete_window_size_request(&self, request_id: u64, applied: bool) -> bool {
+        let Some(mailbox) = self.window_size.as_ref() else {
+            return false;
+        };
+        if applied {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
+        }
+    }
+
     /// Takes a pending notification for the host UI thread.
     ///
     /// The entry is returned alongside so the Shell32 call happens outside the
@@ -361,6 +392,7 @@ impl UiSessionView {
         .with_window_state(ui.window_state_mailbox())
         .with_window_focus(ui.window_focus_mailbox())
         .with_window_fullscreen(ui.window_fullscreen_mailbox())
+        .with_window_size(ui.window_size_mailbox())
         .with_field_reads(ui.field_mailbox());
         view.product_session = Some(Arc::new(session));
         view
@@ -566,7 +598,7 @@ mod tests {
 
     use super::{
         UiSessionView, WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode,
-        WindowState, WindowStateMailbox, WindowTitleMailbox,
+        WindowSize, WindowSizeMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox,
     };
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"session.root","kind":"text","value":"Connected","fontSize":16,"tone":"primary"}}"#;
@@ -676,6 +708,21 @@ mod tests {
             NotificationMailbox::new(),
         )
         .with_window_fullscreen(mailbox.clone());
+        (view, mailbox)
+    }
+
+    /// A session view with its own bounded logical client-size bridge.
+    fn view_with_size() -> (UiSessionView, WindowSizeMailbox) {
+        let mailbox = WindowSizeMailbox::new();
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_window_size(mailbox.clone());
         (view, mailbox)
     }
 
@@ -849,6 +896,20 @@ mod tests {
     }
 
     #[test]
+    fn a_session_without_a_size_bridge_answers_nothing_and_completes_nothing() {
+        let view = UiSessionView::new(
+            UiDocumentMailbox::new(),
+            UiInputMailbox::new(),
+            SessionCloseSignal::default(),
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        );
+        assert!(view.take_window_size_request().is_none());
+        assert!(!view.complete_window_size_request(1, true));
+    }
+
+    #[test]
     fn a_session_without_a_menu_bridge_has_no_menu_request_or_command_route() {
         let view = UiSessionView::new(
             UiDocumentMailbox::new(),
@@ -933,6 +994,30 @@ mod tests {
         };
         assert_eq!(mode, WindowFullscreenMode::Fullscreen);
         assert!(first.complete_window_fullscreen_request(request_id, true));
+        assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
+    }
+
+    #[test]
+    fn one_session_cannot_take_another_sessions_size_request() {
+        let (first, first_mailbox) = view_with_size();
+        let (second, _second_mailbox) = view_with_size();
+        let worker = first_mailbox.clone();
+        let size = WindowSize::new(800, 600).expect("fixture size is valid");
+        let waiting =
+            std::thread::spawn(move || anodrel_window::WindowSizeService::set_size(&worker, size));
+
+        let (request_id, requested) = loop {
+            assert!(
+                second.take_window_size_request().is_none(),
+                "a session took another session's client-size request"
+            );
+            if let Some(request) = first.take_window_size_request() {
+                break request;
+            }
+            std::thread::yield_now();
+        };
+        assert_eq!(requested, size);
+        assert!(first.complete_window_size_request(request_id, true));
         assert_eq!(waiting.join().expect("the worker did not panic"), Ok(()));
     }
 

@@ -51,8 +51,9 @@ use anodrel_ui_session::{
 };
 use anodrel_window::{
     WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
-    WindowFullscreenServiceError, WindowState, WindowStateService, WindowStateServiceError,
-    WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
+    WindowFullscreenServiceError, WindowSize, WindowSizeService, WindowSizeServiceError,
+    WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
+    WindowTitleService, WindowTitleServiceError,
 };
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -147,6 +148,7 @@ pub struct CoreHost {
     window_state: Box<dyn WindowStateService>,
     window_focus: Box<dyn WindowFocusService>,
     window_fullscreen: Box<dyn WindowFullscreenService>,
+    window_size: Box<dyn WindowSizeService>,
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
@@ -177,6 +179,7 @@ pub struct HostServices {
     window_state: Box<dyn WindowStateService>,
     window_focus: Box<dyn WindowFocusService>,
     window_fullscreen: Box<dyn WindowFullscreenService>,
+    window_size: Box<dyn WindowSizeService>,
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
@@ -282,6 +285,15 @@ impl WindowFullscreenService for UnavailableWindowFullscreen {
 }
 
 #[derive(Debug)]
+struct UnavailableWindowSize;
+
+impl WindowSizeService for UnavailableWindowSize {
+    fn set_size(&self, _size: WindowSize) -> Result<(), WindowSizeServiceError> {
+        Err(WindowSizeServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
 struct UnavailableFileDialogs;
 
 impl FileDialogService for UnavailableFileDialogs {
@@ -354,6 +366,7 @@ impl HostServices {
             window_state: Box::new(UnavailableWindowState),
             window_focus: Box::new(UnavailableWindowFocus),
             window_fullscreen: Box::new(UnavailableWindowFullscreen),
+            window_size: Box::new(UnavailableWindowSize),
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
@@ -459,6 +472,18 @@ impl HostServices {
         service: impl WindowFullscreenService + 'static,
     ) -> Self {
         self.window_fullscreen = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed client-size service.
+    ///
+    /// The supplied service must apply only bounded logical client dimensions
+    /// to the requesting session's own window from the host UI thread. It
+    /// accepts no target, position, monitor, or geometry query; see
+    /// `docs/WINDOW_SIZE.md`.
+    #[must_use]
+    pub fn with_window_size(mut self, service: impl WindowSizeService + 'static) -> Self {
+        self.window_size = Box::new(service);
         self
     }
 
@@ -587,6 +612,7 @@ impl CoreHost {
             window_state: services.window_state,
             window_focus: services.window_focus,
             window_fullscreen: services.window_fullscreen,
+            window_size: services.window_size,
             menu: services.menu,
             ui_fields: services.ui_fields,
             file_dialogs: services.file_dialogs,
@@ -827,6 +853,7 @@ impl CoreHost {
             window_state: Box::new(UnavailableWindowState),
             window_focus: Box::new(UnavailableWindowFocus),
             window_fullscreen: Box::new(UnavailableWindowFullscreen),
+            window_size: Box::new(UnavailableWindowSize),
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(file_dialogs),
@@ -939,6 +966,9 @@ impl CoreHost {
             }
             "window.fullscreen.set" if request.protocol_version.minor >= 21 => {
                 self.handle_window_fullscreen_set(request)
+            }
+            "window.size.set" if request.protocol_version.minor >= 23 => {
+                self.handle_window_size_set(request)
             }
             "menu.replace" if request.protocol_version.minor >= 18 => {
                 self.handle_menu_replace(request)
@@ -1688,6 +1718,46 @@ impl CoreHost {
                 request.request_id,
                 ProtocolErrorCode::WindowBusy,
                 "a window fullscreen change is already pending.",
+                None,
+            ),
+        }
+    }
+
+    /// Requests one bounded logical client size for this session's own window.
+    ///
+    /// The request carries neither a native rectangle nor a target. The host
+    /// service resolves the one session window, converts the logical client
+    /// dimensions at its current DPI, and returns acceptance only. No response
+    /// becomes geometry, monitor, DPI, or presentation-state readback.
+    fn handle_window_size_set(&self, request: RequestEnvelope) -> JsonValue {
+        let Some(size) = window_size_set_payload(&request.payload) else {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.size.set requires one bounded logical width and height.",
+                None,
+            );
+        };
+        if !self.policy.has(Capability::WindowSize) {
+            return self.capability_denied(request.request_id, "window.size.set");
+        }
+
+        match self.window_size.set_size(size) {
+            Ok(()) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([("status", JsonValue::String("applied".to_owned()))]),
+            ),
+            Err(WindowSizeServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no session window is available for the requested client size.",
+                None,
+            ),
+            Err(WindowSizeServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "a window size change is already pending.",
                 None,
             ),
         }
@@ -2517,6 +2587,22 @@ fn window_fullscreen_set_payload(value: &JsonValue) -> Option<WindowFullscreenMo
     }
 }
 
+/// Reads the exact two-field payload `window.size.set` accepts.
+///
+/// A position, target, monitor, native rectangle, DPI, constraint, animation,
+/// or readback selector must not be smuggled into the small client-size command.
+/// Both values are strict non-negative JSON integers before the portable bounded
+/// logical client-area type accepts them.
+fn window_size_set_payload(value: &JsonValue) -> Option<WindowSize> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    let width = u32::from(fields.get("width")?.as_u16()?);
+    let height = u32::from(fields.get("height")?.as_u16()?);
+    WindowSize::new(width, height).ok()
+}
+
 fn external_open_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
@@ -2733,8 +2819,9 @@ mod tests {
     use anodrel_ui_session::{MenuInputCandidate, UiInputCandidate};
     use anodrel_window::{
         WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
-        WindowFullscreenServiceError, WindowState, WindowStateService, WindowStateServiceError,
-        WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
+        WindowFullscreenServiceError, WindowSize, WindowSizeService, WindowSizeServiceError,
+        WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
+        WindowTitleService, WindowTitleServiceError,
     };
 
     use super::*;
@@ -3638,6 +3725,12 @@ mod tests {
         )
     }
 
+    fn request_v1_23(operation: &str, payload: &str) -> String {
+        format!(
+            r#"{{"protocolVersion":{{"major":1,"minor":23}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
+        )
+    }
+
     fn host_with_menu(service: impl MenuService + 'static) -> CoreHost {
         CoreHost::with_services(
             HostPolicy::new("test.application", vec![Capability::MenuWrite], "test-host")
@@ -3686,6 +3779,25 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Default)]
+    struct RecordingWindowSize {
+        applied: Arc<Mutex<Vec<WindowSize>>>,
+        result: Option<WindowSizeServiceError>,
+    }
+
+    impl WindowSizeService for RecordingWindowSize {
+        fn set_size(&self, size: WindowSize) -> Result<(), WindowSizeServiceError> {
+            if let Some(error) = self.result {
+                return Err(error);
+            }
+            self.applied
+                .lock()
+                .expect("the test mutex is usable")
+                .push(size);
+            Ok(())
+        }
+    }
+
     impl WindowFocusService for RecordingWindowFocus {
         fn request_focus(&self) -> Result<(), WindowFocusServiceError> {
             if let Some(error) = self.result {
@@ -3718,6 +3830,18 @@ mod tests {
             )
             .expect("test policy is valid"),
             HostServices::unavailable().with_window_fullscreen(service),
+        )
+    }
+
+    fn host_with_window_size(service: impl WindowSizeService + 'static) -> CoreHost {
+        CoreHost::with_services(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::WindowSize],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            HostServices::unavailable().with_window_size(service),
         )
     }
 
@@ -4088,6 +4212,132 @@ mod tests {
             .handle_json(&request_v1_21(
                 "window.fullscreen.set",
                 r#"{"mode":"windowed"}"#,
+            )),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&response, "error"), "code").as_string(),
+            Some("window.unavailable")
+        );
+    }
+
+    #[test]
+    fn a_granted_window_size_reaches_only_the_size_service() {
+        let service = RecordingWindowSize::default();
+        let applied = Arc::clone(&service.applied);
+        let response = JsonValue::parse(&host_with_window_size(service).handle_json(
+            &request_v1_23("window.size.set", r#"{"width":800,"height":600}"#),
+        ))
+        .expect("response JSON is valid");
+
+        assert_eq!(field(&response, "status").as_string(), Some("success"));
+        assert_eq!(
+            field(field(&response, "result"), "status").as_string(),
+            Some("applied")
+        );
+        assert_eq!(
+            applied.lock().expect("the test mutex is usable").as_slice(),
+            &[WindowSize::new(800, 600).expect("fixture size is valid")]
+        );
+    }
+
+    #[test]
+    fn window_size_needs_its_own_grant_and_protocol_version() {
+        let payload = r#"{"width":800,"height":600}"#;
+        let denied = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowFullscreen, Capability::WindowState],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable().with_window_size(RecordingWindowSize::default()),
+            )
+            .handle_json(&request_v1_23("window.size.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&denied, "error"), "code").as_string(),
+            Some("capability.denied")
+        );
+
+        let unsupported = JsonValue::parse(
+            &host_with_window_size(RecordingWindowSize::default())
+                .handle_json(&request_v1_22("window.size.set", payload)),
+        )
+        .expect("response JSON is valid");
+        assert_eq!(
+            field(field(&unsupported, "error"), "code").as_string(),
+            Some("operation.unsupported")
+        );
+    }
+
+    #[test]
+    fn window_size_payload_is_exact_and_bounded() {
+        for payload in [
+            r#"{}"#,
+            r#"{"width":319,"height":600}"#,
+            r#"{"width":800,"height":239}"#,
+            r#"{"width":3841,"height":600}"#,
+            r#"{"width":800,"height":2161}"#,
+            r#"{"width":800.0,"height":600}"#,
+            r#"{"width":800,"height":600,"x":0}"#,
+            r#"{"width":800,"height":600,"monitor":"other"}"#,
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_size(RecordingWindowSize::default())
+                    .handle_json(&request_v1_23("window.size.set", payload)),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some("request.payload_invalid"),
+                "{payload} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn window_size_service_failures_map_to_safe_shared_codes() {
+        for (error, code) in [
+            (WindowSizeServiceError::Unavailable, "window.unavailable"),
+            (WindowSizeServiceError::Busy, "window.busy"),
+        ] {
+            let response = JsonValue::parse(
+                &host_with_window_size(RecordingWindowSize {
+                    result: Some(error),
+                    ..RecordingWindowSize::default()
+                })
+                .handle_json(&request_v1_23(
+                    "window.size.set",
+                    r#"{"width":800,"height":600}"#,
+                )),
+            )
+            .expect("response JSON is valid");
+            assert_eq!(
+                field(field(&response, "error"), "code").as_string(),
+                Some(code),
+                "{error:?} mapped to the wrong code"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_without_a_window_size_service_reports_unavailable() {
+        let response = JsonValue::parse(
+            &CoreHost::with_services(
+                HostPolicy::new(
+                    "test.application",
+                    vec![Capability::WindowSize],
+                    "test-host",
+                )
+                .expect("test policy is valid"),
+                HostServices::unavailable(),
+            )
+            .handle_json(&request_v1_23(
+                "window.size.set",
+                r#"{"width":800,"height":600}"#,
             )),
         )
         .expect("response JSON is valid");

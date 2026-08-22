@@ -19,6 +19,7 @@ mod menu;
 mod present;
 mod product_tile;
 mod registry;
+mod size;
 mod startup_lab;
 mod stats;
 mod text;
@@ -41,8 +42,8 @@ use anodrel_windows_instance::PrimaryInstance;
 use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
 use anodrel_window::{
-    WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowState,
-    WindowStateMailbox, WindowTitleMailbox,
+    WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSizeMailbox,
+    WindowState, WindowStateMailbox, WindowTitleMailbox,
 };
 
 use crate::product::PreflightOutcome;
@@ -660,6 +661,7 @@ pub fn run_ui_session(
     window_state: WindowStateMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
+    window_size: WindowSizeMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -676,6 +678,7 @@ pub fn run_ui_session(
         window_state,
         window_focus,
         window_fullscreen,
+        window_size,
         display_name,
         field_reads,
     )
@@ -704,6 +707,10 @@ pub fn run_ui_session(
 /// `window_fullscreen` carries only a reversible borderless or windowed mode
 /// for this same host-selected window. The UI thread retains native restoration
 /// facts privately; see `docs/WINDOW_FULLSCREEN.md`.
+///
+/// `window_size` carries only bounded logical client dimensions for this same
+/// host-selected window. The UI thread derives its native frame privately; see
+/// `docs/WINDOW_SIZE.md`.
 #[allow(clippy::too_many_arguments)]
 pub fn run_authenticated_ui_session(
     title: &str,
@@ -718,6 +725,7 @@ pub fn run_authenticated_ui_session(
     window_state: WindowStateMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
+    window_size: WindowSizeMailbox,
     display_name: &str,
     field_reads: UiFieldMailbox,
 ) -> io::Result<()> {
@@ -741,6 +749,7 @@ pub fn run_authenticated_ui_session(
                 .with_window_state(window_state)
                 .with_window_focus(window_focus)
                 .with_window_fullscreen(window_fullscreen)
+                .with_window_size(window_size)
                 .with_field_reads(field_reads),
             )),
         }],
@@ -1382,6 +1391,21 @@ fn service_window_fullscreen(window: Hwnd) {
     let _ = registry::complete_window_fullscreen_request(window, request_id, applied);
 }
 
+/// Applies one pending bounded client-size request on its owning UI thread.
+///
+/// Fullscreen transitions run immediately before this route. While the host
+/// holds a private restore fact, the request fails instead of altering the
+/// geometry that restoration must recover.
+fn service_window_size(window: Hwnd) {
+    let Ok(Some((request_id, size, fullscreen_active))) =
+        registry::take_window_size_request(window)
+    else {
+        return;
+    };
+    let applied = !fullscreen_active && size::apply(window, size);
+    let _ = registry::complete_window_size_request(window, request_id, applied);
+}
+
 /// Constructs and attaches one pending session menu on its owning UI thread.
 ///
 /// Native construction happens before taking the process-wide view-registry
@@ -1896,6 +1920,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_window_state(window);
             service_window_focus(window);
             service_window_fullscreen(window);
+            service_window_size(window);
             service_field_read(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {

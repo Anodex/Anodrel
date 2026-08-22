@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { PlatformClient } from "@anodrel/sdk";
+import { PlatformClient, PlatformRemoteError } from "@anodrel/sdk";
 import { WindowsNamedPipeTransport, decodeBootstrapInvitation } from "@anodrel/windows-transport";
 
 import { pollSchedule } from "./poll-schedule.js";
@@ -255,6 +255,35 @@ async function run(): Promise<number> {
       const restored = await client.setWindowFullscreen("windowed");
       if (restored.status !== "applied") {
         return 30;
+      }
+    }
+
+    if (process.argv.includes("--request-window-size")) {
+      // The request names only a bounded logical client area. It cannot move
+      // the window or choose a display; the host derives its own native frame.
+      const applied = await client.setWindowSize(800, 520);
+      if (applied.status !== "applied") {
+        return 32;
+      }
+    }
+
+    if (process.argv.includes("--request-window-size-while-fullscreen")) {
+      const entered = await client.setWindowFullscreen("fullscreen");
+      if (entered.status !== "applied") {
+        return 33;
+      }
+      await delay(650);
+      try {
+        await client.setWindowSize(800, 520);
+        return 33;
+      } catch (error) {
+        if (!(error instanceof PlatformRemoteError) || error.code !== "window.unavailable") {
+          return 33;
+        }
+      }
+      const restored = await client.setWindowFullscreen("windowed");
+      if (restored.status !== "applied") {
+        return 33;
       }
     }
 

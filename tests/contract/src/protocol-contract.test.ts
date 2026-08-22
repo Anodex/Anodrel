@@ -8,6 +8,10 @@ import {
   MAX_NETWORK_FETCH_REQUEST_BYTES,
   MAX_FILE_TEXT_WRITE_BYTES,
   MAX_MENU_REPLACE_REQUEST_BYTES,
+  MAX_WINDOW_CLIENT_HEIGHT,
+  MAX_WINDOW_CLIENT_WIDTH,
+  MIN_WINDOW_CLIENT_HEIGHT,
+  MIN_WINDOW_CLIENT_WIDTH,
   PROTOCOL_VERSION,
   createRequest,
   isWireRequestEnvelope,
@@ -948,6 +952,71 @@ test("a session window fullscreen mode is closed, separately granted, and untarg
     requestId: "window-fullscreen-before-protocol-1.21",
     operation: "window.fullscreen.set",
     payload: { mode: "fullscreen" },
+  });
+  assert.equal(
+    older.status === "failure" ? older.error.code : undefined,
+    "operation.unsupported",
+  );
+});
+
+test("a session window client size is bounded, separately granted, and unpositionable", async () => {
+  const host = new MockHost({
+    applicationId: "test.application",
+    grantedCapabilities: ["window.size"],
+  });
+  const client = new PlatformClient(host.createTransport(), new SequenceRequestIds());
+
+  assert.deepEqual(await client.setWindowSize(800, 600), { status: "applied" });
+  assert.deepEqual(
+    await client.setWindowSize(MAX_WINDOW_CLIENT_WIDTH, MAX_WINDOW_CLIENT_HEIGHT),
+    { status: "applied" },
+  );
+
+  const ungranted = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => ungranted.setWindowSize(800, 600),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "window.size",
+  );
+
+  // A position, target, display, native rectangle, fraction, or out-of-range
+  // value would turn bounded client sizing into broader desktop authority.
+  const transport = host.createTransport();
+  for (const payload of [
+    {},
+    { width: MIN_WINDOW_CLIENT_WIDTH - 1, height: 600 },
+    { width: 800, height: MIN_WINDOW_CLIENT_HEIGHT - 1 },
+    { width: MAX_WINDOW_CLIENT_WIDTH + 1, height: 600 },
+    { width: 800, height: MAX_WINDOW_CLIENT_HEIGHT + 1 },
+    { width: 800.5, height: 600 },
+    { width: 800, height: 600, x: 0 },
+    { width: 800, height: 600, monitor: "other" },
+  ]) {
+    const response = await transport.send({
+      protocolVersion: { major: 1, minor: 23 },
+      kind: "request",
+      requestId: `window-size-${JSON.stringify(payload)}`,
+      operation: "window.size.set",
+      payload: payload as never,
+    });
+    assert.equal(
+      response.status === "failure" ? response.error.code : undefined,
+      "request.payload_invalid",
+      `${JSON.stringify(payload)} was accepted`,
+    );
+  }
+
+  const older = await transport.send({
+    protocolVersion: { major: 1, minor: 22 },
+    kind: "request",
+    requestId: "window-size-before-protocol-1.23",
+    operation: "window.size.set",
+    payload: { width: 800, height: 600 },
   });
   assert.equal(
     older.status === "failure" ? older.error.code : undefined,

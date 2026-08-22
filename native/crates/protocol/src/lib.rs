@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 22;
+pub const PROTOCOL_MINOR: u16 = 23;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -96,6 +96,12 @@ pub enum Capability {
     /// cannot select a monitor, change a display mode, set geometry, or read
     /// window state; see `docs/WINDOW_FULLSCREEN.md`.
     WindowFullscreen,
+    /// Resize the client area of the session's own native window.
+    ///
+    /// The grant carries only bounded logical client dimensions. It cannot
+    /// target or move a window, select a monitor, read geometry, or expose a
+    /// native rectangle; see `docs/WINDOW_SIZE.md` and Decision 0088.
+    WindowSize,
     /// Read every field value on the session's own current surface.
     ///
     /// A snapshot, not a stream. There is no selector and no change event, so
@@ -137,6 +143,7 @@ impl Capability {
             Self::WindowState => "window.state",
             Self::WindowFocus => "window.focus",
             Self::WindowFullscreen => "window.fullscreen",
+            Self::WindowSize => "window.size",
             Self::UiFieldsRead => "ui.fields.read",
             Self::MenuWrite => "menu.write",
         }

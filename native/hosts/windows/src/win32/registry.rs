@@ -325,6 +325,38 @@ pub(super) fn complete_window_fullscreen_request(
     }
 }
 
+/// Takes one pending bounded client-size request from its associated session.
+///
+/// The boolean is internal-only: it tells the UI thread that preserving a
+/// private fullscreen restoration path takes precedence over sizing. Neither
+/// this fact nor any native geometry leaves the host boundary.
+pub(super) fn take_window_size_request(
+    window: Hwnd,
+) -> io::Result<Option<(u64, anodrel_window::WindowSize, bool)>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session
+            .take_window_size_request()
+            .map(|(request_id, size)| (request_id, size, session.fullscreen_restore().is_some()))),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one client-size request through its owning native UI session.
+pub(super) fn complete_window_size_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_window_size_request(request_id, applied),
+        )),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending menu replacement only from its associated UI session.
 ///
 /// The resulting model has no native object yet, so User32 construction can

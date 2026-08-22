@@ -1,7 +1,7 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.22, including separately granted,
-bounded binary file output documented in `docs/FILE_BINARY_WRITE.md`.
+**Status:** Implemented through version 1.23, including separately granted,
+bounded session-window client sizing documented in `docs/WINDOW_SIZE.md`.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -29,8 +29,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.22 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 22}`.
+the host's. Version 1.23 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 23}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -71,6 +71,7 @@ The implemented operations are:
 | `window.state.set` | `{ "state": "minimized" \| "maximized" \| "restored" }` | `{ "status": "applied" }` | `window.state` |
 | `window.focus.request` | `{}` | `{ "status": "requested" }` | `window.focus` |
 | `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
+| `window.size.set` | `{ "width": integer, "height": integer }` | `{ "status": "applied" }` | `window.size` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean }] }] }` | current menu revision | `menu.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
@@ -140,6 +141,24 @@ safe native-transition failure without revealing which occurred. A concurrent
 request returns `window.busy`. The response never states resulting bounds,
 monitor, style, visibility, or fullscreen state. See
 `docs/WINDOW_FULLSCREEN.md` and Decision 0086.
+
+### Session-window client-size request
+
+Protocol 1.23 implements `window.size.set` behind its separate `window.size`
+grant. It accepts exactly `{ "width": integer, "height": integer }`: width is
+320 through 3840 and height is 240 through 2160, inclusive, in whole 96-DPI
+logical client-area pixels. It returns exactly `{ "status": "applied" }` when
+the owning host UI thread accepts the request for that authenticated session's
+own window.
+
+The operation cannot name a target, window handle, process, position, outer
+bounds, monitor, DPI, presentation state, constraint, animation, callback, or
+event. On Windows, the host derives the framed outer rectangle at the known
+window's current DPI and preserves position, activation, and z-order. A
+fullscreen session safely answers `window.unavailable` rather than changing
+private restore facts. A concurrent request returns `window.busy`; neither
+result reveals native geometry or current presentation. See
+`docs/WINDOW_SIZE.md` and Decision 0088.
 
 ### Native session menus
 
@@ -504,6 +523,8 @@ its HTTPS text-fetch boundary.
 Protocol 1.20 adds no error code; its window-focus request reuses the existing
 safe `window.unavailable` and `window.busy` categories.
 Protocol 1.21 adds no error code; its fullscreen request reuses the same safe
+`window.unavailable` and `window.busy` categories.
+Protocol 1.23 adds no error code; its client-size request reuses the same safe
 `window.unavailable` and `window.busy` categories.
 Protocol 1.22 adds `file.binary_too_large`; malformed binary encodings reuse
 the existing `request.payload_invalid` category.

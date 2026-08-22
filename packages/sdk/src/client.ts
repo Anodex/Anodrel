@@ -115,6 +115,20 @@ export class PlatformClient {
   }
 
   /**
+   * Requests one bounded logical client size for this session's own window.
+   *
+   * Width and height are whole 96-DPI client-area pixels. The host alone maps
+   * them to its framed window at the current DPI; there is no target, position,
+   * monitor, geometry readback, resize event, or native handle.
+   */
+  setWindowSize(
+    width: number,
+    height: number,
+  ): Promise<ResultFor<"window.size.set">> {
+    return this.request("window.size.set", { width, height });
+  }
+
+  /**
    * Replaces this session's complete native menu bar.
    *
    * Items are semantic display commands only. The host owns every native menu
