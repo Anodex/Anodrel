@@ -22,6 +22,8 @@ mod mailbox;
 mod revision;
 mod session;
 mod snapshot;
+mod window_group;
+mod window_id;
 mod windows;
 
 pub use error::UiSessionError;
@@ -37,9 +39,13 @@ pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;
 pub use session::UiDocumentSession;
 pub use snapshot::UiDocumentSnapshot;
+pub use window_group::{
+    UI_WINDOW_OPEN_RESPONSE_TIMEOUT, UiWindowGroup, UiWindowGroupError, UiWindowOpenRequest,
+};
+pub use window_id::{MAX_SECONDARY_WINDOW_IDENTITIES, UiWindowId, UiWindowIdError};
 pub use windows::{
-    MAX_SECONDARY_WINDOW_IDENTITIES, MAX_SESSION_WINDOWS, PendingUiWindow, UiWindowId,
-    UiWindowIdError, UiWindowResources, UiWindowSessionError, UiWindowSessions, UiWindowSnapshot,
+    MAX_SESSION_WINDOWS, PendingUiWindow, UiWindowResources, UiWindowSessionError,
+    UiWindowSessions, UiWindowSnapshot,
 };
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 # Anodrel session-owned multi-window contract
 
-**Status:** Specified and under implementation. The existing direct Windows
-host can create and route several native windows, but no released protocol
-version yet lets an application create one. This contract defines the bounded
-session model that must be implemented before that public capability is
-advertised.
+**Status:** The portable session-owned state and worker-to-UI creation handoff
+are implemented. The direct Windows host can already create and route several
+native windows, but its session-group integration and the Protocol 1.25 public
+surface are still under implementation. No released protocol version yet lets
+an application create one.
 
 ## Purpose
 
@@ -95,6 +95,23 @@ field, and file services keep their primary-view-only semantics until each has
 its own separately reviewed multi-view operation. A secondary view initially
 receives document rendering, local semantic input, and Windows accessibility
 only; it does not inherit a generic native service bridge.
+
+## Portable creation handoff
+
+Before the host exposes Protocol 1.25, its portable UI-session group validates
+the proposed initial document and reserves one secondary identity. It sends
+the host-created context, revision-one snapshot, document mailbox, and input
+mailbox through one take-once request for the owning UI thread. The caller
+receives the logical identity only after that UI thread reports successful
+native creation and registration.
+
+At most one creation request is in flight for a group. It waits no more than
+five seconds for the UI thread. A failed or timed-out request rolls its pending
+logical view back; a late completion is rejected so the native host can destroy
+the just-created window. This coordination contains no native handle or
+application-chosen native setting, and it does not itself release a tracked
+product child. Windows integration must retain that child until the final view
+leaves.
 
 ## Security and compatibility rules
 

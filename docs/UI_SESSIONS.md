@@ -1,9 +1,10 @@
 # Anodrel UI session state v1
 
 **Status:** Foundation contract. `anodrel-ui-session` owns in-memory document
-replacement, revision-bound semantic-event validation, and a bounded input
-mailbox. It has no transport, native host, renderer, package, application
-identity, or operating-system authority.
+replacement, revision-bound semantic-event validation, bounded input mailboxes,
+and the portable coordination state for a session-owned view group. It has no
+transport, native host, renderer, package, application identity, or
+operating-system authority.
 
 ## Purpose and boundary
 
@@ -72,34 +73,51 @@ this becomes a broader interactive application surface.
 
 ## Session-owned view groups
 
-Decision 0092 extends the **future** session model from one document to a
-bounded group of independently revised views. The existing `UiDocumentSession`
-remains the current single-view primitive; it is not widened with an ambient
-window target. The portable group layer owns a `main` primary view and at most
-three secondary logical views, each with its own document state, coalescing
-mailbox, and bounded input queue. It has no native window, transport, or
-application identity.
+Decision 0092 extends the session model from one document to a bounded group
+of independently revised views. The existing `UiDocumentSession` remains the
+single-view primitive; it is not widened with an ambient window target. The
+portable `UiWindowGroup` layer owns a `main` primary view and at most three
+secondary logical views, each with its own document state, coalescing mailbox,
+and bounded input queue. It has no native window, transport, or application
+identity.
 
 This keeps a revision number meaningful only together with its owning logical
 view. A revision-one action from `window-1` can never be accepted against a
 revision-one document in `window-2`. The current targetless authenticated
 operations still mean the primary view. The reserved Protocol 1.25 operations
 in `docs/MULTI_WINDOW.md` will add explicit view identity rather than changing
-those operations' meaning.
+those operations' meaning. They remain unavailable until their protocol, host,
+and compatibility work land together.
+
+### Native-creation handoff
+
+A worker asks `UiWindowGroup` to open a validated secondary document together
+with host-created context. The group admits only one such request at a time.
+The owning UI thread can take that request exactly once, create and register
+its native window, then complete it. Only a successful completion commits the
+logical view and publishes its first document snapshot. A failed creation, or
+a five-second unanswered request, aborts the pending view and leaves no
+identity or mailbox routable. If a native host finishes after that timeout,
+completion reports failure and the host must destroy its late-created window.
+
+This is an internal portable handoff, not a native-window abstraction: the
+context contains no application-selected handle or topology data, and the UI
+thread remains the only code that can create or destroy an operating-system
+window.
 
 ## Latest-document delivery
 
-`UiDocumentMailbox` is a portable, per-session handoff for a host that must
-move an already accepted document from a transport worker to another host
-thread. It retains at most one immutable `UiDocumentSnapshot`: the latest
-document and its revision. Publishing a newer snapshot replaces an older
-pending snapshot; publishing an older revision has no effect. Taking a snapshot
-clears that one pending value.
+`UiDocumentMailbox` is a portable, per-view handoff for a host that must move
+an already accepted document from a transport worker to another host thread. It
+retains at most one immutable `UiDocumentSnapshot`: the latest document and
+its revision. Publishing a newer snapshot replaces an older pending snapshot;
+publishing an older revision has no effect. Taking a snapshot clears that one
+pending value.
 
 The mailbox has no I/O, timer, callback, application identity, renderer,
 protocol event, or operating-system operation. It deliberately coalesces visual
 updates rather than promising every intermediate frame. A host must create one
-mailbox for one authenticated session and define how a native window is
+mailbox for each session-owned view and define how that view's native window is
 notified or polls it. It must never use the mailbox for semantic action events.
 
 The Windows UI Session Lab is the first consumer. It polls one explicitly
@@ -111,15 +129,17 @@ launch path. See `docs/UI_SESSION_LAB.md` and Decision 0058.
 
 ## Semantic input delivery
 
-`UiInputMailbox` is one shared per-session queue of at most 32 raw semantic
-interaction candidates. A document producer can add only the document revision
-and an `ActionInvoked` element ID that it derived from its own current layout.
-On Windows, an enabled UI Automation button may offer that exact same candidate
-through its bounded Invoke pattern (Decision 0069). A future native menu
-producer can add only its current menu revision and a host-mapped semantic
-action ID. The queue preserves insertion order across both kinds and has no
-window target, native command identifier, data payload, callback, or operating
-system call.
+`UiInputMailbox` is one shared queue of at most 32 raw semantic interaction
+candidates for one session-owned view. The legacy primary view's queue carries
+document and menu candidates; each secondary view has a separate queue and
+does not inherit the native menu route. A document producer can add only the
+document revision and an `ActionInvoked` element ID that it derived from its
+own current layout. On Windows, an enabled UI Automation button may offer that
+exact same candidate through its bounded Invoke pattern (Decision 0069). A
+future native menu producer can add only its current menu revision and a
+host-mapped semantic action ID. The queue preserves insertion order across both
+kinds and has no window target, native command identifier, data payload,
+callback, or operating-system call.
 
 `ui.events.read` drains that queue through the authenticated transport. The
 core revalidates document candidates through `UiDocumentSession::accept_event`
@@ -134,5 +154,7 @@ an event subscription, callback, or background queue.
 
 The crate tests successful replacement, deterministic revisions, failed-update
 state preservation, clear behavior, stale events, removed actions, disabled
-actions, semantic event identity, and ordered document/menu queue admission.
-It depends only on Anodrel UI/menu crates and the Rust standard library.
+actions, semantic event identity, ordered document/menu queue admission,
+canonical view identities, independent per-view revisions, bounded group size,
+failed creation rollback, and the worker-to-UI-thread creation timeout. It
+depends only on Anodrel UI/menu crates and the Rust standard library.
