@@ -132,6 +132,13 @@ fn generated_menu_project_completes_one_fixed_authenticated_menu_session() {
         request.model().menus()[0].items()[0].id().as_str(),
         MENU_ACTION
     );
+    assert_eq!(
+        request.model().menus()[0].items()[0]
+            .shortcut()
+            .expect("generated menu action declares its fixed local shortcut")
+            .display_text(),
+        "Ctrl+Shift+M"
+    );
     assert!(menu_mailbox.complete(request.id()));
     input_mailbox.push(MenuInputCandidate::new(
         request.revision(),

@@ -38,16 +38,18 @@ It grants exactly:
 
 The host does not receive any project-supplied capability, application ID,
 session ID, window title, native menu handle, command number, shortcut, or
-callback. The generated executable is still explicitly selected unverified
+callback. Decision 0090 later adds one fixed canonical shortcut to the
+generated source without making it generator input. The generated executable is
+still explicitly selected unverified
 development code, not a package, product launcher, installed record, or signed
 application.
 
 Extend the preview `anodrel-ui-client` facade with a closed menu surface:
 
-- `replace_menu_v1` accepts one exact bounded Protocol 1.18 menu-model JSON
-  value, validates it locally, sends only `menu.replace` at Protocol 1.18, and
-  returns a validated nonzero `MenuRevision`;
-- `read_events` sends only `ui.events.read` at Protocol 1.18 and returns a
+- `replace_menu_v1` accepts one exact bounded menu-model JSON value, validates
+  it locally, sends only `menu.replace` at Protocol 1.24, and returns a
+  validated nonzero `MenuRevision`;
+- `read_events` sends only `ui.events.read` at Protocol 1.24 and returns a
   bounded ordered batch of typed document actions and typed menu actions; and
 - the existing `read_actions` stays document-only and fails closed if a menu
   event appears, so an older client cannot silently discard a menu action.
@@ -73,7 +75,8 @@ through `ui.events.read`, then requests close of its own session.
 ## Revisit conditions
 
 Revisit before adding menu capabilities to the default template, accepting a
-capability list, exposing native menu or window identifiers, adding shortcuts,
-submenus, context or system menus, command payloads, concurrent event readers,
-another operating-system adapter, packaging, or production executable identity.
-Each changes either the capability or launch boundary.
+capability list, exposing native menu or window identifiers, adding a
+caller-selected shortcut, submenus, context or system menus, command payloads,
+concurrent event readers, another operating-system adapter, packaging, or
+production executable identity. Each changes either the capability or launch
+boundary.

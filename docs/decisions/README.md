@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0090: Development native menu templates use one fixed canonical shortcut.
+
 - 0089: Session menu shortcuts are local, canonical, and semantic.
 
 - 0088: Session window size is client-area only.

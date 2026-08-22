@@ -2,9 +2,9 @@
 
 **Status:** The portable typed menu facade, constrained generator, fixed
 Windows host route, and real authenticated generated-child session test are
-implemented and verified. The documented manual menu click remains pending.
-This is a Windows development template, not a product packaging or
-application-identity format.
+implemented and verified. The documented manual activation checks—a menu click
+and its fixed local shortcut—remain pending. This is a Windows development
+template, not a product packaging or application-identity format.
 
 ## Purpose
 
@@ -39,8 +39,9 @@ title, window setting, or menu source path.
 
 The generated source contains one fixed v1 document and one fixed v1 menu
 model. Its menu has a single enabled semantic command,
-`template.menu.complete`. It will not read a document or menu from an argument,
-file, environment variable, URL, network connection, or native resource.
+`template.menu.complete`, with the fixed `Ctrl+Shift+M` local shortcut. It
+will not read a document or menu from an argument, file, environment variable,
+URL, network connection, or native resource.
 
 ## Typed client contract
 
@@ -48,8 +49,8 @@ file, environment variable, URL, network connection, or native resource.
 
 | Method | Input | Typed result | Protocol | Required grant |
 | --- | --- | --- | --- | --- |
-| `replace_menu_v1` | one strict complete menu-model JSON string | `MenuRevision` | 1.18 | `menu.write` |
-| `read_events` | none | `UiEventBatch` | 1.18 | `ui.events.read` |
+| `replace_menu_v1` | one strict complete menu-model JSON string | `MenuRevision` | 1.24 | `menu.write` |
+| `read_events` | none | `UiEventBatch` | 1.24 | `ui.events.read` |
 
 `MenuRevision` parses only a canonical nonzero decimal string. `UiEventBatch`
 contains no more than 32 events and the existing bounded `dropped` and
@@ -66,7 +67,8 @@ native menu, creates a window, installs a callback, or starts another process.
 
 The menu model and event shape are already fixed by `docs/MENUS.md`. The client
 uses the existing 16 KiB model limit, exact object fields, bounded labels,
-and semantic action grammar.
+semantic action grammar, and the Protocol 1.24 optional canonical shortcut
+field. The generator exposes no way to alter or add that fixed shortcut.
 
 ## Development host session
 
@@ -95,8 +97,9 @@ On Windows, double-click `start-menu-template.bat` in the repository root. It
 creates a uniquely named temporary project, builds it from the local checkout,
 and opens the generated executable through the fixed menu-template route. In
 the **Anodrel Native Menu Template** window, choose **File > Complete menu
-template session**. A successful close prints a completion message and leaves
-the disposable source project in the temporary directory it reports.
+template session** once, then run it again and press **Ctrl+Shift+M** once. A
+successful close prints a completion message and leaves the disposable source
+project in the temporary directory it reports.
 
 The helper creates no certificate, package, installer, application record, or
 machine policy. It is a convenience for this one development check; it does not
@@ -105,15 +108,16 @@ run a generated executable directly or turn it into a product application.
 ## Compatibility and verification
 
 This work adds no new wire frame or core protocol operation. `menu.replace`
-and `menu.action.invoked` are existing Protocol 1.18 values. Typed-facade unit
-tests now prove local menu-model validation, request versioning, revision
-parsing, menu-event parsing, and document-only failure when a menu event
-arrives. The generator's real-pipe integration test builds a generated
-executable, delivers an invitation, accepts its fixed menu through the host
-mailbox, supplies only its fixed semantic menu action, then verifies self-close
-and clean exit. The Windows host's fixed-grant lifecycle also has a unit test.
-Remaining proof is the documented manual click of **Complete menu template
-session** from the Windows menu bar.
+and `menu.action.invoked` are existing Protocol 1.18 values; the generated
+model uses the Protocol 1.24 shortcut field. Typed-facade unit tests now prove
+local menu-model validation, request versioning, revision parsing, menu-event
+parsing, and document-only failure when a menu event arrives. The generator's
+real-pipe integration test builds a generated executable, delivers an
+invitation, accepts its fixed shortcut-bearing menu through the host mailbox,
+supplies only its fixed semantic menu action, then verifies self-close and
+clean exit. The Windows host's fixed-grant lifecycle also has a unit test.
+Remaining proof is the documented manual click and **Ctrl+Shift+M** activation
+of **Complete menu template session** on a Windows desktop.
 
-No implementation may claim manual menu verification until that last action is
-observed on a Windows desktop. See Decision 0083.
+No implementation may claim manual menu verification until both activation
+paths are observed on a Windows desktop. See Decisions 0083 and 0090.

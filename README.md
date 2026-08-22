@@ -392,9 +392,9 @@ software, and an unoptimised build cannot hold its frame rate.
 
 Double-click `start-menu-template.bat` to build a temporary first-party native
 menu template and open it through its fixed Windows development route. Choose
-**File > Complete menu template session** to exercise the direct User32 menu,
-typed event delivery, and clean session shutdown without Node.js, a webview, or
-machine policy changes.
+**File > Complete menu template session** or press **Ctrl+Shift+M** to exercise
+the direct User32 menu, typed event delivery, and clean session shutdown
+without Node.js, a webview, or machine policy changes.
 
 Double-click `start-network-diagnostic.bat` to build and run the no-window
 native HTTPS diagnostic. It tests the complete direct WinHTTP path only against

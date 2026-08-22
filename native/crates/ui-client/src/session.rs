@@ -13,8 +13,8 @@ use crate::{
 
 /// The smallest protocol version that provides every typed UI-session operation.
 const UI_DOCUMENT_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(3);
-/// The first protocol version that provides bounded native session menus.
-const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(18);
+/// The first protocol version that also carries canonical local menu shortcuts.
+const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(24);
 /// The operation-level document input limit inside one Wire v1 message.
 const MAX_SESSION_DOCUMENT_BYTES: usize = 24 * 1024;
 /// The initial request sequence. Zero remains unavailable as an internal guard.
@@ -100,7 +100,7 @@ where
     ///
     /// Unlike [`Self::read_actions`], this method accepts both document and
     /// native-menu events and therefore requires a host compatible with
-    /// Protocol 1.18.
+    /// Protocol 1.24.
     pub fn read_events(&mut self) -> Result<UiEventBatch, UiClientError> {
         self.request(
             UI_MENU_PROTOCOL,

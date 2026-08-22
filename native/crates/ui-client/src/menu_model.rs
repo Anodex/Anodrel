@@ -1,7 +1,7 @@
 //! Local strict validation for one `menu.replace` model.
 
 use anodrel_json::JsonValue;
-use anodrel_menu::{Menu, MenuAction, MenuActionId, MenuModel, MenuText};
+use anodrel_menu::{Menu, MenuAction, MenuActionId, MenuModel, MenuShortcut, MenuText};
 
 use crate::UiClientError;
 
@@ -46,13 +46,28 @@ fn decode_menu(value: &JsonValue) -> Result<Menu, UiClientError> {
 }
 
 fn decode_action(value: &JsonValue) -> Result<MenuAction, UiClientError> {
-    let fields = exact_object(value, &["id", "label", "enabled"])?;
+    let fields = value.as_object().ok_or(UiClientError::MenuInvalid)?;
+    let has_shortcut = fields.contains_key("shortcut");
+    if fields.len() != 3 + usize::from(has_shortcut)
+        || ["id", "label", "enabled"]
+            .iter()
+            .any(|name| !fields.contains_key(*name))
+    {
+        return Err(UiClientError::MenuInvalid);
+    }
     let id = MenuActionId::new(string(fields, "id")?).map_err(|_| UiClientError::MenuInvalid)?;
     let label = MenuText::new(string(fields, "label")?).map_err(|_| UiClientError::MenuInvalid)?;
     let JsonValue::Bool(enabled) = field(fields, "enabled")? else {
         return Err(UiClientError::MenuInvalid);
     };
-    Ok(MenuAction::new(id, label, *enabled))
+    let action = MenuAction::new(id, label, *enabled);
+    match fields.get("shortcut") {
+        Some(JsonValue::String(shortcut)) => MenuShortcut::parse(shortcut)
+            .map(|shortcut| action.with_shortcut(shortcut))
+            .map_err(|_| UiClientError::MenuInvalid),
+        Some(_) => Err(UiClientError::MenuInvalid),
+        None => Ok(action),
+    }
 }
 
 fn exact_object<'a>(
@@ -87,7 +102,7 @@ mod tests {
     use super::{MAX_MENU_MODEL_BYTES, decode_menu_model};
     use crate::UiClientError;
 
-    const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete","enabled":true}]}]}"#;
+    const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete","enabled":true,"shortcut":"Ctrl+Shift+M"}]}]}"#;
 
     #[test]
     fn accepts_only_one_strict_bounded_complete_menu_model() {
@@ -97,6 +112,9 @@ mod tests {
             r#"{"menus":[]}"#,
             r#"{"menus":[{"label":"File","items":[{"id":"complete","label":"Complete","enabled":true,"extra":false}]}]}"#,
             r#"{"menus":[{"label":"File","items":[{"id":"complete","label":"Complete","enabled":"true"}]}]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"complete","label":"Complete","enabled":true,"shortcut":"Ctrl+m"}]}]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"complete","label":"Complete","enabled":true,"shortcut":true}]}]}"#,
+            r#"{"menus":[{"label":"File","items":[{"id":"complete.primary","label":"Primary","enabled":true,"shortcut":"Ctrl+M"},{"id":"complete.secondary","label":"Secondary","enabled":false,"shortcut":"Ctrl+M"}]}]}"#,
         ] {
             assert_eq!(decode_menu_model(invalid), Err(UiClientError::MenuInvalid));
         }

@@ -22,7 +22,7 @@ if errorlevel 1 (
 )
 
 echo Building and starting the Anodrel native menu template...
-echo The first build takes a moment; then choose File ^> Complete menu template session.
+echo The first build takes a moment; then choose File ^> Complete menu template session or press Ctrl+Shift+M.
 
 cargo run --release --manifest-path native\Cargo.toml -p anodrel-native-app-tool -- init-menu "%ANODREL_TEMPLATE%" anodrel-native-menu-template "Anodrel Native Menu Template"
 set "ANODREL_EXIT=%ERRORLEVEL%"

@@ -15,7 +15,7 @@ const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.ui-client-test";
 const SESSION_ID: &str = "ui-client-test-session";
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"action","label":"Complete","fontSize":16,"enabled":true,"tone":"accent"}}"#;
-const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete menu template session","enabled":true}]}]}"#;
+const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete menu template session","enabled":true,"shortcut":"Ctrl+Shift+M"}]}]}"#;
 
 type WriteLog = Arc<Mutex<Vec<Vec<u8>>>>;
 
@@ -122,7 +122,7 @@ fn the_typed_session_uses_only_its_three_documented_operations() {
 }
 
 #[test]
-fn native_menu_session_uses_the_fixed_protocol_1_18_surface() {
+fn native_menu_session_uses_the_fixed_protocol_1_24_surface() {
     let (mut session, written) = session_with_responses([
         response("anodrel-ui-1", r#"{"revision":"1"}"#),
         response("anodrel-ui-2", r#"{"revision":"1"}"#),
@@ -163,7 +163,7 @@ fn native_menu_session_uses_the_fixed_protocol_1_18_surface() {
         .skip(1)
         .map(|message| request_protocol_minor(message))
         .collect::<Vec<_>>();
-    assert_eq!(minors, [Some(3), Some(18), Some(18), Some(3)]);
+    assert_eq!(minors, [Some(3), Some(24), Some(24), Some(3)]);
     let menu_request = JsonValue::parse(&messages[2]).expect("menu request is JSON");
     assert_eq!(
         menu_request
