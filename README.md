@@ -355,15 +355,17 @@ a real focus move, raises one host-only `ChildrenInvalidated` structure event
 after an accepted document replacement, and exposes read-only current field
 values. The first visible overflowing native scroll group now exposes one
 host-owned vertical ScrollPattern through the same retained offset as pointer,
-wheel, and keyboard input; no application can observe or control its position.
-Manual
+wheel, and keyboard input. Its bounded descendants expose the companion
+ScrollItem pattern, so an assistive technology can reveal an off-screen item
+through that same host-only route; no application can observe or control its
+position. Manual
 screen-reader activation, focus control and event, field-value,
 structure-event, and scrolling verification remain open. Automation editing,
 text ranges, Invoke/property/value/text/
 selection events, live announcements, and every other pattern remain absent.
 See `docs/UI_AUTOMATION_FOCUS.md`, `docs/UI_AUTOMATION_EVENTS.md`,
-`docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`, and
-`docs/UI_AUTOMATION_SCROLL.md`.
+`docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`, `docs/UI_AUTOMATION_SCROLL.md`, and
+`docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary, direct

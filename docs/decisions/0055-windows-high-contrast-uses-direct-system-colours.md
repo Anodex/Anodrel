@@ -7,7 +7,7 @@
 ## Context
 
 The portable Anodrel UI foundation has semantic appearance roles, focus, and a
-visible accessibility snapshot, but direct software-rendered Windows surfaces
+bounded accessibility snapshot, but direct software-rendered Windows surfaces
 previously always used the authored Anodrel palette. A user who enables Windows
 high contrast needs a host-selected accessible colour mapping. Shipping a theme
 framework or allowing application documents to select native colours would

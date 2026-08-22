@@ -5,6 +5,8 @@
 //! clicked action ID back into the same host-owned screen. No UI event opens a
 //! process, reads a file, sends a protocol message, or grants a capability.
 
+use std::collections::BTreeSet;
+
 use anodrel_brand::palette;
 use anodrel_canvas::{Canvas, Color, Paint, Point, Rect, point};
 use anodrel_ui::{
@@ -57,6 +59,59 @@ fn find_field<'a>(node: &'a UiNode, id: &ElementId) -> Option<&'a Field> {
     }
 }
 
+/// Collects the semantic children whose nearest scroll ancestor is `selected`.
+///
+/// The walk stays inside the host because a UI Automation provider must never
+/// infer scroll ownership from control types, geometry, or application data.
+/// A nested viewport is itself a child of its outer viewport, but its contents
+/// belong to the nested context and remain outside this first route.
+fn collect_scroll_item_ids(
+    node: &UiNode,
+    nearest_scroll: Option<ElementId>,
+    selected: &ElementId,
+    laid_out: &BTreeSet<ElementId>,
+    output: &mut Vec<ElementId>,
+) {
+    if nearest_scroll.as_ref() == Some(selected) && laid_out.contains(node.id()) {
+        output.push(node.id().clone());
+    }
+    match node {
+        UiNode::Stack(stack) => {
+            for child in stack.children() {
+                collect_scroll_item_ids(child, nearest_scroll.clone(), selected, laid_out, output);
+            }
+        }
+        UiNode::Scroll(scroll) => collect_scroll_item_ids(
+            scroll.child(),
+            Some(scroll.id().clone()),
+            selected,
+            laid_out,
+            output,
+        ),
+        UiNode::Text(_) | UiNode::Action(_) | UiNode::Field(_) => {}
+    }
+}
+
+/// Calculates the existing retained offset needed to reveal an item.
+///
+/// Coordinates are from the current layout, so the item's paint rectangle has
+/// already moved by the current retained offset. This calculation only chooses
+/// a candidate; [`UiScrollState::scroll_to`] remains the finite clamp.
+fn scroll_into_view_offset(viewport: UiRect, item: UiRect, current_offset: f32) -> Option<f32> {
+    if viewport.is_empty() || item.is_empty() || !current_offset.is_finite() {
+        return None;
+    }
+    let displacement = if item.height() >= viewport.height() || item.top < viewport.top {
+        item.top - viewport.top
+    } else if item.bottom > viewport.bottom {
+        item.bottom - viewport.bottom
+    } else {
+        0.0
+    };
+    let requested = current_offset + displacement;
+    requested.is_finite().then_some(requested)
+}
+
 /// Host-owned state for the UI Lab view.
 #[derive(Clone)]
 pub(super) struct UiLab {
@@ -105,8 +160,8 @@ pub(super) struct AccessibilityFocusResult {
 
 /// The local result of one UI Automation scroll request.
 ///
-/// An accepted request can be at its existing limit. That remains a truthful
-/// ScrollPattern success without a repaint.
+/// An accepted request can already be at its requested position. That remains
+/// a truthful UI Automation success without a repaint.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct AccessibilityScrollResult {
     pub(super) accepted: bool,
@@ -248,7 +303,10 @@ impl UiLab {
         let focused = self.focus.focused()?;
         let layout = self.layout(width, height);
         layout.items().iter().find(|item| {
-            item.id() == focused && item.kind() == UiLayoutKind::Field && item.enabled()
+            item.id() == focused
+                && item.kind() == UiLayoutKind::Field
+                && item.enabled()
+                && !item.bounds().is_empty()
         })?;
         find_field(self.document.root(), focused).cloned()
     }
@@ -582,6 +640,20 @@ impl UiLab {
         )
     }
 
+    /// Returns the immutable semantic descendants eligible for ScrollItem.
+    ///
+    /// This uses the same current layout and first-visible-overflow selection
+    /// as the published ScrollPattern. Fully clipped items remain eligible so
+    /// accessibility navigation can request their reveal; local focus and
+    /// input continue to reject their empty clipped rectangles.
+    pub(super) fn accessibility_scroll_items(&self, width: f32, height: f32) -> Vec<ElementId> {
+        let layout = self.layout(width, height);
+        let Some(metrics) = Self::first_overflowing_scroll_metric(&layout) else {
+            return Vec::new();
+        };
+        self.scroll_item_ids_in_layout(&layout, metrics.id())
+    }
+
     /// Binds one immutable provider snapshot to this view's scroll route.
     pub(super) fn accessibility_scroll_route(
         &self,
@@ -677,30 +749,87 @@ impl UiLab {
         if metrics.id() != target {
             return None;
         }
-        let state = self.scroll_offsets.entry(metrics.id().clone()).or_default();
         let changed = match command {
-            UiAutomationScrollCommand::Line { forward } => {
-                state.scroll_line(forward, metrics.viewport_height(), metrics.content_height())
-            }
-            UiAutomationScrollCommand::Page { forward } => {
-                state.scroll_page(forward, metrics.viewport_height(), metrics.content_height())
-            }
+            UiAutomationScrollCommand::Line { forward } => self
+                .scroll_offsets
+                .entry(metrics.id().clone())
+                .or_default()
+                .scroll_line(forward, metrics.viewport_height(), metrics.content_height()),
+            UiAutomationScrollCommand::Page { forward } => self
+                .scroll_offsets
+                .entry(metrics.id().clone())
+                .or_default()
+                .scroll_page(forward, metrics.viewport_height(), metrics.content_height()),
             UiAutomationScrollCommand::Percent { percent } => {
                 let maximum = UiScrollState::maximum_offset(
                     metrics.viewport_height(),
                     metrics.content_height(),
                 );
-                state.scroll_to(
-                    maximum * (percent / 100.0) as f32,
-                    metrics.viewport_height(),
-                    metrics.content_height(),
-                )
+                self.scroll_offsets
+                    .entry(metrics.id().clone())
+                    .or_default()
+                    .scroll_to(
+                        maximum * (percent / 100.0) as f32,
+                        metrics.viewport_height(),
+                        metrics.content_height(),
+                    )
+            }
+            UiAutomationScrollCommand::ScrollIntoView { item } => {
+                self.scroll_item_into_view(&layout, &metrics, target, &item)?
             }
         };
         if changed {
             self.hovered = None;
         }
         Some(changed)
+    }
+
+    fn scroll_item_into_view(
+        &mut self,
+        layout: &UiLayout,
+        metrics: &anodrel_ui::UiScrollMetrics,
+        viewport: &ElementId,
+        item: &ElementId,
+    ) -> Option<bool> {
+        if !self
+            .scroll_item_ids_in_layout(layout, viewport)
+            .contains(item)
+        {
+            return None;
+        }
+        let viewport_bounds = layout.bounds(viewport)?;
+        let item_bounds = layout
+            .items()
+            .iter()
+            .find(|candidate| candidate.id() == item)?
+            .paint_bounds();
+        let current_offset = self
+            .scroll_offsets
+            .get(metrics.id())
+            .copied()
+            .map_or(0.0, UiScrollState::offset_y);
+        let requested = scroll_into_view_offset(viewport_bounds, item_bounds, current_offset)?;
+        Some(
+            self.scroll_offsets
+                .entry(metrics.id().clone())
+                .or_default()
+                .scroll_to(
+                    requested,
+                    metrics.viewport_height(),
+                    metrics.content_height(),
+                ),
+        )
+    }
+
+    fn scroll_item_ids_in_layout(&self, layout: &UiLayout, viewport: &ElementId) -> Vec<ElementId> {
+        let laid_out = layout
+            .items()
+            .iter()
+            .map(|item| item.id().clone())
+            .collect::<BTreeSet<_>>();
+        let mut items = Vec::new();
+        collect_scroll_item_ids(self.document.root(), None, viewport, &laid_out, &mut items);
+        items
     }
 
     fn layout(&self, width: f32, height: f32) -> UiLayout {
@@ -740,8 +869,11 @@ impl UiLab {
             .scroll_metrics()
             .iter()
             .find(|metrics| {
-                UiScrollState::maximum_offset(metrics.viewport_height(), metrics.content_height())
-                    > 0.0
+                layout.bounds(metrics.id()).is_some()
+                    && UiScrollState::maximum_offset(
+                        metrics.viewport_height(),
+                        metrics.content_height(),
+                    ) > 0.0
             })
             .cloned()
     }
@@ -917,6 +1049,12 @@ fn draw_node(
     let Some(item) = layout.items().iter().find(|item| item.id() == node.id()) else {
         return;
     };
+    // Layout retains a bounded semantic record for fully clipped nodes so the
+    // accessibility tree can navigate to them. Rendering must still avoid
+    // allocating or rasterizing work no viewport can display.
+    if item.bounds().is_empty() {
+        return;
+    }
     let bounds = item.paint_bounds();
     match node {
         UiNode::Stack(stack) => {
@@ -1706,6 +1844,93 @@ mod tests {
         assert_eq!(refreshed.vertical_scroll_percent(), 100.0);
         assert_eq!(lab.last_action, None);
         assert_eq!(lab.focus.focused(), None);
+    }
+
+    #[test]
+    fn accessibility_scroll_item_reveals_an_offscreen_semantic_child() {
+        let mut lab = UiLab::new();
+        let snapshot = lab
+            .accessibility_scroll_snapshot(BASE_WIDTH, BASE_HEIGHT)
+            .expect("the fixed Lab viewport overflows");
+        let target = id("ui.lab.scroll.exercise-9");
+        assert!(
+            lab.accessibility_scroll_items(BASE_WIDTH, BASE_HEIGHT)
+                .contains(&target),
+            "a bounded child of the selected viewport is published for ScrollItem"
+        );
+        assert!(
+            lab.layout(BASE_WIDTH, BASE_HEIGHT)
+                .bounds(&target)
+                .is_none(),
+            "the exercise starts fully clipped but stays in the semantic tree"
+        );
+
+        assert_eq!(
+            lab.scroll_accessibility_target(
+                BASE_WIDTH,
+                BASE_HEIGHT,
+                snapshot.target(),
+                UiAutomationScrollCommand::ScrollIntoView {
+                    item: target.clone(),
+                },
+            ),
+            Some(true)
+        );
+        let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+        let item = layout
+            .items()
+            .iter()
+            .find(|item| item.id() == &target)
+            .expect("the bounded semantic child remains laid out");
+        assert_eq!(layout.bounds(&target), Some(item.paint_bounds()));
+        assert!(lab.scroll_offsets[&id("ui.lab.viewport")].offset_y() > 0.0);
+        assert_eq!(lab.last_action, None);
+        assert_eq!(lab.focus.focused(), None);
+    }
+
+    #[test]
+    fn scroll_item_geometry_uses_nearest_edge_and_never_an_alignment_option() {
+        let viewport = UiRect::from_size(20.0, 40.0, 100.0, 60.0);
+        assert_eq!(
+            scroll_into_view_offset(viewport, UiRect::from_size(20.0, 120.0, 100.0, 20.0), 30.0,),
+            Some(70.0),
+            "a lower item aligns its bottom"
+        );
+        assert_eq!(
+            scroll_into_view_offset(viewport, UiRect::from_size(20.0, 10.0, 100.0, 20.0), 30.0,),
+            Some(0.0),
+            "an upper item aligns its top"
+        );
+        assert_eq!(
+            scroll_into_view_offset(viewport, UiRect::from_size(20.0, 60.0, 100.0, 100.0), 30.0,),
+            Some(50.0),
+            "an oversized item aligns its top"
+        );
+        assert_eq!(
+            scroll_into_view_offset(viewport, UiRect::from_size(20.0, 50.0, 100.0, 20.0), 30.0,),
+            Some(30.0),
+            "a wholly visible item leaves the offset alone"
+        );
+        assert_eq!(
+            scroll_into_view_offset(viewport, UiRect::default(), 30.0),
+            None,
+            "missing geometry cannot become an implicit scroll target"
+        );
+    }
+
+    #[test]
+    fn scroll_item_excludes_a_nested_viewports_contents() {
+        let document = anodrel_ui_document::decode_v2(
+            r#"{"format":"anodrel.ui.document.v2","root":{"id":"outer","kind":"scroll","child":{"id":"outer-content","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":0,"surfaceTone":"plain","children":[{"id":"before","kind":"action","label":"Before","fontSize":16,"enabled":true,"tone":"accent"},{"id":"inner","kind":"scroll","child":{"id":"inner-content","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":0,"surfaceTone":"plain","children":[{"id":"inside","kind":"action","label":"Inside","fontSize":16,"enabled":true,"tone":"accent"}]}},{"id":"after","kind":"action","label":"After","fontSize":16,"enabled":true,"tone":"accent"}]}}}"#,
+        )
+        .expect("the nested scroll fixture is valid");
+        let lab = UiLab::from_document_with_status(document, None);
+        let ids = lab
+            .accessibility_scroll_items(200.0, 40.0)
+            .into_iter()
+            .map(|id| id.as_str().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, ["outer-content", "before", "inner", "after"]);
     }
 
     #[test]

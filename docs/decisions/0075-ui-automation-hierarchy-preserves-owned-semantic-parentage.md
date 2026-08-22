@@ -1,6 +1,6 @@
 # Decision 0075: UI Automation hierarchy preserves owned semantic parentage
 
-**Status:** Accepted
+**Status:** Accepted; extended by Decision 0098
 
 **Date:** 2026-08-21
 
@@ -19,17 +19,18 @@ document already owns the only structure Anodrel can truthfully publish.
 
 ## Decision
 
-Each visible `UiAccessibilityNode` carries an optional parent source-order
-index. The root visible node has no parent; every other node names its direct,
-earlier visible ancestor. The snapshot remains a bounded, immutable preorder
+Each `UiAccessibilityNode` carries an optional parent source-order index. The
+root node has no parent; every other node names its direct, earlier semantic
+ancestor. The snapshot remains a bounded, immutable preorder
 walk of the validated document and concrete layout. It still carries only the
 existing ID, role, name, clipped bounds, and enabled flag, and it still makes no
 operating-system call.
 
 `anodrel-windows-accessibility` copies that direct parent index beside its
 otherwise pure UI Automation mapping. `anodrel-windows-uia` preserves every
-mapped node, including `Group`, and derives immutable parent and child lists
-once while it builds a provider tree. Fragment navigation then reports only
+mapped node, including a node whose clipped bounds are empty, and derives
+immutable parent and child lists once while it builds a provider tree. Fragment
+navigation then reports only
 direct `Parent`, `FirstChild`, `LastChild`, `NextSibling`, and
 `PreviousSibling` relationships. The window root owns the top-level nodes;
 Windows owns the window root's parent.

@@ -84,7 +84,11 @@ impl UiScrollMetrics {
     }
 }
 
-/// One visible element in source paint order.
+/// One semantic element in source paint order.
+///
+/// A clipped element stays in the layout with empty [`Self::bounds`], so an
+/// accessibility adapter can preserve bounded document navigation without
+/// making that element hit-testable or focusable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UiLayoutItem {
     id: ElementId,
@@ -149,7 +153,7 @@ impl UiEvent {
     }
 }
 
-/// The visible result of a deterministic document layout pass.
+/// The bounded result of a deterministic document layout pass.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UiLayout {
     items: Vec<UiLayoutItem>,
@@ -157,13 +161,17 @@ pub struct UiLayout {
 }
 
 impl UiLayout {
-    /// Returns visible items in source paint order.
+    /// Returns every semantic item in source paint order.
+    ///
+    /// An item's [`UiLayoutItem::bounds`] can be empty when ancestor clipping
+    /// currently hides it. Input and rendering use that clipped rectangle;
+    /// accessibility navigation can retain the bounded semantic record.
     #[must_use]
     pub fn items(&self) -> &[UiLayoutItem] {
         &self.items
     }
 
-    /// Returns visible scroll viewport extents in source order.
+    /// Returns laid-out scroll viewport extents in source order.
     ///
     /// A host retains each viewport's [`UiScrollState`] separately, then uses
     /// these extents to clamp it after a layout or resize.
@@ -179,6 +187,7 @@ impl UiLayout {
             .iter()
             .find(|item| item.id == *id)
             .map(UiLayoutItem::bounds)
+            .filter(|bounds| !bounds.is_empty())
     }
 
     /// Returns the focusable item at a point, in reverse paint order.
@@ -222,9 +231,10 @@ impl UiDocument {
     /// Stacks and actions stretch across the available cross axis. Text wraps
     /// to that available width and takes the measured size of the lines it
     /// becomes, so a run that reflowed moves what follows it rather than
-    /// overlapping it. Every visible output item is clipped to each ancestor
-    /// stack content rectangle and the client rectangle. An empty or non-finite
-    /// client rectangle produces no items.
+    /// overlapping it. Every item retains its semantic record while its
+    /// clipped bounds describe the part visible through each ancestor stack
+    /// and the client rectangle. An empty or non-finite client rectangle
+    /// produces no items.
     #[must_use]
     pub fn layout(&self, client_bounds: UiRect, measurer: &dyn TextMeasurer) -> UiLayout {
         self.layout_with_scroll_offsets(client_bounds, measurer, &UiScrollOffsets::new())
@@ -279,9 +289,6 @@ fn layout_node(
     layout: &mut UiLayout,
 ) {
     let visible_bounds = bounds.intersect(clip);
-    if visible_bounds.is_empty() {
-        return;
-    }
 
     match node {
         UiNode::Stack(stack) => {
@@ -345,7 +352,7 @@ fn layout_stack_children(
 ) {
     let content = bounds.inset(stack.padding);
     let child_clip = clip.intersect(content);
-    if content.is_empty() || child_clip.is_empty() {
+    if content.is_empty() {
         return;
     }
 
@@ -843,7 +850,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_invalid_text_measurements() {
+    fn invalid_text_measurements_keep_an_empty_semantic_record() {
         struct InvalidMeasurer;
         impl TextMeasurer for InvalidMeasurer {
             fn measure(&self, _: &str, _: u16) -> UiSize {
@@ -852,12 +859,10 @@ mod tests {
         }
 
         let document = UiDocument::new(text("title", "Visible")).expect("document is valid");
-        assert!(
-            document
-                .layout(UiRect::from_size(0.0, 0.0, 100.0, 100.0), &InvalidMeasurer)
-                .items()
-                .is_empty()
-        );
+        let layout = document.layout(UiRect::from_size(0.0, 0.0, 100.0, 100.0), &InvalidMeasurer);
+        assert_eq!(layout.items().len(), 1);
+        assert!(layout.items()[0].bounds().is_empty());
+        assert!(layout.bounds(&id("title")).is_none());
     }
 
     #[test]

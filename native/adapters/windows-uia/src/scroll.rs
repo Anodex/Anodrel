@@ -18,7 +18,7 @@ use anodrel_ui_session::UiDocumentRevision;
 pub const UI_AUTOMATION_SCROLL_RESPONSE_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// One closed vertical movement command a provider may offer to its host.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UiAutomationScrollCommand {
     /// Moves by the host's standard local line amount.
     Line {
@@ -34,6 +34,14 @@ pub enum UiAutomationScrollCommand {
     Percent {
         /// The requested percentage.
         percent: f64,
+    },
+    /// Reveals one permitted semantic descendant of the selected viewport.
+    ///
+    /// The owner revalidates both this item and the enclosing viewport against
+    /// its current document and layout before it changes host-retained state.
+    ScrollIntoView {
+        /// The semantic item that should become visible.
+        item: ElementId,
     },
 }
 
@@ -147,8 +155,8 @@ impl UiAutomationScrollRequest {
 
     /// Returns the closed host command.
     #[must_use]
-    pub const fn command(&self) -> UiAutomationScrollCommand {
-        self.command
+    pub fn command(&self) -> UiAutomationScrollCommand {
+        self.command.clone()
     }
 }
 
@@ -447,11 +455,12 @@ mod tests {
         let mailbox = UiAutomationScrollMailbox::new();
         let worker = mailbox.clone();
         let command = UiAutomationScrollCommand::Page { forward: true };
+        let command_for_worker = command.clone();
         let waiting = thread::spawn(move || {
             worker.request_within(
                 Some(revision()),
                 id(),
-                command,
+                command_for_worker,
                 Duration::from_secs(1),
                 || true,
             )

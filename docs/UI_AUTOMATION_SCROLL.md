@@ -14,6 +14,10 @@ It uses the Windows UI Automation `ScrollPattern` / `IScrollProvider` interface.
 The platform supplies no browser, webview, toolkit, or third-party accessibility
 runtime.
 
+Decision 0098 adds the companion `ScrollItemPattern` for eligible descendants
+of this same target. Its separate contract is
+`docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
+
 ## Published target
 
 For one immutable accessibility publication, the only target is the first
@@ -79,7 +83,7 @@ contains only:
 
 - the provider's optional authenticated document revision;
 - the selected semantic scroll viewport ID; and
-- line, page, or percentage movement.
+- line, page, percentage, or separately validated item-reveal movement.
 
 The UI thread takes that request once, verifies its current document revision,
 rebuilds its current layout, and confirms the same ID is still the first
@@ -99,10 +103,11 @@ Neither direction crosses the application boundary:
 
 ## Explicitly deferred
 
-`IScrollItemProvider` and scroll-into-view, automation property-change events,
-horizontal movement, nested target arbitration, touch and kinetic movement,
-application-owned scroll state, persistence, and non-Windows adapters are
-outside this slice.
+Automation property-change events, horizontal movement, nested target
+arbitration, touch and kinetic movement, application-owned scroll state,
+persistence, and non-Windows adapters are outside this slice. Scroll-item
+reveal is specified separately by Decision 0098 so it cannot accidentally
+widen the direct ScrollPattern contract.
 
 ## Verification plan
 

@@ -4,6 +4,10 @@
 
 **Date:** 2026-08-21
 
+**Extension:** Decision 0098 adds host-owned `IScrollItemProvider` for eligible
+children of this same selected viewport. This record retains the direct
+ScrollPattern boundary.
+
 ## Context
 
 Decision 0096 gives the direct Windows UI Lab and authenticated session view one
@@ -59,10 +63,11 @@ released before a late UI thread can apply its command.
 
 The new scroll position remains host-local. It does not alter a document
 revision, focus, field state, semantic-action queue, protocol, capability,
-installed record, or application result. This slice does not add
-`IScrollItemProvider`, automation scroll events, nested arbitration, horizontal
-scrolling, touch/gesture input, application styling, persistence, or a
-non-Windows adapter.
+installed record, or application result. This slice does not add automation
+scroll events, nested arbitration, horizontal scrolling, touch/gesture input,
+application styling, persistence, or a non-Windows adapter. Decision 0098
+separately adds the companion no-alignment `IScrollItemProvider` route without
+widening any of those boundaries.
 
 ## Consequences
 
@@ -78,7 +83,7 @@ non-Windows adapter.
 
 ## Revisit conditions
 
-Revisit before adding `IScrollItemProvider` or scroll-into-view, scroll-position
-events, horizontal movement, another/nested automation target, touch or kinetic
-movement, application-facing scroll state or styling, a different UI Automation
-pattern, a native scrollbar control, or another operating-system adapter.
+Revisit before adding scroll-position events, horizontal movement, another or
+nested automation target, touch or kinetic movement, application-facing scroll
+state or styling, a different UI Automation pattern, a native scrollbar
+control, or another operating-system adapter.

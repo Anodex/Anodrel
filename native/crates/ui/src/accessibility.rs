@@ -1,10 +1,10 @@
-//! Portable accessibility semantics for a visible UI layout.
+//! Portable accessibility semantics for one bounded UI layout.
 
 use std::collections::BTreeMap;
 
 use crate::{Action, ElementId, Field, Text, UiDocument, UiLayout, UiNode, UiRect};
 
-/// The semantic role of a visible UI node.
+/// The semantic role of a UI node.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UiAccessibilityRole {
     /// A non-interactive container for related child nodes.
@@ -21,7 +21,7 @@ pub enum UiAccessibilityRole {
     Edit,
 }
 
-/// One accessible semantic element from a visible layout pass.
+/// One accessible semantic element from a layout pass.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UiAccessibilityNode {
     id: ElementId,
@@ -39,7 +39,7 @@ impl UiAccessibilityNode {
         &self.id
     }
 
-    /// Returns this node's direct visible parent's source-order index.
+    /// Returns this node's direct semantic parent's source-order index.
     ///
     /// `None` means this node belongs directly to the host-owned accessibility
     /// root. Every parent index is earlier than this node because snapshots are
@@ -61,7 +61,11 @@ impl UiAccessibilityNode {
         self.name.as_deref()
     }
 
-    /// Returns the layout's clipped visible bounds in logical pixels.
+    /// Returns the layout's clipped bounds in logical pixels.
+    ///
+    /// A wholly clipped node remains in the bounded tree with an empty
+    /// rectangle, allowing an operating-system adapter to navigate to it
+    /// without claiming that it is visible or locally interactive.
     #[must_use]
     pub const fn bounds(&self) -> UiRect {
         self.bounds
@@ -77,9 +81,9 @@ impl UiAccessibilityNode {
     }
 }
 
-/// A source-ordered preorder snapshot of the visible UI accessibility semantics.
+/// A source-ordered preorder snapshot of bounded UI accessibility semantics.
 ///
-/// Each node carries its direct visible parent's earlier source-order index, so
+/// Each node carries its direct semantic parent's earlier source-order index, so
 /// an operating-system adapter can preserve the document's declared hierarchy
 /// without inspecting pixels or a mutable host view.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -88,7 +92,7 @@ pub struct UiAccessibilitySnapshot {
 }
 
 impl UiAccessibilitySnapshot {
-    /// Returns visible semantic nodes in document source order.
+    /// Returns semantic nodes in document source order.
     #[must_use]
     pub fn nodes(&self) -> &[UiAccessibilityNode] {
         &self.nodes
@@ -96,11 +100,12 @@ impl UiAccessibilitySnapshot {
 }
 
 impl UiDocument {
-    /// Builds accessibility semantics for one specific visible layout pass.
+    /// Builds accessibility semantics for one specific layout pass.
     ///
-    /// Only nodes with non-empty clipped layout bounds are included. The
-    /// result contains no operating-system object, focus state, keyboard
-    /// navigation, live announcement, or action invocation mechanism.
+    /// Every bounded layout item remains in source order. A node whose clipped
+    /// bounds are empty is present with that empty rectangle, but this result
+    /// contains no operating-system object, focus state, keyboard navigation,
+    /// live announcement, or action invocation mechanism.
     #[must_use]
     pub fn accessibility_snapshot(&self, layout: &UiLayout) -> UiAccessibilitySnapshot {
         let visible_bounds = layout
@@ -244,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn excludes_fully_clipped_nodes() {
+    fn preserves_fully_clipped_nodes_with_empty_bounds() {
         let document = UiDocument::new(stack(vec![action("first", true), action("second", true)]))
             .expect("document is valid");
         let layout = document.layout(UiRect::from_size(0.0, 0.0, 200.0, 36.0), &FixedMeasurer);
@@ -255,6 +260,8 @@ mod tests {
             .map(|node| node.id().as_str())
             .collect::<Vec<_>>();
 
-        assert_eq!(ids, vec!["root", "first"]);
+        assert_eq!(ids, vec!["root", "first", "second"]);
+        assert!(snapshot.nodes()[2].bounds().is_empty());
+        assert_eq!(snapshot.nodes()[2].parent_index(), Some(0));
     }
 }

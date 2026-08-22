@@ -10,7 +10,7 @@ A scroll container is a portable vertical viewport with one child tree. It owns
 no input device, timer, native handle, callback, protocol operation, or
 application command. The host keeps its `UiScrollState` separately and supplies
 the current offset to `UiDocument::layout_with_scroll_offsets`. Layout returns
-one `UiScrollMetrics` record for each visible viewport so the host can clamp
+one `UiScrollMetrics` record for each laid-out viewport so the host can clamp
 its retained state after measuring the current viewport and content heights.
 
 ## Rules
@@ -19,8 +19,10 @@ its retained state after measuring the current viewport and content heights.
 - The child is measured at the viewport width and its full intrinsic height.
 - A valid offset is `0` through `contentHeight - viewportHeight`.
 - Layout translates only the child vertically by the clamped offset.
-- Hit testing, focus, and accessibility include only the child portions visible
-  through that viewport.
+- Hit testing and focus include only child portions visible through that
+  viewport. The bounded accessibility tree preserves a fully clipped child with
+  an empty rectangle so Windows can navigate to it without treating it as
+  locally interactive.
 - A nested scroll viewport is permitted only inside the existing depth and node
   limits; scroll positions are never serialized into document data.
 
@@ -43,8 +45,11 @@ change layout, consume a document field, move application focus, emit a
 semantic event, expose a handle, or cross the protocol. Decision 0097 implements
 the matching Windows UI Automation surface for that same first viewport:
 vertical line, page, and percentage movement return through a bounded
-host-owned route and never become application state. Nested-scrollbar
-arbitration remains separate. See `docs/UI_AUTOMATION_SCROLL.md`.
+host-owned route and never become application state. Decision 0098 uses that
+same route for `ScrollIntoView` on eligible descendants of that viewport,
+without a position or alignment input. Nested-scrollbar arbitration remains
+separate. See `docs/UI_AUTOMATION_SCROLL.md` and
+`docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
 
 The `--sample-ui-scroll-client` Windows development command sends one exact v2
 tree whose only enabled action begins below the initial viewport. An operator

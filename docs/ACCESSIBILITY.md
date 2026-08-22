@@ -1,33 +1,38 @@
 # Anodrel Windows accessibility
 
-**Status:** **UI Automation reading and host-owned vertical scrolling are
-implemented. Narrator and Inspect verified the earlier flat semantic surface;
-manual hierarchy, scrolling, button invocation, focus, focus-event, field-value,
-and structure-event screen-reader checks remain open.**
+**Status:** **UI Automation reading, host-owned vertical scrolling, and bounded
+scroll-item reveal are implemented. Narrator and Inspect verified the earlier
+flat semantic surface; manual hierarchy, scrolling and item reveal, button
+invocation, focus, focus-event, field-value, and structure-event screen-reader
+checks remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 pre-hierarchy mapping table passed with no failures.
 
 Reading, one bounded action, focus reporting and control, one host-raised
 focus-change event, one host-raised document-replacement structure event,
-read-only field values, and one host-owned vertical ScrollPattern are the
-implemented surface.
+read-only field values, one host-owned vertical ScrollPattern, and its bounded
+ScrollItem companions are the implemented surface.
 Assistive technology can read this surface, obtain a visible field's current
-value, invoke an enabled button in an authenticated UI session, and move to a
-visible enabled field or button through the host's existing focus state. An
+value, invoke an enabled button in an authenticated UI session, move to a
+visible enabled field or button through the host's existing focus state, and
+ask the selected host-owned scroll viewport to reveal one of its bounded
+off-screen descendants. An
 application cannot edit a field through automation, raise or receive an
 automation event, receive a live announcement, or observe focus. The published
-tree preserves the document's direct visible parent/child structure. Anything
+tree preserves the document's direct semantic parent/child structure. Anything
 beyond these routes is deferred and listed at the end of this document.
 
 ## Boundary
 
 Anodrel already derives a bounded, source-ordered accessibility snapshot from a
-validated `UiDocument` and one concrete `UiLayout` (Decision 0026). Each visible
-node carries an element ID, a role, an optional plain-text name, clipped logical
-bounds, an enabled flag, and its direct visible parent's earlier source-order
-index when it has one. That snapshot is portable data and performs no
-operating-system call.
+validated `UiDocument` and one concrete `UiLayout` (Decision 0026). Each
+bounded node carries an element ID, a role, an optional plain-text name, clipped
+logical bounds, an enabled flag, and its direct semantic parent's earlier
+source-order index when it has one. A node wholly clipped out of view remains in
+the tree with empty bounds and `IsOffscreen=true`; it is not locally
+interactive. That snapshot is portable data and performs no operating-system
+call.
 
 This document defines the layer directly above it: the Windows adapter that
 turns one snapshot into the values Microsoft UI Automation asks for.
@@ -46,7 +51,7 @@ UiAccessibilitySnapshot                              │ matching visible Edit
 UIA control types, properties, runtime IDs, rectangles │
         └──────────────────────────┬──────────────────┘
                                    ▼
-anodrel-windows-uia (provider, bounded Invoke, read-only Value)
+anodrel-windows-uia (provider, bounded Invoke, read-only Value, ScrollItem)
                                    │
                                    ▼
 Windows, and any assistive technology it serves
@@ -106,18 +111,20 @@ Decision 0071.
 ### Tree structure
 
 The snapshot is a preorder walk: a node's optional parent index always names
-its direct, earlier visible ancestor. The Windows adapter preserves every mapped
-node, including `Group`, and the provider derives immutable direct parent and
-child lists from those indices. `Parent`, `FirstChild`, `LastChild`,
-`NextSibling`, and `PreviousSibling` therefore describe the rendered document's
-actual visible hierarchy; top-level snapshot nodes belong to the host-owned
-window root.
+its direct, earlier semantic ancestor. The Windows adapter preserves every
+mapped node, including `Group` and a fully clipped node with empty bounds, and
+the provider derives immutable direct parent and child lists from those indices.
+`Parent`, `FirstChild`, `LastChild`, `NextSibling`, and `PreviousSibling`
+therefore describe the declared bounded document hierarchy; top-level snapshot
+nodes belong to the host-owned window root.
 
 Groups are structural only. They are not keyboard focusable and expose no
 action or value pattern. A currently selected overflowing `Scroll` group is the
-one exception: Decision 0097 gives it the host-owned vertical `ScrollPattern`
-described in `docs/UI_AUTOMATION_SCROLL.md`, without changing its Group control
-type or document semantics. An unnamed group remains unnamed because the
+one exception: Decision 0097 gives a selected overflowing `Scroll` group the
+host-owned vertical `ScrollPattern`, while Decision 0098 gives eligible
+descendants of that same group `ScrollItemPattern`. Both are described in
+`docs/UI_AUTOMATION_SCROLL.md` and `docs/UI_AUTOMATION_SCROLL_ITEMS.md`, without
+changing a Group's control type or document semantics. An unnamed group remains unnamed because the
 portable document model has no group-label field. Hit testing returns the
 deepest mapped element containing a point; overlapping siblings follow source
 paint order, with the later sibling winning.
@@ -135,11 +142,12 @@ defines this boundary.
 | `ControlType` (30003) | The table above. |
 | `IsEnabled` (30010) | The node's enabled flag **for a button or a field**; always true for text and groups. |
 | `AutomationId` (30011) | The document element ID. |
+| `IsOffscreen` (30022) | True exactly when the node's clipped bounds are empty. |
 | `IsKeyboardFocusable` (30009) | The table above. |
 | `HasKeyboardFocus` (30008) | The host-owned focus snapshot, true only for its current published focus target. |
 | `Value.Value` (30045) | The copied current host field text, only on a matching visible `Edit`. |
 | `Value.IsReadOnly` (30046) | Always true on that `Edit`, because UI Automation has no write route. |
-| `IsControlElement` (30016) | Always true; every node in the snapshot is visible. |
+| `IsControlElement` (30016) | Always true for a bounded semantic node, whether currently clipped or visible. |
 | `IsContentElement` (30017) | Always true, for the same reason. |
 | `BoundingRectangle` (30001) | Converted as below. |
 
@@ -157,15 +165,16 @@ one. It is not a path, handle, or secret.
 
 Anything not in this table is deliberately absent. In particular there is no
 `HelpText`, `AcceleratorKey`, `AccessKey`, or `LocalizedControlType`. The
-implemented bounded patterns are described below; Decision 0097 implements a
-vertical `ScrollPattern` for the one host-selected overflowing scroll group. It
-does not add an application accessibility field or pattern choice.
+implemented bounded patterns are described below; Decisions 0097 and 0098
+implement a vertical `ScrollPattern` for the one host-selected overflowing
+scroll group and `ScrollItemPattern` for its eligible descendants. Neither adds
+an application accessibility field or pattern choice.
 
 ### Button invocation
 
-An enabled `Button` in an authenticated UI session exposes `Invoke` (10000) through
-`IInvokeProvider`. No other role, disabled button, window root, or diagnostic
-surface exposes it.
+An enabled visible `Button` in an authenticated UI session exposes `Invoke`
+(10000) through `IInvokeProvider`. No other role, disabled or clipped button,
+window root, or diagnostic surface exposes it.
 
 `Invoke` offers exactly one `ActionInvoked(element_id)` candidate, bound to the
 revision whose layout produced the provider, to the session's existing bounded
@@ -223,6 +232,32 @@ can retain that copy, so this feature is for ordinary visible v1 text only;
 Anodrel still has no password or masked field. Decision 0071 defines the
 boundary.
 
+### Scroll-item reveal
+
+The first visible overflowing `Scroll` group exposes its existing vertical
+`ScrollPattern`. Each bounded descendant whose nearest semantic scroll ancestor
+is that group exposes `ScrollItemPattern` (10017) through
+`IScrollItemProvider`, including a descendant whose clipped rectangle is empty.
+The scroll group itself does not expose ScrollItem, and a descendant inside a
+nested scroll group is not an item of the outer group. A nested scroll group may
+be revealed as an outer item; routing into its contents remains deferred.
+
+`ScrollIntoView` has no target, offset, alignment, focus, or callback input.
+It takes the item's already-published semantic ID and the selected viewport ID
+through the same 250 ms revision-bound private route as `IScrollProvider`. The
+owner UI thread checks the current revision, selected first visible overflowing
+viewport, nearest scroll ancestor, and current layout before it changes the
+existing retained offset. It aligns a smaller item to its nearest viewport edge,
+an oversized item to the top, and accepts an already visible item without a
+change. A fresh provider can then show the new visibility; the old one remains
+immutable.
+
+This is a visibility route only. It neither moves focus nor exposes a field
+value or Invoke pattern while the target remains clipped. It emits no automation
+event and changes no application document, protocol state, semantic action, or
+capability. `docs/UI_AUTOMATION_SCROLL_ITEMS.md` and Decision 0098 define the
+full contract.
+
 ### Bounding rectangles
 
 The snapshot holds clipped **logical** pixels relative to the client area. UI
@@ -236,7 +271,8 @@ every supported display density without a window.
 
 An empty rectangle stays empty rather than becoming a degenerate point, so a
 node clipped entirely out of view cannot be reported as a target at the client
-origin.
+origin. That same node reports `IsOffscreen=true`; a partially clipped node
+retains its visible clipped rectangle and remains `IsOffscreen=false`.
 
 ### Runtime IDs
 
@@ -253,11 +289,11 @@ registry.
 
 `WM_GETOBJECT` arrives on the UI thread, which creates the immutable provider
 snapshot. A later UI Automation method can arrive from an automation caller, so
-the mutating methods, `SetFocus` and `IScrollProvider`, use bounded private
-request routes back to that owner. A pipe worker never serves an accessibility
-request, and an automation caller never receives a mutable view or registry
-entry. The mapping itself is pure and holds no lock, so it cannot block a
-message pump.
+the mutating methods, `SetFocus`, `IScrollProvider`, and
+`IScrollItemProvider`, use bounded private request routes back to that owner. A
+pipe worker never serves an accessibility request, and an automation caller
+never receives a mutable view or registry entry. The mapping itself is pure and
+holds no lock, so it cannot block a message pump.
 
 ## Failure behaviour
 
@@ -289,9 +325,10 @@ answered its early requests with nothing and was resolved to the default window
 provider instead.
 
 **Slice 2 — semantic children. Implemented.**
-The window is also an `IRawElementProviderFragmentRoot`, and each published
-element answers `IRawElementProviderFragment`: navigation, `GetRuntimeId` as a
-safe array, `get_BoundingRectangle`, and hit testing from a screen point.
+The window is also an `IRawElementProviderFragmentRoot`, and each bounded
+published element answers `IRawElementProviderFragment`: navigation,
+`GetRuntimeId` as a safe array, `get_BoundingRectangle`, `IsOffscreen`, and hit
+testing from a screen point.
 
 `SetFocus` succeeds only for a published visible enabled focus target. It uses
 the host-owned route described in `docs/UI_AUTOMATION_FOCUS.md`; the root,
@@ -299,12 +336,13 @@ static text, disabled elements, clipped elements, stale session providers, and
 unavailable views fail. `GetFocus` remains a snapshot lookup rather than a live
 view query.
 
-The published tree preserves direct visible parentage, including `Group`
-containers. Fragment navigation reports direct parents, children, and siblings
-from that immutable snapshot; it never consults a mutable view or registry.
-Groups remain non-focusable and pattern-free. The existing reading checks prove
-the former flat surface; the manual hierarchy check below remains required for
-this newly structural tree.
+The published tree preserves direct semantic parentage, including `Group`
+containers and fully clipped descendants. Fragment navigation reports direct
+parents, children, and siblings from that immutable snapshot; it never consults
+a mutable view or registry. Groups remain non-focusable and pattern-free unless
+they are the selected ScrollPattern group or an eligible ScrollItem child. The
+existing reading checks prove the former flat surface; the manual hierarchy
+check below remains required for this newly structural tree.
 
 **Slice 3 — reading verification. Partly complete.** Narrator announced the
 earlier flat surface's elements with their names and roles, and each then-
@@ -312,8 +350,8 @@ published property was cross-checked against the table. The new hierarchy has
 its own manual check below and is not inferred from that result.
 
 **Slice 4 — bounded button invocation. Implemented; manual activation check
-pending.** An enabled authenticated-session button exposes `IInvokeProvider`. Its
-`Invoke` implementation writes only a revision-bound semantic candidate into
+pending.** An enabled visible authenticated-session button exposes
+`IInvokeProvider`. Its `Invoke` implementation writes only a revision-bound semantic candidate into
 the same bounded mailbox as native pointer and keyboard activation (Decision
 0069). It does not move focus, synthesize a Windows input message, or call an
 application. A full mailbox fails without adding a queue. The unit and host
@@ -364,11 +402,23 @@ the pointer/wheel/keyboard scrollbar state. It has no event, application
 callback, position readback, or horizontal/nested target. See
 `docs/UI_AUTOMATION_SCROLL.md`.
 
+**Slice 11 — host-owned scroll-item reveal. Implemented; manual scrolling and
+item-reveal check pending.** Every bounded descendant whose nearest scroll
+ancestor is the selected first visible overflowing group exposes
+`IScrollItemProvider`; an off-screen element therefore remains navigable with
+an empty rectangle and `IsOffscreen=true`. `ScrollIntoView` returns through the
+same 250 ms revision-bound route and the owner revalidates viewport, target, and
+current layout before it adjusts the retained offset. It has no alignment,
+focus, action, value, event, application callback, position readback, or nested
+route. The unit and host checks prove off-screen tree retention, interface and
+pattern gates, nested refusal, nearest-edge geometry, timeout safety, and reuse
+of the existing scroll state. See `docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
+
 Also deferred, each needing its own contract and decision: Invoke,
 property/value/text/selection events, live announcements, selection
 and caret reporting, text patterns and ranges, labelled-by or described-by
-relations, automation editing, `IScrollItemProvider`, horizontal or nested
-scroll automation, scroll events, and non-Windows accessibility adapters.
+relations, automation editing, horizontal or nested scroll automation, scroll
+events, and non-Windows accessibility adapters.
 
 ## Verification
 
@@ -386,8 +436,8 @@ Provider tests cover the COM object without Windows: the interfaces it answers
 and the ones it refuses, a refused query clearing its output, every method
 rejecting a null output rather than writing through it, reference counting
 freeing the object exactly once, a panicking body returning a failure code
-instead of unwinding, the Invoke gate admitting only an enabled authenticated-
-session button to the revision-bound mailbox, and the Value gate returning only
+instead of unwinding, the Invoke gate admitting only an enabled visible
+authenticated-session button to the revision-bound mailbox, and the Value gate returning only
 a matching field snapshot while refusing every automation write. They also
 prove the Focus gate admits only a visible enabled field or button, keeps one
 provider's updated focus snapshot local to that provider, and refuses an
@@ -397,9 +447,12 @@ source and that a focus event names the currently published focused child.
 The scroll provider tests additionally prove that only the selected overflowing
 Group answers the standard interface and pattern, reports finite vertical
 values, accepts only closed vertical commands, rejects malformed or horizontal
-requests, and never lets a busy or timed-out route apply later. The Windows-host
-test proves those commands reach the same retained position used by direct
-pointer, wheel, and keyboard movement.
+requests, and never lets a busy or timed-out route apply later. The scroll-item
+tests prove a fully clipped eligible descendant answers only the standard
+ScrollItem interface and offers its fixed semantic ID through that same route.
+The Windows-host tests prove line, page, percentage, and item-reveal commands
+reach the same retained position used by direct pointer, wheel, and keyboard
+movement while excluding nested contents.
 
 ### Confirmed against real UI Automation before hierarchy
 
@@ -458,13 +511,14 @@ To repeat the reading check:
    focus.
 4. Move through the surface with `Caps Lock+Left/Right`. Each visible element
    should be announced with its name and its role — "button" or "text".
-5. Confirm a disabled action is announced as unavailable, and that an element
-   clipped out of view is not announced at all.
+5. Confirm a disabled action is announced as unavailable. Scroll-item behavior
+   has its own check below because a clipped semantic node is now deliberately
+   navigable rather than omitted.
 6. Optionally cross-check with **Accessibility Insights for Windows** or the
    Windows SDK's **Inspect** tool, which show the raw UI Automation tree
-   including `AutomationId`, `ControlType`, `IsEnabled`, and
+   including `AutomationId`, `ControlType`, `IsEnabled`, `IsOffscreen`, and
    `BoundingRectangle`. Confirm each matches the mapping table above and that
-   the highlighted rectangle sits over the element on screen.
+   a visible element's highlighted rectangle sits over it on screen.
 7. Close Narrator with `Ctrl+Windows+Enter`.
 
 If nothing is announced, check in this order: that Narrator is actually running,
@@ -486,6 +540,22 @@ group.
 
 This check is **pending**. It validates real client tree navigation and spoken
 grouping; unit tests cannot establish either.
+
+### Manual scroll-item verification
+
+Run the version 2 scrolling UI Session Lab, then find an action initially below
+the viewport in Inspect or Accessibility Insights. Before movement, it must stay
+in the tree with `IsOffscreen=true`, an empty bounding rectangle, and
+`ScrollItemPattern`; it must not offer Invoke or move focus. Call
+`ScrollIntoView` through the tool or a UI Automation client. The viewport must
+move just enough to show the item, a fresh provider must report a non-empty
+rectangle and `IsOffscreen=false`, and no action, focus change, value read, or
+application event may occur. Repeat for an already visible item (successful
+with no movement) and for an item inside a nested viewport (no outer item
+pattern).
+
+This check is **pending**. It verifies real Windows tree navigation and spoken
+scroll behavior; the focused tests do not substitute for it.
 
 ### Inspect cross-check before hierarchy
 

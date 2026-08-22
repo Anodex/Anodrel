@@ -65,6 +65,15 @@ impl ScreenRect {
     pub const fn as_array(self) -> [f64; 4] {
         [self.left, self.top, self.width, self.height]
     }
+
+    /// Returns whether this rectangle names no currently visible screen area.
+    #[must_use]
+    pub fn is_empty(self) -> bool {
+        !self.width.is_finite()
+            || !self.height.is_finite()
+            || self.width <= 0.0
+            || self.height <= 0.0
+    }
 }
 
 /// Converts one node's clipped logical bounds into a screen rectangle.

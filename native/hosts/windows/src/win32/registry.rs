@@ -22,12 +22,15 @@ static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 ///
 /// The focus identifier and field values belong to the same current UI Lab
 /// state as the snapshot. The UI Automation adapter filters both against the
-/// resulting visible tree before it reports anything to Windows.
+/// resulting tree before it reports anything to Windows. Scroll-item IDs are
+/// derived from that same view state and identify only host-selected semantic
+/// descendants of the one scrolling viewport.
 pub(super) struct AccessibilityPublication {
     pub(super) snapshot: anodrel_ui::UiAccessibilitySnapshot,
     pub(super) action_sink: Option<anodrel_windows_uia::UiAutomationActionSink>,
     pub(super) focus_route: Option<anodrel_windows_uia::UiAutomationFocusRoute>,
     pub(super) scroll_snapshot: Option<anodrel_windows_uia::UiAutomationScrollSnapshot>,
+    pub(super) scroll_items: Vec<anodrel_ui::ElementId>,
     pub(super) scroll_route: Option<anodrel_windows_uia::UiAutomationScrollRoute>,
     pub(super) focused: Option<anodrel_ui::ElementId>,
     pub(super) field_values: Vec<(anodrel_ui::ElementId, String)>,
@@ -537,6 +540,7 @@ pub(super) fn accessibility_snapshot(
             action_sink: None,
             focus_route: Some(lab.accessibility_focus_route(None)),
             scroll_snapshot: lab.accessibility_scroll_snapshot(width, height),
+            scroll_items: lab.accessibility_scroll_items(width, height),
             scroll_route: Some(lab.accessibility_scroll_route(None)),
             focused: lab.accessibility_focus(),
             field_values: lab.accessibility_field_values(),
@@ -546,6 +550,7 @@ pub(super) fn accessibility_snapshot(
             action_sink: session.accessibility_action_sink(),
             focus_route: Some(session.accessibility_focus_route()),
             scroll_snapshot: session.lab().accessibility_scroll_snapshot(width, height),
+            scroll_items: session.lab().accessibility_scroll_items(width, height),
             scroll_route: Some(session.accessibility_scroll_route()),
             focused: session.lab().accessibility_focus(),
             field_values: session.lab().accessibility_field_values(),

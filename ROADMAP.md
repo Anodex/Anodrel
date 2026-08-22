@@ -190,7 +190,7 @@ Status: **Direct Windows host in progress**
   and structure-event verification remain open. Invoke/property/value/text/
   selection events, live announcements, text patterns and ranges, labelled-by
   or described-by relations, and non-Windows adapters stay deferred. The
-  published tree now preserves direct visible parentage, including groups, with
+  published tree now preserves direct semantic parentage, including clipped groups, with
   immutable parent/child/sibling navigation (Decision 0075); its manual
   screen-reader and client hierarchy check remains open. See
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
@@ -201,8 +201,10 @@ Status: **Direct Windows host in progress**
    captured thumb dragging change only host-retained scroll state, not a
    document or application event; nested arbitration and accessibility scroll
    control remain separate gates. Decision 0097 now implements the matching
-   Windows UI Automation ScrollPattern boundary; its manual Narrator/Inspect
-   verification remains a separate gate.
+   Windows UI Automation ScrollPattern boundary. Decision 0098 adds the
+   companion `IScrollItemProvider` route for bounded off-screen descendants of
+   that same selected viewport; its manual Narrator/Inspect verification
+   remains a separate gate.
    The desktop command surface is a bounded native session menu: Decision 0080
    and `docs/MENUS.md` define a separate `menu.write` grant, a complete model,
    and delivery through the existing revision-checked interaction path.

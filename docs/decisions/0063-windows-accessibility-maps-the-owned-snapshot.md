@@ -1,6 +1,6 @@
 # Decision 0063: Windows accessibility maps the owned snapshot, one direction only
 
-**Status:** Accepted; extended by Decision 0075
+**Status:** Accepted; extended by Decisions 0075 and 0098
 
 **Date:** 2026-08-09
 
@@ -41,7 +41,7 @@ holds no lock, and cannot fail. The conversion from clipped logical bounds to
 screen rectangles takes the client origin and scale as arguments rather than
 querying them, so it is a pure function testable at any display density.
 
-Decision 0075 extends the mapping with the snapshot's direct visible parent
+Decision 0075 extends the mapping with the snapshot's direct semantic parent
 index so the provider can publish immutable parent/child/sibling navigation.
 It adds no application-controlled property, relation, or callback.
 

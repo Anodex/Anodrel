@@ -297,7 +297,7 @@ logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
 
 `anodrel-ui` is a portable foundation between an application model and a future
 host renderer. It owns only a bounded declarative tree, semantic appearance
-roles, layout, clipping, semantic action hit testing, visible accessibility
+roles, layout, clipping, semantic action hit testing, bounded accessibility
 snapshot, portable focus traversal, and host-retained vertical scroll state.
 `anodrel-ui-document` separately owns
 the exact, bounded JSON interchange form for that tree. The Windows UI Lab
@@ -472,9 +472,11 @@ same state. The control changes no portable document data, protocol field,
 application focus, action event, native handle, or input authority. Nested
 scrollbar arbitration remains separate. Decision 0097 implements the matching
 Windows UI Automation vertical ScrollPattern as one bounded route back to that
-same host state; it adds no application-visible position, event, or capability.
-See `docs/SCROLLING.md`, `docs/UI_AUTOMATION_SCROLL.md`, Decisions 0096 and
-0097.
+same host state; Decision 0098 lets an eligible bounded child request that its
+selected viewport reveal it through the same route. Neither adds an
+application-visible position, event, or capability. See `docs/SCROLLING.md`,
+`docs/UI_AUTOMATION_SCROLL.md`, `docs/UI_AUTOMATION_SCROLL_ITEMS.md`, and
+Decisions 0096 through 0098.
 
 Decision 0084 reserves the first direct network data seam without turning the
 host into a browser runtime. Its host-selected HTTPS origins and bounded

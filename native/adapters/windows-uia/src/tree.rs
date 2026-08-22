@@ -4,7 +4,10 @@
 //! layer holds only pointers and reference counts, and every rule about what a
 //! client can see is testable without Windows.
 
-use std::{collections::BTreeMap, sync::Mutex};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Mutex,
+};
 
 use anodrel_ui::ElementId;
 use anodrel_windows_accessibility::{AccessibleElement, ScreenRect, control_type, property};
@@ -48,6 +51,7 @@ pub struct Tree {
 #[derive(Debug)]
 struct ScrollCapability {
     snapshot: UiAutomationScrollSnapshot,
+    items: BTreeSet<ElementId>,
     sink: UiAutomationScrollSink,
 }
 
@@ -132,10 +136,11 @@ impl Relationships {
 impl Tree {
     /// Builds the tree for one window title and its mapped semantic elements.
     ///
-    /// Focus and field values are reduced to published targets while the tree
-    /// is created, so a provider never reads a mutable view. The action sink
-    /// exists only for a current authenticated UI session. The focus sink is a
-    /// host-only route for this one view; both are gated per element below.
+    /// Focus and field values are reduced to visible published targets while
+    /// the tree is created, so a provider never reads a mutable view. The
+    /// action sink exists only for a current authenticated UI session. The
+    /// focus sink is a host-only route for this one view; both are gated per
+    /// element below.
     #[must_use]
     pub fn new(
         title: Vec<u16>,
@@ -171,9 +176,14 @@ impl Tree {
     pub(crate) fn with_scroll(
         mut self,
         snapshot: UiAutomationScrollSnapshot,
+        items: Vec<ElementId>,
         sink: UiAutomationScrollSink,
     ) -> Self {
-        self.scroll = Some(ScrollCapability { snapshot, sink });
+        self.scroll = Some(ScrollCapability {
+            snapshot,
+            items: items.into_iter().collect(),
+            sink,
+        });
         self
     }
 
@@ -215,6 +225,7 @@ impl Tree {
                 Some(Variant::boolean(true))
             }
             property::IS_ENABLED => Some(Variant::boolean(true)),
+            property::IS_OFFSCREEN => Some(Variant::boolean(false)),
             // The window is a container, not a target.
             property::IS_KEYBOARD_FOCUSABLE => Some(Variant::boolean(false)),
             UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => Some(Variant::boolean(false)),
@@ -229,6 +240,7 @@ impl Tree {
             property::CONTROL_TYPE => Some(Variant::int(element.control_type())),
             property::AUTOMATION_ID => Some(Variant::string(&utf16(element.automation_id()))),
             property::IS_ENABLED => Some(Variant::boolean(element.enabled())),
+            property::IS_OFFSCREEN => Some(Variant::boolean(!self.is_visible(index))),
             property::IS_KEYBOARD_FOCUSABLE => Some(Variant::boolean(element.keyboard_focusable())),
             UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID => {
                 Some(Variant::boolean(self.focused() == Some(index)))
@@ -388,6 +400,16 @@ impl Tree {
         self.scroll_snapshot(index).is_some()
     }
 
+    /// Whether one published descendant exposes `ScrollItemPattern`.
+    ///
+    /// The selected viewport itself remains only a Scroll provider. Each
+    /// accepted child identity came from the host's nearest-scroll-ancestor
+    /// walk, so a provider cannot use this route to select another viewport.
+    #[must_use]
+    pub(crate) fn supports_scroll_item(&self, index: usize) -> bool {
+        self.scroll_item_target(index).is_some()
+    }
+
     /// Returns the published immutable scroll values for one selected group.
     #[must_use]
     pub(crate) fn scroll_snapshot(&self, index: usize) -> Option<&UiAutomationScrollSnapshot> {
@@ -412,11 +434,31 @@ impl Tree {
             .scroll(capability.snapshot.target().clone(), command)
     }
 
+    /// Asks the selected viewport to reveal one of its bounded descendants.
+    ///
+    /// A fully clipped element may use this one route, but it cannot gain
+    /// focus, invocation, or a field-value read merely by appearing in the
+    /// immutable navigation tree.
+    pub(crate) fn scroll_into_view(&self, index: usize) -> bool {
+        let Some(target) = self.scroll_item_target(index) else {
+            return false;
+        };
+        let Some(capability) = &self.scroll else {
+            return false;
+        };
+        capability.sink.scroll(
+            capability.snapshot.target().clone(),
+            UiAutomationScrollCommand::ScrollIntoView { item: target },
+        )
+    }
+
     fn invocation_id(&self, index: usize) -> Option<ElementId> {
         let element = self.elements.get(index)?;
-        (element.control_type() == control_type::BUTTON && element.enabled())
-            .then(|| ElementId::new(element.automation_id()).ok())
-            .flatten()
+        (self.is_visible(index)
+            && element.control_type() == control_type::BUTTON
+            && element.enabled())
+        .then(|| ElementId::new(element.automation_id()).ok())
+        .flatten()
     }
 
     fn focus_target(&self, index: usize) -> Option<ElementId> {
@@ -427,13 +469,27 @@ impl Tree {
 
     fn field_value(&self, index: usize) -> Option<&[u16]> {
         let element = self.elements.get(index)?;
-        (element.control_type() == control_type::EDIT)
+        (self.is_visible(index) && element.control_type() == control_type::EDIT)
             .then(|| {
                 self.field_values
                     .get(element.automation_id())
                     .map(Vec::as_slice)
             })
             .flatten()
+    }
+
+    fn scroll_item_target(&self, index: usize) -> Option<ElementId> {
+        let capability = self.scroll.as_ref()?;
+        let element = self.elements.get(index)?;
+        let id = ElementId::new(element.automation_id()).ok()?;
+        (id.as_str() != capability.snapshot.target().as_str() && capability.items.contains(&id))
+            .then_some(id)
+    }
+
+    fn is_visible(&self, index: usize) -> bool {
+        self.elements
+            .get(index)
+            .is_some_and(|element| !element.bounds().is_empty())
     }
 }
 

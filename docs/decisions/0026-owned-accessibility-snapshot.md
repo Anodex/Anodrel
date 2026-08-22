@@ -1,6 +1,6 @@
 # Decision 0026: Native UI accessibility begins with an owned semantic snapshot
 
-**Status:** Accepted; extended by Decision 0075
+**Status:** Accepted; extended by Decisions 0075 and 0098
 
 **Date:** 2026-08-01
 
@@ -17,11 +17,13 @@ established would create a broad, difficult-to-test authority surface.
 
 `anodrel-ui` derives a bounded, source-ordered accessibility snapshot from a
 validated `UiDocument` and one concrete `UiLayout`. It represents a stack as a
-group, text as static text, and an action as a button. Each visible node carries
-only its existing element ID, clipped bounds, role, enabled state, and plain
-text name where applicable.
+group, text as static text, and an action as a button. Each node carries only
+its existing element ID, clipped bounds, role, enabled state, and plain-text
+name where applicable. Decision 0098 preserves a wholly clipped bounded node
+with empty bounds so an operating-system adapter can navigate to it without
+claiming that it is locally visible or interactive.
 
-Decision 0075 extends each node with its direct visible parent's earlier
+Decision 0075 extends each node with its direct semantic parent's earlier
 source-order index. That preserves the document's declared hierarchy for native
 adapters without adding application-defined relations, an operating-system
 object, or a mutable view lookup.
@@ -42,5 +44,5 @@ remain future, operating-system-specific work above this layer.
 ## Revisit conditions
 
 Revisit before accepting untrusted UI documents, adding live announcements,
-focus or keyboard navigation, relations between nodes, an operating-system
+relations between nodes, a virtualized collection, an operating-system
 accessibility adapter, or action invocation through an assistive technology.

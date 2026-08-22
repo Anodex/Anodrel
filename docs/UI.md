@@ -1,7 +1,7 @@
 # Anodrel native UI foundation v1
 
 **Status:** Foundation contract. `anodrel-ui` provides an owned in-memory view
-tree, deterministic layout, clipping, semantic action hit testing, a visible
+tree, deterministic layout, clipping, semantic action hit testing, a bounded
 accessibility snapshot, and portable focus traversal. It does not yet accept an
 application package, protocol, script, renderer, native bridge, or
 operating-system operation.

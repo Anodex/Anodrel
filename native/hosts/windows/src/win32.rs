@@ -1370,6 +1370,7 @@ fn accessible_elements_for(window: Hwnd) -> anodrel_windows_uia::UiAutomationPub
         action_sink,
         focus_route,
         scroll_snapshot,
+        scroll_items,
         scroll_route,
         focused,
         field_values,
@@ -1382,9 +1383,11 @@ fn accessible_elements_for(window: Hwnd) -> anodrel_windows_uia::UiAutomationPub
         focus_route.map(|route| route.for_window(window, WM_ANODREL_UIA_FOCUS)),
     );
     match (scroll_snapshot, scroll_route) {
-        (Some(snapshot), Some(route)) => {
-            publication.with_scroll(snapshot, route.for_window(window, WM_ANODREL_UIA_SCROLL))
-        }
+        (Some(snapshot), Some(route)) => publication.with_scroll(
+            snapshot,
+            scroll_items,
+            route.for_window(window, WM_ANODREL_UIA_SCROLL),
+        ),
         _ => publication,
     }
 }

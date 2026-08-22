@@ -149,7 +149,9 @@ impl UiFocus {
 /// A field takes focus because a person has to reach it to type; an action
 /// takes focus because a person has to reach it to press it.
 fn is_focusable(item: &UiLayoutItem) -> bool {
-    matches!(item.kind(), UiLayoutKind::Action | UiLayoutKind::Field) && item.enabled()
+    matches!(item.kind(), UiLayoutKind::Action | UiLayoutKind::Field)
+        && item.enabled()
+        && !item.bounds().is_empty()
 }
 
 /// Whether activating an item produces a semantic event.
@@ -158,14 +160,14 @@ fn is_focusable(item: &UiLayoutItem) -> bool {
 /// focused field must produce nothing, because a field reports no event at all
 /// — not its text, and not that it was touched. See Decision 0067.
 fn is_activatable(item: &UiLayoutItem) -> bool {
-    item.kind() == UiLayoutKind::Action && item.enabled()
+    item.kind() == UiLayoutKind::Action && item.enabled() && !item.bounds().is_empty()
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        Action, Axis, ElementId, Insets, Stack, TextMeasurer, UiDocument, UiEvent, UiNode, UiRect,
-        UiSize,
+        Action, Axis, ElementId, Insets, Scroll, Stack, TextMeasurer, UiDocument, UiEvent, UiNode,
+        UiRect, UiSize,
     };
 
     use super::UiFocus;
@@ -280,5 +282,33 @@ mod tests {
         assert_eq!(focus.activate(&disabled), None);
         assert_eq!(focus.move_next(&missing), None);
         assert_eq!(focus.focused(), None);
+    }
+
+    #[test]
+    fn keeps_fully_clipped_actions_out_of_keyboard_focus() {
+        let document = UiDocument::new(UiNode::Scroll(Scroll::new(
+            id("viewport"),
+            UiNode::Stack(
+                Stack::new(
+                    id("content"),
+                    Axis::Vertical,
+                    Insets::zero(),
+                    0,
+                    vec![action("first", true), action("second", true)],
+                )
+                .expect("test stack is valid"),
+            ),
+        )))
+        .expect("test document is valid");
+        let layout = document.layout(UiRect::from_size(0.0, 0.0, 200.0, 36.0), &FixedMeasurer);
+        let mut focus = UiFocus::new();
+
+        assert_eq!(focus.move_next(&layout), Some(id("first")));
+        assert_eq!(focus.move_next(&layout), Some(id("first")));
+        assert!(!focus.focus_on(&layout, &id("second")));
+        assert_eq!(
+            focus.activate(&layout),
+            Some(UiEvent::ActionInvoked(id("first")))
+        );
     }
 }

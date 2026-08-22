@@ -32,6 +32,8 @@ pub mod property {
     pub const IS_ENABLED: i32 = 30_010;
     /// `UIA_AutomationIdPropertyId`.
     pub const AUTOMATION_ID: i32 = 30_011;
+    /// `UIA_IsOffscreenPropertyId`.
+    pub const IS_OFFSCREEN: i32 = 30_022;
     /// `UIA_IsControlElementPropertyId`.
     pub const IS_CONTROL_ELEMENT: i32 = 30_016;
     /// `UIA_IsContentElementPropertyId`.

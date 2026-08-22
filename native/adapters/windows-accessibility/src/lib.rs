@@ -249,6 +249,7 @@ mod tests {
         assert_eq!(property::CONTROL_TYPE, 30_003);
         assert_eq!(property::IS_ENABLED, 30_010);
         assert_eq!(property::AUTOMATION_ID, 30_011);
+        assert_eq!(property::IS_OFFSCREEN, 30_022);
         assert_eq!(property::BOUNDING_RECTANGLE, 30_001);
         assert_eq!(property::IS_KEYBOARD_FOCUSABLE, 30_009);
         assert_eq!(property::IS_CONTROL_ELEMENT, 30_016);
