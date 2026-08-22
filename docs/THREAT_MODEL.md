@@ -226,14 +226,18 @@ extension gate.
 The development samples exercise this private path with either a
 developer-supplied Node.js executable and Anodrel sample script, an explicitly
 selected compiled native health probe, an explicitly selected compiled native UI
-probe, or an explicitly selected executable created by the native-template
-generator. The UI probe and generated-template route receive only document
-replacement, semantic-event pull, and their own close grant; neither gains
-window or operating-system authority, and the template cannot supply grants,
-identity, title, or a session ID. None has executable identity verification and
-all end with the host process, so none creates production application-launch
-authority. Their output is intentionally discarded; an exit status is the only
-result used by the host.
+probe, or an explicitly selected executable created by one of the native-template
+generators. The UI probe and regular generated-template route receive only
+document replacement, semantic-event pull, and their own close grant. The
+separate menu route adds only `menu.write`; the separate multi-window route adds
+only `window.open` and `window.close`. Neither route lets a template supply
+grants, identity, title, a session ID, a native handle, or operating-system
+authority. In particular, a multi-window executable receives an opaque logical
+secondary identity only after the host has validated, created, and registered
+the private native view. None has executable identity verification and all end
+with the host process, so none creates production application-launch authority.
+Their output is intentionally discarded; an exit status is the only result used
+by the host.
 
 Decision 0017 adds a direct Windows Authenticode verification primitive. It
 returns the leaf signing certificate fingerprint only after Windows accepts the

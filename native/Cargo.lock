@@ -111,6 +111,7 @@ dependencies = [
  "anodrel-ui",
  "anodrel-ui-document",
  "anodrel-ui-session",
+ "anodrel-window",
  "anodrel-windows-bootstrap",
  "anodrel-windows-pipe",
 ]
@@ -271,6 +272,8 @@ dependencies = [
  "anodrel-menu",
  "anodrel-ui",
  "anodrel-ui-document",
+ "anodrel-ui-session",
+ "anodrel-window",
  "anodrel-wire",
 ]
 

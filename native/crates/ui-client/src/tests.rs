@@ -9,7 +9,10 @@ use anodrel_client::Client;
 use anodrel_json::JsonValue;
 use anodrel_wire::{FrameDecoder, encode_json};
 
-use crate::{UiActionBatch, UiClientError, UiEvent, UiSession};
+use crate::{
+    MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, SessionWindowId, UiActionBatch,
+    UiClientError, UiEvent, UiSession,
+};
 
 const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.ui-client-test";
 const SESSION_ID: &str = "ui-client-test-session";
@@ -174,6 +177,120 @@ fn native_menu_session_uses_the_fixed_protocol_1_24_surface() {
 }
 
 #[test]
+fn multi_window_session_uses_only_the_fixed_protocol_1_25_surface() {
+    let (mut session, written) = session_with_responses([
+        response("anodrel-ui-1", r#"{"windowId":"window-1"}"#),
+        response("anodrel-ui-2", r#"{"revision":"2"}"#),
+        response(
+            "anodrel-ui-3",
+            &window_event_batch("window-1", "template.window.complete", "2"),
+        ),
+        response("anodrel-ui-4", r#"{"status":"requested"}"#),
+    ]);
+
+    let secondary = session
+        .open_window_v1("Template secondary", DOCUMENT)
+        .expect("secondary view is accepted");
+    assert_eq!(secondary.to_string(), "window-1");
+    assert_eq!(
+        session
+            .replace_window_document_v1(secondary, DOCUMENT)
+            .expect("secondary replacement is accepted")
+            .value(),
+        2
+    );
+    let batch = session
+        .read_window_actions()
+        .expect("tagged action batch is typed");
+    assert_eq!(batch.dropped(), 0);
+    assert_eq!(batch.discarded(), 0);
+    let [action] = batch.actions() else {
+        panic!("the one tagged action is preserved");
+    };
+    assert_eq!(action.window(), SessionWindowId::Secondary(secondary));
+    assert_eq!(action.action().revision().value(), 2);
+    assert_eq!(action.action().action(), "template.window.complete");
+    session
+        .close_window(secondary)
+        .expect("secondary close is accepted");
+
+    let messages = messages(&written);
+    let operations = messages
+        .iter()
+        .skip(1)
+        .map(|message| request_field(message, "operation"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        operations,
+        [
+            Some("window.open".to_owned()),
+            Some("ui.document.replace.window".to_owned()),
+            Some("ui.events.read.window".to_owned()),
+            Some("window.close".to_owned()),
+        ]
+    );
+    assert!(
+        messages
+            .iter()
+            .skip(1)
+            .all(|message| { request_protocol_minor(message) == Some(25) })
+    );
+    let open = JsonValue::parse(&messages[1]).expect("open request is JSON");
+    let open_payload = open
+        .as_object()
+        .and_then(|fields| fields.get("payload"))
+        .expect("open has payload");
+    assert_eq!(
+        open_payload,
+        &JsonValue::parse(&format!(
+            r#"{{"title":"Template secondary","document":{}}}"#,
+            JsonValue::String(DOCUMENT.to_owned()).to_json()
+        ))
+        .expect("expected open payload is JSON")
+    );
+}
+
+#[test]
+fn multi_window_action_reads_accept_one_full_group_batch() {
+    let (mut session, _) = session_with_responses([response(
+        "anodrel-ui-1",
+        &window_event_batch_with_count_per_window(MAX_ACTIONS_PER_BATCH),
+    )]);
+
+    let batch = session
+        .read_window_actions()
+        .expect("a full bounded group batch is typed");
+    assert_eq!(batch.actions().len(), MAX_WINDOW_ACTIONS_PER_BATCH);
+    let mut per_window = std::collections::BTreeMap::new();
+    for action in batch.actions() {
+        let identity = match action.window() {
+            SessionWindowId::Main => "main".to_owned(),
+            SessionWindowId::Secondary(window) => window.to_string(),
+        };
+        *per_window.entry(identity).or_insert(0_usize) += 1;
+    }
+    assert_eq!(per_window.len(), 4);
+    assert!(
+        per_window
+            .values()
+            .all(|count| *count == MAX_ACTIONS_PER_BATCH)
+    );
+}
+
+#[test]
+fn multi_window_action_reads_reject_more_than_one_view_queue_can_hold() {
+    let (mut session, _) = session_with_responses([response(
+        "anodrel-ui-1",
+        &window_event_batch_with_count("main", MAX_ACTIONS_PER_BATCH + 1),
+    )]);
+
+    assert_eq!(
+        session.read_window_actions(),
+        Err(UiClientError::ResponseInvalid)
+    );
+}
+
+#[test]
 fn document_only_event_reads_fail_closed_when_a_menu_event_arrives() {
     let (mut session, _) = session_with_responses([response(
         "anodrel-ui-1",
@@ -218,6 +335,28 @@ fn invalid_menus_fail_before_they_can_create_a_protocol_request() {
         messages(&written).len(),
         1,
         "only authentication was written"
+    );
+}
+
+#[test]
+fn invalid_multi_window_title_or_identity_fails_closed() {
+    let (mut session, written) = session_with_responses([]);
+    assert_eq!(
+        session.open_window_v1("unsafe\nwindow title", DOCUMENT),
+        Err(UiClientError::WindowTitleInvalid)
+    );
+    assert_eq!(
+        messages(&written).len(),
+        1,
+        "an invalid title cannot create a request"
+    );
+
+    let (mut session, _) =
+        session_with_responses([response("anodrel-ui-1", r#"{"windowId":"main"}"#)]);
+    assert_eq!(
+        session.open_window_v1("Ordinary", DOCUMENT),
+        Err(UiClientError::ResponseInvalid),
+        "a host must never claim that primary is an opened secondary"
     );
 }
 
@@ -277,7 +416,13 @@ fn session_with_responses(
     let written = Arc::new(Mutex::new(Vec::new()));
     let mut frames = vec![frame(r#"{"kind":"session.authenticated"}"#)];
     frames.extend(responses.into_iter().map(|response| frame(&response)));
-    let stream = TestStream::new(frames, Arc::clone(&written));
+    let reads = frames.into_iter().flat_map(|frame| {
+        frame
+            .chunks(1_024)
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>()
+    });
+    let stream = TestStream::new(reads, Arc::clone(&written));
     let invitation =
         BootstrapInvitation::new(PIPE_NAME, SESSION_ID, TOKEN).expect("invitation is valid");
     let client = Client::authenticate(stream, invitation).expect("authentication succeeds");
@@ -300,6 +445,35 @@ fn menu_event_batch(action: &str, revision: &str) -> String {
     format!(
         r#"{{"events":[{{"kind":"event","eventName":"menu.action.invoked","source":"native.menu","protocolVersion":{{"major":1,"minor":18}},"schemaVersion":{{"major":1,"minor":18}},"payload":{{"menuRevision":"{revision}","action":"{action}"}}}}],"dropped":0,"discarded":0}}"#
     )
+}
+
+fn window_event_batch(window: &str, action: &str, revision: &str) -> String {
+    format!(
+        r#"{{"events":[{{"kind":"event","eventName":"ui.action.invoked","source":"native.ui","protocolVersion":{{"major":1,"minor":25}},"schemaVersion":{{"major":1,"minor":0}},"windowId":"{window}","payload":{{"revision":"{revision}","action":"{action}"}}}}],"dropped":0,"discarded":0}}"#
+    )
+}
+
+fn window_event_batch_with_count(window: &str, count: usize) -> String {
+    format!(
+        r#"{{"events":[{}],"dropped":0,"discarded":0}}"#,
+        window_events_with_count(window, count).join(",")
+    )
+}
+
+fn window_events_with_count(window: &str, count: usize) -> Vec<String> {
+    let event = format!(
+        r#"{{"kind":"event","eventName":"ui.action.invoked","source":"native.ui","protocolVersion":{{"major":1,"minor":25}},"schemaVersion":{{"major":1,"minor":0}},"windowId":"{window}","payload":{{"revision":"1","action":"template.window.complete"}}}}"#
+    );
+    std::iter::repeat_n(event, count).collect()
+}
+
+fn window_event_batch_with_count_per_window(count: usize) -> String {
+    let events = ["main", "window-1", "window-2", "window-3"]
+        .into_iter()
+        .flat_map(|window| window_events_with_count(window, count))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(r#"{{"events":[{events}],"dropped":0,"discarded":0}}"#)
 }
 
 fn frame(message: &str) -> Vec<u8> {

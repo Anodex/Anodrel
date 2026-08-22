@@ -448,6 +448,26 @@ impl UiSessionView {
         .with_session_window(group.member(UiWindowId::primary()))
     }
 
+    /// Creates the primary native view for the fixed development multi-window
+    /// route. The caller has already bound the same portable resources into the
+    /// authenticated pipe core and private native group. Empty bridge values
+    /// deliberately leave every unrelated service unavailable.
+    pub(super) fn for_group_primary(
+        resources: UiWindowResources,
+        close_signal: SessionCloseSignal,
+        session_window: SessionWindowMember,
+    ) -> Self {
+        Self::new(
+            resources.document_mailbox(),
+            resources.input_mailbox(),
+            close_signal,
+            FileDialogMailbox::new(),
+            WindowsFileTextService::new(),
+            NotificationMailbox::new(),
+        )
+        .with_session_window(session_window)
+    }
+
     /// Creates the deliberately limited native view for one group member.
     ///
     /// It receives only its own document mailbox, semantic-input mailbox, and

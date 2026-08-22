@@ -14,12 +14,13 @@ mod validation;
 use std::env;
 
 use arguments::{TemplateKind, parse};
-use init::{initialize, initialize_menu};
+use init::{initialize, initialize_menu, initialize_multi_window};
 
 const USAGE: &str = concat!(
     "usage:\n",
     "  anodrel-native-app-tool init <destination> <project-slug> <display-label>\n",
-    "  anodrel-native-app-tool init-menu <destination> <project-slug> <display-label>"
+    "  anodrel-native-app-tool init-menu <destination> <project-slug> <display-label>\n",
+    "  anodrel-native-app-tool init-multi-window <destination> <project-slug> <display-label>"
 );
 
 fn main() {
@@ -31,6 +32,11 @@ fn main() {
                 &command.display_label,
             ),
             TemplateKind::Menu => initialize_menu(
+                &command.destination,
+                &command.project_slug,
+                &command.display_label,
+            ),
+            TemplateKind::MultiWindow => initialize_multi_window(
                 &command.destination,
                 &command.project_slug,
                 &command.display_label,

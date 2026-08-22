@@ -159,6 +159,14 @@ package and internal protocol core, completes one private IPC loopback,
 then opens the Anodrel Startup Lab. It pauses with a clear error if startup
 fails. See `docs/STARTUP_LAB.md` for the visual test contract.
 
+To exercise the full bounded session-owned multi-window flow, double-click
+`start-multi-window-template.bat` in the repository root. It generates and
+builds a disposable first-party Rust executable, then opens it through the
+fixed development route. In order, activate **Open secondary window** in the
+primary, **Replace this window** in the secondary, and **Close secondary and
+finish** in that same secondary. It creates no certificate, package, installer,
+or machine policy. See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
+
 `start.bat` builds in release. The Startup Lab composes every frame in software,
 and an unoptimised build is roughly ten times slower — far too slow to hold the
 reveal's frame rate. When running the host by hand for a visual check, pass

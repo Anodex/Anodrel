@@ -82,8 +82,10 @@ the existing primary-only window services.
 `ui.events.read.window` returns no document data. Each accepted UI action is
 tagged with the logical `windowId` that produced its revision-bound semantic
 candidate. Each view retains at most 32 pending candidates and reports its own
-overflow and stale/rejected counts. Cross-view events have no promised global
-ordering: the application's model must not infer desktop timing from them.
+overflow and stale/rejected counts. A bounded group has at most four views, so
+one pull carries at most 128 tagged actions and aggregates the four view-local
+counts. Cross-view events have no promised global ordering: the application's
+model must not infer desktop timing from them.
 The legacy targetless document and event operations retain their primary-view
 meaning and cannot consume secondary-view traffic.
 

@@ -36,6 +36,14 @@ Follow `docs/NATIVE_UI_TEMPLATE.md` to create, build, and run it through
 accepts an operator-selected executable and grants exactly document replacement,
 semantic-action reading, and self-close.
 
+The separate constrained native multi-window template uses the same
+authenticated-session mechanics but creates a bounded session-owned view group.
+Follow `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md` to create, build, and run it
+through `--native-multi-window-template-client`. Its explicit development route
+grants exactly document replacement, tagged semantic-action reading, secondary
+open, secondary close, and self-close. It does not give the project a native
+handle, geometry, title readback, enumeration, or product-launch authority.
+
 To exercise Protocol 1.7's UI-thread-routed open picker in the same
 authenticated session, use `--sample-ui-file-client` in place of
 `--sample-ui-client`. Select a `.txt`, `.json`, or `.md` file or cancel the

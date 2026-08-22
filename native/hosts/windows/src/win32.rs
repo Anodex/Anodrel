@@ -37,7 +37,7 @@ use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSe
 use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_ui::UiDocument;
-use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
+use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox, UiWindowGroup, UiWindowId};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_instance::PrimaryInstance;
 
@@ -45,7 +45,7 @@ use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSizeMailbox,
-    WindowState, WindowStateMailbox, WindowTitleMailbox,
+    WindowState, WindowStateMailbox, WindowTitleMailbox, WindowTitleProposal,
 };
 
 use crate::product::PreflightOutcome;
@@ -707,6 +707,44 @@ pub fn run_ui_session(
         window_size,
         display_name,
         field_reads,
+    )
+}
+
+/// Opens one host-controlled primary view for a grouped development session.
+///
+/// This is a fixed host route, not a generic view constructor. Its portable
+/// group already contains the same primary document and input mailboxes that
+/// the authenticated pipe core uses. The host creates the private native group
+/// before the primary view is registered, so later `window.open` requests use
+/// the identical Windows lifecycle as a verified product session without
+/// giving the selected development child any native control.
+pub fn run_grouped_ui_session(
+    window_group: UiWindowGroup<WindowTitleProposal>,
+    close_signal: SessionCloseSignal,
+    title: &str,
+) -> io::Result<()> {
+    let primary_id = UiWindowId::primary();
+    let resources = window_group.resources(&primary_id).ok_or_else(|| {
+        io::Error::other("grouped development session has no primary view resources")
+    })?;
+    let group = session_window_group::SessionWindowGroup::new(
+        window_group,
+        close_signal.clone(),
+        Some(title.to_owned()),
+    );
+    let scale = primary_scale();
+    run_windows(
+        vec![WindowDefinition {
+            title: title.to_owned(),
+            width: (920.0 * scale) as i32,
+            height: (660.0 * scale) as i32,
+            view: View::UiSession(Box::new(ui_session_view::UiSessionView::for_group_primary(
+                resources,
+                close_signal,
+                group.member(primary_id),
+            ))),
+        }],
+        None,
     )
 }
 

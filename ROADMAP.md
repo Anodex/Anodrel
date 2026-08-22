@@ -419,7 +419,14 @@ Status: **First starter-package slice in progress**
   template. A generated child has completed the full authenticated
   shortcut-bearing menu sequence in a real pipe test; manual activation by
   both menu click and keyboard shortcut remains the explicit desktop acceptance
-  check.
+  check. Decision 0094 now adds a third, separately selected native template:
+  its `init-multi-window` generator and fixed five-grant Windows host route
+  exercise Protocol 1.25 without broadening the regular or menu templates.
+  A generated child has completed the full authenticated group walkthrough in
+  a real-pipe test: primary action, secondary creation handoff, independent
+  targeted document replacement, tagged secondary actions, exact secondary
+  close, and whole-session close. The remaining acceptance check is the
+  documented visual Windows walkthrough.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

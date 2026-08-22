@@ -15,6 +15,8 @@ pub enum UiClientError {
     DocumentInvalid,
     /// The supplied menu was not one strict bounded complete menu model.
     MenuInvalid,
+    /// The supplied secondary-window title failed its fixed portable rules.
+    WindowTitleInvalid,
     /// The authenticated underlying conversation could not continue.
     Conversation(ClientError),
     /// A response did not match this typed facade's documented shape.
@@ -28,6 +30,7 @@ impl fmt::Display for UiClientError {
         let message = match self {
             Self::DocumentInvalid => "the UI document was invalid",
             Self::MenuInvalid => "the native menu model was invalid",
+            Self::WindowTitleInvalid => "the window title was invalid",
             Self::Conversation(_) => "the authenticated UI conversation could not continue",
             Self::ResponseInvalid => "the host returned an invalid UI response",
             Self::RequestIdsExhausted => "the UI request identity space was exhausted",

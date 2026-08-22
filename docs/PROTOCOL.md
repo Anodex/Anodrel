@@ -187,9 +187,11 @@ updates only that view's strict v1 document and independent revision. The
 targetless document operations remain primary-only. `ui.events.read.window`
 accepts `{}` and returns only revision-checked semantic UI actions, each tagged
 with its opaque `windowId`, plus aggregated bounded dropped and discarded
-counts. It promises order only within an individual view; it never exposes
-native handles, geometry, lifecycle events, view enumeration, or desktop
-timing. See `docs/MULTI_WINDOW.md` and Decisions 0092–0093.
+counts. Each of the at most four views retains 32 candidates, so one response
+contains at most 128 tagged actions. It promises order only within an
+individual view; it never exposes native handles, geometry, lifecycle events,
+view enumeration, or desktop timing. See `docs/MULTI_WINDOW.md` and Decisions
+0092–0093.
 
 ### Native session menus
 

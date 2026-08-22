@@ -322,7 +322,8 @@ its recovery and capability contract.
 contract.
 `docs/WINDOW_LIFECYCLE.md` defines the multi-window host foundation.
 `docs/MULTI_WINDOW.md` defines the bounded session-owned multi-window contract
-currently being implemented; it is not a public protocol capability yet.
+implemented by Protocol 1.25, including its opaque identities and private
+native mapping boundary.
 `docs/WINDOW_TITLE.md` defines the first public window capability: an
 authenticated session proposes its own window's title and the host composes the
 displayed caption with an application-name suffix the proposal cannot suppress
@@ -375,6 +376,10 @@ without opening a product launch path.
 `docs/NATIVE_MENU_TEMPLATE.md` defines the separate development-native menu
 template. Its generator and fixed four-grant Windows route exercise the
 existing bounded menu protocol without changing the regular template's grants.
+`docs/NATIVE_MULTI_WINDOW_TEMPLATE.md` defines the separate development-native
+multi-window template. Its generator and fixed five-grant Windows route
+exercise the bounded Protocol 1.25 lifecycle without broadening either earlier
+template's grants.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.
@@ -408,6 +413,12 @@ menu template and open it through its fixed Windows development route. Choose
 **File > Complete menu template session** or press **Ctrl+Shift+M** to exercise
 the direct User32 menu, typed event delivery, and clean session shutdown
 without Node.js, a webview, or machine policy changes.
+
+Double-click `start-multi-window-template.bat` to build a temporary
+first-party multi-window template and exercise a typed secondary window open,
+targeted document replacement, tagged action pull, exact secondary close, and
+whole-session close. It uses no Node.js, webview, product package, or
+machine-policy change.
 
 Double-click `start-network-diagnostic.bat` to build and run the no-window
 native HTTPS diagnostic. It tests the complete direct WinHTTP path only against

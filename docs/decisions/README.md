@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0094: Development native multi-window templates keep window authority fixed.
+
 - 0093: Closing the primary session view ends its whole group.
 
 - 0092: Session-owned multi-window views use opaque identities.

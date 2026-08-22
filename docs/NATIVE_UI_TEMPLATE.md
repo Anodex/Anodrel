@@ -54,6 +54,11 @@ typed menu extension is reserved for the native menu template's explicit
 generator command and host route; it does not silently broaden this project's
 authority. See `docs/NATIVE_MENU_TEMPLATE.md`.
 
+The regular template also has no `window.open` or `window.close` grant. Those
+methods are reserved for the separate bounded multi-window template; its
+explicit generator command and host route do not broaden this project's
+authority. See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
+
 ## Generated project contract
 
 `anodrel-native-app-tool init` accepts a destination, a Cargo-compatible

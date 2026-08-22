@@ -438,6 +438,19 @@ endpoint, or process. The host retains the menu mailbox, User32 mapping, child
 lifecycle, and window. See
 `docs/NATIVE_MENU_TEMPLATE.md` and Decision 0083.
 
+Decision 0094 adds a third constrained Windows development template for
+Protocol 1.25's session-owned secondary views. Its `init-multi-window` command
+emits a fixed typed-client project, and the explicit
+`--native-multi-window-template-client` route grants exactly document write,
+semantic-event read, bounded secondary open, bounded secondary close, and
+self-close. The route constructs the same private `UiWindowGroup` lifecycle as
+the direct host, but the generated child sees only the opaque secondary identity
+after successful registration. It cannot choose an identity, capability,
+geometry, native handle, title readback, host command, menu, process, or
+endpoint. The host retains the group map, native views, title composition,
+creation handoff, child lifecycle, and shutdown. See
+`docs/NATIVE_MULTI_WINDOW_TEMPLATE.md` and Decision 0094.
+
 Decision 0084 reserves the first direct network data seam without turning the
 host into a browser runtime. Its host-selected HTTPS origins and bounded
 text-only `GET` result sit behind a separate capability; an application cannot

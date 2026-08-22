@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 mod menu;
+mod multi_window;
 
 pub struct TemplateContext {
     pub project_slug: String,
@@ -42,6 +43,14 @@ pub fn menu_main_source(display_label: &str) -> String {
 
 pub fn menu_readme(context: &TemplateContext) -> String {
     menu::readme(context)
+}
+
+pub fn multi_window_main_source(display_label: &str) -> String {
+    multi_window::main_source(display_label)
+}
+
+pub fn multi_window_readme(context: &TemplateContext) -> String {
+    multi_window::readme(context)
 }
 
 pub(super) fn document_json(display_label: &str) -> String {
@@ -192,7 +201,10 @@ fn run() -> Stage {
 mod tests {
     use std::path::Path;
 
-    use super::{TemplateContext, cargo_toml, document_json, main_source, menu_main_source};
+    use super::{
+        TemplateContext, cargo_toml, document_json, main_source, menu_main_source,
+        multi_window_main_source,
+    };
 
     #[test]
     fn generated_manifest_keeps_all_anodrel_dependencies_relative() {
@@ -228,5 +240,29 @@ mod tests {
         assert!(source.contains("read_events"));
         assert!(source.contains("template.menu.complete"));
         assert!(!source.contains("template.complete\""));
+    }
+
+    #[test]
+    fn multi_window_source_is_closed_over_its_fixed_walkthrough() {
+        let source = multi_window_main_source("Multi \"Window\" Template");
+        for method in [
+            "open_window_v1",
+            "replace_window_document_v1",
+            "read_window_actions",
+            "close_window",
+        ] {
+            assert!(source.contains(method), "generated source uses {method}");
+        }
+        for action in [
+            "template.window.open",
+            "template.window.update",
+            "template.window.complete",
+        ] {
+            assert!(
+                source.contains(action),
+                "generated source includes {action}"
+            );
+        }
+        assert!(!source.contains("--native-template-client"));
     }
 }

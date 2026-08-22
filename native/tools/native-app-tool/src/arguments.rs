@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub enum TemplateKind {
     Ui,
     Menu,
+    MultiWindow,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -21,6 +22,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
     let template_kind = match arguments.next().as_deref() {
         Some("init") => TemplateKind::Ui,
         Some("init-menu") => TemplateKind::Menu,
+        Some("init-multi-window") => TemplateKind::MultiWindow,
         _ => return Err(()),
     };
     let destination = arguments.next().ok_or(())?;
@@ -61,6 +63,23 @@ mod tests {
                 destination: PathBuf::from("out/menu"),
                 project_slug: "menu-app".to_owned(),
                 display_label: "Menu App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(
+                [
+                    "init-multi-window",
+                    "out/multi-window",
+                    "multi-window-app",
+                    "Multi-Window App",
+                ]
+                .map(String::from)
+            ),
+            Ok(InitCommand {
+                template_kind: TemplateKind::MultiWindow,
+                destination: PathBuf::from("out/multi-window"),
+                project_slug: "multi-window-app".to_owned(),
+                display_label: "Multi-Window App".to_owned(),
             })
         );
         assert!(parse(["init", "out", "example"].map(String::from)).is_err());

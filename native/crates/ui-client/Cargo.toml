@@ -10,6 +10,8 @@ anodrel-json = { path = "../json" }
 anodrel-menu = { path = "../menu" }
 anodrel-ui = { path = "../ui" }
 anodrel-ui-document = { path = "../ui-document" }
+anodrel-ui-session = { path = "../ui-session" }
+anodrel-window = { path = "../window" }
 
 [dev-dependencies]
 anodrel-bootstrap = { path = "../bootstrap" }

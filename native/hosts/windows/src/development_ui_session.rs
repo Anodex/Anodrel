@@ -7,6 +7,8 @@ use std::{error::Error, io, thread};
 
 use anodrel_core::{HostPolicy, HostServices};
 use anodrel_protocol::Capability;
+use anodrel_ui_session::UiWindowGroup;
+use anodrel_window::WindowTitleProposal;
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_pipe::WindowsPipeServer;
 
@@ -26,11 +28,19 @@ const MENU_GRANTS: [Capability; 4] = [
     Capability::MenuWrite,
     Capability::SessionClose,
 ];
+const MULTI_WINDOW_GRANTS: [Capability; 5] = [
+    Capability::UiDocumentWrite,
+    Capability::UiEventsRead,
+    Capability::WindowOpen,
+    Capability::WindowClose,
+    Capability::SessionClose,
+];
 
 #[derive(Clone, Copy)]
 enum DevelopmentUiSessionKind {
     Document,
     Menu,
+    MultiWindow,
 }
 
 /// Fixed host facts for one explicitly selected development child route.
@@ -78,15 +88,39 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration for the explicit bounded multi-window route.
+    ///
+    /// Window creation and secondary close are additional fixed grants on this
+    /// distinct route. The normal and menu routes remain narrower.
+    pub(crate) const fn with_multi_window(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::MultiWindow,
+        }
+    }
+
     const fn grants(self) -> &'static [Capability] {
         match self.kind {
             DevelopmentUiSessionKind::Document => &UI_GRANTS,
             DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
+            DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
         }
     }
 
     const fn supports_menu(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::Menu)
+    }
+
+    const fn supports_multi_window(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::MultiWindow)
     }
 }
 
@@ -103,23 +137,40 @@ pub(crate) fn run(
     let command = BootstrapCommand::new(client_path)?;
     let ui = DevelopmentSessionUi::new();
     let policy = HostPolicy::new(config.application_id, config.grants().to_vec(), HOST_NAME)?;
-    let (server, invitation) = if config.supports_menu() {
-        WindowsPipeServer::create_with_session_components_and_service_bundle(
-            policy,
-            config.session_id,
+    let (server, invitation, window_group) = if config.supports_multi_window() {
+        let window_group = UiWindowGroup::<WindowTitleProposal>::with_primary_resources(
             ui.document.clone(),
             ui.input.clone(),
-            ui.close.clone(),
-            HostServices::unavailable().with_menu(ui.menu.clone()),
-        )?
+        );
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_window_group_and_service_bundle(
+                policy,
+                config.session_id,
+                window_group.clone(),
+                ui.close.clone(),
+                HostServices::unavailable(),
+            )?;
+        (server, invitation, Some(window_group))
+    } else if config.supports_menu() {
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                HostServices::unavailable().with_menu(ui.menu.clone()),
+            )?;
+        (server, invitation, None)
     } else {
-        WindowsPipeServer::create_with_session_components(
+        let (server, invitation) = WindowsPipeServer::create_with_session_components(
             policy,
             config.session_id,
             ui.document.clone(),
             ui.input.clone(),
             ui.close.clone(),
-        )?
+        )?;
+        (server, invitation, None)
     };
     let stop = server.stop_signal();
     let bootstrap = invitation.bootstrap_invitation()?;
@@ -133,22 +184,28 @@ pub(crate) fn run(
         }
     };
 
-    if let Err(error) = crate::win32::run_ui_session(
-        ui.document,
-        ui.input,
-        ui.close,
-        ui.file_dialog,
-        ui.file_text,
-        ui.notifications,
-        ui.menu,
-        ui.window_title,
-        ui.window_state,
-        ui.window_focus,
-        ui.window_fullscreen,
-        ui.window_size,
-        config.display_name,
-        ui.fields,
-    ) {
+    let window_result = match window_group {
+        Some(window_group) => {
+            crate::win32::run_grouped_ui_session(window_group, ui.close, config.display_name)
+        }
+        None => crate::win32::run_ui_session(
+            ui.document,
+            ui.input,
+            ui.close,
+            ui.file_dialog,
+            ui.file_text,
+            ui.notifications,
+            ui.menu,
+            ui.window_title,
+            ui.window_state,
+            ui.window_focus,
+            ui.window_fullscreen,
+            ui.window_size,
+            config.display_name,
+            ui.fields,
+        ),
+    };
+    if let Err(error) = window_result {
         let _ = child.terminate(DEVELOPMENT_STOP_CODE);
         stop.request_stop();
         let _ = worker.join();
@@ -183,7 +240,7 @@ pub(crate) fn run(
 mod tests {
     use anodrel_protocol::Capability;
 
-    use super::{DevelopmentUiSessionConfig, MENU_GRANTS, UI_GRANTS};
+    use super::{DevelopmentUiSessionConfig, MENU_GRANTS, MULTI_WINDOW_GRANTS, UI_GRANTS};
 
     #[test]
     fn development_routes_use_only_their_exact_closed_grant_sets() {
@@ -199,6 +256,12 @@ mod tests {
             "Anodrel Menu Test",
             "completed menu",
         );
+        let multi_window = DevelopmentUiSessionConfig::with_multi_window(
+            "anodrel.test-multi-window",
+            "test-multi-window-session",
+            "Anodrel Multi-Window Test",
+            "completed multi-window",
+        );
         assert_eq!(document.application_id, "anodrel.test");
         assert_eq!(document.session_id, "test-session");
         assert_eq!(document.display_name, "Anodrel Test");
@@ -207,6 +270,9 @@ mod tests {
         assert!(!document.supports_menu());
         assert_eq!(menu.grants(), MENU_GRANTS);
         assert!(menu.supports_menu());
+        assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
+        assert!(!multi_window.supports_menu());
+        assert!(multi_window.supports_multi_window());
         assert_eq!(
             UI_GRANTS,
             [
@@ -221,6 +287,16 @@ mod tests {
                 Capability::UiDocumentWrite,
                 Capability::UiEventsRead,
                 Capability::MenuWrite,
+                Capability::SessionClose,
+            ]
+        );
+        assert_eq!(
+            MULTI_WINDOW_GRANTS,
+            [
+                Capability::UiDocumentWrite,
+                Capability::UiEventsRead,
+                Capability::WindowOpen,
+                Capability::WindowClose,
                 Capability::SessionClose,
             ]
         );

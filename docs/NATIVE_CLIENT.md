@@ -131,4 +131,7 @@ diagnostic and by the constrained generated native template. That template has
 a first-party new-directory generator and runs only through the explicit
 fixed-grant `--native-template-client` development route; see
 `docs/NATIVE_UI_TEMPLATE.md`. Publishing a stable API still requires a separate
-decision.
+decision. Decision 0094 extends that preview facade only for the separate
+fixed-grant multi-window template: it returns opaque secondary identities and
+tagged action batches, but exposes no native mapping or raw protocol surface.
+See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.

@@ -5,7 +5,10 @@ use std::{error::Error, fmt, fs, path::Path};
 use crate::{
     arguments::TemplateKind,
     paths::{anodrel_root, relative_path, resolve_new_project, write_new_file},
-    template::{TemplateContext, cargo_toml, main_source, menu_main_source, menu_readme, readme},
+    template::{
+        TemplateContext, cargo_toml, main_source, menu_main_source, menu_readme,
+        multi_window_main_source, multi_window_readme, readme,
+    },
     validation::{validate_display_label, validate_project_slug},
 };
 
@@ -42,6 +45,19 @@ pub fn initialize_menu(
     initialize_template(TemplateKind::Menu, destination, project_slug, display_label)
 }
 
+pub fn initialize_multi_window(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(
+        TemplateKind::MultiWindow,
+        destination,
+        project_slug,
+        display_label,
+    )
+}
+
 fn initialize_template(
     template_kind: TemplateKind,
     destination: &Path,
@@ -64,6 +80,11 @@ fn initialize_template(
             menu_main_source(display_label),
             menu_readme(&context),
             "Created Anodrel native menu project.",
+        ),
+        TemplateKind::MultiWindow => (
+            multi_window_main_source(display_label),
+            multi_window_readme(&context),
+            "Created Anodrel native multi-window project.",
         ),
     };
 
@@ -105,7 +126,7 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    use super::{initialize, initialize_menu};
+    use super::{initialize, initialize_menu, initialize_multi_window};
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
 
@@ -195,5 +216,28 @@ mod tests {
         assert!(source.contains("replace_menu_v1"));
         assert!(source.contains("template.menu.complete"));
         assert!(!source.contains("template.complete"));
+    }
+
+    #[test]
+    fn multi_window_project_is_separate_from_the_other_templates() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-multi-window-app");
+        initialize_multi_window(
+            &destination,
+            "generated-multi-window-app",
+            "Generated Multi-Window App",
+        )
+        .expect("generate a native multi-window project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated multi-window instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated multi-window source");
+        assert!(readme.contains("--native-multi-window-template-client"));
+        assert!(source.contains("open_window_v1"));
+        assert!(source.contains("replace_window_document_v1"));
+        assert!(source.contains("read_window_actions"));
+        assert!(source.contains("close_window"));
+        assert!(!source.contains("replace_menu_v1"));
     }
 }
