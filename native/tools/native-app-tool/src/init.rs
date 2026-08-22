@@ -6,8 +6,9 @@ use crate::{
     arguments::TemplateKind,
     paths::{anodrel_root, relative_path, resolve_new_project, write_new_file},
     template::{
-        TemplateContext, cargo_toml, form_main_source, form_readme, main_source, menu_main_source,
-        menu_readme, multi_window_main_source, multi_window_readme, readme,
+        TemplateContext, cargo_toml, form_main_source, form_readme, live_status_main_source,
+        live_status_readme, main_source, menu_main_source, menu_readme, multi_window_main_source,
+        multi_window_readme, readme,
     },
     validation::{validate_display_label, validate_project_slug},
 };
@@ -43,6 +44,19 @@ pub fn initialize_form(
     display_label: &str,
 ) -> Result<(), InitError> {
     initialize_template(TemplateKind::Form, destination, project_slug, display_label)
+}
+
+pub fn initialize_live_status(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(
+        TemplateKind::LiveStatus,
+        destination,
+        project_slug,
+        display_label,
+    )
 }
 
 pub fn initialize_menu(
@@ -88,6 +102,11 @@ fn initialize_template(
             form_main_source(display_label),
             form_readme(&context),
             "Created Anodrel native form project.",
+        ),
+        TemplateKind::LiveStatus => (
+            live_status_main_source(display_label),
+            live_status_readme(&context),
+            "Created Anodrel native live-status project.",
         ),
         TemplateKind::Menu => (
             menu_main_source(display_label),
@@ -139,7 +158,10 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    use super::{initialize, initialize_form, initialize_menu, initialize_multi_window};
+    use super::{
+        initialize, initialize_form, initialize_live_status, initialize_menu,
+        initialize_multi_window,
+    };
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
 
@@ -247,6 +269,29 @@ mod tests {
         assert!(source.contains("template.form.name"));
         assert!(source.contains("template.form.submit"));
         assert!(!source.contains("replace_menu_v1"));
+    }
+
+    #[test]
+    fn live_status_project_uses_only_explicit_v3_replacements() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-live-status-app");
+        initialize_live_status(
+            &destination,
+            "generated-live-status-app",
+            "Generated Live Status App",
+        )
+        .expect("generate a native live-status project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated live-status instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated live-status source");
+        assert!(readme.contains("--native-live-status-template-client"));
+        assert_eq!(source.matches("replace_document_v3(").count(), 3);
+        assert!(source.contains("template.status.polite"));
+        assert!(source.contains("template.status.assertive"));
+        assert!(source.contains("template.status.complete"));
+        assert!(!source.contains("replace_document_v1("));
     }
 
     #[test]

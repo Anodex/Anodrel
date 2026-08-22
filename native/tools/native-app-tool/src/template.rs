@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 mod form;
+mod live_status;
 mod menu;
 mod multi_window;
 
@@ -48,6 +49,14 @@ pub fn form_main_source(display_label: &str) -> String {
 
 pub fn form_readme(context: &TemplateContext) -> String {
     form::readme(context)
+}
+
+pub fn live_status_main_source(display_label: &str) -> String {
+    live_status::main_source(display_label)
+}
+
+pub fn live_status_readme(context: &TemplateContext) -> String {
+    live_status::readme(context)
 }
 
 pub fn menu_readme(context: &TemplateContext) -> String {
@@ -211,8 +220,8 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        TemplateContext, cargo_toml, document_json, form_main_source, main_source,
-        menu_main_source, multi_window_main_source,
+        TemplateContext, cargo_toml, document_json, form_main_source, live_status_main_source,
+        main_source, menu_main_source, multi_window_main_source,
     };
 
     #[test]
@@ -258,6 +267,23 @@ mod tests {
         assert!(source.contains("template.form.name"));
         assert!(source.contains("template.form.submit"));
         assert_eq!(source.matches("replace_document_v1(").count(), 1);
+    }
+
+    #[test]
+    fn live_status_source_uses_one_visible_status_per_version_three_document() {
+        let source = live_status_main_source("Live \"Status\" Template");
+        assert_eq!(source.matches("replace_document_v3(").count(), 3);
+        for action in [
+            "template.status.polite",
+            "template.status.assertive",
+            "template.status.complete",
+        ] {
+            assert!(
+                source.contains(action),
+                "generated source includes {action}"
+            );
+        }
+        assert!(!source.contains("replace_document_v1("));
     }
 
     #[test]

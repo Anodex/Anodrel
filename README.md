@@ -402,6 +402,10 @@ template's grants.
 template. Its generator and fixed four-grant Windows route demonstrate
 submit-time whole-surface field snapshots without broadening the regular, menu,
 or multi-window templates.
+`docs/NATIVE_LIVE_STATUS_TEMPLATE.md` defines the separate development-native
+live-status template. Its generator and fixed three-grant Windows route
+demonstrate three explicit v3 visible-status updates without adding an
+accessibility callback, listener check, or delivery result.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

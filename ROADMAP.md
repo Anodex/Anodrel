@@ -450,7 +450,14 @@ Status: **First starter-package slice in progress**
   without widening any earlier template. A generated child has completed a real
   pipe session that supplies the form document, submits it, reads the one fixed
   whole-surface snapshot, and closes cleanly. The remaining acceptance check is
-  the documented visual Windows walkthrough.
+  the documented visual Windows walkthrough. Decision 0101 now adds a fifth,
+  separately selected native template: its `init-live-status` generator and
+  fixed three-grant Windows route exercise the existing Protocol 1.26 v3
+  visible-status contract without broadening any earlier template. A generated
+  child has completed a real pipe session that supplies the three fixed v3
+  documents, receives the three matching revision-bound actions, and closes
+  cleanly. The remaining acceptance check is the documented Narrator and Inspect
+  walkthrough; it does not claim announcement delivery to the generated app.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

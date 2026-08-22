@@ -485,6 +485,18 @@ host retains the field states, field-read bridge, native view, title
 composition, child lifecycle, and shutdown. See
 `docs/NATIVE_FORM_TEMPLATE.md` and Decision 0095.
 
+Decision 0101 adds a fifth constrained Windows development template for
+Protocol 1.26's visible version-3 status. Its `init-live-status` command emits
+a fixed typed-client project, and the explicit
+`--native-live-status-template-client` route grants exactly document write,
+semantic-event read, and self-close. The child publishes three fixed complete
+documents only after person-triggered revision-bound actions: a polite
+baseline, a changed polite result, then a changed assertive result. It cannot
+choose a status, politeness, identity, title, window, native handle, UI
+Automation event, listener state, notification, callback, process, or endpoint.
+The host retains the native view, live-region event, lifecycle, and shutdown.
+See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md` and Decision 0101.
+
 Decision 0096 adds one direct-rendered Windows scrollbar to the first visible
 overflowing v2 scroll viewport. Its pure host module derives finite track and
 thumb geometry from existing layout metrics and retained scroll state; the UI

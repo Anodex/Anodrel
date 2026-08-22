@@ -140,3 +140,8 @@ Decision 0095 extends that preview facade only for the separate fixed-grant
 native form template. Its `read_fields` method returns one strictly parsed,
 whole-surface ordered snapshot after an explicit request; it has no selector,
 live change route, or input-state metadata. See `docs/NATIVE_FORM_TEMPLATE.md`.
+
+Decision 0101 uses the already-typed `replace_document_v3` method only in the
+separate fixed-grant native live-status template. Its three fixed documents
+demonstrate outbound visible status changes, not an accessibility callback,
+listener check, or delivery API. See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md`.

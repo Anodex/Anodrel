@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0101: Development native live-status templates keep status delivery one-way.
+
 - 0100: Live status is visible, semantic, and outbound-only.
 
 - 0099: Installed network origins remain machine-selected.

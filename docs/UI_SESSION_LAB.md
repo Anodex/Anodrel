@@ -53,6 +53,15 @@ field reading, and self-close. It does not give the project keystrokes, input
 timing, a field selector, focus/caret/selection state, native control, handle,
 or product-launch authority.
 
+The separate constrained native live-status template uses the same
+authenticated-session mechanics but demonstrates three fixed complete version-3
+status documents. Follow `docs/NATIVE_LIVE_STATUS_TEMPLATE.md` to create,
+build, and run it through `--native-live-status-template-client`. Its explicit
+development route grants exactly document replacement, semantic-action reading,
+and self-close. It receives no accessibility listener state, announcement
+delivery result, callback, notification, UI Automation identifier, or native
+event authority.
+
 To exercise Protocol 1.7's UI-thread-routed open picker in the same
 authenticated session, use `--sample-ui-file-client` in place of
 `--sample-ui-client`. Select a `.txt`, `.json`, or `.md` file or cancel the
