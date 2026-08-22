@@ -20,6 +20,7 @@ use anodrel_file_dialog::{
 use anodrel_protocol::{CancellationEnvelope, JsonValue, RequestEnvelope, object};
 use anodrel_storage::StorageService;
 pub use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox};
+use anodrel_window::WindowTitleProposal;
 use anodrel_wire::{FrameDecoder, WireError, encode_json};
 
 pub const MAX_SESSION_ID_BYTES: usize = 128;
@@ -246,9 +247,21 @@ impl CredentialService for TransportUnavailableCredentials {
 pub struct TransportSession {
     decoder: FrameDecoder,
     host: CoreHost,
-    ui_document_mailbox: UiDocumentMailbox,
+    ui_document_delivery: UiDocumentDelivery,
     pending_cancellations: BTreeSet<String>,
     state: SessionState,
+}
+
+/// The host-owned route for an accepted primary document snapshot.
+///
+/// Legacy sessions publish through one standalone mailbox after core handling.
+/// A session-owned group publishes directly into the view's mailbox while it
+/// holds its own synchronized state, so the transport must not publish a
+/// second copy afterward.
+#[derive(Debug)]
+enum UiDocumentDelivery {
+    Legacy(UiDocumentMailbox),
+    Group,
 }
 
 impl TransportSession {
@@ -270,7 +283,7 @@ impl TransportSession {
         Self {
             decoder: FrameDecoder::new(),
             host: CoreHost::with_services(policy, services),
-            ui_document_mailbox: UiDocumentMailbox::new(),
+            ui_document_delivery: UiDocumentDelivery::Legacy(UiDocumentMailbox::new()),
             pending_cancellations: BTreeSet::new(),
             state: SessionState::Pending(credentials),
         }
@@ -296,7 +309,36 @@ impl TransportSession {
                 session_close_signal,
                 services,
             ),
-            ui_document_mailbox,
+            ui_document_delivery: UiDocumentDelivery::Legacy(ui_document_mailbox),
+            pending_cancellations: BTreeSet::new(),
+            state: SessionState::Pending(credentials),
+        }
+    }
+
+    /// Creates a session whose primary view belongs to one portable
+    /// session-owned window group.
+    ///
+    /// The group is created by the host with its real primary view mailboxes
+    /// before authentication starts. Core updates then publish through that
+    /// group directly; the pipe worker cannot duplicate a snapshot by using
+    /// the legacy document-delivery path.
+    #[must_use]
+    pub fn with_session_window_group_and_service_bundle(
+        policy: HostPolicy,
+        credentials: SessionCredentials,
+        ui_window_group: anodrel_ui_session::UiWindowGroup<WindowTitleProposal>,
+        session_close_signal: SessionCloseSignal,
+        services: HostServices,
+    ) -> Self {
+        Self {
+            decoder: FrameDecoder::new(),
+            host: CoreHost::with_session_window_group_and_service_bundle(
+                policy,
+                ui_window_group,
+                session_close_signal,
+                services,
+            ),
+            ui_document_delivery: UiDocumentDelivery::Group,
             pending_cancellations: BTreeSet::new(),
             state: SessionState::Pending(credentials),
         }
@@ -574,7 +616,7 @@ impl TransportSession {
                 diagnostics,
                 credential_service,
             ),
-            ui_document_mailbox,
+            ui_document_delivery: UiDocumentDelivery::Legacy(ui_document_mailbox),
             pending_cancellations: BTreeSet::new(),
             state: SessionState::Pending(credentials),
         }
@@ -625,8 +667,10 @@ impl TransportSession {
                     return Ok(Some(self.host.cancelled_response(request.request_id)));
                 }
                 let response = self.host.handle_json(message);
-                if let Some(snapshot) = self.host.take_ui_document_update() {
-                    self.ui_document_mailbox.publish(snapshot);
+                if let UiDocumentDelivery::Legacy(mailbox) = &self.ui_document_delivery
+                    && let Some(snapshot) = self.host.take_ui_document_update()
+                {
+                    mailbox.publish(snapshot);
                 }
                 Ok(Some(response))
             }
@@ -743,6 +787,8 @@ mod tests {
     };
     use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkService};
     use anodrel_ui::{ElementId, UiEvent};
+    use anodrel_ui_session::UiWindowGroup;
+    use anodrel_window::WindowTitleProposal;
 
     use anodrel_protocol::{Capability, JsonValue};
     use anodrel_wire::{FrameDecoder, WireError, encode_json};
@@ -1157,6 +1203,47 @@ mod tests {
             mailbox
                 .take()
                 .expect("accepted document is published")
+                .revision()
+                .value(),
+            1
+        );
+    }
+
+    #[test]
+    fn grouped_session_delivers_primary_documents_through_its_group_mailbox() {
+        let mailbox = UiDocumentMailbox::new();
+        let group = UiWindowGroup::<WindowTitleProposal>::with_primary_resources(
+            mailbox.clone(),
+            UiInputMailbox::new(),
+        );
+        let mut transport = TransportSession::with_session_window_group_and_service_bundle(
+            HostPolicy::new(
+                "test.application",
+                vec![Capability::UiDocumentWrite],
+                "test-host",
+            )
+            .expect("test policy is valid"),
+            SessionCredentials::new(SESSION_ID, TOKEN).expect("test credentials are valid"),
+            group,
+            SessionCloseSignal::default(),
+            HostServices::unavailable(),
+        );
+        authenticate(&mut transport);
+
+        let response = transport
+            .receive(&encode_json(&ui_document_request()).expect("request encodes"))
+            .expect("authenticated request succeeds");
+        assert_eq!(
+            decode_response(&response[0])
+                .as_object()
+                .expect("response object")["status"]
+                .as_string(),
+            Some("success")
+        );
+        assert_eq!(
+            mailbox
+                .take()
+                .expect("group publishes the accepted primary document")
                 .revision()
                 .value(),
             1

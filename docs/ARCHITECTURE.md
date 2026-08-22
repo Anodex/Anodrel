@@ -315,8 +315,9 @@ at most three secondary logical views. The core can operate in this group mode
 while retaining every targetless document and event operation as primary-only;
 it never drains a secondary view on that compatibility path. The group has no
 native authority, and its creation handoff stops at the owning UI thread. The
-authenticated transport and direct Windows host must still compose and service
-it before Protocol 1.25 can be released.
+authenticated transport now composes this mode without a duplicate legacy
+document mailbox; the direct Windows host must still service it before Protocol
+1.25 can be released.
 
 `anodrel-menu` is a separate portable module for one authenticated session's
 complete bounded menu model, monotonic revision, enabled-command revalidation,

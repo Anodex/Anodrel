@@ -15,6 +15,7 @@ anodrel-file-dialog = { path = "../file-dialog" }
 anodrel-protocol = { path = "../protocol" }
 anodrel-storage = { path = "../storage" }
 anodrel-ui-session = { path = "../ui-session" }
+anodrel-window = { path = "../window" }
 anodrel-wire = { path = "../wire" }
 
 [dev-dependencies]

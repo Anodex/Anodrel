@@ -111,11 +111,13 @@ It does not copy primary state into another session. The host can therefore
 migrate its internal lifetime ownership without changing the meaning of the
 legacy targetless document and event operations.
 
-The native core now supports this as an opt-in session mode: those existing
-targetless operations resolve only the group's `main` view and publish through
-its supplied primary mailbox. They do not drain or validate any secondary
-input. Transport composition and direct Windows group ownership are still in
-progress, so no released application protocol can select or create a view.
+The native core and authenticated transport now support this as an opt-in
+session mode: those existing targetless operations resolve only the group's
+`main` view and publish through its supplied primary mailbox. They do not drain
+or validate any secondary input, and group delivery has no second legacy
+mailbox that can publish a duplicate snapshot. Direct Windows group ownership
+is still in progress, so no released application protocol can select or create
+a view.
 
 ## Latest-document delivery
 

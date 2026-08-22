@@ -120,6 +120,15 @@ event envelopes, dropped-input count, and discarded-stale count. The mailbox
 has no pointer coordinates, renderer work, callback, pipe I/O, or native
 authority.
 
+The host may instead create one portable session-owned view group with the
+primary view's real document and input mailboxes, then give that group to the
+authenticated transport before the peer connects. In that mode the core
+publishes accepted primary snapshots directly through the group's primary
+mailbox; the transport has no second legacy mailbox to publish. Existing
+targetless document and event requests still resolve only `main`, and no
+released protocol can open, select, or observe a secondary view. Direct Windows
+group ownership remains a separate integration step.
+
 For a host that chooses to support caller-initiated session termination, the
 transport can also receive one host-owned `SessionCloseSignal`. A successful,
 capability-checked `session.close` request sets only that one coalescing bit.
