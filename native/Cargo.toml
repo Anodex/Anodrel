@@ -50,6 +50,7 @@ members = [
   "adapters/windows-file-access",
   "adapters/windows-accessibility",
   "adapters/windows-uia",
+  "adapters/windows-uia-client",
   "adapters/windows-appearance",
   "hosts/windows",
   "tools/perf-lab",

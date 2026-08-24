@@ -368,9 +368,11 @@ position, outer geometry, monitor, DPI, or readback.
 adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the Windows accessibility boundary. **UI
 Automation reading is implemented and verified:** Narrator reads an Anodrel
-surface aloud on Windows 11 and an Inspect cross-check of every published
-property passes. An enabled authenticated-session button now exposes one bounded
-Invoke action that joins the existing revision-bound semantic-event mailbox;
+surface aloud on Windows 11, an Inspect cross-check of every earlier flat
+published property passes, and the first-party `--uia-property-probe` verifies
+the fixed current UI Lab property/tree contract through real Windows APIs. An
+enabled authenticated-session button now exposes one bounded Invoke action that
+joins the existing revision-bound semantic-event mailbox;
 the provider also reports and can move the host's keyboard-focus snapshot
 through a bounded UI-thread route, raises one host-only focus-change event for
 a real focus move, raises one host-only `ChildrenInvalidated` structure event
@@ -390,6 +392,8 @@ See `docs/UI_AUTOMATION_FOCUS.md`, `docs/UI_AUTOMATION_EVENTS.md`,
 `docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
 `docs/ACCESSIBILITY_VERIFICATION.md` records the repeatable and hands-on
 verification evidence for that Windows accessibility surface.
+`docs/UI_AUTOMATION_PROBE.md` defines the fixed host-only Windows property and
+tree diagnostic that complements those manual checks.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary, direct

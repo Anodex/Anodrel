@@ -1,10 +1,12 @@
 # Anodrel Windows accessibility
 
 **Status:** **UI Automation reading, host-owned vertical scrolling, bounded
-scroll-item reveal, and live-status events are implemented. Narrator and Inspect
-verified the earlier flat semantic surface; manual hierarchy, scrolling and item
-reveal, button invocation, focus, focus-event, field-value, structure-event,
-and live-status screen-reader checks remain open.**
+scroll-item reveal, and live-status events are implemented. A direct,
+first-party property/tree probe now verifies the current fixed hierarchy against
+real Windows UI Automation; Narrator and Inspect verified the earlier flat
+semantic surface. Manual hierarchy, scrolling and item reveal, button
+invocation, focus, focus-event, field-value, structure-event, and live-status
+screen-reader checks remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
 with its name and role, and a property-by-property cross-check against the
 pre-hierarchy mapping table passed with no failures.

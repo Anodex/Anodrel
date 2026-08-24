@@ -170,8 +170,9 @@ Status: **Direct Windows host in progress**
   rectangles, and hit testing. **The earlier flat UI Automation reading slice
   is verified:** Narrator reads an Anodrel surface aloud on Windows 11, and an
   Inspect cross-check of each then-published property passed with no failures.
-  The new hierarchical tree has focused automated coverage and awaits its own
-  manual screen-reader and client check. Reading is
+  The new hierarchical tree has focused automated coverage and a repeatable
+  first-party real-Windows property/tree check; its separate manual
+  screen-reader check remains open. Reading is
   joined by one bounded action: an enabled button in an authenticated UI session
   exposes `IInvokeProvider`, which queues the same revision-bound semantic
   event as local pointer and keyboard activation (Decision 0069). It has no
@@ -202,7 +203,7 @@ Status: **Direct Windows host in progress**
   or described-by relations, and non-Windows adapters stay deferred. The
   published tree now preserves direct semantic parentage, including clipped groups, with
   immutable parent/child/sibling navigation (Decision 0075); its manual
-  screen-reader and client hierarchy check remains open. See
+  screen-reader hierarchy check remains open. See
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
    `docs/UI_AUTOMATION_EVENTS.md`, and
    `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.

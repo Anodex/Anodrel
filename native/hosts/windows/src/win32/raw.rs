@@ -25,6 +25,7 @@ pub(super) const SW_SHOW: i32 = 5;
 pub(super) const SW_MINIMIZE: i32 = 6;
 pub(super) const SW_RESTORE: i32 = 9;
 pub(super) const WM_DESTROY: Uint = 0x0002;
+pub(super) const WM_CLOSE: Uint = 0x0010;
 pub(super) const WM_PAINT: Uint = 0x000F;
 pub(super) const WM_ERASEBKGND: Uint = 0x0014;
 pub(super) const WM_SETTINGCHANGE: Uint = 0x001A;

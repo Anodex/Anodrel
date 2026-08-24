@@ -41,4 +41,5 @@ anodrel-window = { path = "../../crates/window" }
 anodrel-windows-notifications = { path = "../../adapters/windows-notifications" }
 anodrel-windows-network = { path = "../../adapters/windows-network" }
 anodrel-windows-uia = { path = "../../adapters/windows-uia" }
+anodrel-windows-uia-client = { path = "../../adapters/windows-uia-client" }
 anodrel-windows-accessibility = { path = "../../adapters/windows-accessibility" }

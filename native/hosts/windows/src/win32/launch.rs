@@ -243,16 +243,43 @@ pub fn run_crash_report_selftest() -> Result<(), Box<dyn std::error::Error>> {
 /// update only a visible diagnostic line; they never reach an application or a
 /// native capability boundary.
 pub fn run_ui_lab() -> io::Result<()> {
+    run_windows(vec![ui_lab_window()], None)
+}
+
+/// Verifies the UI Lab's published Windows UI Automation property tree.
+///
+/// The test window and its client result both remain host-private. This route
+/// has no application input and prints a fixed success message only after the
+/// temporary window closes. Its documented scope is intentionally limited to
+/// read-only properties and direct raw-view relationships.
+pub fn run_uia_property_probe() -> io::Result<()> {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    run_windows_after_shown(vec![ui_lab_window()], None, move |windows| {
+        uia_property_probe::spawn(windows[0], sender)
+    })?;
+    match receiver.recv_timeout(std::time::Duration::from_secs(5)) {
+        Ok(Ok(())) => {
+            println!("UI Automation property probe passed.");
+            Ok(())
+        }
+        Ok(Err(_)) => Err(io::Error::other(
+            "UI Automation property probe did not observe the expected fixed tree",
+        )),
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "UI Automation property probe did not report a result",
+        )),
+    }
+}
+
+fn ui_lab_window() -> WindowDefinition {
     let scale = primary_scale();
-    run_windows(
-        vec![WindowDefinition {
-            title: "Anodrel UI Lab".to_owned(),
-            width: (920.0 * scale) as i32,
-            height: (660.0 * scale) as i32,
-            view: View::UiLab(ui_lab::UiLab::new()),
-        }],
-        None,
-    )
+    WindowDefinition {
+        title: "Anodrel UI Lab".to_owned(),
+        width: (920.0 * scale) as i32,
+        height: (660.0 * scale) as i32,
+        view: View::UiLab(ui_lab::UiLab::new()),
+    }
 }
 
 /// Opens one operator-validated UI document as a local developer preview.
@@ -427,6 +454,22 @@ pub(super) fn run_windows(
     definitions: Vec<WindowDefinition>,
     primary_instance: Option<&PrimaryInstance>,
 ) -> io::Result<()> {
+    run_windows_after_shown(definitions, primary_instance, |_| Ok(()))
+}
+
+/// Builds the host's fixed windows, shows each one, and starts one
+/// host-selected follow-up only after they are available to Windows clients.
+///
+/// This remains internal to host launch paths: callers cannot pass a native
+/// handle or select a callback through the application protocol.
+pub(super) fn run_windows_after_shown<F>(
+    definitions: Vec<WindowDefinition>,
+    primary_instance: Option<&PrimaryInstance>,
+    after_shown: F,
+) -> io::Result<()>
+where
+    F: FnOnce(&[Hwnd]) -> io::Result<()>,
+{
     if definitions.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -499,8 +542,12 @@ pub(super) fn run_windows(
         destroy_windows(&windows);
         return Err(error);
     }
-    for window in windows {
+    for &window in &windows {
         show_and_update(window);
+    }
+    if let Err(error) = after_shown(&windows) {
+        destroy_windows(&windows);
+        return Err(error);
     }
     let result = message_loop();
     // The loop normally ends only after the last window is destroyed, but a

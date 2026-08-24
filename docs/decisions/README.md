@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0106: Windows UI Automation probing is host-only and read-only.
+
 - 0105: Development native window-controls template keeps session controls
   targetless.
 

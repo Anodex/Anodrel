@@ -39,6 +39,7 @@ mod stats;
 mod text;
 mod ui_lab;
 mod ui_session_view;
+mod uia_property_probe;
 mod window_group_lab;
 
 use std::{io, ptr, sync::OnceLock, time::Instant};
@@ -77,7 +78,7 @@ pub use launch::run_crash_selftest_panic;
 pub use launch::{
     print_startup_report, run, run_application, run_authenticated_ui_session,
     run_crash_report_selftest, run_grouped_ui_session, run_startup_lab, run_ui_lab, run_ui_preview,
-    run_ui_session, run_window_group_lab, run_window_lab,
+    run_ui_session, run_uia_property_probe, run_window_group_lab, run_window_lab,
 };
 pub use product_tile::FIXTURE_APPLICATION_ID;
 

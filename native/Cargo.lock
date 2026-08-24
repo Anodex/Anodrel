@@ -413,6 +413,7 @@ dependencies = [
  "anodrel-windows-product-session",
  "anodrel-windows-storage",
  "anodrel-windows-uia",
+ "anodrel-windows-uia-client",
  "anodrel-wire",
 ]
 
@@ -553,6 +554,10 @@ dependencies = [
  "anodrel-ui-session",
  "anodrel-windows-accessibility",
 ]
+
+[[package]]
+name = "anodrel-windows-uia-client"
+version = "0.1.0"
 
 [[package]]
 name = "anodrel-wire"
