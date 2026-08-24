@@ -14,6 +14,7 @@
 //! bounded host-owned focus route; it cannot set field text. Nothing tells an
 //! application that assistive technology is listening. See Decisions 0069,
 //! 0071, and 0073.
+//! [`vtable`] holds only exact COM ABI layouts and static dispatch tables.
 
 mod events;
 mod focus;
@@ -28,6 +29,7 @@ mod raw6;
 mod raw7;
 mod scroll;
 mod tree;
+mod vtable;
 
 use std::{
     ffi::c_void,
@@ -62,6 +64,7 @@ use raw6::{
 };
 use raw7::{IID_ISCROLL_ITEM_PROVIDER, UIA_SCROLL_ITEM_PATTERN_ID};
 use tree::Tree;
+use vtable::*;
 
 pub use events::{raise_focus_changed, raise_live_region_changed, raise_structure_changed};
 pub use focus::{
@@ -244,164 +247,6 @@ pub unsafe fn answer_get_object(
     unsafe { release_provider(provider) };
     Some(result)
 }
-
-/// `IRawElementProviderSimple`.
-#[repr(C)]
-struct SimpleVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    get_provider_options: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
-    get_pattern_provider: unsafe extern "system" fn(*mut c_void, i32, *mut *mut c_void) -> Hresult,
-    get_property_value: unsafe extern "system" fn(*mut c_void, i32, *mut Variant) -> Hresult,
-    get_host_raw_element_provider:
-        unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> Hresult,
-}
-
-/// `IRawElementProviderFragment`.
-#[repr(C)]
-struct FragmentVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    navigate: unsafe extern "system" fn(*mut c_void, i32, *mut *mut c_void) -> Hresult,
-    get_runtime_id: unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> Hresult,
-    get_bounding_rectangle: unsafe extern "system" fn(*mut c_void, *mut UiaRect) -> Hresult,
-    get_embedded_fragment_roots:
-        unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> Hresult,
-    set_focus: unsafe extern "system" fn(*mut c_void) -> Hresult,
-    get_fragment_root: unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> Hresult,
-}
-
-/// `IRawElementProviderFragmentRoot`.
-#[repr(C)]
-struct FragmentRootVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    element_provider_from_point:
-        unsafe extern "system" fn(*mut c_void, f64, f64, *mut *mut c_void) -> Hresult,
-    get_focus: unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> Hresult,
-}
-
-/// `IInvokeProvider`.
-#[repr(C)]
-struct InvokeVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    invoke: unsafe extern "system" fn(*mut c_void) -> Hresult,
-}
-
-/// `IValueProvider`.
-#[repr(C)]
-struct ValueVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    set_value: unsafe extern "system" fn(*mut c_void, *const u16) -> Hresult,
-    get_value: unsafe extern "system" fn(*mut c_void, *mut *mut u16) -> Hresult,
-    get_is_read_only: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
-}
-
-/// `IScrollProvider`.
-#[repr(C)]
-struct ScrollVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    scroll: unsafe extern "system" fn(*mut c_void, i32, i32) -> Hresult,
-    set_scroll_percent: unsafe extern "system" fn(*mut c_void, f64, f64) -> Hresult,
-    get_horizontal_scroll_percent: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
-    get_vertical_scroll_percent: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
-    get_horizontal_view_size: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
-    get_vertical_view_size: unsafe extern "system" fn(*mut c_void, *mut f64) -> Hresult,
-    get_horizontally_scrollable: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
-    get_vertically_scrollable: unsafe extern "system" fn(*mut c_void, *mut i32) -> Hresult,
-}
-
-/// `IScrollItemProvider`.
-#[repr(C)]
-struct ScrollItemVtbl {
-    query_interface:
-        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> Hresult,
-    add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
-    release: unsafe extern "system" fn(*mut c_void) -> u32,
-    scroll_into_view: unsafe extern "system" fn(*mut c_void) -> Hresult,
-}
-
-static SIMPLE_VTBL: SimpleVtbl = SimpleVtbl {
-    query_interface: simple_query_interface,
-    add_ref: simple_add_ref,
-    release: simple_release,
-    get_provider_options,
-    get_pattern_provider,
-    get_property_value,
-    get_host_raw_element_provider,
-};
-
-static FRAGMENT_VTBL: FragmentVtbl = FragmentVtbl {
-    query_interface: fragment_query_interface,
-    add_ref: fragment_add_ref,
-    release: fragment_release,
-    navigate,
-    get_runtime_id,
-    get_bounding_rectangle,
-    get_embedded_fragment_roots,
-    set_focus,
-    get_fragment_root,
-};
-
-static FRAGMENT_ROOT_VTBL: FragmentRootVtbl = FragmentRootVtbl {
-    query_interface: root_query_interface,
-    add_ref: root_add_ref,
-    release: root_release,
-    element_provider_from_point,
-    get_focus,
-};
-
-static INVOKE_VTBL: InvokeVtbl = InvokeVtbl {
-    query_interface: invoke_query_interface,
-    add_ref: invoke_add_ref,
-    release: invoke_release,
-    invoke,
-};
-
-static VALUE_VTBL: ValueVtbl = ValueVtbl {
-    query_interface: value_query_interface,
-    add_ref: value_add_ref,
-    release: value_release,
-    set_value,
-    get_value,
-    get_is_read_only,
-};
-
-static SCROLL_VTBL: ScrollVtbl = ScrollVtbl {
-    query_interface: scroll_query_interface,
-    add_ref: scroll_add_ref,
-    release: scroll_release,
-    scroll,
-    set_scroll_percent,
-    get_horizontal_scroll_percent,
-    get_vertical_scroll_percent,
-    get_horizontal_view_size,
-    get_vertical_view_size,
-    get_horizontally_scrollable,
-    get_vertically_scrollable,
-};
-
-static SCROLL_ITEM_VTBL: ScrollItemVtbl = ScrollItemVtbl {
-    query_interface: scroll_item_query_interface,
-    add_ref: scroll_item_add_ref,
-    release: scroll_item_release,
-    scroll_into_view,
-};
 
 /// One reference-counted provider for the window root or one of its elements.
 ///

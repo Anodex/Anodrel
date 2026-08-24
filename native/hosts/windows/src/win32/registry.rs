@@ -17,6 +17,15 @@ use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 use anodrel_menu::MenuRequest;
 use anodrel_windows_file_access::WindowsFileTextService;
 
+mod window_commands;
+
+pub(super) use window_commands::{
+    complete_window_focus_request, complete_window_fullscreen_request,
+    complete_window_size_request, complete_window_state_request, complete_window_title_request,
+    set_window_fullscreen_restore, take_window_focus_request, take_window_fullscreen_request,
+    take_window_size_request, take_window_state_request, take_window_title_request,
+};
+
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
 
 /// The immutable accessibility data published for one window-message query.
@@ -226,178 +235,6 @@ pub(super) fn complete_notification_request(
                 session.complete_notification_request(request_id, shown),
             ))
         }
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending title proposal only from its associated UI session.
-///
-/// The composed caption comes back with it so the User32 call can run outside
-/// this lock, matching how a notification is serviced.
-pub(super) fn take_window_title_request(window: Hwnd) -> io::Result<Option<(u64, String)>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_window_title_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one title proposal from its owning native UI session.
-pub(super) fn complete_window_title_request(
-    window: Hwnd,
-    request_id: u64,
-    applied: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(
-            session.complete_window_title_request(request_id, applied),
-        )),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending state request only from its associated UI session.
-///
-/// The closed portable value returns to the UI thread, where it becomes the
-/// one documented User32 action outside this registry lock.
-pub(super) fn take_window_state_request(
-    window: Hwnd,
-) -> io::Result<Option<(u64, anodrel_window::WindowState)>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_window_state_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one state request from its owning native UI session.
-pub(super) fn complete_window_state_request(
-    window: Hwnd,
-    request_id: u64,
-    applied: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(
-            session.complete_window_state_request(request_id, applied),
-        )),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending foreground request only from its associated UI session.
-///
-/// The request carries no target: the lookup key is the host-owned window that
-/// received its timer message, so this call cannot route it to another view.
-pub(super) fn take_window_focus_request(window: Hwnd) -> io::Result<Option<u64>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_window_focus_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one foreground request from its owning native UI session.
-pub(super) fn complete_window_focus_request(
-    window: Hwnd,
-    request_id: u64,
-    requested: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(
-            session.complete_window_focus_request(request_id, requested),
-        )),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending fullscreen mode only from its associated UI session.
-///
-/// The returned restore facts are a private copy held by that same view. The
-/// caller never sees a window handle, monitor, rectangle, or current-state
-/// value; it can only hand the known host window to the native adapter.
-pub(super) fn take_window_fullscreen_request(
-    window: Hwnd,
-) -> io::Result<
-    Option<(
-        u64,
-        anodrel_window::WindowFullscreenMode,
-        Option<super::fullscreen::FullscreenRestore>,
-    )>,
-> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session
-            .take_window_fullscreen_request()
-            .map(|(request_id, mode)| (request_id, mode, session.fullscreen_restore()))),
-        _ => Ok(None),
-    }
-}
-
-/// Stores or clears private fullscreen restoration facts for one UI session.
-///
-/// This is deliberately independent from replying to the protocol worker: a
-/// UI-thread transition that finishes as a worker expires must remain
-/// restorable rather than losing its only copy of the original placement.
-pub(super) fn set_window_fullscreen_restore(
-    window: Hwnd,
-    restore: Option<super::fullscreen::FullscreenRestore>,
-) -> io::Result<Option<()>> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => {
-            session.set_fullscreen_restore(restore);
-            Ok(Some(()))
-        }
-        _ => Ok(None),
-    }
-}
-
-/// Completes one fullscreen request from its owning native UI session.
-pub(super) fn complete_window_fullscreen_request(
-    window: Hwnd,
-    request_id: u64,
-    applied: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(
-            session.complete_window_fullscreen_request(request_id, applied),
-        )),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending bounded client-size request from its associated session.
-///
-/// The boolean is internal-only: it tells the UI thread that preserving a
-/// private fullscreen restoration path takes precedence over sizing. Neither
-/// this fact nor any native geometry leaves the host boundary.
-pub(super) fn take_window_size_request(
-    window: Hwnd,
-) -> io::Result<Option<(u64, anodrel_window::WindowSize, bool)>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session
-            .take_window_size_request()
-            .map(|(request_id, size)| (request_id, size, session.fullscreen_restore().is_some()))),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one client-size request through its owning native UI session.
-pub(super) fn complete_window_size_request(
-    window: Hwnd,
-    request_id: u64,
-    applied: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(
-            session.complete_window_size_request(request_id, applied),
-        )),
         _ => Ok(None),
     }
 }

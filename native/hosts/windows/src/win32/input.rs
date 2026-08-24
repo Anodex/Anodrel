@@ -4,6 +4,8 @@
 //! window. Its routing stays inside host-owned UI state and never accepts
 //! native input targets or commands from the application protocol.
 
+use std::mem;
+
 use super::*;
 
 /// Extracts the signed client coordinates packed into an `LPARAM`.
