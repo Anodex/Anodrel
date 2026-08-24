@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0110: Windows UI Automation probe keeps UI Lab buttons non-invokable.
+
 - 0109: Windows UI Automation focus probing stays fixed and host-only.
 
 - 0108: Windows UI Automation value probing remains fixed and read-only.

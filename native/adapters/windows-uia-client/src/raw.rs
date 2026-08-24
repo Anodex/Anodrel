@@ -15,6 +15,7 @@ pub(crate) const VT_BSTR: u16 = 8;
 pub(crate) const UIA_CONTROL_TYPE_PROPERTY_ID: i32 = 30_003;
 pub(crate) const UIA_NAME_PROPERTY_ID: i32 = 30_005;
 pub(crate) const UIA_AUTOMATION_ID_PROPERTY_ID: i32 = 30_011;
+pub(crate) const UIA_INVOKE_PATTERN_ID: i32 = 10_000;
 pub(crate) const UIA_VALUE_PATTERN_ID: i32 = 10_002;
 
 /// The UI Automation client coclass from `UIAutomationClient.h`.
@@ -135,7 +136,8 @@ pub(crate) struct ElementVtable {
     pub(crate) current_pattern_as:
         unsafe extern "system" fn(*mut Element, i32, *const Guid, *mut *mut c_void) -> Hresult,
     pub(crate) cached_pattern_as: *const c_void,
-    pub(crate) current_pattern: *const c_void,
+    pub(crate) current_pattern:
+        unsafe extern "system" fn(*mut Element, i32, *mut *mut Unknown) -> Hresult,
     pub(crate) cached_pattern: *const c_void,
     pub(crate) cached_parent: *const c_void,
     pub(crate) cached_children: *const c_void,
@@ -282,7 +284,7 @@ unsafe extern "system" {
 mod tests {
     use super::{
         AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_VALUE_PATTERN, Point, Rect,
-        UIA_VALUE_PATTERN_ID, ValuePatternVtable, Variant,
+        UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID, ValuePatternVtable, Variant,
     };
 
     #[test]
@@ -316,9 +318,14 @@ mod tests {
             14 * core::mem::size_of::<*const core::ffi::c_void>()
         );
         assert_eq!(
+            core::mem::offset_of!(ElementVtable, current_pattern),
+            16 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
             core::mem::size_of::<ValuePatternVtable>(),
             8 * core::mem::size_of::<*const core::ffi::c_void>()
         );
+        assert_eq!(UIA_INVOKE_PATTERN_ID, 10_000);
         assert_eq!(UIA_VALUE_PATTERN_ID, 10_002);
         assert_eq!(IID_I_UI_AUTOMATION_VALUE_PATTERN.data1, 0xa94c_d8b1);
         assert_eq!(

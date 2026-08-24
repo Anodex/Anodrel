@@ -106,6 +106,13 @@ fn verify_node(
     if !(expected.node == client.node(element)?) {
         return Err(UiAutomationError::UnexpectedTree);
     }
+    // The fixed UI Lab has local diagnostic buttons but no authenticated
+    // application action mailbox. Its semantic nodes must therefore never
+    // publish Invoke through Windows; authenticated-session controls have a
+    // separate, revision-bound boundary.
+    if client.has_invoke_pattern(element)? {
+        return Err(UiAutomationError::UnexpectedTree);
+    }
     let mut children = match view {
         AutomationView::Raw => client.raw_children(element)?,
         AutomationView::Control => client.control_children(element)?,

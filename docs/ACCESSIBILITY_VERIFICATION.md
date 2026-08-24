@@ -3,14 +3,15 @@
 ## Verification
 
 `--uia-property-probe` is the repeatable host-only property, raw-tree,
-control-view, fixed-geometry, and fixed-Value-pattern check for the UI Lab.
+control-view, fixed-geometry, fixed-Value-pattern, and non-Invoke-pattern
+check for the UI Lab.
 `--uia-focus-probe` separately verifies its fixed UI Automation focus route.
 They complement the manual checks below; they do not replace Narrator's
 spoken-output or Inspect's highlight verification. See
 `docs/UI_AUTOMATION_PROBE.md`, `docs/UI_AUTOMATION_FOCUS_PROBE.md`, and
-Decisions 0106 through 0109.
+Decisions 0106 through 0110.
 
-### Automated UI Lab property/tree/geometry/Value-pattern acceptance
+### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 
 This passed on Windows on 2026-08-24. The direct first-party client created a
 separate MTA apartment, attached to the temporary UI Lab through its real
@@ -35,10 +36,19 @@ confirmed the compiled empty initial value and `IsReadOnly = true`; the returned
 `BSTR` was copied and released inside the private worker. This establishes the
 real client/provider pattern bridge without reading a person's text.
 
+The probe also queries each fixed Anodrel semantic node only for the presence
+of the standard Invoke pattern. Every query must return no interface: UI Lab
+buttons are local diagnostics, not authenticated application actions. It does
+not obtain an Invoke-method interface or call an action.
+
 It intentionally did **not** call any interactive pattern, look up focus, or
 register an event handler. Its only field-text read is the compiled empty Value
 check described above. Arbitrary geometry, visible highlight placement, and
-interactive behavior remain distinct acceptance concerns.
+interactive behavior remain distinct acceptance concerns. Re-run it with the
+command in `docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact
+property/tree boundary, including control-view navigation, the fixed hit-test
+target, and the UI Lab's lack of an application Invoke route, not spoken output
+or visual highlight geometry.
 
 ### Automated UI Lab focus acceptance
 
@@ -54,10 +64,6 @@ read a value, invoke a control, register an event, test for assistive
 technology, or force foreground activation. It proves one fixed focus route,
 not Narrator speech, keyboard input, focus-event delivery, or arbitrary focus
 control. Re-run it with the command in `docs/UI_AUTOMATION_FOCUS_PROBE.md`.
-Re-run it with the command in
-`docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact property/tree boundary,
-including control-view navigation and one fixed hit-test target, not spoken
-output or visual highlight geometry.
 
 Automated tests cover the mapping: every role's control type and focusability,
 each property's source, empty and named nodes, rectangle conversion at several

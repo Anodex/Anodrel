@@ -203,6 +203,18 @@ impl UiAutomationClient {
         optional_element(result, element)
     }
 
+    /// Returns whether a fixed host diagnostic element exposes `Invoke`.
+    ///
+    /// This inspects the standard pattern's presence only. It never obtains an
+    /// Invoke-method interface, calls an action, or accepts an element from an
+    /// application, so it cannot become an application interaction route.
+    pub fn has_invoke_pattern(
+        &self,
+        element: &UiAutomationElement,
+    ) -> Result<bool, UiAutomationError> {
+        self.has_pattern(element, raw::UIA_INVOKE_PATTERN_ID)
+    }
+
     /// Reads the closed property set this diagnostic is allowed to inspect.
     pub fn node(
         &self,
@@ -389,6 +401,29 @@ impl UiAutomationClient {
             return Ok(None);
         };
         Ok(Some(Com::from_out(pattern.as_ptr().cast())?))
+    }
+
+    fn has_pattern(
+        &self,
+        element: &UiAutomationElement,
+        pattern_id: i32,
+    ) -> Result<bool, UiAutomationError> {
+        let mut pattern = core::ptr::null_mut();
+        // SAFETY: the element is live, `pattern_id` is a fixed Windows SDK
+        // identifier chosen by this host diagnostic, and `pattern` is writable
+        // storage for the optional IUnknown interface Windows returns.
+        let result = unsafe {
+            let vtable = (*element.raw.as_ptr()).vtable;
+            ((*vtable).current_pattern)(element.raw.as_ptr(), pattern_id, &mut pattern)
+        };
+        if !succeeded(result) {
+            return Err(UiAutomationError::Query(result));
+        }
+        let Some(pattern) = core::ptr::NonNull::new(pattern) else {
+            return Ok(false);
+        };
+        let _pattern = Com::from_out(pattern.as_ptr())?;
+        Ok(true)
     }
 }
 

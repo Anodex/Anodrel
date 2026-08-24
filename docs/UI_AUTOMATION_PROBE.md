@@ -21,6 +21,9 @@ Narrator. It repeats the checks that can be compared to a fixed contract:
 - that same field's provider-side `IValueProvider` is observable through
   Windows' client-side `IUIAutomationValuePattern`, with its compiled empty
   initial value and `IsReadOnly = true`.
+- no Anodrel semantic node in the fixed UI Lab exposes the standard `Invoke`
+  pattern; its displayed buttons are local diagnostics, not authenticated
+  application actions.
 
 It gives an operator one process exit status and a fixed console result. It
 does not print returned property values, expose them to an application, or
@@ -54,9 +57,10 @@ field, UI document field, callback, listener check, or UI Automation pointer
 crosses this boundary. The client inspects only the fixed host-created UI Lab
 window. It neither calls Invoke, SetFocus, Scroll, SetValue, ClickablePoint,
 nor registers an event handler. It reads only the compiled empty value from the
-fixed field's read-only client-side Value pattern. Its one geometry query derives
-the centre from the fixed field's current published rectangle; it accepts no
-point or selector.
+fixed field's read-only client-side Value pattern and checks only the presence
+of the standard Invoke pattern; it never obtains an Invoke-method interface or
+calls an action. Its one geometry query derives the centre from the fixed
+field's current published rectangle; it accepts no point or selector.
 The host changes only the temporary test window's z-order for that query, not
 an application's window state or any other process's window state.
 
@@ -65,4 +69,4 @@ The property probe supplements rather than replaces the manual checks in
 Inspect or Accessibility Insights still proves highlight geometry and visual
 tool interoperability.
 
-See Decisions 0106, 0107, and 0108 and `docs/ACCESSIBILITY.md`.
+See Decisions 0106 through 0110 and `docs/ACCESSIBILITY.md`.

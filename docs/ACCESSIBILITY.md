@@ -4,8 +4,9 @@
 scroll-item reveal, and live-status events are implemented. Direct,
 first-party property/tree/geometry and focus probes now verify the current
 fixed hierarchy in raw and control views, plus one fixed field rectangle, hit
-target, read-only Value pattern, and `SetFocus` result against real Windows UI
-Automation; Narrator and Inspect verified the earlier flat semantic surface.
+target, read-only Value pattern, absence of a UI Lab Invoke pattern, and
+`SetFocus` result against real Windows UI Automation; Narrator and Inspect
+verified the earlier flat semantic surface.
 Manual hierarchy, scrolling and item reveal, button invocation, focus,
 focus-event, field-value, structure-event, and live-status screen-reader checks
 remain open.**

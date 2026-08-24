@@ -372,7 +372,8 @@ surface aloud on Windows 11, an Inspect cross-check of every earlier flat
 published property passes, and the first-party `--uia-property-probe` and
 `--uia-focus-probe` verify the fixed current UI Lab's raw/control-view
 property/tree contract, fixed field rectangle, hit target, read-only Value
-pattern, and `SetFocus` result through real Windows APIs. An enabled
+pattern, absence of a UI Lab Invoke pattern, and `SetFocus` result through real
+Windows APIs. An enabled
 authenticated-session button now exposes one bounded Invoke action that joins
 the existing revision-bound semantic-event mailbox;
 the provider also reports and can move the host's keyboard-focus snapshot
