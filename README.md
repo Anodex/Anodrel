@@ -370,7 +370,7 @@ adapter used by the native interactive UI labs.
 Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11, an Inspect cross-check of every earlier flat
 published property passes, and the first-party `--uia-property-probe`,
-`--uia-focus-probe`, `--uia-focus-event-probe`, and `--uia-invoke-probe` verify the fixed current UI
+`--uia-focus-probe`, and `--uia-focus-event-probe` verify the fixed current UI
 Lab's raw/control-view
 property/tree contract, fixed field rectangle, hit target, read-only Value
 pattern, absence of a UI Lab Invoke pattern, semantic `SetFocus` result, and
@@ -382,7 +382,9 @@ the provider also reports and can move the host's keyboard-focus snapshot
 through a bounded UI-thread route, raises one host-only focus-change event for
 a real focus move, raises one host-only `ChildrenInvalidated` structure event
 after an accepted document replacement, and exposes read-only current field
-values. The first visible overflowing native scroll group now exposes one
+values. The structure-event probe verifies the fixed root event after one
+compiled authenticated document replacement and its normal child-close path.
+The first visible overflowing native scroll group now exposes one
 host-owned vertical ScrollPattern through the same retained offset as pointer,
 wheel, and keyboard input. Its bounded descendants expose the companion
 ScrollItem pattern, so an assistive technology can reveal an off-screen item
@@ -401,6 +403,8 @@ verification evidence for that Windows accessibility surface.
 tree diagnostic that complements those manual checks.
 `docs/UI_AUTOMATION_INVOKE_PROBE.md` defines the separate compiled-session
 Windows Invoke acceptance diagnostic.
+`docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md` defines the separate
+compiled-session Windows structure-event acceptance diagnostic.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary, direct

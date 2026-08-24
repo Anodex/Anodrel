@@ -13,6 +13,34 @@ use crate::{
 
 use super::{UiAutomationClient, UiAutomationElement, UiAutomationError};
 
+/// One client-side Invoke interface prepared for a fixed host diagnostic.
+///
+/// It owns the interface Windows returned for a previously selected element
+/// and consumes itself on the one standard Invoke call. The direct-client
+/// adapter remains host-only: no Anodrel application, protocol message, or SDK
+/// caller can create an element, receive this interface, or observe its result.
+pub struct UiAutomationInvocation {
+    pattern: Com<raw::InvokePattern>,
+}
+
+impl UiAutomationInvocation {
+    /// Invokes the already-selected control exactly once.
+    pub fn invoke(self) -> Result<(), UiAutomationError> {
+        // SAFETY: this guard owns the exact client-side Invoke interface
+        // Windows returned, and the vtable slot is the documented
+        // `IUIAutomationInvokePattern::Invoke` member.
+        let result = unsafe {
+            let vtable = (*self.pattern.as_ptr()).vtable;
+            ((*vtable).invoke)(self.pattern.as_ptr())
+        };
+        if succeeded(result) {
+            Ok(())
+        } else {
+            Err(UiAutomationError::Query(result))
+        }
+    }
+}
+
 impl UiAutomationClient {
     pub(super) fn value_pattern(
         &self,
@@ -52,6 +80,21 @@ impl UiAutomationClient {
             )
         };
         optional_pattern(result, pattern)
+    }
+
+    /// Obtains the one standard Invoke interface for a fixed diagnostic node.
+    ///
+    /// Holding the returned interface lets a short-lived event diagnostic arm
+    /// its private listener before it performs the one already-selected action.
+    /// No target, input, result, or interface crosses into an application.
+    pub fn prepare_invoke(
+        &self,
+        element: &UiAutomationElement,
+    ) -> Result<UiAutomationInvocation, UiAutomationError> {
+        let Some(pattern) = self.invoke_pattern(element)? else {
+            return Err(UiAutomationError::UnexpectedTree);
+        };
+        Ok(UiAutomationInvocation { pattern })
     }
 }
 

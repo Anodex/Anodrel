@@ -61,6 +61,7 @@ members = [
   "tools/native-client-sample",
   "tools/native-network-client-sample",
   "tools/native-ui-client-sample",
+  "tools/native-structure-event-client",
 ]
 resolver = "2"
 

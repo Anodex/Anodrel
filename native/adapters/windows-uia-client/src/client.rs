@@ -10,7 +10,8 @@ use crate::{
     raw,
 };
 
-pub use events::UiAutomationFocusSubscription;
+pub use events::{UiAutomationFocusSubscription, UiAutomationStructureSubscription};
+pub use patterns::UiAutomationInvocation;
 
 /// A safe failure category from the direct Windows UI Automation client.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,6 +28,8 @@ pub enum UiAutomationError {
     PropertyType,
     /// Windows returned a non-UTF-16 BSTR for a textual property.
     PropertyText,
+    /// A fixed host diagnostic did not receive its bounded Windows event.
+    EventNotObserved,
     /// A fixed host diagnostic observed a different tree than its contract.
     UnexpectedTree,
 }
@@ -40,6 +43,7 @@ impl fmt::Display for UiAutomationError {
             Self::NullInterface => "UI Automation client received no interface",
             Self::PropertyType => "UI Automation property had an unexpected representation",
             Self::PropertyText => "UI Automation property text was invalid",
+            Self::EventNotObserved => "UI Automation event was not delivered before its bound",
             Self::UnexpectedTree => {
                 "UI Automation tree differed from the fixed diagnostic contract"
             }
@@ -226,21 +230,7 @@ impl UiAutomationClient {
     /// session window. This client accepts neither an action ID nor input data,
     /// and exposes no Invoke result to an application, protocol, or SDK caller.
     pub fn invoke(&self, element: &UiAutomationElement) -> Result<(), UiAutomationError> {
-        let Some(pattern) = self.invoke_pattern(element)? else {
-            return Err(UiAutomationError::UnexpectedTree);
-        };
-        // SAFETY: `pattern` owns the exact client-side Invoke interface Windows
-        // returned for this element, and the vtable slot is the documented
-        // `IUIAutomationInvokePattern::Invoke` member.
-        let result = unsafe {
-            let vtable = (*pattern.as_ptr()).vtable;
-            ((*vtable).invoke)(pattern.as_ptr())
-        };
-        if succeeded(result) {
-            Ok(())
-        } else {
-            Err(UiAutomationError::Query(result))
-        }
+        self.prepare_invoke(element)?.invoke()
     }
 
     /// Reads the closed property set this diagnostic is allowed to inspect.

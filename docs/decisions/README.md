@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0114: Windows UI Automation structure-event probe separates setup from replacement.
+
 - 0113: Windows UI Automation focus probe reads provider focus.
 
 - 0112: Windows UI Automation focus-event probe keeps listening private.

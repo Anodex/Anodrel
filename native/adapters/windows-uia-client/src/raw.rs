@@ -22,6 +22,8 @@ pub(crate) const UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID: i32 = 30_008;
 pub(crate) const UIA_AUTOMATION_ID_PROPERTY_ID: i32 = 30_011;
 pub(crate) const UIA_INVOKE_PATTERN_ID: i32 = 10_000;
 pub(crate) const UIA_VALUE_PATTERN_ID: i32 = 10_002;
+pub(crate) const TREE_SCOPE_ELEMENT: i32 = 1;
+pub(crate) const STRUCTURE_CHANGE_CHILDREN_INVALIDATED: i32 = 2;
 
 /// The UI Automation client coclass from `UIAutomationClient.h`.
 pub(crate) const CLSID_C_UI_AUTOMATION: Guid = Guid::new(
@@ -54,6 +56,15 @@ pub(crate) const IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER: Guid = Guid::n
     0x5c69,
     0x4290,
     [0x97, 0x45, 0x7a, 0x7f, 0x97, 0x16, 0x94, 0x68],
+);
+
+/// The `IUIAutomationStructureChangedEventHandler` callback interface from
+/// `UIAutomationClient.h`.
+pub(crate) const IID_I_UI_AUTOMATION_STRUCTURE_CHANGED_EVENT_HANDLER: Guid = Guid::new(
+    0xe81d_1b4e,
+    0x11c5,
+    0x42f8,
+    [0x97, 0x54, 0xe7, 0x03, 0x6c, 0x79, 0xf0, 0x54],
 );
 
 /// The client-side `IUIAutomationValuePattern` interface from
@@ -159,8 +170,15 @@ pub(crate) struct AutomationVtable {
     pub(crate) add_property_changed_event_handler_native_array: *const c_void,
     pub(crate) add_property_changed_event_handler: *const c_void,
     pub(crate) remove_property_changed_event_handler: *const c_void,
-    pub(crate) add_structure_changed_event_handler: *const c_void,
-    pub(crate) remove_structure_changed_event_handler: *const c_void,
+    pub(crate) add_structure_changed_event_handler: unsafe extern "system" fn(
+        *mut Automation,
+        *mut Element,
+        i32,
+        *mut c_void,
+        *mut c_void,
+    ) -> Hresult,
+    pub(crate) remove_structure_changed_event_handler:
+        unsafe extern "system" fn(*mut Automation, *mut Element, *mut c_void) -> Hresult,
     pub(crate) add_focus_changed_event_handler:
         unsafe extern "system" fn(*mut Automation, *mut c_void, *mut c_void) -> Hresult,
     pub(crate) remove_focus_changed_event_handler:
@@ -356,9 +374,11 @@ unsafe extern "system" {
 mod tests {
     use super::{
         AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER,
-        IID_I_UI_AUTOMATION_INVOKE_PATTERN, IID_I_UI_AUTOMATION_VALUE_PATTERN, InvokePatternVtable,
-        Point, Rect, UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, UIA_INVOKE_PATTERN_ID,
-        UIA_VALUE_PATTERN_ID, VT_BOOL, ValuePatternVtable, Variant,
+        IID_I_UI_AUTOMATION_INVOKE_PATTERN, IID_I_UI_AUTOMATION_STRUCTURE_CHANGED_EVENT_HANDLER,
+        IID_I_UI_AUTOMATION_VALUE_PATTERN, InvokePatternVtable, Point, Rect,
+        STRUCTURE_CHANGE_CHILDREN_INVALIDATED, TREE_SCOPE_ELEMENT,
+        UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID, VT_BOOL,
+        ValuePatternVtable, Variant,
     };
 
     #[test]
@@ -404,6 +424,14 @@ mod tests {
             40 * core::mem::size_of::<*const core::ffi::c_void>()
         );
         assert_eq!(
+            core::mem::offset_of!(AutomationVtable, add_structure_changed_event_handler),
+            37 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
+            core::mem::offset_of!(AutomationVtable, remove_structure_changed_event_handler),
+            38 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
             core::mem::size_of::<ValuePatternVtable>(),
             8 * core::mem::size_of::<*const core::ffi::c_void>()
         );
@@ -415,6 +443,8 @@ mod tests {
         assert_eq!(UIA_VALUE_PATTERN_ID, 10_002);
         assert_eq!(UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, 30_008);
         assert_eq!(VT_BOOL, 11);
+        assert_eq!(TREE_SCOPE_ELEMENT, 1);
+        assert_eq!(STRUCTURE_CHANGE_CHILDREN_INVALIDATED, 2);
         assert_eq!(
             IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER.data1,
             0xc270_f6b5
@@ -422,6 +452,14 @@ mod tests {
         assert_eq!(
             IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER.data4,
             [0x97, 0x45, 0x7a, 0x7f, 0x97, 0x16, 0x94, 0x68]
+        );
+        assert_eq!(
+            IID_I_UI_AUTOMATION_STRUCTURE_CHANGED_EVENT_HANDLER.data1,
+            0xe81d_1b4e
+        );
+        assert_eq!(
+            IID_I_UI_AUTOMATION_STRUCTURE_CHANGED_EVENT_HANDLER.data4,
+            [0x97, 0x54, 0xe7, 0x03, 0x6c, 0x79, 0xf0, 0x54]
         );
         assert_eq!(IID_I_UI_AUTOMATION_INVOKE_PATTERN.data1, 0xfb37_7fbe);
         assert_eq!(

@@ -45,11 +45,12 @@ pub fn raise_structure_changed(window: raw::Handle, publication: UiAutomationPub
     // retain its own reference while it delivers the best-effort notification.
     unsafe {
         let simple = (&raw mut (*provider).simple).cast::<c_void>();
+        let (runtime_id, runtime_id_len) = children_invalidated_arguments();
         let _ = raw::UiaRaiseStructureChangedEvent(
             simple,
             raw::STRUCTURE_CHANGE_CHILDREN_INVALIDATED,
-            std::ptr::null(),
-            0,
+            runtime_id,
+            runtime_id_len,
         );
         release_provider(provider);
     }
@@ -97,6 +98,10 @@ fn structure_event_tree(
     (!tree.is_empty()).then_some(tree)
 }
 
+fn children_invalidated_arguments() -> (*const i32, i32) {
+    (std::ptr::null(), 0)
+}
+
 fn live_region_event_tree(
     title: Vec<u16>,
     publication: UiAutomationPublication,
@@ -113,7 +118,10 @@ mod tests {
     use anodrel_ui_document::{decode, decode_v3};
     use anodrel_windows_accessibility::{ClientOrigin, accessible_elements};
 
-    use super::{focus_event_tree, live_region_event_tree, structure_event_tree};
+    use super::{
+        children_invalidated_arguments, focus_event_tree, live_region_event_tree,
+        structure_event_tree,
+    };
     use crate::UiAutomationPublication;
 
     const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root","kind":"stack","axis":"vertical","padding":{"left":0,"top":0,"right":0,"bottom":0},"gap":10,"surfaceTone":"plain","children":[{"id":"heading","kind":"text","value":"Anodrel","fontSize":16,"tone":"primary"},{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}]}}"#;
@@ -166,6 +174,13 @@ mod tests {
             )
             .is_some()
         );
+    }
+
+    #[test]
+    fn children_invalidated_carries_no_provider_runtime_id_payload() {
+        let (runtime_id, runtime_id_len) = children_invalidated_arguments();
+        assert!(runtime_id.is_null());
+        assert_eq!(runtime_id_len, 0);
     }
 
     #[test]

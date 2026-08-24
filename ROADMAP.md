@@ -196,9 +196,9 @@ Status: **Direct Windows host in progress**
   a strictly newer session document, its root raises one host-only
   `ChildrenInvalidated` structure event; it has no listener, callback, or
   application surface (Decision 0076). Unit and host checks cover all five
-  routes; the compiled Invoke, focus-property, and focus-event routes are now
-  real-Windows verified, while manual screen-reader activation, focus control
-  and event, field-value,
+  routes; the compiled Invoke, focus-property, focus-event, and structure-event
+  routes are now real-Windows verified, while manual screen-reader activation,
+  focus control and event, field-value,
   and structure-event verification remain open. **Protocol 1.26 adds one bounded
   live-status slice:** an authenticated v3 session document may contain one
   visible semantic status, which a later changed visible value maps to a

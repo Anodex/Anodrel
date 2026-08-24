@@ -35,6 +35,13 @@ double-click `start-uia-invoke-probe.bat`. It invokes the one fixed button
 without a local click and passes only after the child receives its normal
 revision-bound event and closes its session.
 
+To repeat the separate host-only Windows UI Automation structure-event
+acceptance check, follow `docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md` or
+double-click `start-uia-structure-event-probe.bat`. Its compiled child first
+renders one document, then replaces it only after the probe's fixed action; the
+probe passes only after Windows delivers the resulting root structure event and
+the child closes through its second fixed action.
+
 The constrained generated native template uses the same host-controlled UI-session
 mechanics, but is created in a new directory by `anodrel-native-app-tool`.
 Follow `docs/NATIVE_UI_TEMPLATE.md` to create, build, and run it through

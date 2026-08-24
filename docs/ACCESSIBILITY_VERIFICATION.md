@@ -9,12 +9,17 @@ check for the UI Lab.
 `--uia-focus-event-probe` separately verifies one fixed outbound focus-change
 event route.
 `--uia-invoke-probe` proves one compiled authenticated button through its
-normal semantic-event and session-close path. They complement the manual
+normal semantic-event and session-close path.
+`--uia-structure-event-probe` proves one compiled authenticated document
+replacement through its fixed outbound structure event and normal child-close
+path. They complement the manual
 checks below; they do not replace Narrator's spoken-output or Inspect's
 highlight verification. See `docs/UI_AUTOMATION_PROBE.md`,
 `docs/UI_AUTOMATION_FOCUS_PROBE.md`,
 `docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`,
-`docs/UI_AUTOMATION_INVOKE_PROBE.md`, and Decisions 0106 through 0113.
+`docs/UI_AUTOMATION_INVOKE_PROBE.md`,
+`docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md`, and Decisions 0106 through
+0114.
 
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 
@@ -101,6 +106,25 @@ route and the existing bounded semantic mailbox end to end; it does not prove
 screen-reader speech, a caller-selected action, disabled-button refusal, or
 application behaviour beyond the compiled child's success sequence. Re-run it
 with the command in `docs/UI_AUTOMATION_INVOKE_PROBE.md`.
+
+### Automated authenticated-session structure-event acceptance
+
+This passed on Windows on 2026-08-24. A separate direct first-party MTA client
+waited for the compiled two-document child's fixed revision-1 prepare button,
+prepared that standard Invoke interface, registered one element-scoped
+structure listener on the fixed window root, and invoked the prepared action.
+Windows delivered one `ChildrenInvalidated` callback whose sender AutomationId
+was exactly `anodrel.surface`. The child then published its revision-2
+replacement document, received the probe's fixed complete action, and closed
+its own session.
+
+The listener accepts no application data and ignores Windows' callback
+runtime-ID representation; the provider's null, zero-length runtime-ID input
+is separately unit-tested. This proves one fixed authenticated replacement and
+outbound event route, not screen-reader speech, a person-visible tree refresh,
+rejected or stale-event silence, repeated replacement, arbitrary subscriptions,
+or an application event surface. Re-run it with the command in
+`docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md`.
 
 Automated tests cover the mapping: every role's control type and focusability,
 each property's source, empty and named nodes, rectangle conversion at several

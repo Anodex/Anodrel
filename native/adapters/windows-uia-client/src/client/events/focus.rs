@@ -17,7 +17,7 @@ use std::{
 
 use crate::{com::succeeded, raw};
 
-use super::{UiAutomationClient, UiAutomationError, text_property_from_raw};
+use super::super::{UiAutomationClient, UiAutomationError, text_property_from_raw};
 
 /// One short-lived focus-event listener owned by a host acceptance diagnostic.
 ///
