@@ -1,5 +1,6 @@
 //! Focused verification for the retained Windows UI Lab.
 
+use super::accessibility::scroll_into_view_offset;
 use super::*;
 use anodrel_ui::UiAccessibilityRole;
 
