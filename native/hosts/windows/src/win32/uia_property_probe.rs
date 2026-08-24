@@ -14,6 +14,7 @@ use std::{
 
 use anodrel_windows_uia_client::{
     ComApartment, UiAutomationClient, UiAutomationElement, UiAutomationError, UiAutomationNode,
+    UiAutomationRect,
 };
 
 use super::{Bool, Hwnd, Lparam, PostMessageW, WM_CLOSE, Wparam};
@@ -82,7 +83,17 @@ fn verify_tree(
     root: &UiAutomationElement,
     view: AutomationView,
 ) -> Result<(), UiAutomationError> {
-    verify_node(client, root, ROOT, view)
+    let root_bounds = match view {
+        AutomationView::Raw => {
+            let bounds = client.bounding_rectangle(root)?;
+            if bounds.is_empty() {
+                return Err(UiAutomationError::UnexpectedTree);
+            }
+            Some(bounds)
+        }
+        AutomationView::Control => None,
+    };
+    verify_node(client, root, ROOT, view, root_bounds)
 }
 
 fn verify_node(
@@ -90,6 +101,7 @@ fn verify_node(
     element: &UiAutomationElement,
     expected: ExpectedNode,
     view: AutomationView,
+    root_bounds: Option<UiAutomationRect>,
 ) -> Result<(), UiAutomationError> {
     if !(expected.node == client.node(element)?) {
         return Err(UiAutomationError::UnexpectedTree);
@@ -111,7 +123,33 @@ fn verify_node(
         return Err(UiAutomationError::UnexpectedTree);
     }
     for (child, child_expected) in children.iter().zip(expected.children) {
-        verify_node(client, child, *child_expected, view)?;
+        verify_node(client, child, *child_expected, view, root_bounds)?;
+    }
+    if expected.verify_geometry {
+        verify_geometry(client, element, expected.node.automation_id, root_bounds)?;
+    }
+    Ok(())
+}
+
+fn verify_geometry(
+    client: &UiAutomationClient,
+    element: &UiAutomationElement,
+    automation_id: &str,
+    root_bounds: Option<UiAutomationRect>,
+) -> Result<(), UiAutomationError> {
+    let Some(root_bounds) = root_bounds else {
+        return Ok(());
+    };
+    let bounds = client.bounding_rectangle(element)?;
+    if !root_bounds.contains(bounds) {
+        return Err(UiAutomationError::UnexpectedTree);
+    }
+    let Some(hit) = client.element_at_center(element)? else {
+        return Err(UiAutomationError::UnexpectedTree);
+    };
+    let hit_node = client.node(&hit)?;
+    if hit_node.automation_id != automation_id {
+        return Err(UiAutomationError::UnexpectedTree);
     }
     Ok(())
 }
@@ -128,6 +166,7 @@ struct ExpectedNode {
     node: ExpectedProperties,
     children: &'static [ExpectedNode],
     has_windows_title_bar: bool,
+    verify_geometry: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -176,7 +215,7 @@ const ACTIONS: ExpectedNode = group(
     &[FIELD, INSPECT, HIT_TEST, REPORT],
     UIA_GROUP_CONTROL_TYPE,
 );
-const FIELD: ExpectedNode = element("Sample field", "ui.lab.field", UIA_EDIT_CONTROL_TYPE, &[]);
+const FIELD: ExpectedNode = geometry_target("Sample field", "ui.lab.field", UIA_EDIT_CONTROL_TYPE);
 const INSPECT: ExpectedNode = button("Inspect layout", "ui.lab.inspect");
 const HIT_TEST: ExpectedNode = button("Test semantic action", "ui.lab.hit-test");
 const REPORT: ExpectedNode = button("Report semantic action", "ui.lab.report");
@@ -223,6 +262,7 @@ const fn root(
         },
         children,
         has_windows_title_bar: true,
+        verify_geometry: false,
     }
 }
 
@@ -243,6 +283,16 @@ const fn button(name: &'static str, automation_id: &'static str) -> ExpectedNode
     element(name, automation_id, UIA_BUTTON_CONTROL_TYPE, &[])
 }
 
+const fn geometry_target(
+    name: &'static str,
+    automation_id: &'static str,
+    control_type: i32,
+) -> ExpectedNode {
+    let mut node = element(name, automation_id, control_type, &[]);
+    node.verify_geometry = true;
+    node
+}
+
 const fn element(
     name: &'static str,
     automation_id: &'static str,
@@ -257,6 +307,7 @@ const fn element(
         },
         children,
         has_windows_title_bar: false,
+        verify_geometry: false,
     }
 }
 

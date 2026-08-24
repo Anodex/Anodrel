@@ -2,13 +2,13 @@
 
 ## Verification
 
-`--uia-property-probe` is the repeatable host-only property, raw-tree, and
-control-view check for the fixed UI Lab. It complements the manual checks
-below; it does not replace Narrator's spoken-output or Inspect's highlight
-verification. See
-`docs/UI_AUTOMATION_PROBE.md` and Decision 0106.
+`--uia-property-probe` is the repeatable host-only property, raw-tree,
+control-view, and fixed-geometry check for the UI Lab. It complements the
+manual checks below; it does not replace Narrator's spoken-output or Inspect's
+highlight verification. See
+`docs/UI_AUTOMATION_PROBE.md` and Decisions 0106 and 0107.
 
-### Automated UI Lab property/tree acceptance
+### Automated UI Lab property/tree/geometry acceptance
 
 This passed on Windows on 2026-08-24. The direct first-party client created a
 separate MTA apartment, attached to the temporary UI Lab through its real
@@ -18,11 +18,23 @@ twenty-three Anodrel semantic document nodes in their fixed parent and sibling
 order in both raw and control views. For every Anodrel node, it compared
 `Name`, `AutomationId`, and `ControlType` with the compiled UI Lab contract.
 
+It also read the root and fixed `ui.lab.field` bounding rectangles, confirmed
+that both were non-empty and the field lay inside the window, then used
+Windows' desktop-level `ElementFromPoint` at the field centre and received the
+same AutomationId. Because that API answers for the topmost desktop element,
+the temporary test window is placed in the topmost band for this short
+diagnostic only and is destroyed afterward. The check therefore catches both
+bad published geometry and a broken provider hit-test route without changing a
+product window or accepting a caller-selected coordinate.
+
 It intentionally did **not** call any interactive pattern, read current field
-text, look up focus, inspect geometry, or register an event handler. Those
-remain distinct acceptance concerns. Re-run it with the command in
+text, look up focus, or register an event handler. A fixed rectangle and
+centre-point check is now included; arbitrary geometry, visible highlight
+placement, and interactive behavior remain distinct acceptance concerns.
+Re-run it with the command in
 `docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact property/tree boundary,
-including control-view navigation, not spoken output or highlight geometry.
+including control-view navigation and one fixed hit-test target, not spoken
+output or visual highlight geometry.
 
 Automated tests cover the mapping: every role's control type and focusability,
 each property's source, empty and named nodes, rectangle conversion at several

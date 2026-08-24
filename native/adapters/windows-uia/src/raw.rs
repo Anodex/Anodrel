@@ -23,7 +23,7 @@ pub const E_FAIL: Hresult = -2_147_467_259;
 pub const UIA_ROOT_OBJECT_ID: isize = -25;
 
 /// `ProviderOptions_ServerSideProvider`.
-pub const PROVIDER_OPTIONS_SERVER_SIDE: i32 = 0x1;
+pub const PROVIDER_OPTIONS_SERVER_SIDE: i32 = 0x2;
 
 /// `UIA_WindowControlTypeId`.
 pub const CONTROL_TYPE_WINDOW: i32 = 50_032;
@@ -268,10 +268,16 @@ unsafe extern "system" {
 #[cfg(test)]
 mod tests {
     use super::{
-        E_FAIL, E_NOINTERFACE, E_POINTER, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN, S_OK,
-        STRUCTURE_CHANGE_CHILDREN_INVALIDATED, UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID,
-        UIA_LIVE_REGION_CHANGED_EVENT_ID, VARIANT_TRUE, VT_BOOL, VT_EMPTY, VT_I4, VT_R8, Variant,
+        E_FAIL, E_NOINTERFACE, E_POINTER, IID_IRAW_ELEMENT_PROVIDER_SIMPLE, IID_IUNKNOWN,
+        PROVIDER_OPTIONS_SERVER_SIDE, S_OK, STRUCTURE_CHANGE_CHILDREN_INVALIDATED,
+        UIA_AUTOMATION_FOCUS_CHANGED_EVENT_ID, UIA_LIVE_REGION_CHANGED_EVENT_ID, VARIANT_TRUE,
+        VT_BOOL, VT_EMPTY, VT_I4, VT_R8, Variant,
     };
+
+    #[test]
+    fn server_side_provider_option_matches_the_windows_sdk() {
+        assert_eq!(PROVIDER_OPTIONS_SERVER_SIDE, 0x2);
+    }
 
     #[test]
     fn a_variant_has_the_documented_size_and_alignment() {

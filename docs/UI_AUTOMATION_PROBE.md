@@ -14,7 +14,9 @@ Narrator. It repeats the checks that can be compared to a fixed contract:
   window, while every Anodrel semantic node appears after it in its documented
   parent and sibling order in both the raw and control views; and
 - each node's `Name`, `AutomationId`, and `ControlType` match the native UI
-  Lab's immutable document.
+  Lab's immutable document; and
+- the fixed visible `ui.lab.field` rectangle is non-empty, contained by the
+  window rectangle, and resolves through Windows UI Automation at its centre.
 
 It gives an operator one process exit status and a fixed console result. It
 does not print returned property values, expose them to an application, or
@@ -31,8 +33,10 @@ cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host --
 Or double-click `start-uia-property-probe.bat` in the repository root.
 
 The diagnostic window is visible briefly while a separate MTA worker queries
-it. A successful run prints `UI Automation property probe passed` and closes
-the window itself. A failure closes the window and exits non-zero with a fixed
+it. For the one desktop-level centre-point check, the host temporarily places
+that private window above ordinary windows; it is destroyed when the run ends.
+A successful run prints `UI Automation property probe passed` and closes the
+window itself. A failure closes the window and exits non-zero with a fixed
 failure category.
 
 ## Boundary
@@ -44,12 +48,15 @@ third-party runtime binding.
 No application protocol message, SDK method, capability, installed-record
 field, UI document field, callback, listener check, or UI Automation pointer
 crosses this boundary. The client inspects only the fixed host-created UI Lab
-window. It neither calls Invoke, SetFocus, Scroll, SetValue, nor registers an
-event handler.
+window. It neither calls Invoke, SetFocus, Scroll, SetValue, ClickablePoint,
+nor registers an event handler. Its one geometry query derives the centre from
+the fixed field's current published rectangle; it accepts no point or selector.
+The host changes only the temporary test window's z-order for that query, not
+an application's window state or any other process's window state.
 
 The property probe supplements rather than replaces the manual checks in
 `docs/ACCESSIBILITY_VERIFICATION.md`: Narrator proves spoken behaviour, and
 Inspect or Accessibility Insights still proves highlight geometry and visual
 tool interoperability.
 
-See Decision 0106 and `docs/ACCESSIBILITY.md`.
+See Decisions 0106 and 0107 and `docs/ACCESSIBILITY.md`.

@@ -255,6 +255,7 @@ pub fn run_ui_lab() -> io::Result<()> {
 pub fn run_uia_property_probe() -> io::Result<()> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     run_windows_after_shown(vec![ui_lab_window()], None, move |windows| {
+        prioritize_uia_point_probe(windows[0])?;
         uia_property_probe::spawn(windows[0], sender)
     })?;
     match receiver.recv_timeout(std::time::Duration::from_secs(5)) {
@@ -269,6 +270,34 @@ pub fn run_uia_property_probe() -> io::Result<()> {
             io::ErrorKind::TimedOut,
             "UI Automation property probe did not report a result",
         )),
+    }
+}
+
+/// Keeps the temporary UI Automation geometry probe above ordinary windows.
+///
+/// Windows resolves `ElementFromPoint` against the topmost desktop element,
+/// not against a selected host window. The test therefore uses the topmost band
+/// only for its short-lived private UI Lab window, then destroys that window
+/// once the read-only probe has completed. It never leaves a product window
+/// topmost or changes another process's window state.
+fn prioritize_uia_point_probe(window: Hwnd) -> io::Result<()> {
+    // SAFETY: `window` is a visible host-created temporary diagnostic window,
+    // and the flags preserve its size, position, and activation state.
+    let moved = unsafe {
+        SetWindowPos(
+            window,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+    };
+    if moved == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
     }
 }
 

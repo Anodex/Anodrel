@@ -83,7 +83,8 @@ pub(crate) struct AutomationVtable {
     pub(crate) get_root_element: *const c_void,
     pub(crate) element_from_handle:
         unsafe extern "system" fn(*mut Automation, isize, *mut *mut Element) -> Hresult,
-    pub(crate) element_from_point: *const c_void,
+    pub(crate) element_from_point:
+        unsafe extern "system" fn(*mut Automation, Point, *mut *mut Element) -> Hresult,
     pub(crate) get_focused_element: *const c_void,
     pub(crate) get_root_element_build_cache: *const c_void,
     pub(crate) element_from_handle_build_cache: *const c_void,
@@ -102,7 +103,7 @@ pub(crate) struct Element {
     pub(crate) vtable: *const ElementVtable,
 }
 
-/// The prefix through `GetCurrentPropertyValue` of `IUIAutomationElementVtbl`.
+/// The prefix through `get_CurrentBoundingRectangle` of `IUIAutomationElementVtbl`.
 #[repr(C)]
 pub(crate) struct ElementVtable {
     pub(crate) query_interface: *const c_void,
@@ -117,6 +118,56 @@ pub(crate) struct ElementVtable {
     pub(crate) build_updated_cache: *const c_void,
     pub(crate) current_property_value:
         unsafe extern "system" fn(*mut Element, i32, *mut Variant) -> Hresult,
+    pub(crate) current_property_value_ex: *const c_void,
+    pub(crate) cached_property_value: *const c_void,
+    pub(crate) cached_property_value_ex: *const c_void,
+    pub(crate) current_pattern_as: *const c_void,
+    pub(crate) cached_pattern_as: *const c_void,
+    pub(crate) current_pattern: *const c_void,
+    pub(crate) cached_pattern: *const c_void,
+    pub(crate) cached_parent: *const c_void,
+    pub(crate) cached_children: *const c_void,
+    pub(crate) current_process_id: *const c_void,
+    pub(crate) current_control_type: *const c_void,
+    pub(crate) current_localized_control_type: *const c_void,
+    pub(crate) current_name: *const c_void,
+    pub(crate) current_accelerator_key: *const c_void,
+    pub(crate) current_access_key: *const c_void,
+    pub(crate) current_has_keyboard_focus: *const c_void,
+    pub(crate) current_is_keyboard_focusable: *const c_void,
+    pub(crate) current_is_enabled: *const c_void,
+    pub(crate) current_automation_id: *const c_void,
+    pub(crate) current_class_name: *const c_void,
+    pub(crate) current_help_text: *const c_void,
+    pub(crate) current_culture: *const c_void,
+    pub(crate) current_is_control_element: *const c_void,
+    pub(crate) current_is_content_element: *const c_void,
+    pub(crate) current_is_password: *const c_void,
+    pub(crate) current_native_window_handle: *const c_void,
+    pub(crate) current_item_type: *const c_void,
+    pub(crate) current_is_offscreen: *const c_void,
+    pub(crate) current_orientation: *const c_void,
+    pub(crate) current_framework_id: *const c_void,
+    pub(crate) current_is_required_for_form: *const c_void,
+    pub(crate) current_item_status: *const c_void,
+    pub(crate) current_bounding_rectangle:
+        unsafe extern "system" fn(*mut Element, *mut Rect) -> Hresult,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(crate) struct Point {
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Rect {
+    pub(crate) left: i32,
+    pub(crate) top: i32,
+    pub(crate) right: i32,
+    pub(crate) bottom: i32,
 }
 
 #[repr(C)]
@@ -196,7 +247,27 @@ unsafe extern "system" {
 
 #[cfg(test)]
 mod tests {
-    use super::Variant;
+    use super::{AutomationVtable, ElementVtable, Point, Rect, Variant};
+
+    #[test]
+    fn point_and_rectangle_match_the_windows_target_abi() {
+        assert_eq!(core::mem::size_of::<Point>(), 8);
+        assert_eq!(core::mem::align_of::<Point>(), 4);
+        assert_eq!(core::mem::size_of::<Rect>(), 16);
+        assert_eq!(core::mem::align_of::<Rect>(), 4);
+    }
+
+    #[test]
+    fn geometry_methods_keep_their_windows_sdk_vtable_slots() {
+        assert_eq!(
+            core::mem::offset_of!(AutomationVtable, element_from_point),
+            7 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
+            core::mem::offset_of!(ElementVtable, current_bounding_rectangle),
+            43 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+    }
 
     #[test]
     fn variant_matches_the_windows_target_abi_size() {

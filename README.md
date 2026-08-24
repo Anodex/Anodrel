@@ -370,9 +370,10 @@ adapter used by the native interactive UI labs.
 Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11, an Inspect cross-check of every earlier flat
 published property passes, and the first-party `--uia-property-probe` verifies
-the fixed current UI Lab raw/control-view property/tree contract through real
-Windows APIs. An enabled authenticated-session button now exposes one bounded
-Invoke action that joins the existing revision-bound semantic-event mailbox;
+the fixed current UI Lab raw/control-view property/tree contract plus one
+fixed field rectangle and hit target through real Windows APIs. An enabled
+authenticated-session button now exposes one bounded Invoke action that joins
+the existing revision-bound semantic-event mailbox;
 the provider also reports and can move the host's keyboard-focus snapshot
 through a bounded UI-thread route, raises one host-only focus-change event for
 a real focus move, raises one host-only `ChildrenInvalidated` structure event
