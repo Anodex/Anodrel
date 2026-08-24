@@ -139,7 +139,7 @@ fn everything_but_the_ambient_loop_is_static_once_revealed() {
     // Sampling a whole ambient cycle apart puts the animation at the same
     // phase, so any difference would be a reveal stage still running.
     let settled = frame_at(startup_lab::REVEAL_MILLIS);
-    let later = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS);
+    let later = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::ambient::AMBIENT_CYCLE_MILLIS);
     assert_eq!(
         differing_pixels(&settled, &later),
         0,
@@ -150,8 +150,10 @@ fn everything_but_the_ambient_loop_is_static_once_revealed() {
 #[test]
 fn ambient_motion_actually_moves() {
     // Mid-sweep against a point in the cycle with no sweep at all.
-    let swept = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 10);
-    let quiet = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 2);
+    let swept =
+        frame_at(startup_lab::REVEAL_MILLIS + startup_lab::ambient::AMBIENT_CYCLE_MILLIS / 10);
+    let quiet =
+        frame_at(startup_lab::REVEAL_MILLIS + startup_lab::ambient::AMBIENT_CYCLE_MILLIS / 2);
     assert!(
         differing_pixels(&swept, &quiet) > 5_000,
         "the mark should visibly change across the ambient cycle"
@@ -182,8 +184,10 @@ fn ambient_motion_stays_inside_its_declared_region() {
     // Whatever moves must be inside the region the host invalidates, or
     // the screen would tear where an update was never sent.
     let region = startup_lab::ambient_region(1_240.0, 900.0).expect("region available");
-    let swept = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 10);
-    let quiet = frame_at(startup_lab::REVEAL_MILLIS + startup_lab::AMBIENT_CYCLE_MILLIS / 2);
+    let swept =
+        frame_at(startup_lab::REVEAL_MILLIS + startup_lab::ambient::AMBIENT_CYCLE_MILLIS / 10);
+    let quiet =
+        frame_at(startup_lab::REVEAL_MILLIS + startup_lab::ambient::AMBIENT_CYCLE_MILLIS / 2);
     for y in 0..900_i32 {
         for x in 0..1_240_i32 {
             if swept.pixel(x, y) == quiet.pixel(x, y) {
