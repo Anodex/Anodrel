@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0104: Stable Windows native SDK keeps the invited session closed.
+
 - 0103: Development native scroll-window template keeps scroll state
   host-owned.
 
