@@ -534,6 +534,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-ui-sdk"
+version = "0.1.0"
+dependencies = [
+ "anodrel-bootstrap",
+ "anodrel-client",
+ "anodrel-ui-client",
+ "anodrel-windows-client",
+ "anodrel-wire",
+]
+
+[[package]]
 name = "anodrel-windows-uia"
 version = "0.1.0"
 dependencies = [

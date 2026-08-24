@@ -33,11 +33,11 @@ const MAIN_PREFIX: &str = r##"#![deny(unsafe_op_in_unsafe_fn)]
 //! program opens only that invited Windows pipe, reads one typed whole-surface
 //! field snapshot after explicit submission, and never selects host authority.
 
-use std::{io, process::ExitCode, thread};
+use std::{process::ExitCode, thread};
 
-use anodrel_client::{Client, InteractivePollSchedule};
-use anodrel_ui_client::UiSession;
-use anodrel_windows_client::WindowsClientStream;
+use anodrel_windows_ui_sdk::{
+    InteractivePollSchedule, WindowsUiConnectionError, WindowsUiSession,
+};
 
 const SUBMIT_ACTION: &str = "template.form.submit";
 const NAME_FIELD: &str = "template.form.name";
@@ -45,7 +45,6 @@ const DOCUMENT: &str = "##;
 
 const MAIN_SUFFIX: &str = r##";
 
-type NativeUiClient = Client<WindowsClientStream>;
 
 #[derive(Clone, Copy)]
 enum Stage {
@@ -81,16 +80,16 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Stage {
-    let Ok(invitation) = NativeUiClient::read_invitation(&mut io::stdin()) else {
-        return Stage::BootstrapUnreadable;
+    let mut session = match WindowsUiSession::connect_from_stdin() {
+        Ok(session) => session,
+        Err(WindowsUiConnectionError::BootstrapUnavailable) => return Stage::BootstrapUnreadable,
+        Err(WindowsUiConnectionError::InvitedEndpointUnavailable) => {
+            return Stage::EndpointUnavailable;
+        }
+        Err(WindowsUiConnectionError::AuthenticationUnavailable) => {
+            return Stage::AuthenticationRejected;
+        }
     };
-    let Ok(stream) = WindowsClientStream::connect(&invitation) else {
-        return Stage::EndpointUnavailable;
-    };
-    let Ok(client) = NativeUiClient::authenticate(stream, invitation) else {
-        return Stage::AuthenticationRejected;
-    };
-    let mut session = UiSession::new(client);
     let Ok(revision) = session.replace_document_v1(DOCUMENT) else {
         return Stage::DocumentRejected;
     };

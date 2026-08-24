@@ -293,6 +293,8 @@ Anodrel/
 digest-verified native text package without reaching into host source code.
 `docs/SDK.md` defines the public application client and the boundary between a
 typed request helper and host-owned native authority.
+`docs/WINDOWS_NATIVE_SDK.md` defines the stable in-repository Windows native
+application facade over one authenticated invited session.
 `docs/RENDERER.md` documents the renderer and brand API.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/CRASH_REPORTS.md` defines the host-only bounded record of a contained

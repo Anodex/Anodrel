@@ -21,8 +21,9 @@ path in `docs/PRODUCT_SESSIONS.md`.
 
 ## Typed client contract
 
-`anodrel-ui-client` wraps one already-authenticated `anodrel-client` session.
-Its implemented initial Protocol 1.3 surface is exactly this:
+`anodrel-windows-ui-sdk` owns the invited-session setup and returns one typed
+Windows UI session. Its implemented initial Protocol 1.3 surface is exactly
+this:
 
 | Operation | Input | Typed result | Required host grant |
 | --- | --- | --- | --- |
@@ -44,10 +45,10 @@ handle, launches a process, or reads a raw response. There is no background
 event receiver: an application deliberately calls `read_actions` when it wants
 one bounded pull.
 
-The application still explicitly opens the one invited Windows pipe through
-`anodrel-windows-client` after reading its standard-input invitation. That
-adapter can open only the invitation's exact pipe and owns no host policy or
-window API. See `docs/NATIVE_CLIENT.md`.
+The generated application imports only the Windows SDK. The SDK consumes the
+standard-input invitation, opens only its exact pipe, and authenticates before
+returning the typed session; it exposes no host policy or window API. See
+`docs/WINDOWS_NATIVE_SDK.md`.
 
 The regular template has no `menu.write` grant. The separately implemented
 typed menu extension is reserved for the native menu template's explicit

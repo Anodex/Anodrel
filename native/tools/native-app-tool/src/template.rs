@@ -10,19 +10,15 @@ mod scroll_window;
 
 pub struct TemplateContext {
     pub project_slug: String,
-    pub client_path: PathBuf,
-    pub ui_client_path: PathBuf,
-    pub windows_client_path: PathBuf,
+    pub windows_ui_sdk_path: PathBuf,
     pub host_manifest_path: PathBuf,
 }
 
 pub fn cargo_toml(context: &TemplateContext) -> String {
     format!(
-        "[package]\nname = {project_slug}\nversion = \"0.1.0\"\nedition = \"2024\"\npublish = false\nlicense = \"MIT OR Apache-2.0\"\n\n[dependencies]\nanodrel-client = {{ path = {client_path} }}\nanodrel-ui-client = {{ path = {ui_client_path} }}\nanodrel-windows-client = {{ path = {windows_client_path} }}\n",
+        "[package]\nname = {project_slug}\nversion = \"0.1.0\"\nedition = \"2024\"\npublish = false\nlicense = \"MIT OR Apache-2.0\"\n\n[dependencies]\nanodrel-windows-ui-sdk = {{ path = {windows_ui_sdk_path} }}\n",
         project_slug = quoted(&context.project_slug),
-        client_path = quoted_path(&context.client_path),
-        ui_client_path = quoted_path(&context.ui_client_path),
-        windows_client_path = quoted_path(&context.windows_client_path),
+        windows_ui_sdk_path = quoted_path(&context.windows_ui_sdk_path),
     )
 }
 
@@ -137,18 +133,17 @@ const MAIN_PREFIX: &str = r##"#![deny(unsafe_op_in_unsafe_fn)]
 //! program opens only that invited Windows pipe, uses the typed three-operation
 //! UI client, and never selects host capabilities or native window resources.
 
-use std::{io, process::ExitCode, thread};
+use std::{process::ExitCode, thread};
 
-use anodrel_client::{Client, InteractivePollSchedule};
-use anodrel_ui_client::UiSession;
-use anodrel_windows_client::WindowsClientStream;
+use anodrel_windows_ui_sdk::{
+    InteractivePollSchedule, WindowsUiConnectionError, WindowsUiSession,
+};
 
 const COMPLETE_ACTION: &str = "template.complete";
 const DOCUMENT: &str = "##;
 
 const MAIN_SUFFIX: &str = r##";
 
-type NativeUiClient = Client<WindowsClientStream>;
 
 #[derive(Clone, Copy)]
 enum Stage {
@@ -182,16 +177,16 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Stage {
-    let Ok(invitation) = NativeUiClient::read_invitation(&mut io::stdin()) else {
-        return Stage::BootstrapUnreadable;
+    let mut session = match WindowsUiSession::connect_from_stdin() {
+        Ok(session) => session,
+        Err(WindowsUiConnectionError::BootstrapUnavailable) => return Stage::BootstrapUnreadable,
+        Err(WindowsUiConnectionError::InvitedEndpointUnavailable) => {
+            return Stage::EndpointUnavailable;
+        }
+        Err(WindowsUiConnectionError::AuthenticationUnavailable) => {
+            return Stage::AuthenticationRejected;
+        }
     };
-    let Ok(stream) = WindowsClientStream::connect(&invitation) else {
-        return Stage::EndpointUnavailable;
-    };
-    let Ok(client) = NativeUiClient::authenticate(stream, invitation) else {
-        return Stage::AuthenticationRejected;
-    };
-    let mut session = UiSession::new(client);
     let Ok(revision) = session.replace_document_v1(DOCUMENT) else {
         return Stage::DocumentRejected;
     };
@@ -234,16 +229,18 @@ mod tests {
     };
 
     #[test]
-    fn generated_manifest_keeps_all_anodrel_dependencies_relative() {
+    fn generated_manifest_uses_only_the_relative_windows_sdk() {
         let context = TemplateContext {
             project_slug: "native-example".to_owned(),
-            client_path: Path::new("../../native/crates/client").to_path_buf(),
-            ui_client_path: Path::new("../../native/crates/ui-client").to_path_buf(),
-            windows_client_path: Path::new("../../native/adapters/windows-client").to_path_buf(),
+            windows_ui_sdk_path: Path::new("../../native/adapters/windows-ui-sdk").to_path_buf(),
             host_manifest_path: Path::new("../../native/Cargo.toml").to_path_buf(),
         };
         let manifest = cargo_toml(&context);
-        assert!(manifest.contains("path = \"../../native/crates/client\""));
+        assert!(manifest.contains("anodrel-windows-ui-sdk"));
+        assert!(manifest.contains("path = \"../../native/adapters/windows-ui-sdk\""));
+        assert!(!manifest.contains("anodrel-client"));
+        assert!(!manifest.contains("anodrel-ui-client"));
+        assert!(!manifest.contains("anodrel-windows-client"));
         assert!(!manifest.contains(":/"));
     }
 

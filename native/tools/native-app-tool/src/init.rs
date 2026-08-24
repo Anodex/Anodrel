@@ -158,11 +158,9 @@ fn template_context(
 ) -> Result<TemplateContext, InitError> {
     Ok(TemplateContext {
         project_slug: project_slug.to_owned(),
-        client_path: relative_path(project_directory, &root.join("native/crates/client"))?,
-        ui_client_path: relative_path(project_directory, &root.join("native/crates/ui-client"))?,
-        windows_client_path: relative_path(
+        windows_ui_sdk_path: relative_path(
             project_directory,
-            &root.join("native/adapters/windows-client"),
+            &root.join("native/adapters/windows-ui-sdk"),
         )?,
         host_manifest_path: relative_path(project_directory, &root.join("native/Cargo.toml"))?,
     })

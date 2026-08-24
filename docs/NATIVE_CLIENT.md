@@ -1,10 +1,10 @@
 # Anodrel native child client
 
 **Status:** Implemented and tested: the portable `anodrel-client` core, direct
-`anodrel-windows-client` adapter, migrated product fixture, and compiled native
-health and UI-session development probes. The existing Node.js diagnostic
-remains separately useful for development paths that exercise the broader
-service set.
+`anodrel-windows-client` adapter, stable `anodrel-windows-ui-sdk` facade,
+migrated product fixture, and compiled native health and UI-session development
+probes. The existing Node.js diagnostic remains separately useful for
+development paths that exercise the broader service set.
 
 ## Purpose
 
@@ -123,30 +123,30 @@ test, not a trusted launch, application template, or public native UI API.
 
 This contract adds no protocol version and no wire format. `ANBI` bootstrap v1
 and `ANDR` wire v1 remain the existing host contracts in `docs/TRANSPORT.md`.
-The native-client modules are not a published stable application SDK yet;
-their public API may evolve while the repository retains the fixture and probe
-checks described above. Decision 0082's deliberately smaller typed
-`anodrel-ui-client` facade is now implemented and consumed by the compiled UI
-diagnostic and by the constrained generated native template. That template has
-a first-party new-directory generator and runs only through the explicit
-fixed-grant `--native-template-client` development route; see
-`docs/NATIVE_UI_TEMPLATE.md`. Publishing a stable API still requires a separate
-decision. Decision 0094 extends that preview facade only for the separate
-fixed-grant multi-window template: it returns opaque secondary identities and
-tagged action batches, but exposes no native mapping or raw protocol surface.
-See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
+The lower-level native-client modules remain implementation crates rather than
+the application SDK. Decision 0104 establishes `anodrel-windows-ui-sdk` as the
+stable in-repository Windows application facade. It owns standard-input
+invitation consumption, exact invited-pipe opening, and authentication before
+returning the existing typed UI session. The generated templates consume only
+that facade, and their isolated builds plus real pipe sessions are its
+compatibility proof. See `docs/WINDOWS_NATIVE_SDK.md`.
+
+Registry publication remains separate work. Decision 0094's existing bounded
+multi-window methods return opaque secondary identities and tagged action
+batches, but expose no native mapping or raw protocol surface. See
+`docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
 
 Decision 0095 extends that preview facade only for the separate fixed-grant
 native form template. Its `read_fields` method returns one strictly parsed,
 whole-surface ordered snapshot after an explicit request; it has no selector,
 live change route, or input-state metadata. See `docs/NATIVE_FORM_TEMPLATE.md`.
 
-Decision 0101 uses the already-typed `replace_document_v3` method only in the
+Decision 0101 uses the SDK's existing typed `replace_document_v3` method only in the
 separate fixed-grant native live-status template. Its three fixed documents
 demonstrate outbound visible status changes, not an accessibility callback,
 listener check, or delivery API. See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md`.
 
-Decision 0102 adds the preview facade's `open_window_v2` and
+Decision 0102 adds the SDK's `open_window_v2` and
 `replace_window_document_v2` methods for exact scroll documents in an existing
 session-owned group. They share the existing window and document grants and
 expose no scroll position, callback, native view, or automation route. See

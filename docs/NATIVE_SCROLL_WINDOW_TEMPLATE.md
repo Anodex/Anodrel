@@ -48,7 +48,7 @@ scrolling is necessary before each next step.
 
 ## Typed client contract
 
-The generated source uses only these closed `anodrel-ui-client` methods:
+The generated source uses only these closed `anodrel-windows-ui-sdk` methods:
 
 | Method | Input | Typed result | Protocol | Required grants |
 | --- | --- | --- | --- | --- |

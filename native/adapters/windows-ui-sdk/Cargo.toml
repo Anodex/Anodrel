@@ -1,0 +1,14 @@
+[package]
+name = "anodrel-windows-ui-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-bootstrap = { path = "../../crates/bootstrap" }
+anodrel-client = { path = "../../crates/client" }
+anodrel-ui-client = { path = "../../crates/ui-client" }
+anodrel-windows-client = { path = "../windows-client" }
+
+[dev-dependencies]
+anodrel-wire = { path = "../../crates/wire" }

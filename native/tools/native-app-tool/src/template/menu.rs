@@ -37,11 +37,11 @@ const MAIN_PREFIX: &str = r##"#![deny(unsafe_op_in_unsafe_fn)]
 //! program opens only that invited Windows pipe, uses the typed menu surface,
 //! and never selects host capabilities or native window resources.
 
-use std::{io, process::ExitCode, thread};
+use std::{process::ExitCode, thread};
 
-use anodrel_client::{Client, InteractivePollSchedule};
-use anodrel_ui_client::{UiEvent, UiSession};
-use anodrel_windows_client::WindowsClientStream;
+use anodrel_windows_ui_sdk::{
+    InteractivePollSchedule, UiEvent, WindowsUiConnectionError, WindowsUiSession,
+};
 
 const COMPLETE_ACTION: &str = "template.menu.complete";
 const DOCUMENT: &str = "##;
@@ -51,7 +51,6 @@ const MENU: &str = "##;
 
 const MAIN_SUFFIX: &str = r##";
 
-type NativeUiClient = Client<WindowsClientStream>;
 
 #[derive(Clone, Copy)]
 enum Stage {
@@ -87,16 +86,16 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Stage {
-    let Ok(invitation) = NativeUiClient::read_invitation(&mut io::stdin()) else {
-        return Stage::BootstrapUnreadable;
+    let mut session = match WindowsUiSession::connect_from_stdin() {
+        Ok(session) => session,
+        Err(WindowsUiConnectionError::BootstrapUnavailable) => return Stage::BootstrapUnreadable,
+        Err(WindowsUiConnectionError::InvitedEndpointUnavailable) => {
+            return Stage::EndpointUnavailable;
+        }
+        Err(WindowsUiConnectionError::AuthenticationUnavailable) => {
+            return Stage::AuthenticationRejected;
+        }
     };
-    let Ok(stream) = WindowsClientStream::connect(&invitation) else {
-        return Stage::EndpointUnavailable;
-    };
-    let Ok(client) = NativeUiClient::authenticate(stream, invitation) else {
-        return Stage::AuthenticationRejected;
-    };
-    let mut session = UiSession::new(client);
     let Ok(document_revision) = session.replace_document_v1(DOCUMENT) else {
         return Stage::DocumentRejected;
     };

@@ -50,7 +50,7 @@ native resource.
 
 ## Typed client contract
 
-`anodrel-ui-client` adds the following closed methods:
+`anodrel-windows-ui-sdk` exposes the following closed methods:
 
 | Method | Input | Typed result | Protocol | Required grants |
 | --- | --- | --- | --- | --- |

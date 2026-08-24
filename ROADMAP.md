@@ -424,10 +424,9 @@ Status: **First starter-package slice in progress**
   `platform.health` without Node.js. A separate compiled native UI diagnostic
   now proves document delivery, semantic input, and clean session close through
   a host-owned Windows window, still without Node.js or machine-trust setup.
-  This is not yet a stable public native SDK or executable template. Decision
-  0082 now defines the next development-native UI template boundary. Its typed
-  three-operation `anodrel-ui-client` facade is implemented and exercised by
-  the compiled native UI diagnostic. The new-directory generator now writes a
+  Decision 0082 defines the development-native UI template boundary. Its typed
+  UI-session facade is implemented and exercised by the compiled native UI
+  diagnostic. The new-directory generator now writes a
   constrained Rust project with only checkout-relative first-party paths and
   proves it through an isolated build plus a real authenticated child session.
   Its explicit Windows host route is also implemented: it grants exactly
@@ -471,7 +470,14 @@ Status: **First starter-package slice in progress**
   that view at revision 2, closes its issued secondary identity, and closes its
   group. Local native scroll state, input, accessibility behavior, and mapping
   remain host-owned. The remaining acceptance check is the documented visual
-  Windows walkthrough.
+  Windows walkthrough. **Decision 0104 now stabilizes the in-repository Windows
+  application surface:** `anodrel-windows-ui-sdk` consumes the private standard-
+  input invitation, opens only its exact invited pipe, authenticates, and exposes
+  only the existing typed UI-session operations. All six generated templates
+  now depend on that one facade rather than the three lower-level client crates;
+  their isolated release builds and real invited-pipe sessions verify it. It is
+  not registry-published and adds no capability, packaging, identity, or
+  non-Windows claim.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an
@@ -489,8 +495,8 @@ Acceptance gate: a new project can be created from a documented template and
 run without knowing the internals of the native host. **Met for the constrained
 Windows development template:** the generator, typed client, fixed-grant host
 route, isolated release build, and real child-session test are implemented.
-Manual window-action verification, production executable identity, a published
-stable SDK, packaging, and non-Windows hosts remain separate work.
+Manual window-action verification, production executable identity, registry
+publication, packaging, and non-Windows hosts remain separate work.
 
 ## Phase 4 — Anodex adapter
 

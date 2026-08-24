@@ -1,6 +1,7 @@
 # Anodrel Windows native SDK
 
-**Status:** Contract accepted; implementation follows Decision 0104.
+**Status:** Implemented and verified through every generated Windows native
+template's isolated build and invited-pipe session test.
 
 ## Purpose
 

@@ -45,7 +45,7 @@ URL, network connection, or native resource.
 
 ## Typed client contract
 
-`anodrel-ui-client` extends its preview surface with:
+`anodrel-windows-ui-sdk` exposes these existing closed methods:
 
 | Method | Input | Typed result | Protocol | Required grant |
 | --- | --- | --- | --- | --- |

@@ -47,7 +47,7 @@ reinsert the returned value into a document.
 
 ## Typed client contract
 
-`anodrel-ui-client` will add:
+`anodrel-windows-ui-sdk` exposes:
 
 | Method | Input | Typed result | Protocol | Required grant |
 | --- | --- | --- | --- | --- |

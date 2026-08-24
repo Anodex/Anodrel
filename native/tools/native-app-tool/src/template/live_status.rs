@@ -66,11 +66,11 @@ const MAIN_PREFIX: &str = r##"#![deny(unsafe_op_in_unsafe_fn)]
 //! document surface, and never selects host capabilities or observes assistive
 //! technology.
 
-use std::{io, process::ExitCode, thread};
+use std::{process::ExitCode, thread};
 
-use anodrel_client::{Client, InteractivePollSchedule};
-use anodrel_ui_client::UiSession;
-use anodrel_windows_client::WindowsClientStream;
+use anodrel_windows_ui_sdk::{
+    InteractivePollSchedule, WindowsUiConnectionError, WindowsUiSession,
+};
 
 const POLITE_ACTION: &str = "template.status.polite";
 const ASSERTIVE_ACTION: &str = "template.status.assertive";
@@ -79,7 +79,6 @@ const INITIAL_DOCUMENT: &str = "##;
 
 const MAIN_SUFFIX: &str = r##";
 
-type NativeUiClient = Client<WindowsClientStream>;
 
 #[derive(Clone, Copy)]
 enum Stage {
@@ -113,16 +112,16 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Stage {
-    let Ok(invitation) = NativeUiClient::read_invitation(&mut io::stdin()) else {
-        return Stage::BootstrapUnreadable;
+    let mut session = match WindowsUiSession::connect_from_stdin() {
+        Ok(session) => session,
+        Err(WindowsUiConnectionError::BootstrapUnavailable) => return Stage::BootstrapUnreadable,
+        Err(WindowsUiConnectionError::InvitedEndpointUnavailable) => {
+            return Stage::EndpointUnavailable;
+        }
+        Err(WindowsUiConnectionError::AuthenticationUnavailable) => {
+            return Stage::AuthenticationRejected;
+        }
     };
-    let Ok(stream) = WindowsClientStream::connect(&invitation) else {
-        return Stage::EndpointUnavailable;
-    };
-    let Ok(client) = NativeUiClient::authenticate(stream, invitation) else {
-        return Stage::AuthenticationRejected;
-    };
-    let mut session = UiSession::new(client);
 
     let Ok(revision) = session.replace_document_v3(INITIAL_DOCUMENT) else {
         return Stage::DocumentRejected;
@@ -161,7 +160,7 @@ fn run() -> Stage {
 }
 
 fn wait_for_action(
-    session: &mut UiSession<WindowsClientStream>,
+    session: &mut WindowsUiSession,
     expected_action: &str,
     expected_revision: u64,
 ) -> Result<(), Stage> {

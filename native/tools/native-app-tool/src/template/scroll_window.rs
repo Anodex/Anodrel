@@ -69,11 +69,11 @@ const MAIN_PREFIX: &str = r##"#![deny(unsafe_op_in_unsafe_fn)]
 //! secondary-document client methods, and never selects host capabilities or
 //! observes native scroll state.
 
-use std::{io, process::ExitCode, thread};
+use std::{process::ExitCode, thread};
 
-use anodrel_client::{Client, InteractivePollSchedule};
-use anodrel_ui_client::{SessionWindowId, UiSession};
-use anodrel_windows_client::WindowsClientStream;
+use anodrel_windows_ui_sdk::{
+    InteractivePollSchedule, SessionWindowId, WindowsUiConnectionError, WindowsUiSession,
+};
 
 const PRIMARY_OPEN_ACTION: &str = "template.scroll.open";
 const SECONDARY_REVEAL_ACTION: &str = "template.scroll.reveal";
@@ -83,7 +83,6 @@ const PRIMARY_DOCUMENT: &str = "##;
 
 const MAIN_SUFFIX: &str = r##"
 
-type NativeUiClient = Client<WindowsClientStream>;
 
 #[derive(Clone, Copy)]
 enum Stage {
@@ -123,16 +122,16 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Stage {
-    let Ok(invitation) = NativeUiClient::read_invitation(&mut io::stdin()) else {
-        return Stage::BootstrapUnreadable;
+    let mut session = match WindowsUiSession::connect_from_stdin() {
+        Ok(session) => session,
+        Err(WindowsUiConnectionError::BootstrapUnavailable) => return Stage::BootstrapUnreadable,
+        Err(WindowsUiConnectionError::InvitedEndpointUnavailable) => {
+            return Stage::EndpointUnavailable;
+        }
+        Err(WindowsUiConnectionError::AuthenticationUnavailable) => {
+            return Stage::AuthenticationRejected;
+        }
     };
-    let Ok(stream) = WindowsClientStream::connect(&invitation) else {
-        return Stage::EndpointUnavailable;
-    };
-    let Ok(client) = NativeUiClient::authenticate(stream, invitation) else {
-        return Stage::AuthenticationRejected;
-    };
-    let mut session = UiSession::new(client);
     let Ok(primary_revision) = session.replace_document_v1(PRIMARY_DOCUMENT) else {
         return Stage::DocumentRejected;
     };
@@ -184,7 +183,7 @@ fn run() -> Stage {
 }
 
 fn wait_for_action(
-    session: &mut UiSession<WindowsClientStream>,
+    session: &mut WindowsUiSession,
     expected_window: SessionWindowId,
     expected_action: &str,
     expected_revision: u64,
