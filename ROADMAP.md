@@ -132,6 +132,15 @@ Status: **Direct Windows host in progress**
   the direct Windows experiment proved that the available rename path cannot
   preserve the existing retained-target race boundary. Persistent file grants
   remain a separate gate.
+- Define one bounded user-mediated folder choice. **Implemented through the
+  direct Windows UI-session host:** Protocol 1.28 adds the separately granted,
+  exact-empty `dialog.open_folder` operation. Its SDK, mock host,
+  installed-record 1.15 policy, one-request UI-thread bridge, first-party
+  Common Item Dialog adapter, and manual development diagnostic are complete
+  (Decision 0115). It returns only cancellation or one absolute display path;
+  enumeration, folder access, a retained reference, initial-folder control,
+  filters, and non-Windows adapters remain separate gates. The final selected
+  and cancelled desktop outcomes remain manual checks.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and

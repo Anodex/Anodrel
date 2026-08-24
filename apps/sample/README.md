@@ -27,6 +27,13 @@ is separate: it captures one host-retained output object after the save picker,
 then writes a fixed diagnostic line through its one-use save reference. Choose
 a new temporary `.txt` filename for that diagnostic, then inspect its contents.
 
+`--sample-ui-folder-client` is the separate folder-selection diagnostic. It
+opens one host-owned Windows folder picker with no application-selected title,
+initial folder, filters, or native flags. Select a filesystem folder in one
+run and cancel a second; after either result, activate the sample's ordinary
+action to close the session. The returned path remains display data only and
+does not grant enumeration or access.
+
 `--sample-ui-file-binary-write-client` is the separate bounded binary-output
 diagnostic. It captures one output object after the save picker and writes the
 fixed bytes `41 6E 6F 64 72 65 6C 00 FF` through its one-use save reference.

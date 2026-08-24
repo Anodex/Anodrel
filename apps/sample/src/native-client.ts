@@ -123,6 +123,16 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-open-folder")) {
+      const dialog = await client.openFolderDialog();
+      if (dialog.status !== "selected" && dialog.status !== "cancelled") {
+        return 35;
+      }
+      if (dialog.status === "selected" && dialog.path.length === 0) {
+        return 35;
+      }
+    }
+
     if (process.argv.includes("--request-save-file")) {
       const dialog = await client.saveFileDialog([
         { label: "Documents", extensions: ["txt", "json", "md"] },

@@ -3,13 +3,14 @@
 //! This path proves the private bootstrap and named-pipe contract. It does not
 //! verify the child executable or provide product application lifecycle policy.
 
+mod request;
+
 use std::{error::Error, io, thread};
 
 use anodrel_application::ApplicationManifest;
 use anodrel_core::HostPolicy;
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_access::SelectionFileDialogMailbox;
-use anodrel_protocol::Capability;
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
@@ -19,32 +20,9 @@ use anodrel_windows_pipe::WindowsPipeServer;
 use anodrel_windows_storage::WindowsStorageService;
 
 use crate::session_ui::DevelopmentSessionUi;
+use request::{SampleDialogRequest, sample_capabilities};
 
 const SAMPLE_TIMEOUT_MILLISECONDS: u32 = 10_000;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SampleDialogRequest {
-    None,
-    OpenFile,
-    OpenFileWithReference,
-    SaveFile,
-    SaveFileWithReference,
-    SaveFileBinaryWithReference,
-    Storage,
-    Scroll,
-    Diagnostics,
-    Credentials,
-    Notification,
-    WindowTitle,
-    WindowState,
-    WindowFocus,
-    WindowFullscreen,
-    WindowSize,
-    WindowSizeWhileFullscreen,
-    FieldRead,
-    Menu,
-    LiveStatus,
-}
 
 pub fn run(node_path: &str, client_path: &str) -> Result<(), Box<dyn Error>> {
     run_with_optional_session_view(node_path, client_path, None, SampleDialogRequest::None)
@@ -73,6 +51,14 @@ pub fn run_ui_session_with_open_file_dialog(
     client_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::OpenFile)
+}
+
+/// Runs the UI session diagnostic and asks its client to show one folder picker.
+pub fn run_ui_session_with_open_folder_dialog(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::OpenFolder)
 }
 
 /// Runs the UI session diagnostic and asks its client for a selection-scoped
@@ -344,6 +330,7 @@ fn run_with_optional_session_view(
         match dialog_request {
             SampleDialogRequest::None => command,
             SampleDialogRequest::OpenFile => command.arg("--request-open-file")?,
+            SampleDialogRequest::OpenFolder => command.arg("--request-open-folder")?,
             SampleDialogRequest::OpenFileWithReference => {
                 command.arg("--request-selected-file-text")?
             }
@@ -410,58 +397,6 @@ fn run_with_optional_session_view(
     Ok(())
 }
 
-fn sample_capabilities(dialog_request: SampleDialogRequest) -> Vec<Capability> {
-    let mut capabilities = vec![
-        Capability::DiagnosticsRead,
-        Capability::UiDocumentWrite,
-        Capability::UiEventsRead,
-        Capability::SessionClose,
-        Capability::ClipboardRead,
-        Capability::ClipboardWrite,
-        Capability::ExternalOpen,
-        Capability::DialogOpenFile,
-        Capability::DialogSaveFile,
-        Capability::FileReadText,
-        Capability::FileWriteText,
-        Capability::StorageStateRead,
-        Capability::StorageStateReplace,
-        Capability::StorageStateClear,
-        Capability::CredentialRead,
-        Capability::CredentialWrite,
-        Capability::CredentialDelete,
-        Capability::NotificationShow,
-        Capability::MenuWrite,
-        Capability::WindowTitle,
-        Capability::UiFieldsRead,
-        Capability::WindowState,
-    ];
-    // New authority is never silently added to an older broad diagnostic. The
-    // focus and fullscreen routes are explicit so each manual check proves the
-    // exact grant rather than silently widening a broad diagnostic.
-    if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
-        capabilities.push(Capability::WindowFocus);
-    }
-    if matches!(
-        dialog_request,
-        SampleDialogRequest::WindowFullscreen | SampleDialogRequest::WindowSizeWhileFullscreen
-    ) {
-        capabilities.push(Capability::WindowFullscreen);
-    }
-    if matches!(
-        dialog_request,
-        SampleDialogRequest::WindowSize | SampleDialogRequest::WindowSizeWhileFullscreen
-    ) {
-        capabilities.push(Capability::WindowSize);
-    }
-    if matches!(
-        dialog_request,
-        SampleDialogRequest::SaveFileBinaryWithReference
-    ) {
-        capabilities.push(Capability::FileWriteBinary);
-    }
-    capabilities
-}
-
 fn sample_storage() -> Result<WindowsStorageService, Box<dyn Error>> {
     let manifest = ApplicationManifest::parse(
         r#"{"manifestVersion":{"major":1,"minor":0},"applicationId":"anodrel.sample","displayName":"Anodrel Sample","content":{"format":"anodrel.text.v1","path":"content/main.txt","sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}}"#,
@@ -485,53 +420,4 @@ fn sample_diagnostics() -> LogBook {
     log.record(Event::PipeLoopbackChecked)
         .expect("the fixed development log cannot exhaust its sequence");
     log
-}
-
-#[cfg(test)]
-mod tests {
-    use anodrel_protocol::Capability;
-
-    use super::{SampleDialogRequest, sample_capabilities};
-
-    #[test]
-    fn binary_output_grant_is_limited_to_the_explicit_binary_diagnostic() {
-        let ordinary = sample_capabilities(SampleDialogRequest::None);
-        let binary = sample_capabilities(SampleDialogRequest::SaveFileBinaryWithReference);
-
-        assert!(!ordinary.contains(&Capability::FileWriteBinary));
-        assert!(binary.contains(&Capability::FileWriteBinary));
-        assert_eq!(binary.len(), ordinary.len() + 1);
-        assert!(!binary.contains(&Capability::WindowFocus));
-        assert!(!binary.contains(&Capability::WindowFullscreen));
-        assert!(!binary.contains(&Capability::WindowSize));
-    }
-
-    #[test]
-    fn window_size_grant_is_limited_to_the_explicit_size_diagnostic() {
-        let ordinary = sample_capabilities(SampleDialogRequest::None);
-        let size = sample_capabilities(SampleDialogRequest::WindowSize);
-
-        assert!(!ordinary.contains(&Capability::WindowSize));
-        assert!(size.contains(&Capability::WindowSize));
-        assert_eq!(size.len(), ordinary.len() + 1);
-        assert!(!size.contains(&Capability::WindowFullscreen));
-    }
-
-    #[test]
-    fn fullscreen_size_refusal_diagnostic_has_only_its_two_window_grants() {
-        let ordinary = sample_capabilities(SampleDialogRequest::None);
-        let combined = sample_capabilities(SampleDialogRequest::WindowSizeWhileFullscreen);
-
-        assert!(combined.contains(&Capability::WindowFullscreen));
-        assert!(combined.contains(&Capability::WindowSize));
-        assert_eq!(combined.len(), ordinary.len() + 2);
-    }
-
-    #[test]
-    fn live_status_uses_the_existing_document_and_action_grants() {
-        assert_eq!(
-            sample_capabilities(SampleDialogRequest::LiveStatus),
-            sample_capabilities(SampleDialogRequest::None)
-        );
-    }
 }

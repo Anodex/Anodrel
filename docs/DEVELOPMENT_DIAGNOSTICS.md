@@ -160,6 +160,19 @@ replace `--sample-ui-client` with `--sample-ui-file-client` or
 `--sample-ui-save-client`. Both commands accept only the strict sample filters;
 the save diagnostic never writes the selected destination.
 
+To exercise the independently granted host-owned folder picker, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-folder-client $nodePath $clientPath
+~~~
+
+Select one local filesystem folder. In a second run, cancel the picker. In
+each case, activate the sample's ordinary action to close the session. The
+selected result is only one bounded display path: the diagnostic cannot set the
+title, initial folder, filters, or flags, and it receives no directory access,
+enumeration, handle, or retained permission. This is the manual acceptance
+check for `dialog.open_folder`; see `docs/FOLDER_DIALOGS.md`.
+
 To exercise the separately granted selection-scoped write route, run:
 
 ~~~powershell

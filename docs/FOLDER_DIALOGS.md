@@ -1,8 +1,9 @@
 # Anodrel folder-selection contract
 
 **Status:** The portable value, Protocol 1.28, TypeScript SDK/mock,
-installed-policy compatibility, direct Windows picker, and UI-thread host
-routing are implemented. The first direct desktop-picker check remains manual.
+installed-policy compatibility, direct Windows picker, UI-thread host routing,
+and an explicit manual diagnostic are implemented. The first direct
+desktop-picker check remains manual.
 
 ## Purpose and boundary
 
