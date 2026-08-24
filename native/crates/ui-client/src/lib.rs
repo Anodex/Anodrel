@@ -16,8 +16,10 @@ mod menu_model;
 mod menu_revision;
 mod revision;
 mod session;
+mod window_controls;
 mod window_id;
 
+pub use anodrel_window::{WindowFullscreenMode, WindowSize, WindowState};
 pub use error::UiClientError;
 pub use events::{
     MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, UiAction, UiActionBatch, UiEvent,

@@ -477,7 +477,9 @@ Status: **First starter-package slice in progress**
   now depend on that one facade rather than the three lower-level client crates;
   their isolated release builds and real invited-pipe sessions verify it. It is
   not registry-published and adds no capability, packaging, identity, or
-  non-Windows claim.
+  non-Windows claim. The same stable facade now exposes the existing typed,
+  targetless session-window title, state, focus, fullscreen, and bounded-size
+  controls, while preserving every operation's separate host-issued grant.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

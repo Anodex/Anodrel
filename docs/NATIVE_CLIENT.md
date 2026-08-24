@@ -131,6 +131,12 @@ returning the existing typed UI session. The generated templates consume only
 that facade, and their isolated builds plus real pipe sessions are its
 compatibility proof. See `docs/WINDOWS_NATIVE_SDK.md`.
 
+The facade also carries the existing typed, targetless controls for the
+authenticated session's own host window: title proposal, closed state,
+foreground request, reversible fullscreen, and bounded logical client size.
+Those calls retain their individual host-issued grants and provide no native
+handle, window target, state or geometry readback, or cross-window route.
+
 Registry publication remains separate work. Decision 0094's existing bounded
 multi-window methods return opaque secondary identities and tagged action
 batches, but expose no native mapping or raw protocol surface. See

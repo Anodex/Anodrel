@@ -355,7 +355,7 @@ where
         }
     }
 
-    fn request(
+    pub(super) fn request(
         &mut self,
         version: ProtocolVersion,
         operation: &str,

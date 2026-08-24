@@ -17,8 +17,8 @@ use anodrel_windows_client::WindowsClientStream;
 pub use anodrel_client::InteractivePollSchedule;
 pub use anodrel_ui_client::{
     DocumentRevision, MenuRevision, SecondaryWindowId, SessionWindowId, UiAction, UiActionBatch,
-    UiClientError, UiEvent, UiEventBatch, UiFieldSnapshot, UiFieldValue, WindowUiAction,
-    WindowUiActionBatch,
+    UiClientError, UiEvent, UiEventBatch, UiFieldSnapshot, UiFieldValue, WindowFullscreenMode,
+    WindowSize, WindowState, WindowUiAction, WindowUiActionBatch,
 };
 
 /// Closed outcomes while establishing one invited Windows UI session.
@@ -103,6 +103,34 @@ impl WindowsUiSession {
     /// Drains one bounded batch of document and native-menu semantic events.
     pub fn read_events(&mut self) -> Result<UiEventBatch, UiClientError> {
         self.session.read_events()
+    }
+
+    /// Proposes a title for this session's own host window.
+    pub fn set_window_title(&mut self, title: &str) -> Result<(), UiClientError> {
+        self.session.set_window_title(title)
+    }
+
+    /// Requests one closed presentation state for this session's own host window.
+    pub fn set_window_state(&mut self, state: WindowState) -> Result<(), UiClientError> {
+        self.session.set_window_state(state)
+    }
+
+    /// Asks Windows to foreground this session's own host window.
+    pub fn request_window_focus(&mut self) -> Result<(), UiClientError> {
+        self.session.request_window_focus()
+    }
+
+    /// Requests one reversible presentation mode for this session's own host window.
+    pub fn set_window_fullscreen(
+        &mut self,
+        mode: WindowFullscreenMode,
+    ) -> Result<(), UiClientError> {
+        self.session.set_window_fullscreen(mode)
+    }
+
+    /// Requests one bounded logical client size for this session's own host window.
+    pub fn set_window_size(&mut self, size: WindowSize) -> Result<(), UiClientError> {
+        self.session.set_window_size(size)
     }
 
     /// Opens one session-owned secondary view with a strict version-1 document.

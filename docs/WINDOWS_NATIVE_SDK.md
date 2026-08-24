@@ -30,9 +30,24 @@ pipe names, tokens, raw Windows errors, raw host responses, or host diagnostics.
 The facade preserves the documented typed operations from `anodrel-ui-client`:
 strict v1/v2/v3 document replacement, bounded semantic-event reads,
 whole-surface field snapshots, complete menu replacement, opaque secondary-view
-operations, and group close. Every method uses its minimum documented protocol
-version internally; applications cannot choose an arbitrary operation or
-protocol version.
+operations, and group close. It also exposes the existing targetless controls
+for the authenticated session's own host window:
+
+| Method | Existing operation | Result |
+| --- | --- | --- |
+| `set_window_title` | `window.title.set` | accepted host-composed title proposal |
+| `set_window_state` | `window.state.set` | accepted closed state request |
+| `request_window_focus` | `window.focus.request` | accepted foreground request |
+| `set_window_fullscreen` | `window.fullscreen.set` | accepted reversible presentation request |
+| `set_window_size` | `window.size.set` | accepted bounded logical client-size request |
+
+`WindowState`, `WindowFullscreenMode`, and `WindowSize` are re-exported by the
+facade, so an application does not import an implementation crate. The methods
+have no window identifier, native handle, geometry readback, presentation
+readback, or cross-window route; the host remains authoritative for the
+separate grant attached to each operation. Every method uses its minimum
+documented protocol version internally; applications cannot choose an arbitrary
+operation or protocol version.
 
 Whether a method succeeds still depends on the host-issued grant. The SDK does
 not declare, request, inspect, or broaden capabilities.

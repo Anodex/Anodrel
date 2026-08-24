@@ -8,7 +8,10 @@ use std::{
 use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_wire::{FrameDecoder, encode_json};
 
-use super::{WindowsUiConnectionError, establish_session};
+use super::{
+    UiClientError, WindowFullscreenMode, WindowSize, WindowState, WindowsUiConnectionError,
+    WindowsUiSession, establish_session,
+};
 
 const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.windows-sdk-test";
 const SESSION_ID: &str = "windows-sdk-test-session";
@@ -109,4 +112,20 @@ fn refused_authentication_remains_a_closed_category() {
         result.unwrap_err(),
         WindowsUiConnectionError::AuthenticationUnavailable
     );
+}
+
+#[test]
+fn facade_exposes_only_typed_targetless_window_controls() {
+    let _set_title: fn(&mut WindowsUiSession, &str) -> Result<(), UiClientError> =
+        WindowsUiSession::set_window_title;
+    let _set_state: fn(&mut WindowsUiSession, WindowState) -> Result<(), UiClientError> =
+        WindowsUiSession::set_window_state;
+    let _request_focus: fn(&mut WindowsUiSession) -> Result<(), UiClientError> =
+        WindowsUiSession::request_window_focus;
+    let _set_fullscreen: fn(
+        &mut WindowsUiSession,
+        WindowFullscreenMode,
+    ) -> Result<(), UiClientError> = WindowsUiSession::set_window_fullscreen;
+    let _set_size: fn(&mut WindowsUiSession, WindowSize) -> Result<(), UiClientError> =
+        WindowsUiSession::set_window_size;
 }
