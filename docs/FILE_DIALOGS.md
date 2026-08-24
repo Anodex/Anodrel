@@ -43,8 +43,10 @@ operation: only the v2 route may retain a native output object. See
 
 ## Deferred
 
-Initial-directory policy, folder dialogs, multiple selection, additional
-confirmation UI, and non-Windows adapters need separate decisions.
+Initial-directory policy, multiple selection, additional confirmation UI, and
+non-Windows adapters need separate decisions. `docs/FOLDER_DIALOGS.md` defines
+the separate one-folder selection contract now being integrated through the
+same mailbox; it does not add folder access or enumeration.
 `docs/FILE_ACCESS.md` defines the accepted read-side selection-identity
 requirement. `docs/FILE_WRITE.md` and `docs/FILE_BINARY_WRITE.md` define the
 separately scoped text and binary write contracts.

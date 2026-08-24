@@ -8,10 +8,12 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod folder;
 mod mailbox;
 
 use std::{fmt, path::PathBuf};
 
+pub use folder::SelectedFolderPath;
 pub use mailbox::{
     FileDialogMailbox, FileDialogRequest, FileDialogRequestKind, FileDialogSelection,
     FileDialogService, FileDialogServiceError,
@@ -136,6 +138,8 @@ pub enum FileDialogInputError {
     InvalidSelectedPath,
     /// The save destination was empty, relative, or exceeded its bound.
     InvalidSavePath,
+    /// The selected folder path was empty, relative, or exceeded its bound.
+    InvalidSelectedFolderPath,
 }
 impl fmt::Display for FileDialogInputError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
