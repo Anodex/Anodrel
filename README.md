@@ -370,11 +370,11 @@ adapter used by the native interactive UI labs.
 Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11, an Inspect cross-check of every earlier flat
 published property passes, and the first-party `--uia-property-probe`,
-`--uia-focus-probe`, and `--uia-invoke-probe` verify the fixed current UI
+`--uia-focus-probe`, `--uia-focus-event-probe`, and `--uia-invoke-probe` verify the fixed current UI
 Lab's raw/control-view
 property/tree contract, fixed field rectangle, hit target, read-only Value
-pattern, absence of a UI Lab Invoke pattern, and `SetFocus` result through real
-Windows APIs. The Invoke probe also verifies one compiled authenticated-session
+pattern, absence of a UI Lab Invoke pattern, semantic `SetFocus` result, and
+one outbound focus event through real Windows APIs. The Invoke probe also verifies one compiled authenticated-session
 button through Windows' standard Invoke pattern, the existing revision-bound
 semantic-event mailbox, and its normal child-close sequence. An enabled
 authenticated-session button now exposes one bounded Invoke action;

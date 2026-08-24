@@ -172,7 +172,7 @@ Status: **Direct Windows host in progress**
   Inspect cross-check of each then-published property passed with no failures.
   The new hierarchical tree has focused automated coverage plus repeatable
   first-party real-Windows property/tree, geometry, Value-pattern, UI Lab
-  non-Invoke, fixed `SetFocus`, and compiled authenticated-session Invoke
+  non-Invoke, fixed `SetFocus`, fixed focus-event, and compiled authenticated-session Invoke
   acceptance checks; its separate manual
   screen-reader check remains open. Reading is
   joined by one bounded action: an enabled button in an authenticated UI session
@@ -188,14 +188,17 @@ Status: **Direct Windows host in progress**
   or activation route. A genuine focus transition now also raises one
   host-only `UIA_AutomationFocusChangedEventId` from a fresh post-change
   provider (Decision 0074); it has no listener, callback, or application
-  surface. A visible field now exposes only its copied current text through a
+  surface. The fixed first-party focus-event diagnostic has passed through
+  Windows; the manual screen-reader event check remains separate. A visible
+  field now exposes only its copied current text through a
   read-only `IValueProvider`; `SetValue`, selection, caret data, and value
   events stay absent (Decision 0071). After the UI thread accepts and applies
   a strictly newer session document, its root raises one host-only
   `ChildrenInvalidated` structure event; it has no listener, callback, or
   application surface (Decision 0076). Unit and host checks cover all five
-  routes; the compiled Invoke route is now real-Windows verified, while manual
-  screen-reader activation, focus control and event, field-value,
+  routes; the compiled Invoke, focus-property, and focus-event routes are now
+  real-Windows verified, while manual screen-reader activation, focus control
+  and event, field-value,
   and structure-event verification remain open. **Protocol 1.26 adds one bounded
   live-status slice:** an authenticated v3 session document may contain one
   visible semantic status, which a later changed visible value maps to a
@@ -208,7 +211,7 @@ Status: **Direct Windows host in progress**
   immutable parent/child/sibling navigation (Decision 0075); its manual
   screen-reader hierarchy check remains open. See
   `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
-   `docs/UI_AUTOMATION_EVENTS.md`, and
+   `docs/UI_AUTOMATION_EVENTS.md`, `docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`, and
    `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`.
    Decision 0096 now adds a direct-rendered first-viewport scrollbar to the
    Windows UI Lab and authenticated UI-session view. Its track paging and

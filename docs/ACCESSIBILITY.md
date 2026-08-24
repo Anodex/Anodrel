@@ -2,12 +2,13 @@
 
 **Status:** **UI Automation reading, host-owned vertical scrolling, bounded
 scroll-item reveal, and live-status events are implemented. Direct,
-first-party property/tree/geometry, focus, and authenticated Invoke probes now
+first-party property/tree/geometry, focus, focus-event, and authenticated Invoke probes now
 verify the current
 fixed hierarchy in raw and control views, plus one fixed field rectangle, hit
 target, read-only Value pattern, absence of a UI Lab Invoke pattern, and
-`SetFocus` result, and one compiled authenticated button's full Invoke/event/
-close sequence against real Windows UI Automation; Narrator and Inspect
+`SetFocus` result, one outbound fixed focus event, and one compiled
+authenticated button's full Invoke/event/close sequence against real Windows
+UI Automation; Narrator and Inspect
 verified the earlier flat semantic surface.
 Manual hierarchy, scrolling and item reveal, button invocation, focus,
 focus-event, field-value, structure-event, and live-status screen-reader checks

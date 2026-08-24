@@ -6,12 +6,15 @@
 control-view, fixed-geometry, fixed-Value-pattern, and non-Invoke-pattern
 check for the UI Lab.
 `--uia-focus-probe` separately verifies its fixed UI Automation focus route.
+`--uia-focus-event-probe` separately verifies one fixed outbound focus-change
+event route.
 `--uia-invoke-probe` proves one compiled authenticated button through its
 normal semantic-event and session-close path. They complement the manual
 checks below; they do not replace Narrator's spoken-output or Inspect's
 highlight verification. See `docs/UI_AUTOMATION_PROBE.md`,
-`docs/UI_AUTOMATION_FOCUS_PROBE.md`, `docs/UI_AUTOMATION_INVOKE_PROBE.md`, and
-Decisions 0106 through 0111.
+`docs/UI_AUTOMATION_FOCUS_PROBE.md`,
+`docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`,
+`docs/UI_AUTOMATION_INVOKE_PROBE.md`, and Decisions 0106 through 0113.
 
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 
@@ -56,16 +59,32 @@ or visual highlight geometry.
 
 This passed on Windows on 2026-08-24. A separate direct first-party MTA client
 attached to the temporary fixed UI Lab, found only its compiled `ui.lab.field`
-control, called standard `SetFocus`, and then received that same AutomationId
-from Windows' `GetFocusedElement`. This covers the real provider call, its
-private payload-free host route, the UI-thread focusability gate, and the
-observable focused result.
+control, called standard `SetFocus`, then read `HasKeyboardFocus = true` from
+that same field in a fresh provider publication. This covers the real provider
+call, its private payload-free host route, the UI-thread focusability gate, and
+the resulting published semantic focus.
 
 It accepted no target or input from an operator or application, and did not
 read a value, invoke a control, register an event, test for assistive
 technology, or force foreground activation. It proves one fixed focus route,
 not Narrator speech, keyboard input, focus-event delivery, or arbitrary focus
 control. Re-run it with the command in `docs/UI_AUTOMATION_FOCUS_PROBE.md`.
+
+### Automated UI Lab focus-event acceptance
+
+This passed on Windows on 2026-08-24. A separate direct first-party MTA client
+registered one private `IUIAutomationFocusChangedEventHandler` before calling
+`SetFocus` for the fixed UI Lab field. Windows delivered the resulting focus
+event, and the callback's sender AutomationId was exactly `ui.lab.field`.
+This covers the real provider event call, Windows' registration and dispatch,
+and the callback's bounded sender read.
+
+The listener accepts no application data and records no event outside the
+short-lived diagnostic. The production host remains listener-free. This proves
+one changed fixed focus event, not Narrator speech, keyboard or pointer events,
+repeat-focus silence, refusal of disabled or clipped controls, or an
+application event surface. Re-run it with the command in
+`docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`.
 
 ### Automated authenticated-session Invoke acceptance
 
@@ -286,11 +305,11 @@ client merely seeing the pattern.
 ### Manual focus verification
 
 On the same development UI Session Lab surface, use Tab to reach a visible
-field or button. Inspect must show that element's `HasKeyboardFocus` as true
-and `GetFocus` must return that same element. Move focus with Tab again and ask
-Inspect to refresh: the new provider snapshot must name the new target. The
-previous provider is allowed to retain its old snapshot, because this slice
-does not make earlier providers chase live state. A UI Automation client
+field or button. Inspect must show that element's `HasKeyboardFocus` as true.
+Move focus with Tab again and ask Inspect to refresh: the new provider snapshot
+must name the new target. The previous provider is allowed to retain its old
+snapshot, because this slice does not make earlier providers chase live state.
+A UI Automation client
 registered for focus-change events must receive one event naming the new target
 after Tab, pointer focus, and a changed successful `SetFocus`; repeating focus
 on the same control and attempting disabled or clipped targets must produce

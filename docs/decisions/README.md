@@ -13,6 +13,10 @@ Each record should include:
 
 Current records (newest first):
 
+- 0113: Windows UI Automation focus probe reads provider focus.
+
+- 0112: Windows UI Automation focus-event probe keeps listening private.
+
 - 0111: Windows UI Automation Invoke probe uses one compiled session.
 
 - 0110: Windows UI Automation probe keeps UI Lab buttons non-invokable.

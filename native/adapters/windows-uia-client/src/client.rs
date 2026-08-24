@@ -1,5 +1,6 @@
 //! Host-only element lookup, tree walking, property decoding, and fixed focus.
 
+mod events;
 mod patterns;
 
 use std::{fmt, string::FromUtf16Error};
@@ -8,6 +9,8 @@ use crate::{
     com::{Com, create_automation, succeeded},
     raw,
 };
+
+pub use events::UiAutomationFocusSubscription;
 
 /// A safe failure category from the direct Windows UI Automation client.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -252,6 +255,18 @@ impl UiAutomationClient {
         })
     }
 
+    /// Reads whether Windows currently publishes this element as keyboard focused.
+    ///
+    /// The result is used only by the fixed host focus acceptance probe after
+    /// it obtains a fresh provider publication. Applications cannot request a
+    /// focus readback or receive this value through Anodrel.
+    pub fn has_keyboard_focus(
+        &self,
+        element: &UiAutomationElement,
+    ) -> Result<bool, UiAutomationError> {
+        self.boolean_property(element, raw::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+    }
+
     /// Returns the element's direct raw-view children in published sibling order.
     pub fn raw_children(
         &self,
@@ -352,22 +367,7 @@ impl UiAutomationClient {
         element: &UiAutomationElement,
         property: i32,
     ) -> Result<String, UiAutomationError> {
-        let variant = self.property(element, property)?;
-        if variant.vt != raw::VT_BSTR {
-            return Err(UiAutomationError::PropertyType);
-        }
-        // SAFETY: a `VT_BSTR` variant carries exactly one BSTR pointer, which
-        // may be null for an empty value. The Variant releases it on Drop.
-        let text = unsafe { variant.value.bstr };
-        if text.is_null() {
-            return Ok(String::new());
-        }
-        // SAFETY: SysStringLen reads the BSTR allocation Windows returned.
-        let length = unsafe { raw::SysStringLen(text) } as usize;
-        // SAFETY: the BSTR has `length` UTF-16 code units and remains owned by
-        // `variant` until this function returns.
-        let units = unsafe { core::slice::from_raw_parts(text, length) };
-        Ok(String::from_utf16(units)?)
+        text_property_from_raw(element.raw.as_ptr(), property)
     }
 
     fn integer_property(
@@ -381,6 +381,24 @@ impl UiAutomationClient {
         }
         // SAFETY: a `VT_I4` variant carries exactly one i32.
         Ok(unsafe { variant.value.i4 })
+    }
+
+    fn boolean_property(
+        &self,
+        element: &UiAutomationElement,
+        property: i32,
+    ) -> Result<bool, UiAutomationError> {
+        let variant = self.property(element, property)?;
+        if variant.vt != raw::VT_BOOL {
+            return Err(UiAutomationError::PropertyType);
+        }
+        // SAFETY: a `VT_BOOL` variant carries exactly one Windows VARIANT_BOOL
+        // value, where zero is false and negative one is true.
+        match unsafe { variant.value.bool_value } {
+            0 => Ok(false),
+            -1 => Ok(true),
+            _ => Err(UiAutomationError::PropertyType),
+        }
     }
 
     fn property(
@@ -424,6 +442,47 @@ impl UiAutomationClient {
         let _pattern = Com::from_out(pattern.as_ptr())?;
         Ok(true)
     }
+}
+
+/// Reads one BSTR property while Windows temporarily lends an element pointer.
+///
+/// The focus-event callback uses this for its sender while Windows guarantees
+/// that sender remains valid. It copies the text before the callback returns,
+/// so no UI Automation interface crosses from the callback thread to the
+/// waiting diagnostic worker.
+fn text_property_from_raw(
+    element: *mut raw::Element,
+    property: i32,
+) -> Result<String, UiAutomationError> {
+    if element.is_null() {
+        return Err(UiAutomationError::NullInterface);
+    }
+    let mut value = raw::Variant::empty();
+    // SAFETY: this helper is called only for a live owned element or a sender
+    // Windows temporarily lends to its callback. `value` is initialized
+    // writable VARIANT storage for the documented property result.
+    let result = unsafe {
+        let vtable = (*element).vtable;
+        ((*vtable).current_property_value)(element, property, &mut value)
+    };
+    if !succeeded(result) {
+        return Err(UiAutomationError::Query(result));
+    }
+    if value.vt != raw::VT_BSTR {
+        return Err(UiAutomationError::PropertyType);
+    }
+    // SAFETY: a `VT_BSTR` variant carries exactly one BSTR pointer, which may
+    // be null for an empty value. The Variant releases it on Drop.
+    let text = unsafe { value.value.bstr };
+    if text.is_null() {
+        return Ok(String::new());
+    }
+    // SAFETY: SysStringLen reads the BSTR allocation Windows returned.
+    let length = unsafe { raw::SysStringLen(text) } as usize;
+    // SAFETY: the BSTR has `length` UTF-16 code units and remains owned by
+    // `value` until this function returns.
+    let units = unsafe { core::slice::from_raw_parts(text, length) };
+    Ok(String::from_utf16(units)?)
 }
 
 #[derive(Clone, Copy)]

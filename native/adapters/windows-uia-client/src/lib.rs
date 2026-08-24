@@ -14,7 +14,7 @@ mod com;
 mod raw;
 
 pub use client::{
-    UiAutomationClient, UiAutomationElement, UiAutomationError, UiAutomationNode, UiAutomationRect,
-    UiAutomationValue,
+    UiAutomationClient, UiAutomationElement, UiAutomationError, UiAutomationFocusSubscription,
+    UiAutomationNode, UiAutomationRect, UiAutomationValue,
 };
 pub use com::ComApartment;

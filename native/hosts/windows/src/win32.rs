@@ -40,6 +40,7 @@ mod stats;
 mod text;
 mod ui_lab;
 mod ui_session_view;
+mod uia_focus_event_probe;
 mod uia_focus_probe;
 mod uia_property_probe;
 mod window_group_lab;
@@ -85,6 +86,7 @@ pub use launch::{
 pub use product_tile::FIXTURE_APPLICATION_ID;
 pub(crate) use session_launch::run_ui_session_after_shown;
 pub use session_launch::{run_authenticated_ui_session, run_ui_session};
+pub use uia_focus_event_probe::run as run_uia_focus_event_probe;
 pub use uia_focus_probe::run as run_uia_focus_probe;
 
 mod raw;

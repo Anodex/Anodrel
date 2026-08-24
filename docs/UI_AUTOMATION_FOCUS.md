@@ -76,10 +76,13 @@ snapshot revision gate, the focusability gate, the COM result, and session
 isolation.
 
 The repeatable host-only `--uia-focus-probe` passed on Windows on 2026-08-24.
-It asks Windows to focus the compiled UI Lab field, then confirms Windows
-returns that same fixed field from `GetFocusedElement`. It proves the real
-provider-to-host focus route but not speech, input, focus events, or an
-arbitrary target. Run it with the command in `docs/UI_AUTOMATION_FOCUS_PROBE.md`.
+It asks Windows to focus the compiled UI Lab field, obtains a fresh provider
+publication, and confirms that same fixed field reports
+`HasKeyboardFocus = true`. It proves the real provider-to-host focus route but
+not speech, input, focus-event delivery, or an arbitrary target. The separate
+`--uia-focus-event-probe` passed on the same date and proves one real outbound
+focus-change callback; run it with the command in
+`docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`.
 
 To verify with Narrator on Windows:
 

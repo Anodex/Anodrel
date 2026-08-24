@@ -7,13 +7,18 @@ use core::ffi::c_void;
 pub(crate) type Hresult = i32;
 
 pub(crate) const S_OK: Hresult = 0;
+pub(crate) const E_NOINTERFACE: Hresult = -2_147_467_262;
+pub(crate) const E_POINTER: Hresult = -2_147_467_261;
+pub(crate) const E_FAIL: Hresult = -2_147_467_259;
 pub(crate) const COINIT_MULTITHREADED: u32 = 0;
 pub(crate) const CLSCTX_INPROC_SERVER: u32 = 1;
 pub(crate) const VT_I4: u16 = 3;
 pub(crate) const VT_BSTR: u16 = 8;
+pub(crate) const VT_BOOL: u16 = 11;
 
 pub(crate) const UIA_CONTROL_TYPE_PROPERTY_ID: i32 = 30_003;
 pub(crate) const UIA_NAME_PROPERTY_ID: i32 = 30_005;
+pub(crate) const UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID: i32 = 30_008;
 pub(crate) const UIA_AUTOMATION_ID_PROPERTY_ID: i32 = 30_011;
 pub(crate) const UIA_INVOKE_PATTERN_ID: i32 = 10_000;
 pub(crate) const UIA_VALUE_PATTERN_ID: i32 = 10_002;
@@ -32,6 +37,23 @@ pub(crate) const IID_I_UI_AUTOMATION: Guid = Guid::new(
     0xd9d0,
     0x452a,
     [0xab, 0x13, 0x7a, 0xc5, 0xac, 0x48, 0x25, 0xee],
+);
+
+/// The base COM interface every client callback must answer.
+pub(crate) const IID_I_UNKNOWN: Guid = Guid::new(
+    0x0000_0000,
+    0x0000,
+    0x0000,
+    [0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46],
+);
+
+/// The `IUIAutomationFocusChangedEventHandler` callback interface from
+/// `UIAutomationClient.h`.
+pub(crate) const IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER: Guid = Guid::new(
+    0xc270_f6b5,
+    0x5c69,
+    0x4290,
+    [0x97, 0x45, 0x7a, 0x7f, 0x97, 0x16, 0x94, 0x68],
 );
 
 /// The client-side `IUIAutomationValuePattern` interface from
@@ -53,7 +75,7 @@ pub(crate) const IID_I_UI_AUTOMATION_INVOKE_PATTERN: Guid = Guid::new(
 );
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) struct Guid {
     data1: u32,
     data2: u16,
@@ -89,7 +111,7 @@ pub(crate) struct Automation {
     pub(crate) vtable: *const AutomationVtable,
 }
 
-/// The prefix through `get_RawViewWalker` of `IUIAutomationVtbl`.
+/// The prefix through `RemoveFocusChangedEventHandler` of `IUIAutomationVtbl`.
 ///
 /// Slots not used by this host-only adapter are retained as pointer-sized
 /// placeholders to preserve the Windows SDK vtable offset of the next slot.
@@ -117,6 +139,32 @@ pub(crate) struct AutomationVtable {
     pub(crate) content_view_walker: *const c_void,
     pub(crate) raw_view_walker:
         unsafe extern "system" fn(*mut Automation, *mut *mut TreeWalker) -> Hresult,
+    pub(crate) raw_view_condition: *const c_void,
+    pub(crate) control_view_condition: *const c_void,
+    pub(crate) content_view_condition: *const c_void,
+    pub(crate) create_cache_request: *const c_void,
+    pub(crate) create_true_condition: *const c_void,
+    pub(crate) create_false_condition: *const c_void,
+    pub(crate) create_property_condition: *const c_void,
+    pub(crate) create_property_condition_ex: *const c_void,
+    pub(crate) create_and_condition: *const c_void,
+    pub(crate) create_and_condition_from_array: *const c_void,
+    pub(crate) create_and_condition_from_native_array: *const c_void,
+    pub(crate) create_or_condition: *const c_void,
+    pub(crate) create_or_condition_from_array: *const c_void,
+    pub(crate) create_or_condition_from_native_array: *const c_void,
+    pub(crate) create_not_condition: *const c_void,
+    pub(crate) add_automation_event_handler: *const c_void,
+    pub(crate) remove_automation_event_handler: *const c_void,
+    pub(crate) add_property_changed_event_handler_native_array: *const c_void,
+    pub(crate) add_property_changed_event_handler: *const c_void,
+    pub(crate) remove_property_changed_event_handler: *const c_void,
+    pub(crate) add_structure_changed_event_handler: *const c_void,
+    pub(crate) remove_structure_changed_event_handler: *const c_void,
+    pub(crate) add_focus_changed_event_handler:
+        unsafe extern "system" fn(*mut Automation, *mut c_void, *mut c_void) -> Hresult,
+    pub(crate) remove_focus_changed_event_handler:
+        unsafe extern "system" fn(*mut Automation, *mut c_void) -> Hresult,
 }
 
 #[repr(C)]
@@ -250,6 +298,7 @@ pub(crate) struct TreeWalkerVtable {
 #[repr(C)]
 pub(crate) union VariantValue {
     pub(crate) i4: i32,
+    pub(crate) bool_value: i16,
     pub(crate) bstr: *mut u16,
     /// The documented VARIANT union holds two pointer-sized words. The property
     /// forms this client reads use only the first word, but this storage
@@ -306,9 +355,10 @@ unsafe extern "system" {
 #[cfg(test)]
 mod tests {
     use super::{
-        AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_INVOKE_PATTERN,
-        IID_I_UI_AUTOMATION_VALUE_PATTERN, InvokePatternVtable, Point, Rect, UIA_INVOKE_PATTERN_ID,
-        UIA_VALUE_PATTERN_ID, ValuePatternVtable, Variant,
+        AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER,
+        IID_I_UI_AUTOMATION_INVOKE_PATTERN, IID_I_UI_AUTOMATION_VALUE_PATTERN, InvokePatternVtable,
+        Point, Rect, UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, UIA_INVOKE_PATTERN_ID,
+        UIA_VALUE_PATTERN_ID, VT_BOOL, ValuePatternVtable, Variant,
     };
 
     #[test]
@@ -346,6 +396,14 @@ mod tests {
             16 * core::mem::size_of::<*const core::ffi::c_void>()
         );
         assert_eq!(
+            core::mem::offset_of!(AutomationVtable, add_focus_changed_event_handler),
+            39 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
+            core::mem::offset_of!(AutomationVtable, remove_focus_changed_event_handler),
+            40 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
             core::mem::size_of::<ValuePatternVtable>(),
             8 * core::mem::size_of::<*const core::ffi::c_void>()
         );
@@ -355,6 +413,16 @@ mod tests {
         );
         assert_eq!(UIA_INVOKE_PATTERN_ID, 10_000);
         assert_eq!(UIA_VALUE_PATTERN_ID, 10_002);
+        assert_eq!(UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, 30_008);
+        assert_eq!(VT_BOOL, 11);
+        assert_eq!(
+            IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER.data1,
+            0xc270_f6b5
+        );
+        assert_eq!(
+            IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER.data4,
+            [0x97, 0x45, 0x7a, 0x7f, 0x97, 0x16, 0x94, 0x68]
+        );
         assert_eq!(IID_I_UI_AUTOMATION_INVOKE_PATTERN.data1, 0xfb37_7fbe);
         assert_eq!(
             IID_I_UI_AUTOMATION_INVOKE_PATTERN.data4,

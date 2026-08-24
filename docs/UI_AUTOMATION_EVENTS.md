@@ -1,7 +1,7 @@
 # Anodrel UI Automation events
 
-**Status:** Implemented on Windows; manual UI Automation-client verification is
-still required.**
+**Status:** Implemented and fixed-event-probe verified on Windows; manual
+screen-reader verification is still required.**
 
 ## Purpose
 
@@ -69,6 +69,15 @@ Automated checks must prove that the host distinguishes an accepted `SetFocus`
 no-op from a changed focus target and only asks the event adapter to raise an
 event for the latter. Adapter tests must prove it refuses an empty publication
 without calling Windows and uses the published focus child as the event source.
+
+The repeatable host-only `--uia-focus-event-probe` passed on Windows on
+2026-08-24. It registers one private client callback before calling `SetFocus`
+on the compiled UI Lab field, then passes only when Windows delivers one event
+whose sender has the fixed `ui.lab.field` AutomationId. It proves one real
+outbound event path, not Narrator speech, pointer or keyboard coverage,
+disabled/clipped refusal, repeated-focus silence, or an application-visible
+event API. Run it with the command in
+`docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`.
 
 Manual Windows verification uses a UI Automation client registered for
 focus-changed events while an Anodrel UI Lab or UI Session Lab is open. Tab,

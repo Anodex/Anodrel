@@ -1,6 +1,6 @@
 # Decision 0109: Windows UI Automation focus probing stays fixed and host-only
 
-**Status:** Accepted
+**Status:** Superseded in part by Decision 0113
 
 **Date:** 2026-08-24
 

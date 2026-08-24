@@ -6,10 +6,11 @@
 opens the fixed UI Lab and uses a direct Windows UI Automation client in a
 separate MTA apartment to request focus for its compiled `ui.lab.field`.
 
-The probe then asks Windows for the focused UI Automation element and passes
-only when its AutomationId is the same fixed `ui.lab.field` value. It gives an
-operator one process exit status and a fixed console result; it does not print
-or expose a focus identity to an application.
+The probe then obtains a fresh UI Automation publication for the temporary
+window and passes only when that same fixed `ui.lab.field` reports
+`HasKeyboardFocus = true`. It gives an operator one process exit status and a
+fixed console result; it does not print or expose a focus identity to an
+application.
 
 ## Running it
 
@@ -33,8 +34,9 @@ runtime binding.
 
 The probe accepts no window, selector, document, coordinate, action, value,
 event, or focus target. It finds the one compiled field in the host-created UI
-Lab, calls standard `SetFocus`, then reads standard `GetFocusedElement`. It
-does not invoke a control, write a value, send synthetic input, activate or
+Lab, calls standard `SetFocus`, then reads only the standard
+`HasKeyboardFocus` property from a fresh fixed provider publication. It does
+not invoke a control, write a value, send synthetic input, activate or
 foreground a window, subscribe to events, or test for assistive technology.
 Its only mutation is the existing bounded host-owned focus transition for its
 temporary window.
@@ -42,4 +44,4 @@ temporary window.
 The focus probe supplements rather than replaces the manual checks in
 `docs/ACCESSIBILITY_VERIFICATION.md`: Narrator proves usable spoken and input
 behaviour, while Inspect or Accessibility Insights still proves every property
-and highlight rectangle. See Decisions 0073 and 0109.
+and highlight rectangle. See Decisions 0073, 0109, and 0113.

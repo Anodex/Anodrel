@@ -2,9 +2,10 @@
 //!
 //! This diagnostic is intentionally separate from the read-only property
 //! probe. It opens the compiled UI Lab, asks Windows to focus its one fixed
-//! field through the provider, observes Windows' current focus, then closes
-//! the temporary window. No application can start it, choose a target, inspect
-//! its result, or acquire a UI Automation object.
+//! field through the provider, then checks the same fixed field's fresh
+//! keyboard-focus property before closing the temporary window. No application
+//! can start it, choose a target, inspect its result, or acquire a UI
+//! Automation object.
 
 use std::{
     io,
@@ -89,10 +90,14 @@ fn probe_once(window: Hwnd) -> Result<(), UiAutomationError> {
     let root = client.element_from_handle(window)?;
     let field = find_fixed_field(&client, root)?.ok_or(UiAutomationError::UnexpectedTree)?;
     client.set_focus(&field)?;
-    let focused = client
-        .focused_element()?
-        .ok_or(UiAutomationError::UnexpectedTree)?;
-    if client.node(&focused)?.automation_id == FIXED_FIELD_ID {
+    // Fetch a fresh immutable provider publication after the UI-thread route
+    // accepted the request. Windows' global focused-element query reports
+    // native input focus, which is intentionally distinct from this
+    // custom-drawn semantic focus state.
+    let refreshed_root = client.element_from_handle(window)?;
+    let refreshed_field =
+        find_fixed_field(&client, refreshed_root)?.ok_or(UiAutomationError::UnexpectedTree)?;
+    if client.has_keyboard_focus(&refreshed_field)? {
         Ok(())
     } else {
         Err(UiAutomationError::UnexpectedTree)
