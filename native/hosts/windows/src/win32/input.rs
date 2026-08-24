@@ -6,6 +6,16 @@
 
 use super::*;
 
+/// Extracts the signed client coordinates packed into an `LPARAM`.
+pub(super) fn mouse_position(lparam: Lparam) -> (i32, i32) {
+    let raw = lparam as u32;
+    ((raw & 0xFFFF) as i16 as i32, (raw >> 16) as i16 as i32)
+}
+
+pub(super) fn wheel_delta(wparam: Wparam) -> i16 {
+    ((wparam >> 16) as u16) as i16
+}
+
 pub(super) fn handle_input_message(
     window: Hwnd,
     message: Uint,

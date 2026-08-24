@@ -2,8 +2,8 @@
 
 use super::{
     Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, PreflightOutcome,
-    StartupLab, action_document, document, mouse_position, presentation_command, startup_lab,
-    startup_log_book, wheel_delta, window_size_for_client,
+    StartupLab, action_document, document, input::mouse_position, input::wheel_delta,
+    launch::startup_log_book, services::presentation_command, startup_lab, window_size_for_client,
 };
 /// Representative surface state, matching the shipped sample package.
 pub(super) fn sample_lab() -> StartupLab {

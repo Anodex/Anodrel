@@ -5,6 +5,30 @@
 //! style, or desktop-control value.
 
 use super::*;
+use anodrel_diagnostics::Event;
+
+/// Builds the diagnostic history displayed by the Startup Lab.
+///
+/// Its only input is one member of the closed event catalogue, chosen by the
+/// caller's preflight. The displayed history therefore still reflects fixed host
+/// milestones rather than application text, operating-system errors, paths, or
+/// arbitrary caller data.
+pub(super) fn startup_log_book(launch_event: Event) -> LogBook {
+    let mut log = LogBook::new();
+    // Chronological: the preflight runs alongside the two checks above it and is
+    // settled before this surface is authorized to open.
+    for event in [
+        Event::PackageVerified,
+        Event::CoreHealthChecked,
+        Event::PipeLoopbackChecked,
+        launch_event,
+        Event::StartupLabAuthorized,
+    ] {
+        log.record(event)
+            .expect("five fixed startup events fit in the diagnostic log");
+    }
+    log
+}
 
 /// Opens the simple native document surface.
 pub fn run(title: &str, text: &str) -> io::Result<()> {

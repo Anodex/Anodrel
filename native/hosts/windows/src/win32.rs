@@ -42,7 +42,7 @@ use std::{io, mem, ptr, sync::OnceLock, time::Instant};
 
 use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_core::SessionCloseSignal;
-use anodrel_diagnostics::{Event, LogBook};
+use anodrel_diagnostics::LogBook;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSelection};
 use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
@@ -55,7 +55,7 @@ use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSizeMailbox,
-    WindowState, WindowStateMailbox, WindowTitleMailbox, WindowTitleProposal,
+    WindowStateMailbox, WindowTitleMailbox, WindowTitleProposal,
 };
 
 use crate::product::PreflightOutcome;
@@ -328,29 +328,6 @@ pub(super) struct StartupLab {
     /// hit-testing, so the surface cannot offer a launch on a machine where the
     /// record or signature does not validate. See `docs/PRODUCT_FIXTURE.md`.
     pub(super) launch_available: bool,
-}
-
-/// Builds the diagnostic history displayed by the Startup Lab.
-///
-/// Its only input is one member of the closed event catalogue, chosen by the
-/// caller's preflight. The displayed history therefore still reflects fixed host
-/// milestones rather than application text, operating-system errors, paths, or
-/// arbitrary caller data.
-fn startup_log_book(launch_event: Event) -> LogBook {
-    let mut log = LogBook::new();
-    // Chronological: the preflight runs alongside the two checks above it and is
-    // settled before this surface is authorized to open.
-    for event in [
-        Event::PackageVerified,
-        Event::CoreHealthChecked,
-        Event::PipeLoopbackChecked,
-        launch_event,
-        Event::StartupLabAuthorized,
-    ] {
-        log.record(event)
-            .expect("five fixed startup events fit in the diagnostic log");
-    }
-    log
 }
 
 #[derive(Clone)]
@@ -693,28 +670,6 @@ fn invalidate_region(window: Hwnd, region: CanvasRect) {
     // the canvas covers every pixel it will repaint.
     unsafe {
         InvalidateRect(window, &rect, 0);
-    }
-}
-
-/// Extracts the signed client coordinates packed into an `LPARAM`.
-fn mouse_position(lparam: Lparam) -> (i32, i32) {
-    let raw = lparam as u32;
-    ((raw & 0xFFFF) as i16 as i32, (raw >> 16) as i16 as i32)
-}
-
-fn wheel_delta(wparam: Wparam) -> i16 {
-    ((wparam >> 16) as u16) as i16
-}
-
-/// Converts the portable closed state into its one documented User32 command.
-///
-/// Keeping this conversion separate makes the native boundary exhaustive and
-/// unit-testable without creating a window. No caller can supply the integer.
-const fn presentation_command(state: WindowState) -> i32 {
-    match state {
-        WindowState::Minimized => SW_MINIMIZE,
-        WindowState::Maximized => SW_MAXIMIZE,
-        WindowState::Restored => SW_RESTORE,
     }
 }
 

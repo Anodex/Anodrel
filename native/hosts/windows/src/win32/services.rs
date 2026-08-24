@@ -6,6 +6,19 @@
 //! native state through this module.
 
 use super::*;
+use anodrel_window::WindowState;
+
+/// Converts the portable closed state into its one documented User32 command.
+///
+/// Keeping this conversion separate makes the native boundary exhaustive and
+/// unit-testable without creating a window. No caller can supply the integer.
+pub(super) const fn presentation_command(state: WindowState) -> i32 {
+    match state {
+        WindowState::Minimized => SW_MINIMIZE,
+        WindowState::Maximized => SW_MAXIMIZE,
+        WindowState::Restored => SW_RESTORE,
+    }
+}
 
 /// Opens an additional native window while the message loop is running.
 pub(super) fn open_document_window(title: &str, document: Document) -> io::Result<()> {
