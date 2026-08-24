@@ -15,6 +15,7 @@ pub(crate) const VT_BSTR: u16 = 8;
 pub(crate) const UIA_CONTROL_TYPE_PROPERTY_ID: i32 = 30_003;
 pub(crate) const UIA_NAME_PROPERTY_ID: i32 = 30_005;
 pub(crate) const UIA_AUTOMATION_ID_PROPERTY_ID: i32 = 30_011;
+pub(crate) const UIA_VALUE_PATTERN_ID: i32 = 10_002;
 
 /// The UI Automation client coclass from `UIAutomationClient.h`.
 pub(crate) const CLSID_C_UI_AUTOMATION: Guid = Guid::new(
@@ -30,6 +31,15 @@ pub(crate) const IID_I_UI_AUTOMATION: Guid = Guid::new(
     0xd9d0,
     0x452a,
     [0xab, 0x13, 0x7a, 0xc5, 0xac, 0x48, 0x25, 0xee],
+);
+
+/// The client-side `IUIAutomationValuePattern` interface from
+/// `UIAutomationClient.h`.
+pub(crate) const IID_I_UI_AUTOMATION_VALUE_PATTERN: Guid = Guid::new(
+    0xa94c_d8b1,
+    0x0844,
+    0x4cd6,
+    [0x9d, 0x2d, 0x64, 0x05, 0x37, 0xab, 0x39, 0xe9],
 );
 
 #[repr(C)]
@@ -121,7 +131,8 @@ pub(crate) struct ElementVtable {
     pub(crate) current_property_value_ex: *const c_void,
     pub(crate) cached_property_value: *const c_void,
     pub(crate) cached_property_value_ex: *const c_void,
-    pub(crate) current_pattern_as: *const c_void,
+    pub(crate) current_pattern_as:
+        unsafe extern "system" fn(*mut Element, i32, *const Guid, *mut *mut c_void) -> Hresult,
     pub(crate) cached_pattern_as: *const c_void,
     pub(crate) current_pattern: *const c_void,
     pub(crate) cached_pattern: *const c_void,
@@ -152,6 +163,27 @@ pub(crate) struct ElementVtable {
     pub(crate) current_item_status: *const c_void,
     pub(crate) current_bounding_rectangle:
         unsafe extern "system" fn(*mut Element, *mut Rect) -> Hresult,
+}
+
+#[repr(C)]
+pub(crate) struct ValuePattern {
+    pub(crate) vtable: *const ValuePatternVtable,
+}
+
+/// The prefix through cached read-only state of the client-side
+/// `IUIAutomationValuePatternVtbl`.
+#[repr(C)]
+pub(crate) struct ValuePatternVtable {
+    pub(crate) query_interface: *const c_void,
+    pub(crate) add_ref: *const c_void,
+    pub(crate) release: *const c_void,
+    pub(crate) set_value: *const c_void,
+    pub(crate) current_value:
+        unsafe extern "system" fn(*mut ValuePattern, *mut *mut u16) -> Hresult,
+    pub(crate) current_is_read_only:
+        unsafe extern "system" fn(*mut ValuePattern, *mut i32) -> Hresult,
+    pub(crate) cached_value: *const c_void,
+    pub(crate) cached_is_read_only: *const c_void,
 }
 
 #[repr(C)]
@@ -247,7 +279,10 @@ unsafe extern "system" {
 
 #[cfg(test)]
 mod tests {
-    use super::{AutomationVtable, ElementVtable, Point, Rect, Variant};
+    use super::{
+        AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_VALUE_PATTERN, Point, Rect,
+        UIA_VALUE_PATTERN_ID, ValuePatternVtable, Variant,
+    };
 
     #[test]
     fn point_and_rectangle_match_the_windows_target_abi() {
@@ -267,6 +302,20 @@ mod tests {
             core::mem::offset_of!(ElementVtable, current_bounding_rectangle),
             43 * core::mem::size_of::<*const core::ffi::c_void>()
         );
+        assert_eq!(
+            core::mem::offset_of!(ElementVtable, current_pattern_as),
+            14 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
+            core::mem::size_of::<ValuePatternVtable>(),
+            8 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(UIA_VALUE_PATTERN_ID, 10_002);
+        assert_eq!(IID_I_UI_AUTOMATION_VALUE_PATTERN.data1, 0xa94c_d8b1);
+        assert_eq!(
+            IID_I_UI_AUTOMATION_VALUE_PATTERN.data4,
+            [0x9d, 0x2d, 0x64, 0x05, 0x37, 0xab, 0x39, 0xe9]
+        );
     }
 
     #[test]
@@ -284,4 +333,5 @@ mod tests {
 unsafe extern "system" {
     pub(crate) fn VariantClear(value: *mut Variant) -> Hresult;
     pub(crate) fn SysStringLen(value: *const u16) -> u32;
+    pub(crate) fn SysFreeString(value: *mut u16);
 }

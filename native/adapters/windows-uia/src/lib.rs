@@ -372,7 +372,6 @@ unsafe fn query(provider: *mut Provider, requested: *const Guid, out: *mut *mut 
                 .is_some_and(|index| provider.tree.supports_scroll_item(index)),
         )
     };
-
     let interface = if requested == IID_IUNKNOWN || requested == IID_IRAW_ELEMENT_PROVIDER_SIMPLE {
         // SAFETY: taking the address of a field of a live object.
         unsafe { (&raw mut (*provider).simple).cast::<c_void>() }

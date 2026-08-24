@@ -44,25 +44,29 @@ pub(super) unsafe extern "system" fn get_pattern_provider(
                     if pattern == UIA_INVOKE_PATTERN_ID
                         && provider_ref.tree.supports_invoke(index) =>
                 {
-                    Some((&raw mut (*provider).invoke).cast::<c_void>())
+                    // A pattern response is an IUnknown. Returning the
+                    // provider's canonical Simple interface preserves COM
+                    // identity; UI Automation then queries the pattern from
+                    // that one object.
+                    Some((&raw mut (*provider).simple).cast::<c_void>())
                 }
                 Some(index)
                     if pattern == UIA_VALUE_PATTERN_ID
                         && provider_ref.tree.supports_value(index) =>
                 {
-                    Some((&raw mut (*provider).value).cast::<c_void>())
+                    Some((&raw mut (*provider).simple).cast::<c_void>())
                 }
                 Some(index)
                     if pattern == UIA_SCROLL_PATTERN_ID
                         && provider_ref.tree.supports_scroll(index) =>
                 {
-                    Some((&raw mut (*provider).scroll).cast::<c_void>())
+                    Some((&raw mut (*provider).simple).cast::<c_void>())
                 }
                 Some(index)
                     if pattern == UIA_SCROLL_ITEM_PATTERN_ID
                         && provider_ref.tree.supports_scroll_item(index) =>
                 {
-                    Some((&raw mut (*provider).scroll_item).cast::<c_void>())
+                    Some((&raw mut (*provider).simple).cast::<c_void>())
                 }
                 _ => None,
             }

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0108: Windows UI Automation value probing remains fixed and read-only.
+
 - 0107: Windows UI Automation geometry probing remains fixed and read-only.
 
 - 0106: Windows UI Automation probing is host-only and read-only.

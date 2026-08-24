@@ -128,6 +128,9 @@ fn verify_node(
     if expected.verify_geometry {
         verify_geometry(client, element, expected.node.automation_id, root_bounds)?;
     }
+    if expected.verify_value_pattern {
+        verify_value_pattern(client, element)?;
+    }
     Ok(())
 }
 
@@ -154,6 +157,19 @@ fn verify_geometry(
     Ok(())
 }
 
+fn verify_value_pattern(
+    client: &UiAutomationClient,
+    element: &UiAutomationElement,
+) -> Result<(), UiAutomationError> {
+    let Some(value) = client.read_value_pattern(element)? else {
+        return Err(UiAutomationError::UnexpectedTree);
+    };
+    if !value.value.is_empty() || !value.is_read_only {
+        return Err(UiAutomationError::UnexpectedTree);
+    }
+    Ok(())
+}
+
 /// The two read-only Windows UI Automation views this diagnostic compares.
 #[derive(Clone, Copy)]
 enum AutomationView {
@@ -167,6 +183,7 @@ struct ExpectedNode {
     children: &'static [ExpectedNode],
     has_windows_title_bar: bool,
     verify_geometry: bool,
+    verify_value_pattern: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -215,7 +232,7 @@ const ACTIONS: ExpectedNode = group(
     &[FIELD, INSPECT, HIT_TEST, REPORT],
     UIA_GROUP_CONTROL_TYPE,
 );
-const FIELD: ExpectedNode = geometry_target("Sample field", "ui.lab.field", UIA_EDIT_CONTROL_TYPE);
+const FIELD: ExpectedNode = field_target("Sample field", "ui.lab.field", UIA_EDIT_CONTROL_TYPE);
 const INSPECT: ExpectedNode = button("Inspect layout", "ui.lab.inspect");
 const HIT_TEST: ExpectedNode = button("Test semantic action", "ui.lab.hit-test");
 const REPORT: ExpectedNode = button("Report semantic action", "ui.lab.report");
@@ -263,6 +280,7 @@ const fn root(
         children,
         has_windows_title_bar: true,
         verify_geometry: false,
+        verify_value_pattern: false,
     }
 }
 
@@ -283,13 +301,14 @@ const fn button(name: &'static str, automation_id: &'static str) -> ExpectedNode
     element(name, automation_id, UIA_BUTTON_CONTROL_TYPE, &[])
 }
 
-const fn geometry_target(
+const fn field_target(
     name: &'static str,
     automation_id: &'static str,
     control_type: i32,
 ) -> ExpectedNode {
     let mut node = element(name, automation_id, control_type, &[]);
     node.verify_geometry = true;
+    node.verify_value_pattern = true;
     node
 }
 
@@ -308,6 +327,7 @@ const fn element(
         children,
         has_windows_title_bar: false,
         verify_geometry: false,
+        verify_value_pattern: false,
     }
 }
 

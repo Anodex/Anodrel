@@ -172,7 +172,7 @@ Status: **Direct Windows host in progress**
   Inspect cross-check of each then-published property passed with no failures.
   The new hierarchical tree has focused automated coverage and a repeatable
   first-party real-Windows raw/control-view property/tree check plus one fixed
-  rectangle and hit target; its separate manual screen-reader check remains
+  rectangle, hit target, and read-only Value-pattern check; its separate manual screen-reader check remains
   open. Reading is
   joined by one bounded action: an enabled button in an authenticated UI session
   exposes `IInvokeProvider`, which queues the same revision-bound semantic

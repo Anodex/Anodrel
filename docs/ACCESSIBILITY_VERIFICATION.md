@@ -3,12 +3,12 @@
 ## Verification
 
 `--uia-property-probe` is the repeatable host-only property, raw-tree,
-control-view, and fixed-geometry check for the UI Lab. It complements the
+control-view, fixed-geometry, and fixed-Value-pattern check for the UI Lab. It complements the
 manual checks below; it does not replace Narrator's spoken-output or Inspect's
 highlight verification. See
-`docs/UI_AUTOMATION_PROBE.md` and Decisions 0106 and 0107.
+`docs/UI_AUTOMATION_PROBE.md` and Decisions 0106, 0107, and 0108.
 
-### Automated UI Lab property/tree/geometry acceptance
+### Automated UI Lab property/tree/geometry/Value-pattern acceptance
 
 This passed on Windows on 2026-08-24. The direct first-party client created a
 separate MTA apartment, attached to the temporary UI Lab through its real
@@ -27,10 +27,16 @@ diagnostic only and is destroyed afterward. The check therefore catches both
 bad published geometry and a broken provider hit-test route without changing a
 product window or accepting a caller-selected coordinate.
 
-It intentionally did **not** call any interactive pattern, read current field
-text, look up focus, or register an event handler. A fixed rectangle and
-centre-point check is now included; arbitrary geometry, visible highlight
-placement, and interactive behavior remain distinct acceptance concerns.
+For that one fixed field, the probe also obtained Windows' client-side
+`IUIAutomationValuePattern` for the provider-side read-only Value pattern. It
+confirmed the compiled empty initial value and `IsReadOnly = true`; the returned
+`BSTR` was copied and released inside the private worker. This establishes the
+real client/provider pattern bridge without reading a person's text.
+
+It intentionally did **not** call any interactive pattern, look up focus, or
+register an event handler. Its only field-text read is the compiled empty Value
+check described above. Arbitrary geometry, visible highlight placement, and
+interactive behavior remain distinct acceptance concerns.
 Re-run it with the command in
 `docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact property/tree boundary,
 including control-view navigation and one fixed hit-test target, not spoken
@@ -52,7 +58,9 @@ rejecting a null output rather than writing through it, reference counting
 freeing the object exactly once, a panicking body returning a failure code
 instead of unwinding, the Invoke gate admitting only an enabled visible
 authenticated-session button to the revision-bound mailbox, and the Value gate returning only
-a matching field snapshot while refusing every automation write. They also
+a matching field snapshot while refusing every automation write, and that every
+pattern response retains the provider's canonical COM identity before Windows
+queries its requested pattern interface. They also
 prove the Focus gate admits only a visible enabled field or button, keeps one
 provider's updated focus snapshot local to that provider, and refuses an
 expired, busy, unknown, or late-completing route without changing host focus.

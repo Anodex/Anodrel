@@ -3,9 +3,9 @@
 **Status:** **UI Automation reading, host-owned vertical scrolling, bounded
 scroll-item reveal, and live-status events are implemented. A direct,
 first-party property/tree/geometry probe now verifies the current fixed
-hierarchy in raw and control views, plus one fixed field rectangle and hit
-target, against real Windows UI Automation; Narrator and Inspect verified the
-earlier flat semantic surface. Manual hierarchy, scrolling and item reveal,
+hierarchy in raw and control views, plus one fixed field rectangle, hit target,
+and read-only Value pattern, against real Windows UI Automation; Narrator and
+Inspect verified the earlier flat semantic surface. Manual hierarchy, scrolling and item reveal,
 button invocation, focus, focus-event, field-value, structure-event, and
 live-status screen-reader checks remain open.**
 Narrator reads an Anodrel surface aloud on Windows 11, announcing each element
@@ -368,9 +368,11 @@ provider returns the matching child from `GetFocus` and sets
 `HasKeyboardFocus` only on that element, using one immutable snapshot of the
 host's existing layout-validated focus (Decision 0070).
 
-**Slice 6 — read-only field values. Implemented; manual value check pending.**
-A matching visible `Edit` exposes `IValueProvider`, returns its copied host
-value, and is read-only to automation (Decision 0071). It has no `SetValue`,
+**Slice 6 — read-only field values. Implemented; fixed Windows probe passed;
+manual value check pending.** A matching visible `Edit` exposes
+`IValueProvider`, returns its copied host value, and is read-only to automation
+(Decision 0071). The fixed UI Lab probe confirms that through Windows'
+client-side `IUIAutomationValuePattern` (Decision 0108). It has no `SetValue`,
 caret, selection, text range, or value-change event.
 
 **Slice 7 — bounded focus control. Implemented; manual focus-control check
