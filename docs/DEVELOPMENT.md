@@ -177,6 +177,16 @@ secondary and finish** is visible and activate it. The host retains each
 scroll position and all native scroll input. The helper creates no certificate,
 package, installer, or machine policy. See `docs/NATIVE_SCROLL_WINDOW_TEMPLATE.md`.
 
+To exercise every typed targetless session-window control, double-click
+`start-window-controls-template.bat` in the repository root. It generates and
+builds a disposable first-party Rust executable, then opens it through the
+fixed development route. Advance **Set host-composed title**, **Resize client
+area**, **Maximise window**, **Restore window**, **Request foreground
+attention**, **Enter fullscreen**, **Return to windowed**, and **Complete
+window-controls session** in order. The host retains native state and the
+foreground result; the helper creates no certificate, package, installer, or
+machine policy. See `docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md`.
+
 To exercise submit-time native form entry, double-click
 `start-form-template.bat` in the repository root. It generates and builds a
 disposable first-party Rust executable, then opens it through the fixed

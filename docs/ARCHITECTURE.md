@@ -518,6 +518,20 @@ The host retains the group map, native views, scroll state, direct input,
 accessibility scrolling, lifecycle, and shutdown. See
 `docs/NATIVE_SCROLL_WINDOW_TEMPLATE.md` and Decision 0103.
 
+Decision 0105 adds a seventh constrained Windows development template for the
+existing targetless session-window controls. Its `init-window-controls` command
+emits a fixed typed-client project, and the explicit
+`--native-window-controls-template-client` route grants exactly document write,
+semantic-event read, title proposal, state, focus, fullscreen, bounded client
+size, and self-close. Its fixed person-driven walkthrough makes one title
+proposal, one size request, maximise and restore requests, one foreground
+request, fullscreen and windowed requests, then closes. It cannot choose a
+window, handle, monitor, geometry, native title, focus result, display state,
+identity, capability, host command, process, or endpoint. The host retains the
+native view, composed title, direct User32 calls, fullscreen restoration facts,
+lifecycle, and shutdown. See `docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md` and
+Decision 0105.
+
 Decision 0096 adds one direct-rendered Windows scrollbar to the first visible
 overflowing v2 scroll viewport. Its pure host module derives finite track and
 thumb geometry from existing layout metrics and retained scroll state; the UI

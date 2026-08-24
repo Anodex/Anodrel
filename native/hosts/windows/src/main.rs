@@ -10,6 +10,7 @@ mod native_probe;
 mod native_scroll_window_template;
 mod native_template;
 mod native_ui_probe;
+mod native_window_controls_template;
 mod product;
 mod sample;
 mod session_ui;
@@ -82,6 +83,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         && command == "--native-scroll-window-template-client"
     {
         return native_scroll_window_template::run(client_path);
+    }
+    if let [command, client_path] = arguments.as_slice()
+        && command == "--native-window-controls-template-client"
+    {
+        return native_window_controls_template::run(client_path);
     }
     if let [command, node_path, client_path] = arguments.as_slice()
         && command == "--sample-client"
@@ -234,7 +240,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !arguments.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --startup-report <anodrel.application.json> | --crash-report-selftest | --window-lab | --window-group-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --native-sample-client <native-client.exe> | --native-network-sample-client <native-client.exe> | --native-ui-sample-client <native-client.exe> | --native-template-client <native-template.exe> | --native-form-template-client <native-form-template.exe> | --native-live-status-template-client <native-live-status-template.exe> | --native-menu-template-client <native-menu-template.exe> | --native-multi-window-template-client <native-multi-window-template.exe> | --native-scroll-window-template-client <native-scroll-window-template.exe> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-live-status-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-file-write-client <node.exe> <native-client.js> | --sample-ui-file-binary-write-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js> | --sample-ui-window-state-client <node.exe> <native-client.js> | --sample-ui-window-focus-client <node.exe> <native-client.js> | --sample-ui-window-fullscreen-client <node.exe> <native-client.js> | --sample-ui-window-size-client <node.exe> <native-client.js> | --sample-ui-window-size-fullscreen-client <node.exe> <native-client.js> | --sample-ui-fields-client <node.exe> <native-client.js> | --sample-ui-menu-client <node.exe> <native-client.js>]",
+            "usage: anodrel-windows-host [--ui-lab | --ui-preview <document.json> | --startup-report <anodrel.application.json> | --crash-report-selftest | --window-lab | --window-group-lab | --showcase <anodrel.application.json> | --application <anodrel.application.json> | --product-session <applicationId> | --native-sample-client <native-client.exe> | --native-network-sample-client <native-client.exe> | --native-ui-sample-client <native-client.exe> | --native-template-client <native-template.exe> | --native-form-template-client <native-form-template.exe> | --native-live-status-template-client <native-live-status-template.exe> | --native-menu-template-client <native-menu-template.exe> | --native-multi-window-template-client <native-multi-window-template.exe> | --native-scroll-window-template-client <native-scroll-window-template.exe> | --native-window-controls-template-client <native-window-controls-template.exe> | --sample-client <node.exe> <native-client.js> | --sample-ui-client <node.exe> <native-client.js> | --sample-ui-live-status-client <node.exe> <native-client.js> | --sample-ui-file-client <node.exe> <native-client.js> | --sample-ui-file-text-client <node.exe> <native-client.js> | --sample-ui-save-client <node.exe> <native-client.js> | --sample-ui-file-write-client <node.exe> <native-client.js> | --sample-ui-file-binary-write-client <node.exe> <native-client.js> | --sample-ui-storage-client <node.exe> <native-client.js> | --sample-ui-scroll-client <node.exe> <native-client.js> | --sample-ui-diagnostics-client <node.exe> <native-client.js> | --sample-ui-credentials-client <node.exe> <native-client.js> | --sample-ui-notification-client <node.exe> <native-client.js> | --sample-ui-window-title-client <node.exe> <native-client.js> | --sample-ui-window-state-client <node.exe> <native-client.js> | --sample-ui-window-focus-client <node.exe> <native-client.js> | --sample-ui-window-fullscreen-client <node.exe> <native-client.js> | --sample-ui-window-size-client <node.exe> <native-client.js> | --sample-ui-window-size-fullscreen-client <node.exe> <native-client.js> | --sample-ui-fields-client <node.exe> <native-client.js> | --sample-ui-menu-client <node.exe> <native-client.js>]",
         )
         .into());
     }

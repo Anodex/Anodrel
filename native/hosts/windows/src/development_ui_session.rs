@@ -1,7 +1,8 @@
 //! Shared lifecycle for fixed-grant development native UI sessions.
 //!
 //! Each caller chooses only fixed host constants. The selected child supplies
-//! no identity, title, capability, endpoint, or native window information.
+//! no identity, capability, endpoint, or native window information. A route
+//! may accept one bounded typed proposal only when its fixed grant permits it.
 
 use std::{error::Error, io, thread};
 
@@ -41,6 +42,16 @@ const MULTI_WINDOW_GRANTS: [Capability; 5] = [
     Capability::WindowClose,
     Capability::SessionClose,
 ];
+const WINDOW_CONTROLS_GRANTS: [Capability; 8] = [
+    Capability::UiDocumentWrite,
+    Capability::UiEventsRead,
+    Capability::WindowTitle,
+    Capability::WindowState,
+    Capability::WindowFocus,
+    Capability::WindowFullscreen,
+    Capability::WindowSize,
+    Capability::SessionClose,
+];
 
 #[derive(Clone, Copy)]
 enum DevelopmentUiSessionKind {
@@ -48,6 +59,7 @@ enum DevelopmentUiSessionKind {
     Form,
     Menu,
     MultiWindow,
+    WindowControls,
 }
 
 /// Fixed host facts for one explicitly selected development child route.
@@ -131,12 +143,30 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration for the explicit targetless session-window
+    /// controls route. No existing development template acquires these grants.
+    pub(crate) const fn with_window_controls(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::WindowControls,
+        }
+    }
+
     const fn grants(self) -> &'static [Capability] {
         match self.kind {
             DevelopmentUiSessionKind::Document => &UI_GRANTS,
             DevelopmentUiSessionKind::Form => &FORM_GRANTS,
             DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
+            DevelopmentUiSessionKind::WindowControls => &WINDOW_CONTROLS_GRANTS,
         }
     }
 
@@ -150,6 +180,10 @@ impl DevelopmentUiSessionConfig {
 
     const fn supports_multi_window(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::MultiWindow)
+    }
+
+    const fn supports_window_controls(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::WindowControls)
     }
 }
 
@@ -200,6 +234,23 @@ pub(crate) fn run(
                 ui.input.clone(),
                 ui.close.clone(),
                 HostServices::unavailable().with_ui_fields(ui.fields.clone()),
+            )?;
+        (server, invitation, None)
+    } else if config.supports_window_controls() {
+        let services = HostServices::unavailable()
+            .with_window_title(ui.window_title.clone())
+            .with_window_state(ui.window_state.clone())
+            .with_window_focus(ui.window_focus.clone())
+            .with_window_fullscreen(ui.window_fullscreen.clone())
+            .with_window_size(ui.window_size.clone());
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                services,
             )?;
         (server, invitation, None)
     } else {
@@ -282,6 +333,7 @@ mod tests {
 
     use super::{
         DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS, MULTI_WINDOW_GRANTS, UI_GRANTS,
+        WINDOW_CONTROLS_GRANTS,
     };
 
     #[test]
@@ -310,6 +362,12 @@ mod tests {
             "Anodrel Multi-Window Test",
             "completed multi-window",
         );
+        let window_controls = DevelopmentUiSessionConfig::with_window_controls(
+            "anodrel.test-window-controls",
+            "test-window-controls-session",
+            "Anodrel Window Controls Test",
+            "completed window controls",
+        );
         assert_eq!(document.application_id, "anodrel.test");
         assert_eq!(document.session_id, "test-session");
         assert_eq!(document.display_name, "Anodrel Test");
@@ -325,6 +383,11 @@ mod tests {
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
         assert!(!multi_window.supports_menu());
         assert!(multi_window.supports_multi_window());
+        assert_eq!(window_controls.grants(), WINDOW_CONTROLS_GRANTS);
+        assert!(window_controls.supports_window_controls());
+        assert!(!window_controls.supports_menu());
+        assert!(!window_controls.supports_fields());
+        assert!(!window_controls.supports_multi_window());
         assert_eq!(
             UI_GRANTS,
             [
@@ -358,6 +421,19 @@ mod tests {
                 Capability::UiEventsRead,
                 Capability::WindowOpen,
                 Capability::WindowClose,
+                Capability::SessionClose,
+            ]
+        );
+        assert_eq!(
+            WINDOW_CONTROLS_GRANTS,
+            [
+                Capability::UiDocumentWrite,
+                Capability::UiEventsRead,
+                Capability::WindowTitle,
+                Capability::WindowState,
+                Capability::WindowFocus,
+                Capability::WindowFullscreen,
+                Capability::WindowSize,
                 Capability::SessionClose,
             ]
         );

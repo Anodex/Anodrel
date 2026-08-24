@@ -59,9 +59,11 @@ need public documentation and generated-template compatibility coverage. A
 removal or incompatible type change requires a new decision and a new `0.2`
 minor line. Registry publication is intentionally separate work.
 
-The generated UI, menu, form, live-status, multi-window, and scroll-window
-projects are the real consumers. Their isolated release builds and authenticated
-Windows-pipe sessions prove that the SDK has no hidden host-source dependency.
+The generated UI, menu, form, live-status, multi-window, scroll-window, and
+window-controls projects are the real consumers. Their isolated release builds
+and authenticated Windows-pipe sessions prove that the SDK has no hidden
+host-source dependency. The window-controls project specifically covers every
+targetless window-control method under the host's exact fixed grants.
 
 See Decision 0104 and `docs/NATIVE_CLIENT.md` for the lower-level private
 transport contract.

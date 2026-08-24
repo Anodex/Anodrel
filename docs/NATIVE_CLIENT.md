@@ -137,6 +137,11 @@ foreground request, reversible fullscreen, and bounded logical client size.
 Those calls retain their individual host-issued grants and provide no native
 handle, window target, state or geometry readback, or cross-window route.
 
+Decision 0105 exercises that complete control surface only through the separate
+fixed-grant native window-controls template. It has no SDK method for choosing
+its grant set, target, native handle, geometry, monitor, current state, focus
+result, or title readback. See `docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md`.
+
 Registry publication remains separate work. Decision 0094's existing bounded
 multi-window methods return opaque secondary identities and tagged action
 batches, but expose no native mapping or raw protocol surface. See

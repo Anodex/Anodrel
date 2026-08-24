@@ -9,6 +9,7 @@ use crate::{
         TemplateContext, cargo_toml, form_main_source, form_readme, live_status_main_source,
         live_status_readme, main_source, menu_main_source, menu_readme, multi_window_main_source,
         multi_window_readme, readme, scroll_window_main_source, scroll_window_readme,
+        window_controls_main_source, window_controls_readme,
     },
     validation::{validate_display_label, validate_project_slug},
 };
@@ -93,6 +94,19 @@ pub fn initialize_scroll_window(
     )
 }
 
+pub fn initialize_window_controls(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(
+        TemplateKind::WindowControls,
+        destination,
+        project_slug,
+        display_label,
+    )
+}
+
 fn initialize_template(
     template_kind: TemplateKind,
     destination: &Path,
@@ -136,6 +150,11 @@ fn initialize_template(
             scroll_window_readme(&context),
             "Created Anodrel native scroll-window project.",
         ),
+        TemplateKind::WindowControls => (
+            window_controls_main_source(display_label),
+            window_controls_readme(&context),
+            "Created Anodrel native window-controls project.",
+        ),
     };
 
     fs::create_dir(&project_directory)
@@ -176,7 +195,7 @@ mod tests {
 
     use super::{
         initialize, initialize_form, initialize_live_status, initialize_menu,
-        initialize_multi_window, initialize_scroll_window,
+        initialize_multi_window, initialize_scroll_window, initialize_window_controls,
     };
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
@@ -355,5 +374,34 @@ mod tests {
         assert!(source.contains("close_window"));
         assert!(!source.contains("open_window_v1"));
         assert!(!source.contains("replace_window_document_v1"));
+    }
+
+    #[test]
+    fn window_controls_project_is_separate_from_the_other_templates() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-window-controls-app");
+        initialize_window_controls(
+            &destination,
+            "generated-window-controls-app",
+            "Generated Window Controls App",
+        )
+        .expect("generate a native window-controls project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated window-controls instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated window-controls source");
+        assert!(readme.contains("--native-window-controls-template-client"));
+        for method in [
+            "set_window_title",
+            "set_window_state",
+            "request_window_focus",
+            "set_window_fullscreen",
+            "set_window_size",
+        ] {
+            assert!(source.contains(method), "generated source uses {method}");
+        }
+        assert!(!source.contains("replace_menu_v1"));
+        assert!(!source.contains("open_window_v1"));
     }
 }

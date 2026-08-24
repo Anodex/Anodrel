@@ -7,6 +7,7 @@ mod live_status;
 mod menu;
 mod multi_window;
 mod scroll_window;
+mod window_controls;
 
 pub struct TemplateContext {
     pub project_slug: String,
@@ -74,6 +75,14 @@ pub fn scroll_window_main_source(display_label: &str) -> String {
 
 pub fn scroll_window_readme(context: &TemplateContext) -> String {
     scroll_window::readme(context)
+}
+
+pub fn window_controls_main_source(display_label: &str) -> String {
+    window_controls::main_source(display_label)
+}
+
+pub fn window_controls_readme(context: &TemplateContext) -> String {
+    window_controls::readme(context)
 }
 
 pub(super) fn document_json(display_label: &str) -> String {
@@ -226,6 +235,7 @@ mod tests {
     use super::{
         TemplateContext, cargo_toml, document_json, form_main_source, live_status_main_source,
         main_source, menu_main_source, multi_window_main_source, scroll_window_main_source,
+        window_controls_main_source,
     };
 
     #[test]
@@ -343,5 +353,37 @@ mod tests {
         assert!(!source.contains("protocolVersion"));
         assert!(!source.contains("--native-"));
         assert!(!source.contains("scrollOffset"));
+    }
+
+    #[test]
+    fn window_controls_source_uses_all_five_typed_targetless_controls() {
+        let source = window_controls_main_source("Window \"Controls\" Template");
+        for method in [
+            "set_window_title",
+            "set_window_state",
+            "request_window_focus",
+            "set_window_fullscreen",
+            "set_window_size",
+        ] {
+            assert!(source.contains(method), "generated source uses {method}");
+        }
+        for action in [
+            "template.controls.title",
+            "template.controls.resize",
+            "template.controls.maximize",
+            "template.controls.restore",
+            "template.controls.focus",
+            "template.controls.fullscreen",
+            "template.controls.windowed",
+            "template.controls.complete",
+        ] {
+            assert!(
+                source.contains(action),
+                "generated source includes {action}"
+            );
+        }
+        assert!(!source.contains("protocolVersion"));
+        assert!(!source.contains("request("));
+        assert!(!source.contains("native-window-controls-template-client"));
     }
 }

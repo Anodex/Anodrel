@@ -417,6 +417,10 @@ accessibility callback, listener check, or delivery result.
 scroll-window template. Its generator and fixed five-grant Windows route
 demonstrate explicit v2 secondary opening and replacement while native scroll
 state, input, accessibility behavior, and mappings remain host-owned.
+`docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md` defines the separate development-
+native window-controls template. Its generator and fixed eight-grant Windows
+route demonstrate every existing targetless session-window control without
+broadening any earlier template's authority or exposing native readback.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.
@@ -462,6 +466,11 @@ first-party scroll-window template. It opens a v2 secondary view, requires
 local scrolling to reveal each action, replaces only that view, and then closes
 the view and its session. It uses no Node.js, webview, product package, or
 machine-policy change.
+
+Double-click `start-window-controls-template.bat` to build a temporary
+first-party window-controls template. It visibly exercises the typed title,
+size, state, focus, fullscreen, and windowed controls in one host-owned session
+without Node.js, a webview, product package, or machine-policy change.
 
 Double-click `start-form-template.bat` to build a temporary first-party native
 form template. Enter text and select **Submit form** to exercise host-owned

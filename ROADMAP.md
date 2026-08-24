@@ -470,10 +470,18 @@ Status: **First starter-package slice in progress**
   that view at revision 2, closes its issued secondary identity, and closes its
   group. Local native scroll state, input, accessibility behavior, and mapping
   remain host-owned. The remaining acceptance check is the documented visual
-  Windows walkthrough. **Decision 0104 now stabilizes the in-repository Windows
+  Windows walkthrough. Decision 0105 now adds a seventh, separately selected
+  native template: its `init-window-controls` generator and fixed eight-grant
+  Windows route exercise every existing targetless session-window control
+  without widening any earlier template. A generated child has completed a
+  real-pipe session that submits each fixed document, sends title, size, state,
+  focus, fullscreen, and windowed requests to their matching host bridges, then
+  closes cleanly. The remaining acceptance check is the documented visual
+  Windows walkthrough; accepted foreground requests deliberately provide no
+  focus readback. **Decision 0104 now stabilizes the in-repository Windows
   application surface:** `anodrel-windows-ui-sdk` consumes the private standard-
   input invitation, opens only its exact invited pipe, authenticates, and exposes
-  only the existing typed UI-session operations. All six generated templates
+  only the existing typed UI-session operations. All seven generated templates
   now depend on that one facade rather than the three lower-level client crates;
   their isolated release builds and real invited-pipe sessions verify it. It is
   not registry-published and adds no capability, packaging, identity, or

@@ -147,7 +147,7 @@ pub(in crate::win32) const PLANNED_MARKER: &str = "PLANNED";
 
 /// Builds the planned marker's text at a layout's scale.
 ///
-/// Drawing and [`tile_subtitle_limit`] both build it here, so the room reserved
+/// Drawing and `tile_subtitle_limit` both build it here, so the room reserved
 /// for it is measured from the same text that gets painted.
 pub(in crate::win32) fn planned_marker(layout: &Layout) -> TextSpec {
     TextSpec::new(PLANNED_MARKER, layout.font(9.0), WEIGHT_SEMIBOLD)

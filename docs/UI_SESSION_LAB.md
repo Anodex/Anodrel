@@ -36,6 +36,16 @@ Follow `docs/NATIVE_UI_TEMPLATE.md` to create, build, and run it through
 accepts an operator-selected executable and grants exactly document replacement,
 semantic-action reading, and self-close.
 
+The separate constrained native window-controls template uses the same
+authenticated-session mechanics but exercises the existing typed targetless
+controls for that one session's host window. Follow
+`docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md` to create, build, and run it through
+`--native-window-controls-template-client`. Its explicit development route
+grants exactly document replacement, semantic-action reading, title proposal,
+state, focus, fullscreen, bounded client size, and self-close. It gives the
+project no native handle, window target, geometry, display, focus, or title
+readback, and it has no product-launch authority.
+
 The separate constrained native multi-window template uses the same
 authenticated-session mechanics but creates a bounded session-owned view group.
 Follow `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md` to create, build, and run it

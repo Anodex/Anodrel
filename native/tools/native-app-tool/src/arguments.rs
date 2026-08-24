@@ -10,6 +10,7 @@ pub enum TemplateKind {
     Menu,
     MultiWindow,
     ScrollWindow,
+    WindowControls,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -29,6 +30,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
         Some("init-menu") => TemplateKind::Menu,
         Some("init-multi-window") => TemplateKind::MultiWindow,
         Some("init-scroll-window") => TemplateKind::ScrollWindow,
+        Some("init-window-controls") => TemplateKind::WindowControls,
         _ => return Err(()),
     };
     let destination = arguments.next().ok_or(())?;
@@ -86,6 +88,23 @@ mod tests {
                 destination: PathBuf::from("out/live-status"),
                 project_slug: "live-status-app".to_owned(),
                 display_label: "Live Status App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(
+                [
+                    "init-window-controls",
+                    "out/window-controls",
+                    "window-controls-app",
+                    "Window Controls App",
+                ]
+                .map(String::from)
+            ),
+            Ok(InitCommand {
+                template_kind: TemplateKind::WindowControls,
+                destination: PathBuf::from("out/window-controls"),
+                project_slug: "window-controls-app".to_owned(),
+                display_label: "Window Controls App".to_owned(),
             })
         );
         assert_eq!(

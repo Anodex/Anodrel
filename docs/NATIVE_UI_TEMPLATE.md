@@ -60,6 +60,12 @@ methods are reserved for the separate bounded multi-window template; its
 explicit generator command and host route do not broaden this project's
 authority. See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
 
+The regular template has none of the five session-window control grants. The
+separate window-controls template is the only generated development route that
+can exercise title, state, focus, fullscreen, and bounded client-size requests;
+it does not broaden this three-grant project. See
+`docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md`.
+
 ## Generated project contract
 
 `anodrel-native-app-tool init` accepts a destination, a Cargo-compatible
