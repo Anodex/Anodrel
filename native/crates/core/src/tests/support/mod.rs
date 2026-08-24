@@ -1,5 +1,13 @@
 //! Shared test fixtures and request builders.
 
+mod requests;
+
+pub(super) use requests::{
+    request, request_v1_1, request_v1_2, request_v1_3, request_v1_4, request_v1_5, request_v1_6,
+    request_v1_7, request_v1_8, request_v1_9, request_v1_10, request_v1_12, request_v1_13,
+    request_v1_15,
+};
+
 pub(super) use std::cell::RefCell;
 pub(super) use std::collections::BTreeMap;
 pub(super) use std::sync::{Arc, Mutex};
@@ -511,78 +519,6 @@ pub(super) fn credential_host(
     )
 }
 
-pub(super) fn request(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":0}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_1(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":1}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_2(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":2}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_3(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":3}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_4(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":4}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_5(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":5}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_6(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":6}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_7(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":7}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_8(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":8}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_9(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":9}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_10(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":10}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_12(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":12}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
 pub(super) fn host_with_notifications(service: impl NotificationService + 'static) -> CoreHost {
     CoreHost::with_services(
         HostPolicy::new(
@@ -592,18 +528,6 @@ pub(super) fn host_with_notifications(service: impl NotificationService + 'stati
         )
         .expect("test policy is valid"),
         HostServices::unavailable().with_notifications(service),
-    )
-}
-
-pub(super) fn request_v1_13(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":13}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
-    )
-}
-
-pub(super) fn request_v1_15(operation: &str, payload: &str) -> String {
-    format!(
-        r#"{{"protocolVersion":{{"major":1,"minor":15}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#
     )
 }
 
