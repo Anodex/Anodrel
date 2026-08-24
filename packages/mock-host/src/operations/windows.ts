@@ -253,4 +253,3 @@ export function dispatchWindowOperation(
 
   return undefined;
 }
-

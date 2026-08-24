@@ -163,4 +163,3 @@ export function dispatchPlatformOperation(
 
   return undefined;
 }
-
