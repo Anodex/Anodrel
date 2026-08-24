@@ -16,6 +16,7 @@ mod appicon;
 mod crash;
 mod document;
 mod fullscreen;
+mod input;
 mod menu;
 mod messages;
 mod present;
