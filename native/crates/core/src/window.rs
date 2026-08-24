@@ -6,6 +6,14 @@
 use super::*;
 
 impl CoreHost {
+    /// Proposes the title of this session's own window.
+    ///
+    /// The request names no window. The host resolves it from the authenticated
+    /// session, and the service composes the displayed caption with a validated
+    /// application-name suffix the proposal cannot suppress or forge. Success
+    /// reports acceptance only: returning the composed caption would hand the
+    /// application a way to probe the host's framing, and it already knows both
+    /// halves. See `docs/WINDOW_TITLE.md` and Decision 0066.
     pub(super) fn handle_window_title_set(&self, request: RequestEnvelope) -> JsonValue {
         let Some(title) = window_title_set_payload(&request.payload) else {
             return self.failure(
