@@ -67,14 +67,17 @@ mod bevel;
 mod color;
 mod geometry;
 mod image;
+mod mask;
 mod paint;
 mod path;
+mod raster;
 mod surface;
 
 pub use bevel::Bevel;
 pub use color::Color;
 pub use geometry::{Point, Rect, point};
 pub use image::Image;
+pub use mask::Mask;
 pub use paint::{Paint, Stop, stop};
 pub use path::{BevelBand, Path};
-pub use surface::{Canvas, Mask};
+pub use surface::Canvas;
