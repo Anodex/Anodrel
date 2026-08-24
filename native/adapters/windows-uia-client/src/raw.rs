@@ -43,6 +43,15 @@ pub(crate) const IID_I_UI_AUTOMATION_VALUE_PATTERN: Guid = Guid::new(
     [0x9d, 0x2d, 0x64, 0x05, 0x37, 0xab, 0x39, 0xe9],
 );
 
+/// The client-side `IUIAutomationInvokePattern` interface from
+/// `UIAutomationClient.h`.
+pub(crate) const IID_I_UI_AUTOMATION_INVOKE_PATTERN: Guid = Guid::new(
+    0xfb37_7fbe,
+    0x8ea6,
+    0x46d5,
+    [0x9c, 0x73, 0x64, 0x99, 0x64, 0x2d, 0x30, 0x59],
+);
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub(crate) struct Guid {
@@ -173,6 +182,20 @@ pub(crate) struct ValuePattern {
     pub(crate) vtable: *const ValuePatternVtable,
 }
 
+#[repr(C)]
+pub(crate) struct InvokePattern {
+    pub(crate) vtable: *const InvokePatternVtable,
+}
+
+/// The complete `IUIAutomationInvokePatternVtbl`.
+#[repr(C)]
+pub(crate) struct InvokePatternVtable {
+    pub(crate) query_interface: *const c_void,
+    pub(crate) add_ref: *const c_void,
+    pub(crate) release: *const c_void,
+    pub(crate) invoke: unsafe extern "system" fn(*mut InvokePattern) -> Hresult,
+}
+
 /// The prefix through cached read-only state of the client-side
 /// `IUIAutomationValuePatternVtbl`.
 #[repr(C)]
@@ -283,8 +306,9 @@ unsafe extern "system" {
 #[cfg(test)]
 mod tests {
     use super::{
-        AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_VALUE_PATTERN, Point, Rect,
-        UIA_INVOKE_PATTERN_ID, UIA_VALUE_PATTERN_ID, ValuePatternVtable, Variant,
+        AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_INVOKE_PATTERN,
+        IID_I_UI_AUTOMATION_VALUE_PATTERN, InvokePatternVtable, Point, Rect, UIA_INVOKE_PATTERN_ID,
+        UIA_VALUE_PATTERN_ID, ValuePatternVtable, Variant,
     };
 
     #[test]
@@ -325,8 +349,17 @@ mod tests {
             core::mem::size_of::<ValuePatternVtable>(),
             8 * core::mem::size_of::<*const core::ffi::c_void>()
         );
+        assert_eq!(
+            core::mem::size_of::<InvokePatternVtable>(),
+            4 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
         assert_eq!(UIA_INVOKE_PATTERN_ID, 10_000);
         assert_eq!(UIA_VALUE_PATTERN_ID, 10_002);
+        assert_eq!(IID_I_UI_AUTOMATION_INVOKE_PATTERN.data1, 0xfb37_7fbe);
+        assert_eq!(
+            IID_I_UI_AUTOMATION_INVOKE_PATTERN.data4,
+            [0x9c, 0x73, 0x64, 0x99, 0x64, 0x2d, 0x30, 0x59]
+        );
         assert_eq!(IID_I_UI_AUTOMATION_VALUE_PATTERN.data1, 0xa94c_d8b1);
         assert_eq!(
             IID_I_UI_AUTOMATION_VALUE_PATTERN.data4,

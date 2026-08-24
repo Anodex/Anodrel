@@ -29,6 +29,12 @@ submits only one compiled-in document, accepts only its own action at revision
 1, and closes only its own session; it is a diagnostic, not a general native
 application or window API.
 
+To repeat the separate host-only Windows UI Automation Invoke acceptance check
+for that same compiled child, follow `docs/UI_AUTOMATION_INVOKE_PROBE.md` or
+double-click `start-uia-invoke-probe.bat`. It invokes the one fixed button
+without a local click and passes only after the child receives its normal
+revision-bound event and closes its session.
+
 The constrained generated native template uses the same host-controlled UI-session
 mechanics, but is created in a new directory by `anodrel-native-app-tool`.
 Follow `docs/NATIVE_UI_TEMPLATE.md` to create, build, and run it through

@@ -172,7 +172,8 @@ Status: **Direct Windows host in progress**
   Inspect cross-check of each then-published property passed with no failures.
   The new hierarchical tree has focused automated coverage plus repeatable
   first-party real-Windows property/tree, geometry, Value-pattern, UI Lab
-  non-Invoke, and fixed `SetFocus` acceptance checks; its separate manual
+  non-Invoke, fixed `SetFocus`, and compiled authenticated-session Invoke
+  acceptance checks; its separate manual
   screen-reader check remains open. Reading is
   joined by one bounded action: an enabled button in an authenticated UI session
   exposes `IInvokeProvider`, which queues the same revision-bound semantic
@@ -193,7 +194,8 @@ Status: **Direct Windows host in progress**
   a strictly newer session document, its root raises one host-only
   `ChildrenInvalidated` structure event; it has no listener, callback, or
   application surface (Decision 0076). Unit and host checks cover all five
-  routes; manual screen-reader activation, focus control and event, field-value,
+  routes; the compiled Invoke route is now real-Windows verified, while manual
+  screen-reader activation, focus control and event, field-value,
   and structure-event verification remain open. **Protocol 1.26 adds one bounded
   live-status slice:** an authenticated v3 session document may contain one
   visible semantic status, which a later changed visible value maps to a

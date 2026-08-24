@@ -369,13 +369,15 @@ adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the Windows accessibility boundary. **UI
 Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11, an Inspect cross-check of every earlier flat
-published property passes, and the first-party `--uia-property-probe` and
-`--uia-focus-probe` verify the fixed current UI Lab's raw/control-view
+published property passes, and the first-party `--uia-property-probe`,
+`--uia-focus-probe`, and `--uia-invoke-probe` verify the fixed current UI
+Lab's raw/control-view
 property/tree contract, fixed field rectangle, hit target, read-only Value
 pattern, absence of a UI Lab Invoke pattern, and `SetFocus` result through real
-Windows APIs. An enabled
-authenticated-session button now exposes one bounded Invoke action that joins
-the existing revision-bound semantic-event mailbox;
+Windows APIs. The Invoke probe also verifies one compiled authenticated-session
+button through Windows' standard Invoke pattern, the existing revision-bound
+semantic-event mailbox, and its normal child-close sequence. An enabled
+authenticated-session button now exposes one bounded Invoke action;
 the provider also reports and can move the host's keyboard-focus snapshot
 through a bounded UI-thread route, raises one host-only focus-change event for
 a real focus move, raises one host-only `ChildrenInvalidated` structure event
@@ -397,6 +399,8 @@ See `docs/UI_AUTOMATION_FOCUS.md`, `docs/UI_AUTOMATION_EVENTS.md`,
 verification evidence for that Windows accessibility surface.
 `docs/UI_AUTOMATION_PROBE.md` defines the fixed host-only Windows property and
 tree diagnostic that complements those manual checks.
+`docs/UI_AUTOMATION_INVOKE_PROBE.md` defines the separate compiled-session
+Windows Invoke acceptance diagnostic.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary, direct

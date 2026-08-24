@@ -6,7 +6,7 @@
 
 use std::{error::Error, io, thread};
 
-use anodrel_core::{HostPolicy, HostServices};
+use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_protocol::Capability;
 use anodrel_ui_session::UiWindowGroup;
 use anodrel_window::WindowTitleProposal;
@@ -195,6 +195,26 @@ pub(crate) fn run(
     client_path: &str,
     config: DevelopmentUiSessionConfig,
 ) -> Result<(), Box<dyn Error>> {
+    run_with_window_observer(client_path, config, |_, _| Ok(()), || Ok(()))
+}
+
+/// Runs one development session with a host-private visible-window observer.
+///
+/// Both callbacks are internal verification seams. The shown callback receives
+/// only the newly-created host window and that session's close signal; neither
+/// can be supplied by a child, protocol request, or SDK caller. The completion
+/// callback runs after the session window closes and before the child is
+/// allowed to outlive a failed observation.
+pub(crate) fn run_with_window_observer<F, G>(
+    client_path: &str,
+    config: DevelopmentUiSessionConfig,
+    after_shown: F,
+    after_closed: G,
+) -> Result<(), Box<dyn Error>>
+where
+    F: FnOnce(isize, SessionCloseSignal) -> io::Result<()>,
+    G: FnOnce() -> io::Result<()>,
+{
     // Validate the selected command before a worker is allowed to wait for a
     // process that cannot start.
     let command = BootstrapCommand::new(client_path)?;
@@ -275,28 +295,43 @@ pub(crate) fn run(
         }
     };
 
+    let mut after_shown = Some(after_shown);
     let window_result = match window_group {
         Some(window_group) => {
             crate::win32::run_grouped_ui_session(window_group, ui.close, config.display_name)
         }
-        None => crate::win32::run_ui_session(
-            ui.document,
-            ui.input,
-            ui.close,
-            ui.file_dialog,
-            ui.file_text,
-            ui.notifications,
-            ui.menu,
-            ui.window_title,
-            ui.window_state,
-            ui.window_focus,
-            ui.window_fullscreen,
-            ui.window_size,
-            config.display_name,
-            ui.fields,
-        ),
+        None => {
+            let close_for_observer = ui.close.clone();
+            let after_shown = after_shown
+                .take()
+                .expect("non-grouped development session has one observer");
+            crate::win32::run_ui_session_after_shown(
+                ui.document,
+                ui.input,
+                ui.close,
+                ui.file_dialog,
+                ui.file_text,
+                ui.notifications,
+                ui.menu,
+                ui.window_title,
+                ui.window_state,
+                ui.window_focus,
+                ui.window_fullscreen,
+                ui.window_size,
+                config.display_name,
+                ui.fields,
+                move |window| after_shown(window, close_for_observer),
+            )
+        }
     };
     if let Err(error) = window_result {
+        let _ = child.terminate(DEVELOPMENT_STOP_CODE);
+        stop.request_stop();
+        let _ = worker.join();
+        return Err(error.into());
+    }
+
+    if let Err(error) = after_closed() {
         let _ = child.terminate(DEVELOPMENT_STOP_CODE);
         stop.request_stop();
         let _ = worker.join();

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0111: Windows UI Automation Invoke probe uses one compiled session.
+
 - 0110: Windows UI Automation probe keeps UI Lab buttons non-invokable.
 
 - 0109: Windows UI Automation focus probing stays fixed and host-only.

@@ -6,10 +6,12 @@
 control-view, fixed-geometry, fixed-Value-pattern, and non-Invoke-pattern
 check for the UI Lab.
 `--uia-focus-probe` separately verifies its fixed UI Automation focus route.
-They complement the manual checks below; they do not replace Narrator's
-spoken-output or Inspect's highlight verification. See
-`docs/UI_AUTOMATION_PROBE.md`, `docs/UI_AUTOMATION_FOCUS_PROBE.md`, and
-Decisions 0106 through 0110.
+`--uia-invoke-probe` proves one compiled authenticated button through its
+normal semantic-event and session-close path. They complement the manual
+checks below; they do not replace Narrator's spoken-output or Inspect's
+highlight verification. See `docs/UI_AUTOMATION_PROBE.md`,
+`docs/UI_AUTOMATION_FOCUS_PROBE.md`, `docs/UI_AUTOMATION_INVOKE_PROBE.md`, and
+Decisions 0106 through 0111.
 
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 
@@ -64,6 +66,22 @@ read a value, invoke a control, register an event, test for assistive
 technology, or force foreground activation. It proves one fixed focus route,
 not Narrator speech, keyboard input, focus-event delivery, or arbitrary focus
 control. Re-run it with the command in `docs/UI_AUTOMATION_FOCUS_PROBE.md`.
+
+### Automated authenticated-session Invoke acceptance
+
+This passed on Windows on 2026-08-24. A separate direct first-party MTA client
+waited for the compiled native UI child's immutable `native.ui.complete`
+button in a real authenticated session, confirmed its standard Invoke pattern,
+and called `IUIAutomationInvokePattern::Invoke` once. The child then completed
+its normal revision-1 `ui.events.read` and `session.close` sequence, exiting
+successfully. The host printed `UI Automation Invoke probe passed.`
+
+The probe accepts no action, document, selector, coordinate, or result from an
+operator or application. It proves the provider's positive Windows Invoke
+route and the existing bounded semantic mailbox end to end; it does not prove
+screen-reader speech, a caller-selected action, disabled-button refusal, or
+application behaviour beyond the compiled child's success sequence. Re-run it
+with the command in `docs/UI_AUTOMATION_INVOKE_PROBE.md`.
 
 Automated tests cover the mapping: every role's control type and focusability,
 each property's source, empty and named nodes, rectangle conversion at several

@@ -1,6 +1,8 @@
 //! Host-only element lookup, tree walking, property decoding, and fixed focus.
 
-use std::{ffi::c_void, fmt, string::FromUtf16Error};
+mod patterns;
+
+use std::{fmt, string::FromUtf16Error};
 
 use crate::{
     com::{Com, create_automation, succeeded},
@@ -215,6 +217,29 @@ impl UiAutomationClient {
         self.has_pattern(element, raw::UIA_INVOKE_PATTERN_ID)
     }
 
+    /// Invokes one compiled action selected by a host acceptance diagnostic.
+    ///
+    /// The diagnostic derives the element from its own fixed authenticated
+    /// session window. This client accepts neither an action ID nor input data,
+    /// and exposes no Invoke result to an application, protocol, or SDK caller.
+    pub fn invoke(&self, element: &UiAutomationElement) -> Result<(), UiAutomationError> {
+        let Some(pattern) = self.invoke_pattern(element)? else {
+            return Err(UiAutomationError::UnexpectedTree);
+        };
+        // SAFETY: `pattern` owns the exact client-side Invoke interface Windows
+        // returned for this element, and the vtable slot is the documented
+        // `IUIAutomationInvokePattern::Invoke` member.
+        let result = unsafe {
+            let vtable = (*pattern.as_ptr()).vtable;
+            ((*vtable).invoke)(pattern.as_ptr())
+        };
+        if succeeded(result) {
+            Ok(())
+        } else {
+            Err(UiAutomationError::Query(result))
+        }
+    }
+
     /// Reads the closed property set this diagnostic is allowed to inspect.
     pub fn node(
         &self,
@@ -303,8 +328,8 @@ impl UiAutomationClient {
             return Ok(None);
         };
         Ok(Some(UiAutomationValue {
-            value: value_pattern_value(&pattern)?,
-            is_read_only: value_pattern_is_read_only(&pattern)?,
+            value: patterns::value_pattern_value(&pattern)?,
+            is_read_only: patterns::value_pattern_is_read_only(&pattern)?,
         }))
     }
 
@@ -377,32 +402,6 @@ impl UiAutomationClient {
         }
     }
 
-    fn value_pattern(
-        &self,
-        element: &UiAutomationElement,
-    ) -> Result<Option<Com<raw::ValuePattern>>, UiAutomationError> {
-        let mut pattern: *mut c_void = core::ptr::null_mut();
-        // SAFETY: the element is live, both identifiers are fixed Windows SDK
-        // values, and `pattern` is writable output storage for the client-side
-        // Value pattern interface.
-        let result = unsafe {
-            let vtable = (*element.raw.as_ptr()).vtable;
-            ((*vtable).current_pattern_as)(
-                element.raw.as_ptr(),
-                raw::UIA_VALUE_PATTERN_ID,
-                &raw::IID_I_UI_AUTOMATION_VALUE_PATTERN,
-                &mut pattern,
-            )
-        };
-        if !succeeded(result) {
-            return Err(UiAutomationError::Query(result));
-        }
-        let Some(pattern) = core::ptr::NonNull::new(pattern) else {
-            return Ok(None);
-        };
-        Ok(Some(Com::from_out(pattern.as_ptr().cast())?))
-    }
-
     fn has_pattern(
         &self,
         element: &UiAutomationElement,
@@ -425,61 +424,6 @@ impl UiAutomationClient {
         let _pattern = Com::from_out(pattern.as_ptr())?;
         Ok(true)
     }
-}
-
-/// Releases the BSTR a Windows pattern getter returns after decoding it.
-struct OwnedBstr(*mut u16);
-
-impl OwnedBstr {
-    fn decode(&self) -> Result<String, UiAutomationError> {
-        if self.0.is_null() {
-            return Ok(String::new());
-        }
-        // SAFETY: the BSTR pointer comes from a successful Windows pattern
-        // getter and remains owned by this guard through the conversion.
-        let length = unsafe { raw::SysStringLen(self.0) } as usize;
-        // SAFETY: a BSTR has exactly `length` UTF-16 code units.
-        let units = unsafe { core::slice::from_raw_parts(self.0, length) };
-        Ok(String::from_utf16(units)?)
-    }
-}
-
-impl Drop for OwnedBstr {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            // SAFETY: this guard exclusively owns the BSTR returned by the
-            // successful Value-pattern getter.
-            unsafe { raw::SysFreeString(self.0) };
-        }
-    }
-}
-
-fn value_pattern_value(pattern: &Com<raw::ValuePattern>) -> Result<String, UiAutomationError> {
-    let mut value = core::ptr::null_mut();
-    // SAFETY: `pattern` owns a live client-side Value pattern and `value`
-    // is writable BSTR output storage whose ownership transfers here.
-    let result = unsafe {
-        let vtable = (*pattern.as_ptr()).vtable;
-        ((*vtable).current_value)(pattern.as_ptr(), &mut value)
-    };
-    if !succeeded(result) {
-        return Err(UiAutomationError::Query(result));
-    }
-    OwnedBstr(value).decode()
-}
-
-fn value_pattern_is_read_only(pattern: &Com<raw::ValuePattern>) -> Result<bool, UiAutomationError> {
-    let mut read_only = 0;
-    // SAFETY: `pattern` owns a live client-side Value pattern and
-    // `read_only` is writable output storage for its documented BOOL value.
-    let result = unsafe {
-        let vtable = (*pattern.as_ptr()).vtable;
-        ((*vtable).current_is_read_only)(pattern.as_ptr(), &mut read_only)
-    };
-    if !succeeded(result) {
-        return Err(UiAutomationError::Query(result));
-    }
-    Ok(read_only != 0)
 }
 
 #[derive(Clone, Copy)]

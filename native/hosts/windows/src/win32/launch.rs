@@ -329,45 +329,6 @@ pub fn run_ui_preview(document: UiDocument) -> io::Result<()> {
     )
 }
 
-/// Opens one host-controlled native view that consumes exactly one authenticated
-/// session's mailboxes. Actions enter only the bounded semantic-input mailbox
-/// and remain incapable of native operations in this diagnostic.
-#[allow(clippy::too_many_arguments)]
-pub fn run_ui_session(
-    mailbox: UiDocumentMailbox,
-    input_mailbox: UiInputMailbox,
-    close_signal: SessionCloseSignal,
-    file_dialog_mailbox: FileDialogMailbox,
-    file_text: WindowsFileTextService,
-    notifications: NotificationMailbox,
-    menu: MenuMailbox,
-    window_title: WindowTitleMailbox,
-    window_state: WindowStateMailbox,
-    window_focus: WindowFocusMailbox,
-    window_fullscreen: WindowFullscreenMailbox,
-    window_size: WindowSizeMailbox,
-    display_name: &str,
-    field_reads: UiFieldMailbox,
-) -> io::Result<()> {
-    run_authenticated_ui_session(
-        "Anodrel UI Session Lab",
-        mailbox,
-        input_mailbox,
-        close_signal,
-        file_dialog_mailbox,
-        file_text,
-        notifications,
-        menu,
-        window_title,
-        window_state,
-        window_focus,
-        window_fullscreen,
-        window_size,
-        display_name,
-        field_reads,
-    )
-}
-
 /// Opens one host-controlled primary view for a grouped development session.
 ///
 /// This is a fixed host route, not a generic view constructor. Its portable
@@ -401,79 +362,6 @@ pub fn run_grouped_ui_session(
                 close_signal,
                 group.member(primary_id),
             ))),
-        }],
-        None,
-    )
-}
-
-/// Opens one host-selected authenticated application session window.
-///
-/// The caller must supply resources created together for one already
-/// authenticated session. This is host lifecycle code, not an application
-/// window-management API: the application cannot create a window, pass a
-/// handle, or attach a different session's resource.
-///
-/// `title` is the caption the host opens with. A session holding the
-/// `window.title` grant may later propose a replacement, which the host
-/// composes with `display_name` before applying — the application supplies one
-/// half and never the other. See `docs/WINDOW_TITLE.md`.
-///
-/// `window_state` carries only minimise, maximise, and restore requests for
-/// this same host-selected window. It is a closed command bridge, not a native
-/// handle or a window-management API; see `docs/WINDOW_STATE.md`.
-///
-/// `window_focus` carries only a request to foreground this same host-selected
-/// window. It exposes no target, input, retry, or observed focus state; see
-/// `docs/WINDOW_FOCUS.md`.
-///
-/// `window_fullscreen` carries only a reversible borderless or windowed mode
-/// for this same host-selected window. The UI thread retains native restoration
-/// facts privately; see `docs/WINDOW_FULLSCREEN.md`.
-///
-/// `window_size` carries only bounded logical client dimensions for this same
-/// host-selected window. The UI thread derives its native frame privately; see
-/// `docs/WINDOW_SIZE.md`.
-#[allow(clippy::too_many_arguments)]
-pub fn run_authenticated_ui_session(
-    title: &str,
-    mailbox: UiDocumentMailbox,
-    input_mailbox: UiInputMailbox,
-    close_signal: SessionCloseSignal,
-    file_dialog_mailbox: FileDialogMailbox,
-    file_text: WindowsFileTextService,
-    notifications: NotificationMailbox,
-    menu: MenuMailbox,
-    window_title: WindowTitleMailbox,
-    window_state: WindowStateMailbox,
-    window_focus: WindowFocusMailbox,
-    window_fullscreen: WindowFullscreenMailbox,
-    window_size: WindowSizeMailbox,
-    display_name: &str,
-    field_reads: UiFieldMailbox,
-) -> io::Result<()> {
-    let scale = primary_scale();
-    run_windows(
-        vec![WindowDefinition {
-            title: title.to_owned(),
-            width: (920.0 * scale) as i32,
-            height: (660.0 * scale) as i32,
-            view: View::UiSession(Box::new(
-                ui_session_view::UiSessionView::new(
-                    mailbox,
-                    input_mailbox,
-                    close_signal,
-                    file_dialog_mailbox,
-                    file_text,
-                    notifications,
-                )
-                .with_menu(menu)
-                .with_window_title(window_title, display_name)
-                .with_window_state(window_state)
-                .with_window_focus(window_focus)
-                .with_window_fullscreen(window_fullscreen)
-                .with_window_size(window_size)
-                .with_field_reads(field_reads),
-            )),
         }],
         None,
     )

@@ -31,6 +31,7 @@ mod product_tile;
 mod registry;
 mod scrollbar;
 mod services;
+mod session_launch;
 mod session_window_group;
 mod size;
 mod startup_lab;
@@ -77,11 +78,13 @@ pub use dpi::enable_dpi_awareness;
 #[cfg(debug_assertions)]
 pub use launch::run_crash_selftest_panic;
 pub use launch::{
-    print_startup_report, run, run_application, run_authenticated_ui_session,
-    run_crash_report_selftest, run_grouped_ui_session, run_startup_lab, run_ui_lab, run_ui_preview,
-    run_ui_session, run_uia_property_probe, run_window_group_lab, run_window_lab,
+    print_startup_report, run, run_application, run_crash_report_selftest, run_grouped_ui_session,
+    run_startup_lab, run_ui_lab, run_ui_preview, run_uia_property_probe, run_window_group_lab,
+    run_window_lab,
 };
 pub use product_tile::FIXTURE_APPLICATION_ID;
+pub(crate) use session_launch::run_ui_session_after_shown;
+pub use session_launch::{run_authenticated_ui_session, run_ui_session};
 pub use uia_focus_probe::run as run_uia_focus_probe;
 
 mod raw;

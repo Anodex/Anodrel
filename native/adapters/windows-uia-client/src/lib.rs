@@ -5,8 +5,9 @@
 //!
 //! This adapter is intentionally separate from Anodrel's provider. It lets a
 //! host-owned diagnostic inspect a fixed native window through Windows and use
-//! its one documented fixed focus check, without exposing an automation tree,
-//! pointer, listener, operation, or result to an application.
+//! its documented fixed focus and authenticated-action checks, without exposing
+//! an automation tree, pointer, listener, operation, or result to an
+//! application.
 
 mod client;
 mod com;
