@@ -287,6 +287,16 @@ export class PlatformClient {
     return this.request("dialog.open_file", { filters });
   }
 
+  /**
+   * Opens one host-owned folder picker.
+   *
+   * A returned path is display data only: it is not a retained folder
+   * permission, handle, enumeration route, or later filesystem authority.
+   */
+  openFolderDialog(): Promise<ResultFor<"dialog.open_folder">> {
+    return this.request("dialog.open_folder", {});
+  }
+
   saveFileDialog(
     filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
   ): Promise<ResultFor<"dialog.save_file">> {

@@ -58,6 +58,13 @@ export function isFileDialogOpenPayload(
   );
 }
 
+/** Validates the exact empty payload for one host-owned folder picker. */
+export function isFolderDialogOpenPayload(
+  value: unknown,
+): value is PayloadFor<"dialog.open_folder"> {
+  return isRecord(value) && Object.keys(value).length === 0;
+}
+
 /** Validates one exact opaque selection reference for a bounded file text read. */
 export function isFileTextReadPayload(
   value: unknown,

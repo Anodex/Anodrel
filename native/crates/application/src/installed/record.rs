@@ -38,6 +38,7 @@ pub(super) enum RecordVersion {
     V1_12,
     V1_13,
     V1_14,
+    V1_15,
 }
 
 impl RecordVersion {
@@ -90,7 +91,7 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
             "executable",
             "publisher",
         ][..]
-    } else if version == RecordVersion::V1_14 {
+    } else if version.accepts(RecordVersion::V1_14) {
         &[
             "recordVersion",
             "applicationId",
@@ -153,7 +154,7 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
         }
         grants
     };
-    let network_policy = if version == RecordVersion::V1_14 {
+    let network_policy = if version.accepts(RecordVersion::V1_14) {
         network_policy::parse_network_policy(
             fields,
             capabilities.contains(&Capability::NetworkFetch),
@@ -219,7 +220,10 @@ fn capability_for_record_version(
         "window.size" if version.accepts(RecordVersion::V1_12) => Some(Capability::WindowSize),
         "window.open" if version.accepts(RecordVersion::V1_13) => Some(Capability::WindowOpen),
         "window.close" if version.accepts(RecordVersion::V1_13) => Some(Capability::WindowClose),
-        "network.fetch" if version == RecordVersion::V1_14 => Some(Capability::NetworkFetch),
+        "network.fetch" if version.accepts(RecordVersion::V1_14) => Some(Capability::NetworkFetch),
+        "dialog.open_folder" if version.accepts(RecordVersion::V1_15) => {
+            Some(Capability::DialogOpenFolder)
+        }
         _ => None,
     }
 }

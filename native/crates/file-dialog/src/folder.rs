@@ -38,7 +38,7 @@ mod tests {
 
     #[test]
     fn accepts_only_bounded_absolute_folder_paths() {
-        assert!(SelectedFolderPath::new(r"C:\\Users\\Owner\\Documents").is_ok());
+        assert!(SelectedFolderPath::new(r"C:\Users\Owner\Documents").is_ok());
         assert_eq!(
             SelectedFolderPath::new("Documents"),
             Err(FileDialogInputError::InvalidSelectedFolderPath)

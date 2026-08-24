@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 27;
+pub const PROTOCOL_MINOR: u16 = 28;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -56,6 +56,11 @@ pub enum Capability {
     /// header, cookie, credential, proxy, or connection handle.
     NetworkFetch,
     DialogOpenFile,
+    /// Show a host-owned picker for exactly one filesystem folder.
+    ///
+    /// The result is a display path only. It creates no retained folder
+    /// permission, enumeration route, handle, or filesystem access surface.
+    DialogOpenFolder,
     DialogSaveFile,
     FileReadText,
     FileWriteText,
@@ -140,6 +145,7 @@ impl Capability {
             Self::ExternalOpen => "external.open",
             Self::NetworkFetch => "network.fetch",
             Self::DialogOpenFile => "dialog.open_file",
+            Self::DialogOpenFolder => "dialog.open_folder",
             Self::DialogSaveFile => "dialog.save_file",
             Self::FileReadText => "file.read_text",
             Self::FileWriteText => "file.write_text",

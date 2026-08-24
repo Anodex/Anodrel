@@ -28,6 +28,7 @@ export type Capability =
   | "external.open"
   | "network.fetch"
   | "dialog.open_file"
+  | "dialog.open_folder"
   | "dialog.save_file"
   | "file.read_text"
   | "file.write_text"
@@ -342,6 +343,13 @@ export interface PlatformOperationMap {
     readonly payload: {
       readonly filters: readonly { readonly label: string; readonly extensions: readonly string[] }[];
     };
+    readonly result:
+      | { readonly status: "selected"; readonly path: string }
+      | { readonly status: "cancelled" };
+  };
+  /** Selects one user-chosen filesystem folder without granting later access. */
+  "dialog.open_folder": {
+    readonly payload: EmptyPayload;
     readonly result:
       | { readonly status: "selected"; readonly path: string }
       | { readonly status: "cancelled" };

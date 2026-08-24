@@ -396,6 +396,7 @@ fn validate_version(
         (1, 12) => Ok(record::RecordVersion::V1_12),
         (1, 13) => Ok(record::RecordVersion::V1_13),
         (1, 14) => Ok(record::RecordVersion::V1_14),
+        (1, 15) => Ok(record::RecordVersion::V1_15),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }

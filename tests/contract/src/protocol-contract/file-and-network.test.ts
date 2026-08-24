@@ -25,6 +25,30 @@ test("SDK and host agree on a capability-checked file dialog cancellation", asyn
   });
 });
 
+test("SDK and host keep folder selection separately granted and payload-free", async () => {
+  const client = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.open_folder"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+
+  assert.deepEqual(await client.openFolderDialog(), { status: "cancelled" });
+
+  const denied = new PlatformClient(
+    new MockHost({ applicationId: "test.application" }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => denied.openFolderDialog(),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "dialog.open_folder",
+  );
+});
+
 test("file dialog validates filters and its independent host grant", async () => {
   const denied = new PlatformClient(
     new MockHost({ applicationId: "test.application" }).createTransport(),

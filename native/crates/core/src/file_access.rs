@@ -3,6 +3,8 @@
 //! The portable core validates only narrow protocol values and checks the
 //! session policy. Native adapters own file identity capture and I/O.
 
+mod folder;
+
 use super::*;
 
 impl CoreHost {
@@ -44,6 +46,7 @@ impl CoreHost {
                 object([("status", JsonValue::String("cancelled".to_owned()))]),
             ),
             Ok(FileDialogSelection::Saved(_))
+            | Ok(FileDialogSelection::Folder(_))
             | Ok(FileDialogSelection::Captured(_, _))
             | Ok(FileDialogSelection::CapturedSave(_, _)) => self.failure(
                 request.request_id,
@@ -98,6 +101,7 @@ impl CoreHost {
                 object([("status", JsonValue::String("cancelled".to_owned()))]),
             ),
             Ok(FileDialogSelection::Selected(_))
+            | Ok(FileDialogSelection::Folder(_))
             | Ok(FileDialogSelection::Captured(_, _))
             | Ok(FileDialogSelection::CapturedSave(_, _))
             | Err(FileDialogServiceError::Unavailable) => self.failure(

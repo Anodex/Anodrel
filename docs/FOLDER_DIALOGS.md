@@ -1,7 +1,8 @@
 # Anodrel folder-selection contract
 
-**Status:** The portable value and UI-thread mailbox contract are implemented.
-Protocol, SDK, and direct Windows picker integration are the next section.
+**Status:** The portable value, Protocol 1.28, TypeScript SDK/mock, and
+installed-policy compatibility are implemented. Direct Windows picker and
+UI-thread host routing are the next section.
 
 ## Purpose and boundary
 

@@ -5,6 +5,7 @@ import {
   isExternalOpenPayload,
   isFileBinaryWritePayloadShape,
   isFileDialogOpenPayload,
+  isFolderDialogOpenPayload,
   isFileTextReadPayload,
   isFileTextWritePayload,
   isNetworkFetchTextPayload,
@@ -184,6 +185,31 @@ export function dispatchServiceOperation(
         );
       }
       return context.success("dialog.open_file", request.requestId, { status: "cancelled" });
+
+    case "dialog.open_folder":
+      if (request.protocolVersion.minor < 28) {
+        return context.failure(
+          request.requestId,
+          "operation.unsupported",
+          "dialog.open_folder requires protocol 1.28 or later.",
+        );
+      }
+      if (!isFolderDialogOpenPayload(request.payload)) {
+        return context.failure(
+          request.requestId,
+          "request.payload_invalid",
+          "dialog.open_folder does not accept a payload.",
+        );
+      }
+      if (!context.hasCapability(sessionId, "dialog.open_folder")) {
+        return context.failure(
+          request.requestId,
+          "capability.denied",
+          "dialog.open_folder requires the dialog.open_folder capability.",
+          { capability: "dialog.open_folder" },
+        );
+      }
+      return context.success("dialog.open_folder", request.requestId, { status: "cancelled" });
 
     case "dialog.save_file":
       if (request.protocolVersion.minor < 8) {

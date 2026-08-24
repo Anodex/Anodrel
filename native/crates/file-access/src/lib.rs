@@ -402,6 +402,7 @@ impl FileSelectionService for SelectionFileDialogMailbox {
             Ok(FileDialogSelection::Cancelled) => Ok(FileSelectionResult::Cancelled),
             Ok(FileDialogSelection::Selected(_))
             | Ok(FileDialogSelection::Saved(_))
+            | Ok(FileDialogSelection::Folder(_))
             | Ok(FileDialogSelection::CapturedSave(_, _)) => {
                 Err(FileSelectionServiceError::Unavailable)
             }
@@ -440,6 +441,7 @@ impl SaveSelectionService for SaveFileDialogMailbox {
             Ok(FileDialogSelection::Cancelled) => Ok(SaveSelectionResult::Cancelled),
             Ok(FileDialogSelection::Selected(_))
             | Ok(FileDialogSelection::Saved(_))
+            | Ok(FileDialogSelection::Folder(_))
             | Ok(FileDialogSelection::Captured(_, _)) => {
                 Err(SaveSelectionServiceError::Unavailable)
             }

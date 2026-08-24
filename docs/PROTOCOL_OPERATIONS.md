@@ -296,6 +296,22 @@ when it cannot service the request. It exposes no raw Windows error, initial
 directory, owner window, dialog flags, native handle, saved-history choice, or
 path in a failure or diagnostic.
 
+## `dialog.open_folder`
+
+Protocol 1.28 adds one host-owned folder picker. It requires the independent
+`dialog.open_folder` capability and accepts exactly `{}`. The result is either
+`{ "status": "selected", "path": string }` or `{ "status": "cancelled" }`.
+The selected path is absolute, non-empty, and at most **32 KiB** in UTF-8 bytes.
+
+It is display data, not a retained folder permission: it does not permit
+enumeration, reading, writing, creation, deletion, process launch, a handle,
+or later folder operation. The request accepts no filter, initial folder,
+title, owner window, multiple-selection flag, native dialog setting, callback,
+or current-location readback. A host cannot service the picker only through
+the safe `dialog.unavailable` category, without a path or native detail.
+
+See `docs/FOLDER_DIALOGS.md` and Decision 0115.
+
 ## `external.open`
 
 Protocol 1.6 adds one external-link handoff operation. It requires the

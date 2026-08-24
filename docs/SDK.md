@@ -53,7 +53,7 @@ command or a replacement for a real authenticated native session.
 `PlatformClient` provides typed methods for the exact operations defined by
 `docs/PROTOCOL.md`, including health and capability discovery, bounded
 diagnostic reads, UI document replacement and semantic-event reads, session
-close, clipboard, HTTPS handoff, file dialog plus retained text read and
+close, clipboard, HTTPS handoff, file and folder dialogs plus retained text read and
 bounded text or binary write, state, credentials, notifications, host-authorized
 HTTPS text fetches, narrow primary-window commands, and bounded session-owned
 view creation, replacement, close, and event reads. Every
@@ -77,6 +77,15 @@ Failures have two separate meanings:
 The result and error shapes, field limits, capability requirements, and
 compatibility rules live in `docs/PROTOCOL.md`. A method name is a convenience
 for that contract, not a second policy layer.
+
+### Folder selection
+
+Protocol 1.28 adds `openFolderDialog()`. It sends exactly `{}` and requires the
+separate `dialog.open_folder` grant. It returns either a selected folder path or
+cancellation. The SDK has no filter, initial folder, title, multiple-selection,
+or native-dialog option because those are host policy. A selected path is display
+data only, never a retained folder permission or later filesystem authority.
+See `docs/FOLDER_DIALOGS.md`.
 
 ### Host-authorized HTTPS text fetch
 

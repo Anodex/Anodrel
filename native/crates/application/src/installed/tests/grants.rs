@@ -2,6 +2,7 @@
 
 use super::*;
 
+mod folder;
 mod network;
 
 #[test]

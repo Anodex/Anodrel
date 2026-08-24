@@ -167,6 +167,9 @@ impl CoreHost {
             "dialog.open_file" if request.protocol_version.minor >= 7 => {
                 self.handle_file_dialog_open(request)
             }
+            "dialog.open_folder" if request.protocol_version.minor >= 28 => {
+                self.handle_folder_dialog_open(request)
+            }
             "dialog.save_file" if request.protocol_version.minor >= 8 => {
                 self.handle_file_dialog_save(request)
             }
