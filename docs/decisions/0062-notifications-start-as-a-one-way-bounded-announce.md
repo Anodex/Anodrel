@@ -19,7 +19,7 @@ The second choice is the constrained one. Windows toast notifications through
 `ToastNotificationManager` are the richer and more modern surface, and they
 require an Application User Model ID backed by an installed Start Menu shortcut
 or a packaged identity. Anodrel has neither. Packaging and installation are an
-explicitly open decision in `docs/ARCHITECTURE.md`, and the only signed
+explicitly open decision in `docs/ARCHITECTURE_FOUNDATIONS.md`, and the only signed
 application the platform can currently provision is the development fixture from
 Decision 0061.
 

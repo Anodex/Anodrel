@@ -184,7 +184,7 @@ application cannot demand attention beyond the text it was granted.
 Windows toast notifications through `ToastNotificationManager` are the richer
 surface, and they require an Application User Model ID backed by an installed
 Start Menu shortcut or a packaged identity. Anodrel has neither: installation
-and packaging are the open gate recorded in `docs/ARCHITECTURE.md`, and the only
+and packaging are the open gate recorded in `docs/ARCHITECTURE_FOUNDATIONS.md`, and the only
 signed application it can currently provision is a development fixture.
 
 Adopting toast now would mean either inventing that packaging story as a side
@@ -245,7 +245,7 @@ window.
 
 What those tests cannot cover is the notification actually appearing. Shell32
 behaviour needs a real desktop session, so a manual check belongs in
-`docs/DEVELOPMENT.md` once host wiring exists.
+`docs/DEVELOPMENT_DIAGNOSTICS.md` once host wiring exists.
 
 Core tests cover the operation: the independent grant check, the refusal of a
 client asking below Protocol 1.13, the exact two-field payload including a
@@ -260,7 +260,7 @@ characters that could forge a second message, a title refusing line feeds, and a
 refusal that does not echo the text it rejected.
 
 Host wiring is covered indirectly by the session-view tests, and directly by the
-development diagnostic in `docs/DEVELOPMENT.md`. What no automated test can
+development diagnostic in `docs/DEVELOPMENT_DIAGNOSTICS.md`. What no automated test can
 cover is a notification actually being **seen**, because Shell32 needs a real
 desktop and because this contract deliberately refuses to report whether a user
 saw anything. That check is a person looking at a screen.

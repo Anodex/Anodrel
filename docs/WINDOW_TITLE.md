@@ -150,7 +150,7 @@ cover single delivery, the busy answer, and the timeout freeing the session.
 Protocol contract tests verify the exact payload shape, the independent grant
 check, the version gate, and that no failure echoes the proposal.
 
-Manual check on Windows is in `docs/DEVELOPMENT.md`: a development diagnostic
+Manual check on Windows is in `docs/DEVELOPMENT_DIAGNOSTICS.md`: a development diagnostic
 proposes a title, the window's caption changes, and the application-name suffix
 remains present and correct.
 

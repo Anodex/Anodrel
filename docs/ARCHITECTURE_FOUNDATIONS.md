@@ -1,0 +1,433 @@
+# Anodrel architecture foundations
+
+## Modularity and performance
+
+The dependency direction is one-way: protocol types sit at the center; SDKs and
+test hosts depend on the protocol; applications depend only on SDKs and an
+injected transport. A mock host must not depend on the SDK at runtime, and no
+application may import native host internals.
+
+Public packages should have no import-time side effects, avoid framework-wide
+global state, and keep their dependency surface minimal. Production runtime
+packages use Anodrel code, language standard libraries, and direct
+operating-system APIs. Validate messages at a trust boundary rather than
+repeatedly in internal layers. The native wire limits encoded messages to 64 KiB
+before UTF-8 or JSON parsing and accepts at most four complete frames from one
+receive operation; the JSON codec limits nesting to 64 levels. The session
+engine runs messages in arrival order and owns a policy-bound core. The Windows
+adapter adds logon-SID access control, CNG session credentials, worker-thread
+I/O, and a separate bounded one-use bootstrap launcher. The launcher passes
+the invitation only over a restricted inherited standard-input handle; it does
+not verify executable identity or own a restart policy. Separately,
+`anodrel-application` validates a bounded manifest, canonical package paths,
+and content digest before the host draws a plain-text application surface.
+`anodrel-package-tool` reuses that same portable validator to create or verify
+only the current text-package format; it cannot launch, sign, install, or grant
+an application.
+`anodrel-session-policy` then converts only a validated installed application
+record into the identity and machine-selected grants for one `anodrel-core`
+host session. It has no operating-system store, launch, pipe, bootstrap, or UI
+authority; platform adapters select the record before calling it. A version
+  1.0 record produces no grants, version 1.1 uses its original strict capability
+  array, and version 1.2 adds the existing storage, credential, and file grant
+  names. Later strict supersets add each new capability explicitly; version 1.11
+  adds `file.write_binary`, never retroactively widening an older record. See
+  Decisions 0023, 0057, and 0087.
+
+`anodrel-windows-registered-session` is the Windows composition boundary for
+that policy and the owner-restricted named-pipe adapter. Before creating the
+endpoint it composes a fixed `HostServices` bundle: identity-derived Windows
+state storage and Credential Manager, plus bounded clipboard and HTTPS-link
+services. A version 1.14 record carrying the coupled `network.fetch` grant and
+exact origin list additionally supplies the direct WinHTTP text service; every
+other record leaves it unavailable. UI-bound file and document services remain
+unavailable. It returns an endpoint and a separate sensitive invitation, but
+does not start a process, deliver the invitation, or perform pipe I/O. Those
+remain explicit caller-owned lifecycle steps.
+
+For an interactive registered session, the same boundary creates one
+session-owned view group containing the real primary document and input
+mailboxes, alongside close, dialog, retained-file, notification, and other
+primary-only bridge resources. It attaches that group to the authenticated
+transport before the client connects. The session receives the notification
+mailbox rather than the Shell32 adapter, so a worker never holds anything that
+can reach the notification area; the owning UI thread performs that call and
+the adapter's entry lives as long as its view. See `docs/NOTIFICATIONS.md` and
+Decision 0062. The direct Windows host now consumes the group through its
+internal authenticated-session window entry point: it maps each opaque logical
+view to one privately registered Win32 window, creates and registers a
+secondary before showing it, and keeps each secondary's document and semantic
+input mailboxes separate. Its native group retains the verified product session
+until the final view leaves the registry. The application cannot select or
+assemble that group, and the group has no application-visible process-launch or
+native-handle authority. See Decisions 0058, 0092, and 0093.
+
+The product-session adapter creates the group before bootstrap delivery, starts
+the pipe only on a worker, and observes the tracked child on a separate worker.
+Child exit ends pending pipe I/O and closes the native window; pipe exit closes
+the window and ends the child. This control path is host-only and has no
+protocol message. The host activates it from a command-line route or the
+preflight-resolved Startup Lab tile; in both cases the blocking start runs on a
+worker and only the resulting grouped resources reach a window. See Decisions
+0060 and 0061.
+
+`anodrel-product-fixture` and `anodrel-product-provisioning` are development
+tools, not part of the shipped host. The fixture is a first-party child that
+speaks only the authenticated protocol through the reusable native-client
+foundation; the provisioning helper is the one component that writes machine
+policy, and it can write exactly one value for one compile-time identity after
+validating the record through the host's own parser.
+Decision 0081 separately establishes the first reusable child-side split:
+portable framed conversation code above a direct Windows pipe-opening adapter.
+That client foundation inherits an invitation from the host; it cannot construct
+an endpoint, inspect policy, or turn the fixture into a public application
+runtime.
+See `docs/PRODUCT_FIXTURE.md`.
+
+`anodrel-perf-lab` is a development tool, not part of the shipped host. It
+measures either the owned in-process wire, authenticated transport, and core
+path or the same path through a temporary authenticated Windows named-pipe
+loopback, always at fixed 1 KiB and 64 KiB payload sizes. Its bounded iteration
+count, fixed warmup, and nearest-rank percentiles make results repeatable; it
+does not measure application startup, memory, rendering, or another runtime.
+Its report includes only non-identifying target OS, architecture, and available
+logical-processor context. See `docs/PERFORMANCE.md` and Decision 0024.
+
+`anodrel-ui` is a portable foundation between an application model and a future
+host renderer. It owns only a bounded declarative tree, semantic appearance
+roles, layout, clipping, semantic action hit testing, bounded accessibility
+snapshot, portable focus traversal, and host-retained vertical scroll state.
+`anodrel-ui-document` separately owns
+the exact, bounded JSON interchange form for that tree. The Windows UI Lab
+decodes a fixed compile-time fixture through it, and the separate explicit
+Windows developer preview can render one bounded operator-selected document.
+`anodrel-ui-session` owns the revision-bound state behind one authenticated
+transport session's capability-checked 24 KiB document replacement operation;
+its single-slot latest-document mailbox can transfer a snapshot to another host
+thread without queueing or I/O, while its shared 32-candidate interaction
+mailbox keeps host-layout-derived document and menu actions in one bounded
+order until the authenticated `ui.events.read` pull revalidates them. The
+development-only Windows UI Session
+Lab consumes both supplied mailboxes in one host-created view. It renders an
+explicit v2 scroll tree with locally retained offsets driven only by native
+wheel and page input; those offsets never enter the protocol. It is not a
+public window capability and delivers no native command. None of these crates
+has operating-system authority. A separate coalescing close signal lets the
+host end only that same authenticated session after a capability-checked
+request; it carries no window target or native handle. The
+host remains responsible for text measurement, mapping appearance roles to an
+actual visual system, rendering, input delivery, operating-system accessibility
+and focus adapters, and every capability decision. See `docs/UI.md`,
+`docs/UI_DOCUMENTS.md`, `docs/UI_SESSIONS.md`, `docs/UI_PREVIEW.md`,
+`docs/SCROLLING.md`, and Decisions 0025 through 0039.
+
+Decision 0092 adds an opt-in portable `UiWindowGroup` around that same state:
+it binds the already-created primary document and input mailboxes rather than
+copying them into a parallel session, then reserves independent resources for
+at most three secondary logical views. The core can operate in this group mode
+while retaining every targetless document and event operation as primary-only;
+it never drains a secondary view on that compatibility path. The group has no
+native authority, and its creation handoff stops at the owning UI thread. The
+authenticated transport now composes this mode without a duplicate legacy
+document mailbox. The direct Windows host services its creation handoff on the
+owning UI thread, while Decision 0093 latches a primary close or session-close
+request across the native group and retains a product lifetime through the last
+view. Protocol 1.25 exposes the group’s explicit creation, secondary close,
+strict-v1 per-view replacement, and tagged semantic-event routes. Protocol
+1.26 adds separately named exact-v3 replacement and creation routes, while
+Protocol 1.27 adds their exact-v2 scroll counterparts. All native mapping and
+presentation state remain on the host side of this seam.
+
+`anodrel-menu` is a separate portable module for one authenticated session's
+complete bounded menu model, monotonic revision, enabled-command revalidation,
+and optional canonical local shortcut declaration. Its one-way service seam
+transfers only a validated model and host-owned revision; it carries no window,
+native identifier, callback, keyboard state, or operating-system authority.
+Its one-request mailbox gives the model to one owning UI thread without moving
+a native resource to the pipe worker. `anodrel-core` applies the `menu.write`
+policy and commits that portable state only after the host service accepts the
+complete replacement. The Windows adapter owns direct native menu construction,
+numeric command mapping, host-derived shortcut display, direct UI-thread
+attachment, the strict normal-menu `WM_COMMAND` filter, and the equally narrow
+first-key-down local `WM_KEYDOWN` route. Both activations create the same
+revision-bound candidate for the shared session mailbox. See `docs/MENUS.md`
+and Decisions 0080 and 0089.
+
+`anodrel-windows-accessibility` sits directly above that snapshot. It is a pure
+mapping from one bounded semantic snapshot to the values Microsoft UI
+Automation asks for: control types, property values, runtime IDs, and
+screen-space rectangles. It performs no operating-system call and cannot fail.
+`anodrel-windows-uia` publishes that mapping through `WM_GETOBJECT`, a root,
+immutable hierarchical parent/child/sibling navigation, properties, and hit
+testing. It preserves every bounded semantic node, including a fully clipped
+node with an empty rectangle and `IsOffscreen=true`, but adds no arbitrary
+accessibility-specific data, callback, or live view lookup (Decision 0075).
+One visible v3 status supplies its declared `LiveSetting`; after a later
+changed visible status reaches an established authenticated view, the host may
+raise one best-effort live-region event from a fresh provider without listener
+inspection or application readback (Decision 0100). An enabled visible button
+in a current authenticated UI session
+also exposes the one `Invoke` pattern: it offers the exact revision-bound
+semantic action candidate to the existing session mailbox, with no native input
+message, application callback, focus movement, or accessibility-specific queue
+(Decision 0069). The same provider reports its copied host-focus snapshot
+through `GetFocus` and `HasKeyboardFocus`, and a visible enabled field or button
+can request that same host focus through a bounded private route. The provider
+holds only its revision-bound semantic target; the owning UI thread revalidates
+it before it changes focus, and no application sees that route (Decisions 0070
+and 0073). After a real focus move, the host raises one best-effort focus-change
+event on a fresh provider without checking for or recording listeners
+(Decision 0074). A matching visible field separately exposes only a copied
+current host value through a read-only `IValueProvider`; it has no automation
+write, caret, selection, text range, or value event route (Decision 0071).
+After the UI thread accepts and applies a strictly newer session document, the
+window root raises one best-effort `ChildrenInvalidated` structure event from a
+fresh provider; it keeps no listener, callback, application, or protocol
+surface (Decision 0076). No other pattern or event is supplied. The boundary
+does not read the tree back or
+reveal that assistive technology is present. Narrator and an Inspect
+cross-check verified the earlier flat read provider on Windows 11; the new
+hierarchy, manual screen-reader activation, focus control and event, and
+field-value and structure-event verification remain open. The selected first
+visible overflowing viewport exposes one host-controlled vertical ScrollPattern;
+its eligible bounded descendants expose ScrollItemPattern, which can reveal an
+off-screen item through the same revision-bound route without moving focus or
+adding a protocol capability (Decisions 0097 and 0098).
+See `docs/ACCESSIBILITY.md`, `docs/UI_AUTOMATION_FOCUS.md`,
+`docs/UI_AUTOMATION_EVENTS.md`, `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`,
+`docs/UI_AUTOMATION_SCROLL.md`, `docs/UI_AUTOMATION_SCROLL_ITEMS.md`, and
+Decisions 0063, 0069 through 0071, 0073 through 0076, 0097, and 0098.
+
+## Communication model
+
+The application-to-host boundary must use a documented, versioned protocol.
+The initial transport may be a local message channel, but the application must
+not depend on transport-specific details.
+
+The initial protocol contract is documented in `docs/PROTOCOL.md`. Its SDK,
+mock host, and contract tests are transport-neutral; the mock does not select a
+native transport implementation. `docs/TRANSPORT.md` defines the bounded
+frame/session engine, direct one-client Windows named-pipe adapter, and the
+separate private child-bootstrap format. The bootstrap adapter can launch a
+caller-selected executable but is not integrated with application package trust
+or rendered content. The repository's Node-based development sample and the
+compiled native probes from Decision 0081 exercise real authenticated paths:
+the health probe has no runtime dependency, and the UI probe carries one fixed
+document, one revision-bound semantic action, and session close through the
+host-owned Windows view. Neither is a trusted application host. Its
+Protocol 1.11 diagnostic read
+projects only the host-supplied closed catalogue through the existing
+`diagnostics.read` grant; no transport layer can manufacture dynamic diagnostic
+content. `docs/APPLICATIONS.md` separately
+defines the no-script package surface that the Windows host can display. It has
+no native bridge or protocol session.
+
+The native session handles the existing `cancel` control before the core begins
+a matching request. It retains no more than 32 unresolved opaque IDs, sends no
+control response, and cannot interrupt work already begun. See
+`docs/TRANSPORT.md` and Decision 0054.
+
+Decision 0082 adds a constrained Windows development-native UI path without
+turning the host into a general launcher. The first-party generator writes a
+new Rust project with only checkout-relative Anodrel dependencies; its fixed
+child uses the typed UI client rather than raw bootstrap or protocol code. An
+operator selects that executable explicitly for the `--native-template-client`
+route. The host creates a fresh session with only document replacement,
+semantic-action read, and self-close grants; the project cannot name a window,
+identity, endpoint, title, or additional capability. This development path is
+unverified and remains distinct from the signed product-session boundary. See
+`docs/NATIVE_UI_TEMPLATE.md` and Decision 0082.
+
+Decision 0083 adds a separate constrained Windows native-menu template to
+that development path. Its `init-menu` command emits a fixed typed-client
+project, and the explicit `--native-menu-template-client` route grants exactly
+document write, semantic-event read, menu write, and self-close. The ordinary
+template remains three-grant. A generated menu project may declare only the
+Protocol 1.24 canonical local shortcut that its bounded menu model allows; it
+cannot select an identity, capability, window, native command, keyboard state,
+endpoint, or process. The host retains the menu mailbox, User32 mapping, child
+lifecycle, and window. See
+`docs/NATIVE_MENU_TEMPLATE.md` and Decision 0083.
+
+Decision 0094 adds a third constrained Windows development template for
+Protocol 1.25's session-owned secondary views. Its `init-multi-window` command
+emits a fixed typed-client project, and the explicit
+`--native-multi-window-template-client` route grants exactly document write,
+semantic-event read, bounded secondary open, bounded secondary close, and
+self-close. The route constructs the same private `UiWindowGroup` lifecycle as
+the direct host, but the generated child sees only the opaque secondary identity
+after successful registration. It cannot choose an identity, capability,
+geometry, native handle, title readback, host command, menu, process, or
+endpoint. The host retains the group map, native views, title composition,
+creation handoff, child lifecycle, and shutdown. See
+`docs/NATIVE_MULTI_WINDOW_TEMPLATE.md` and Decision 0094.
+
+Decision 0095 adds a fourth constrained Windows development template for
+Protocol 1.15's host-owned field snapshots. Its `init-form` command emits a
+fixed typed-client project, and the explicit
+`--native-form-template-client` route grants exactly document write,
+semantic-event read, whole-surface field read, and self-close. The child
+publishes one fixed field and action, then reads the entire current form only
+after the submit action. It cannot select a field, observe typing, receive
+keyboard input, read focus/caret/selection, republish the entered value, choose
+an identity, title, window, handle, host command, process, or endpoint. The
+host retains the field states, field-read bridge, native view, title
+composition, child lifecycle, and shutdown. See
+`docs/NATIVE_FORM_TEMPLATE.md` and Decision 0095.
+
+Decision 0101 adds a fifth constrained Windows development template for
+Protocol 1.26's visible version-3 status. Its `init-live-status` command emits
+a fixed typed-client project, and the explicit
+`--native-live-status-template-client` route grants exactly document write,
+semantic-event read, and self-close. The child publishes three fixed complete
+documents only after person-triggered revision-bound actions: a polite
+baseline, a changed polite result, then a changed assertive result. It cannot
+choose a status, politeness, identity, title, window, native handle, UI
+Automation event, listener state, notification, callback, process, or endpoint.
+The host retains the native view, live-region event, lifecycle, and shutdown.
+See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md` and Decision 0101.
+
+Decision 0103 adds a sixth constrained Windows development template for
+Protocol 1.27's explicit version-2 secondary scroll documents. Its
+`init-scroll-window` command emits a fixed typed-client project, and the
+explicit `--native-scroll-window-template-client` route uses the same five
+fixed multi-window grants: document write, semantic-event read, bounded
+secondary open, bounded secondary close, and self-close. A strict v1 primary
+opens one strict v2 secondary; local host-owned scrolling reveals the action
+that replaces only that secondary with a second v2 document, and a second local
+action closes the issued secondary and its group. The child cannot select or
+observe an offset, input, scrollbar, accessibility provider, identity,
+geometry, native handle, title readback, host command, process, or endpoint.
+The host retains the group map, native views, scroll state, direct input,
+accessibility scrolling, lifecycle, and shutdown. See
+`docs/NATIVE_SCROLL_WINDOW_TEMPLATE.md` and Decision 0103.
+
+Decision 0105 adds a seventh constrained Windows development template for the
+existing targetless session-window controls. Its `init-window-controls` command
+emits a fixed typed-client project, and the explicit
+`--native-window-controls-template-client` route grants exactly document write,
+semantic-event read, title proposal, state, focus, fullscreen, bounded client
+size, and self-close. Its fixed person-driven walkthrough makes one title
+proposal, one size request, maximise and restore requests, one foreground
+request, fullscreen and windowed requests, then closes. It cannot choose a
+window, handle, monitor, geometry, native title, focus result, display state,
+identity, capability, host command, process, or endpoint. The host retains the
+native view, composed title, direct User32 calls, fullscreen restoration facts,
+lifecycle, and shutdown. See `docs/NATIVE_WINDOW_CONTROLS_TEMPLATE.md` and
+Decision 0105.
+
+Decision 0096 adds one direct-rendered Windows scrollbar to the first visible
+overflowing v2 scroll viewport. Its pure host module derives finite track and
+thumb geometry from existing layout metrics and retained scroll state; the UI
+thread maps direct pointer paging and captured thumb dragging back into that
+same state. The control changes no portable document data, protocol field,
+application focus, action event, native handle, or input authority. Nested
+scrollbar arbitration remains separate. Decision 0097 implements the matching
+Windows UI Automation vertical ScrollPattern as one bounded route back to that
+same host state; Decision 0098 lets an eligible bounded child request that its
+selected viewport reveal it through the same route. Neither adds an
+application-visible position, event, or capability. See `docs/SCROLLING.md`,
+`docs/UI_AUTOMATION_SCROLL.md`, `docs/UI_AUTOMATION_SCROLL_ITEMS.md`, and
+Decisions 0096 through 0098.
+
+Decision 0084 reserves the first direct network data seam without turning the
+host into a browser runtime. Its host-selected HTTPS origins and bounded
+text-only `GET` result sit behind a separate capability; an application cannot
+choose headers, bodies, cookies, redirects, credentials, proxies, certificates,
+or a native handle. The portable protocol core, strict URL and exact-origin
+values, SDK, and mock host are implemented; its direct no-proxy WinHTTP
+adapter and a separate fixed-origin compiled Windows diagnostic are
+implemented. That diagnostic grants only `network.fetch` and composes only
+`example.com:443` before authentication; it is not a template or fixture path.
+Decision 0099 additionally lets a version 1.14 machine record couple that
+grant to one through eight exact origins, which the registered Windows-session
+adapter composes into the same service before authentication. The policy stays
+outside application authority and is never returned through the protocol. See
+`docs/NETWORK.md`.
+
+Every request should have:
+
+- protocol version;
+- request ID;
+- operation name;
+- capability context;
+- typed payload;
+- cancellation identity where applicable.
+
+Every response should have:
+
+- request ID;
+- success or failure status;
+- typed result or structured error;
+- diagnostic metadata safe to expose to the application.
+
+Events must be explicitly subscribed to and must identify their source and
+schema version. Protocol changes require compatibility tests and a decision
+record when they affect existing consumers.
+
+## Security model
+
+Security is a platform responsibility, not a UI convention.
+
+- Capabilities are explicit and least-privilege.
+- Sensitive operations require a policy decision before execution.
+- Application content cannot gain native access merely because it is rendered.
+- File paths are validated at the host boundary.
+- Secrets are kept in operating-system credential storage where available.
+- Child processes are tracked, bounded, and terminated during shutdown.
+- Logs must not contain credentials or raw secret material.
+- Native APIs are exposed through narrow operations, not arbitrary host access.
+
+The detailed threat model will be added before the first host exposes filesystem,
+process, or credential operations.
+
+`docs/THREAT_MODEL.md` establishes the current protocol baseline. It must be
+extended with the selected native-host, UI, and transport controls before any
+privileged capability is implemented.
+
+## Data and storage
+
+Anodrel should provide paths and secure storage primitives, but applications
+should own their domain data format. The platform must not create a shared
+database that couples unrelated applications together.
+
+Application data should be:
+
+- versioned;
+- exportable;
+- recoverable after interrupted writes;
+- isolated by application identity;
+- excluded from source control by default.
+
+## Migration strategy
+
+Migration follows the strangler pattern:
+
+1. Define platform contracts without copying Anodex code.
+2. Add an adapter around the existing Anodex behavior.
+3. Keep the current Electron path working.
+4. Build a native host against the same contracts.
+5. Compare the two hosts with shared integration tests.
+6. Move Anodex features one boundary at a time.
+7. Remove Electron only after feature parity and recovery are demonstrated.
+
+No migration step should require a big-bang rewrite or make the existing Anodex
+repository unbuildable.
+
+## Testing strategy
+
+- Unit tests cover protocol types, validation, permissions, and pure logic.
+- Contract tests run the same application requests against mock and native hosts.
+- Integration tests cover lifecycle, dialogs, paths, secure storage, and process
+  cleanup.
+- Security tests cover traversal, capability bypass, malformed messages, and
+  shutdown races.
+- Manual smoke tests cover window behavior and operating-system integration.
+
+## Open decisions
+
+The following choices remain intentionally open and must be recorded before
+implementation locks them in:
+
+- packaging, signing, and update strategy;
+- license and contribution model.

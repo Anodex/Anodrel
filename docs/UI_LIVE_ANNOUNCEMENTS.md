@@ -74,7 +74,7 @@ property publication, and every event gate: initial, unchanged, removed,
 clipped, stale, and changed-visible statuses.
 
 Manual Windows verification uses the built-in `--sample-ui-live-status-client`
-route from `docs/DEVELOPMENT.md`. Open its window, then start Narrator, so the
+route from `docs/DEVELOPMENT_DIAGNOSTICS.md`. Open its window, then start Narrator, so the
 check covers the order that originally found the listener-gate defect. Establish
 the sample's visible initial status, activate **Publish visible result**, and
 observe one distinct polite and one distinct assertive later value. Each must

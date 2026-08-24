@@ -190,7 +190,7 @@ See `docs/MENUS.md`.
 for the direct Windows bootstrap and named-pipe diagnostic path. It is not a
 production content host and is never embedded by the native Windows host. The
 sample's `native-client.ts` demonstrates that path; its launch commands live in
-`docs/DEVELOPMENT.md`.
+`docs/DEVELOPMENT_DIAGNOSTICS.md`.
 
 ## Compatibility and boundaries
 

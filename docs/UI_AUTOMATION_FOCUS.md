@@ -78,7 +78,7 @@ isolation.
 To verify with Narrator on Windows:
 
 1. Run `npm run build`, then use the `--sample-ui-client` command in
-   `docs/DEVELOPMENT.md` to open the authenticated UI Session Lab.
+   `docs/DEVELOPMENT_DIAGNOSTICS.md` to open the authenticated UI Session Lab.
 2. Start Narrator and move to a visible field or button in the Anodrel window.
 3. Ask Narrator to set focus on that element, then type in a field or activate
    a button using Narrator's normal command.
@@ -86,5 +86,5 @@ To verify with Narrator on Windows:
    keyboard input reaches that element. A screen reader must not move focus to
    a disabled or clipped control.
 
-Record the result in `docs/ACCESSIBILITY.md`. The automated route proves the
+Record the result in `docs/ACCESSIBILITY_VERIFICATION.md`. The automated route proves the
 boundary; only this check proves it is usable with a real assistive technology.

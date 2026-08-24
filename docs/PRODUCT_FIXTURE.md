@@ -278,7 +278,7 @@ test that needs no provisioning, the following remain unverified in practice:
 - that the child, pipe worker, and window shut down cleanly on each path.
 
 Treat this fixture as designed and tested in parts, not as demonstrated.
-`docs/DEVELOPMENT.md` carries the manual sequence for whenever installing that
+`docs/DEVELOPMENT_DIAGNOSTICS.md` carries the manual sequence for whenever installing that
 certificate is acceptable: provision, run the host route, confirm the delivered
 document, activate the action, watch the window close, and confirm the child is
 gone.

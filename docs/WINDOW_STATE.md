@@ -92,7 +92,7 @@ command.
 
 The remaining manual Windows verification runs an authenticated development
 session, observes minimise, maximise, and restore, then closes it normally; no
-other host window may change. `docs/DEVELOPMENT.md` gives the exact command.
+other host window may change. `docs/DEVELOPMENT_DIAGNOSTICS.md` gives the exact command.
 
 ## Compatibility
 

@@ -284,7 +284,11 @@ Anodrel/
 - AGENTS.md — rules for making changes safely.
 - ROADMAP.md — current phases and acceptance gates.
 - docs/ARCHITECTURE.md — system boundaries and data flow.
+- docs/ARCHITECTURE_FOUNDATIONS.md — cross-cutting architecture rules.
 - docs/DEVELOPMENT.md — local workflow and verification.
+- docs/DEVELOPMENT_DIAGNOSTICS.md — native diagnostics and product-fixture checks.
+- docs/PROTOCOL.md — boundary, compatibility, responses, and security rules.
+- docs/PROTOCOL_OPERATIONS.md — request-specific payload and operation rules.
 - docs/decisions/ — durable decisions and their reasoning.
 
 `docs/TRANSPORT.md` defines the native frame and session contract.
@@ -384,6 +388,8 @@ selection events, live announcements, and every other pattern remain absent.
 See `docs/UI_AUTOMATION_FOCUS.md`, `docs/UI_AUTOMATION_EVENTS.md`,
 `docs/UI_AUTOMATION_STRUCTURE_EVENTS.md`, `docs/UI_AUTOMATION_SCROLL.md`, and
 `docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
+`docs/ACCESSIBILITY_VERIFICATION.md` records the repeatable and hands-on
+verification evidence for that Windows accessibility surface.
 `docs/UI_DOCUMENTS.md` defines its exact, capability-free external document
 format.
 `docs/SCROLLING.md` defines the owned scroll-container boundary, direct

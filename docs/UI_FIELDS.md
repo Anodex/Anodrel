@@ -160,7 +160,7 @@ and *what did this activate*, which only an action can.
 Portable unit tests cover the bounds, the control-character rule, layout and hit
 testing, focus participation, and the strict document codec in both directions.
 Host tests cover typing, caret movement, and that a disabled field refuses
-input. A manual check is in `docs/DEVELOPMENT.md`.
+input. A manual check is in `docs/DEVELOPMENT_DIAGNOSTICS.md`.
 
 ## Compatibility
 
