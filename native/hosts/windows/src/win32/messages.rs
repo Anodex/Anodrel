@@ -195,11 +195,10 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_field_read(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {
-                    // Protocol and installed policy can name this request before
-                    // the direct Windows picker is integrated. Fail closed here
-                    // rather than treating a folder as an open-file selection.
                     FileDialogRequestKind::OpenFolder => {
-                        Err(anodrel_windows_file_dialog::FileDialogError::Unavailable)
+                        anodrel_windows_file_dialog::open_folder_with_owner(window).map(|path| {
+                            path.map_or(FileDialogSelection::Cancelled, FileDialogSelection::Folder)
+                        })
                     }
                     FileDialogRequestKind::Open => {
                         anodrel_windows_file_dialog::open_file_with_owner(window, request.filters())

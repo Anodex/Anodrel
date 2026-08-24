@@ -1,8 +1,8 @@
 # Anodrel folder-selection contract
 
-**Status:** The portable value, Protocol 1.28, TypeScript SDK/mock, and
-installed-policy compatibility are implemented. Direct Windows picker and
-UI-thread host routing are the next section.
+**Status:** The portable value, Protocol 1.28, TypeScript SDK/mock,
+installed-policy compatibility, direct Windows picker, and UI-thread host
+routing are implemented. The first direct desktop-picker check remains manual.
 
 ## Purpose and boundary
 
@@ -73,6 +73,8 @@ boundaries remain unchanged; see `docs/FILE_DIALOGS.md`,
 ## Verification
 
 Portable tests prove absolute-path validation, exact request/result pairing,
-one-request concurrency, and cancellation. The Windows section must add ABI
-checks for the owned COM boundary plus a manual desktop picker check before the
-feature is described as complete.
+one-request concurrency, and cancellation. The Windows adapter has focused
+tests for its exact COM identifiers, folder-only option composition, and
+bounded UTF-16 result decoding. Its final manual check must still show the
+owned desktop picker, select one filesystem folder, cancel a second run, and
+confirm both outcomes close the matching session without granting access.

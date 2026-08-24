@@ -1,7 +1,8 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 //! Direct host-only Windows open-file dialog access.
+mod folder;
 mod raw;
-use anodrel_file_dialog::{FileDialogFilter, SaveFilePath, SelectedFilePath};
+use anodrel_file_dialog::{FileDialogFilter, SaveFilePath, SelectedFilePath, SelectedFolderPath};
 /// Opens one host-owned Windows file picker with the supplied strict filters.
 pub fn open_file(
     filters: &[FileDialogFilter],
@@ -36,6 +37,23 @@ pub fn open_file_with_owner_and_capture<T>(
     let captured = capture(&path).map_err(|_| FileDialogError::Unavailable)?;
     Ok(Some((path, captured)))
 }
+
+/// Opens one host-owned Windows folder picker.
+pub fn open_folder() -> Result<Option<SelectedFolderPath>, FileDialogError> {
+    open_folder_with_owner(0)
+}
+
+/// Opens one host-owned folder picker attached to the supplied host window.
+///
+/// The owner is selected only by trusted host code; applications never pass a
+/// native handle, initial folder, title, or native option through Anodrel's
+/// protocol.
+pub fn open_folder_with_owner(
+    owner_window: isize,
+) -> Result<Option<SelectedFolderPath>, FileDialogError> {
+    folder::open(owner_window).map_err(|_| FileDialogError::Unavailable)
+}
+
 /// Opens one host-owned Windows save picker with the supplied strict filters.
 ///
 /// A returned destination is only a user choice. This function never creates,

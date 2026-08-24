@@ -322,7 +322,9 @@ text-fetch contract, SDK, mock-host boundary, direct WinHTTP adapter, and
 fixed-origin Windows development diagnostic. Decision 0099 adds the exact
 machine-selected origin policy for version 1.14 installed records.
 `docs/FILE_DIALOGS.md` defines the bounded file-dialog value foundation.
-`docs/FOLDER_DIALOGS.md` defines the separate bounded folder-selection contract.
+`docs/FOLDER_DIALOGS.md` defines the separate bounded folder-selection
+contract, its direct Windows Common Item Dialog adapter, and its remaining
+manual desktop check.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.
 `docs/FILE_WRITE.md` defines the separately scoped retained-output-object
