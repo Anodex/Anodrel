@@ -12,7 +12,7 @@ Narrator. It repeats the checks that can be compared to a fixed contract:
 - the UI Lab window has the Anodrel automation root;
 - Windows contributes the expected native `TitleBar` peer for the framed
   window, while every Anodrel semantic node appears after it in its documented
-  parent and sibling order; and
+  parent and sibling order in both the raw and control views; and
 - each node's `Name`, `AutomationId`, and `ControlType` match the native UI
   Lab's immutable document.
 

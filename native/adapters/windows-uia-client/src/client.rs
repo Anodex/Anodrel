@@ -70,29 +70,23 @@ pub struct UiAutomationElement {
     raw: Com<raw::Element>,
 }
 
-/// A direct read-only UI Automation client and its raw-view tree walker.
+/// A direct read-only UI Automation client and its raw/control tree walkers.
 pub struct UiAutomationClient {
     automation: Com<raw::Automation>,
     raw_view_walker: Com<raw::TreeWalker>,
+    control_view_walker: Com<raw::TreeWalker>,
 }
 
 impl UiAutomationClient {
     /// Creates the direct UI Automation client on an initialized COM thread.
     pub fn connect() -> Result<Self, UiAutomationError> {
         let automation = create_automation()?;
-        let mut walker = core::ptr::null_mut();
-        // SAFETY: `automation` is a live `IUIAutomation` object and `walker`
-        // is writable storage for the one returned interface pointer.
-        let result = unsafe {
-            let vtable = (*automation.as_ptr()).vtable;
-            ((*vtable).raw_view_walker)(automation.as_ptr(), &mut walker)
-        };
-        if !succeeded(result) {
-            return Err(UiAutomationError::Query(result));
-        }
+        let raw_view_walker = walker_from(&automation, TreeView::Raw)?;
+        let control_view_walker = walker_from(&automation, TreeView::Control)?;
         Ok(Self {
             automation,
-            raw_view_walker: Com::from_out(walker)?,
+            raw_view_walker,
+            control_view_walker,
         })
     }
 
@@ -133,49 +127,33 @@ impl UiAutomationClient {
         &self,
         parent: &UiAutomationElement,
     ) -> Result<Vec<UiAutomationElement>, UiAutomationError> {
-        let mut current = self.walker_child(parent)?;
+        self.children_with(&self.raw_view_walker, parent)
+    }
+
+    /// Returns the element's direct control-view children in published order.
+    ///
+    /// The control view is the filtered tree Windows accessibility clients use
+    /// to navigate controls. It remains host-diagnostic data; applications
+    /// receive neither this tree nor a result derived from it.
+    pub fn control_children(
+        &self,
+        parent: &UiAutomationElement,
+    ) -> Result<Vec<UiAutomationElement>, UiAutomationError> {
+        self.children_with(&self.control_view_walker, parent)
+    }
+
+    fn children_with(
+        &self,
+        walker: &Com<raw::TreeWalker>,
+        parent: &UiAutomationElement,
+    ) -> Result<Vec<UiAutomationElement>, UiAutomationError> {
+        let mut current = walker_child(walker, parent)?;
         let mut children = Vec::new();
         while let Some(element) = current {
-            current = self.walker_next_sibling(&element)?;
+            current = walker_next_sibling(walker, &element)?;
             children.push(element);
         }
         Ok(children)
-    }
-
-    fn walker_child(
-        &self,
-        parent: &UiAutomationElement,
-    ) -> Result<Option<UiAutomationElement>, UiAutomationError> {
-        let mut child = core::ptr::null_mut();
-        // SAFETY: the walker and parent element are live COM objects, and
-        // `child` is writable storage for an optional returned interface.
-        let result = unsafe {
-            let vtable = (*self.raw_view_walker.as_ptr()).vtable;
-            ((*vtable).first_child)(
-                self.raw_view_walker.as_ptr(),
-                parent.raw.as_ptr(),
-                &mut child,
-            )
-        };
-        optional_element(result, child)
-    }
-
-    fn walker_next_sibling(
-        &self,
-        element: &UiAutomationElement,
-    ) -> Result<Option<UiAutomationElement>, UiAutomationError> {
-        let mut sibling = core::ptr::null_mut();
-        // SAFETY: the walker and element are live COM objects, and `sibling`
-        // is writable storage for an optional returned interface.
-        let result = unsafe {
-            let vtable = (*self.raw_view_walker.as_ptr()).vtable;
-            ((*vtable).next_sibling)(
-                self.raw_view_walker.as_ptr(),
-                element.raw.as_ptr(),
-                &mut sibling,
-            )
-        };
-        optional_element(result, sibling)
     }
 
     fn text_property(
@@ -232,6 +210,61 @@ impl UiAutomationClient {
             Err(UiAutomationError::Query(result))
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum TreeView {
+    Raw,
+    Control,
+}
+
+fn walker_from(
+    automation: &Com<raw::Automation>,
+    view: TreeView,
+) -> Result<Com<raw::TreeWalker>, UiAutomationError> {
+    let mut walker = core::ptr::null_mut();
+    // SAFETY: `automation` is a live `IUIAutomation` object, the selected
+    // vtable slot is documented by UIAutomationClient.h, and `walker` is
+    // writable storage for the one returned interface pointer.
+    let result = unsafe {
+        let vtable = (*automation.as_ptr()).vtable;
+        match view {
+            TreeView::Raw => ((*vtable).raw_view_walker)(automation.as_ptr(), &mut walker),
+            TreeView::Control => ((*vtable).control_view_walker)(automation.as_ptr(), &mut walker),
+        }
+    };
+    if !succeeded(result) {
+        return Err(UiAutomationError::Query(result));
+    }
+    Com::from_out(walker)
+}
+
+fn walker_child(
+    walker: &Com<raw::TreeWalker>,
+    parent: &UiAutomationElement,
+) -> Result<Option<UiAutomationElement>, UiAutomationError> {
+    let mut child = core::ptr::null_mut();
+    // SAFETY: the walker and parent element are live COM objects, and `child`
+    // is writable storage for an optional returned interface.
+    let result = unsafe {
+        let vtable = (*walker.as_ptr()).vtable;
+        ((*vtable).first_child)(walker.as_ptr(), parent.raw.as_ptr(), &mut child)
+    };
+    optional_element(result, child)
+}
+
+fn walker_next_sibling(
+    walker: &Com<raw::TreeWalker>,
+    element: &UiAutomationElement,
+) -> Result<Option<UiAutomationElement>, UiAutomationError> {
+    let mut sibling = core::ptr::null_mut();
+    // SAFETY: the walker and element are live COM objects, and `sibling` is
+    // writable storage for an optional returned interface.
+    let result = unsafe {
+        let vtable = (*walker.as_ptr()).vtable;
+        ((*vtable).next_sibling)(walker.as_ptr(), element.raw.as_ptr(), &mut sibling)
+    };
+    optional_element(result, sibling)
 }
 
 fn optional_element(

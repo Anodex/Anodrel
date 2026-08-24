@@ -2,9 +2,10 @@
 
 ## Verification
 
-`--uia-property-probe` is the repeatable host-only property and raw-tree check
-for the fixed UI Lab. It complements the manual checks below; it does not
-replace Narrator's spoken-output or Inspect's highlight verification. See
+`--uia-property-probe` is the repeatable host-only property, raw-tree, and
+control-view check for the fixed UI Lab. It complements the manual checks
+below; it does not replace Narrator's spoken-output or Inspect's highlight
+verification. See
 `docs/UI_AUTOMATION_PROBE.md` and Decision 0106.
 
 ### Automated UI Lab property/tree acceptance
@@ -13,15 +14,15 @@ This passed on Windows on 2026-08-24. The direct first-party client created a
 separate MTA apartment, attached to the temporary UI Lab through its real
 `HWND`, and read each fixed node through Windows UI Automation. It confirmed
 the Anodrel window root, Windows' expected native `TitleBar` peer, and all
-twenty-three Anodrel semantic document nodes in their fixed raw-view parent
-and sibling order. For every Anodrel node, it compared `Name`, `AutomationId`,
-and `ControlType` with the compiled UI Lab contract.
+twenty-three Anodrel semantic document nodes in their fixed parent and sibling
+order in both raw and control views. For every Anodrel node, it compared
+`Name`, `AutomationId`, and `ControlType` with the compiled UI Lab contract.
 
 It intentionally did **not** call any interactive pattern, read current field
 text, look up focus, inspect geometry, or register an event handler. Those
 remain distinct acceptance concerns. Re-run it with the command in
 `docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact property/tree boundary,
-not spoken output or highlight geometry.
+including control-view navigation, not spoken output or highlight geometry.
 
 Automated tests cover the mapping: every role's control type and focusability,
 each property's source, empty and named nodes, rectangle conversion at several
@@ -123,10 +124,9 @@ To repeat the reading check:
 7. Close Narrator with `Ctrl+Windows+Enter`.
 
 If nothing is announced, check in this order: that Narrator is actually running,
-that the Anodrel window has focus, and only then suspect the provider. A quick
-way to separate a provider fault from a Narrator one is to walk the control view
-with `TreeWalker::ControlViewWalker` from a UI Automation client — that is the
-same view Narrator navigates, and it needs no screen reader.
+that the Anodrel window has focus, and only then suspect the provider. The
+repeatable property probe already walks the control view, which is the view
+Narrator navigates, but it cannot establish that Narrator spoke the result.
 
 ### Manual hierarchy verification
 

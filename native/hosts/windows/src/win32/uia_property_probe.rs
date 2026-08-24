@@ -65,7 +65,8 @@ fn probe_once(window: Hwnd) -> Result<(), UiAutomationError> {
     let _apartment = ComApartment::initialize_mta()?;
     let client = UiAutomationClient::connect()?;
     let root = client.element_from_handle(window)?;
-    verify_node(&client, &root, ROOT)?;
+    verify_tree(&client, &root, AutomationView::Raw)?;
+    verify_tree(&client, &root, AutomationView::Control)?;
     Ok(())
 }
 
@@ -76,15 +77,27 @@ fn close_probe_window(window: Hwnd) {
     let _: Bool = unsafe { PostMessageW(window, WM_CLOSE, Wparam::default(), Lparam::default()) };
 }
 
+fn verify_tree(
+    client: &UiAutomationClient,
+    root: &UiAutomationElement,
+    view: AutomationView,
+) -> Result<(), UiAutomationError> {
+    verify_node(client, root, ROOT, view)
+}
+
 fn verify_node(
     client: &UiAutomationClient,
     element: &UiAutomationElement,
     expected: ExpectedNode,
+    view: AutomationView,
 ) -> Result<(), UiAutomationError> {
     if !(expected.node == client.node(element)?) {
         return Err(UiAutomationError::UnexpectedTree);
     }
-    let mut children = client.raw_children(element)?;
+    let mut children = match view {
+        AutomationView::Raw => client.raw_children(element)?,
+        AutomationView::Control => client.control_children(element)?,
+    };
     if expected.has_windows_title_bar {
         let Some(title_bar) = children.first() else {
             return Err(UiAutomationError::UnexpectedTree);
@@ -98,9 +111,16 @@ fn verify_node(
         return Err(UiAutomationError::UnexpectedTree);
     }
     for (child, child_expected) in children.iter().zip(expected.children) {
-        verify_node(client, child, *child_expected)?;
+        verify_node(client, child, *child_expected, view)?;
     }
     Ok(())
+}
+
+/// The two read-only Windows UI Automation views this diagnostic compares.
+#[derive(Clone, Copy)]
+enum AutomationView {
+    Raw,
+    Control,
 }
 
 #[derive(Clone, Copy)]

@@ -90,7 +90,8 @@ pub(crate) struct AutomationVtable {
     pub(crate) element_from_point_build_cache: *const c_void,
     pub(crate) get_focused_element_build_cache: *const c_void,
     pub(crate) create_tree_walker: *const c_void,
-    pub(crate) control_view_walker: *const c_void,
+    pub(crate) control_view_walker:
+        unsafe extern "system" fn(*mut Automation, *mut *mut TreeWalker) -> Hresult,
     pub(crate) content_view_walker: *const c_void,
     pub(crate) raw_view_walker:
         unsafe extern "system" fn(*mut Automation, *mut *mut TreeWalker) -> Hresult,

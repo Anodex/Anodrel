@@ -26,20 +26,24 @@ Automation client and queries only that window's published immutable tree.
 The probe uses only `Ole32`, `OleAut32`, and Windows UI Automation APIs.
 
 Its first slice is read-only. It obtains the host window's automation root,
-walks the raw child tree, and reads a closed set of published properties:
+walks its raw child tree and its control-view tree, and reads a closed set of
+published properties:
 
 - `Name`;
 - `AutomationId`;
 - `ControlType`; and
 - structural child/sibling order.
 
-The host compares those values with the fixed UI Lab contract, writes one
-fixed pass/fail result to its operator console, and closes its own diagnostic
-window. The normal framed Windows window contributes one native `TitleBar`
-peer before the Anodrel semantic viewport; the probe verifies that peer and
-then verifies the Anodrel subtree separately. No application is connected to
-this route, and nothing is added to the protocol, SDK, document format,
-capability list, installed record, or product session.
+The host compares those values with the fixed UI Lab contract in each view,
+writes one fixed pass/fail result to its operator console, and closes its own
+diagnostic window. The normal framed Windows window contributes one native
+`TitleBar` peer before the Anodrel semantic viewport; the probe verifies that
+peer and then verifies the Anodrel subtree separately. The control-view check
+is meaningful because the provider declares every bounded semantic node to be
+a control element, but it remains a tree check rather than a claim about
+spoken output. No application is connected to this route, and nothing is added
+to the protocol, SDK, document format, capability list, installed record, or
+product session.
 
 The probe does not invoke a button, set focus, edit a field, scroll, subscribe
 to events, inspect assistive-technology presence, or report arbitrary returned
