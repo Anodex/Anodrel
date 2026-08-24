@@ -8,7 +8,7 @@ use crate::{
     template::{
         TemplateContext, cargo_toml, form_main_source, form_readme, live_status_main_source,
         live_status_readme, main_source, menu_main_source, menu_readme, multi_window_main_source,
-        multi_window_readme, readme,
+        multi_window_readme, readme, scroll_window_main_source, scroll_window_readme,
     },
     validation::{validate_display_label, validate_project_slug},
 };
@@ -80,6 +80,19 @@ pub fn initialize_multi_window(
     )
 }
 
+pub fn initialize_scroll_window(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(
+        TemplateKind::ScrollWindow,
+        destination,
+        project_slug,
+        display_label,
+    )
+}
+
 fn initialize_template(
     template_kind: TemplateKind,
     destination: &Path,
@@ -117,6 +130,11 @@ fn initialize_template(
             multi_window_main_source(display_label),
             multi_window_readme(&context),
             "Created Anodrel native multi-window project.",
+        ),
+        TemplateKind::ScrollWindow => (
+            scroll_window_main_source(display_label),
+            scroll_window_readme(&context),
+            "Created Anodrel native scroll-window project.",
         ),
     };
 
@@ -160,7 +178,7 @@ mod tests {
 
     use super::{
         initialize, initialize_form, initialize_live_status, initialize_menu,
-        initialize_multi_window,
+        initialize_multi_window, initialize_scroll_window,
     };
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
@@ -315,5 +333,29 @@ mod tests {
         assert!(source.contains("read_window_actions"));
         assert!(source.contains("close_window"));
         assert!(!source.contains("replace_menu_v1"));
+    }
+
+    #[test]
+    fn scroll_window_project_is_separate_from_the_other_templates() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-scroll-window-app");
+        initialize_scroll_window(
+            &destination,
+            "generated-scroll-window-app",
+            "Generated Scroll Window App",
+        )
+        .expect("generate a native scroll-window project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated scroll-window instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated scroll-window source");
+        assert!(readme.contains("--native-scroll-window-template-client"));
+        assert!(source.contains("open_window_v2"));
+        assert!(source.contains("replace_window_document_v2"));
+        assert!(source.contains("read_window_actions"));
+        assert!(source.contains("close_window"));
+        assert!(!source.contains("open_window_v1"));
+        assert!(!source.contains("replace_window_document_v1"));
     }
 }

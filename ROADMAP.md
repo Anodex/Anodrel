@@ -463,6 +463,15 @@ Status: **First starter-package slice in progress**
   documents, receives the three matching revision-bound actions, and closes
   cleanly. The remaining acceptance check is the documented Narrator and Inspect
   walkthrough; it does not claim announcement delivery to the generated app.
+  Decision 0103 now adds a sixth, separately selected native template: its
+  `init-scroll-window` generator and fixed five-grant Windows route exercise
+  Protocol 1.27's explicit v2 secondary scroll-document path without widening
+  any earlier template. A generated child has completed a real-pipe session
+  that opens the v2 secondary, receives the two tagged actions, replaces only
+  that view at revision 2, closes its issued secondary identity, and closes its
+  group. Local native scroll state, input, accessibility behavior, and mapping
+  remain host-owned. The remaining acceptance check is the documented visual
+  Windows walkthrough.
 - Provide development and diagnostic tools. **The first content-package
   native package tool is available:** it creates and verifies only a strict,
   digest-verified `anodrel.text.v1` package in a new directory, never an

@@ -503,6 +503,21 @@ Automation event, listener state, notification, callback, process, or endpoint.
 The host retains the native view, live-region event, lifecycle, and shutdown.
 See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md` and Decision 0101.
 
+Decision 0103 adds a sixth constrained Windows development template for
+Protocol 1.27's explicit version-2 secondary scroll documents. Its
+`init-scroll-window` command emits a fixed typed-client project, and the
+explicit `--native-scroll-window-template-client` route uses the same five
+fixed multi-window grants: document write, semantic-event read, bounded
+secondary open, bounded secondary close, and self-close. A strict v1 primary
+opens one strict v2 secondary; local host-owned scrolling reveals the action
+that replaces only that secondary with a second v2 document, and a second local
+action closes the issued secondary and its group. The child cannot select or
+observe an offset, input, scrollbar, accessibility provider, identity,
+geometry, native handle, title readback, host command, process, or endpoint.
+The host retains the group map, native views, scroll state, direct input,
+accessibility scrolling, lifecycle, and shutdown. See
+`docs/NATIVE_SCROLL_WINDOW_TEMPLATE.md` and Decision 0103.
+
 Decision 0096 adds one direct-rendered Windows scrollbar to the first visible
 overflowing v2 scroll viewport. Its pure host module derives finite track and
 thumb geometry from existing layout metrics and retained scroll state; the UI

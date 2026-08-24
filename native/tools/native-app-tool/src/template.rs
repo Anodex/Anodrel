@@ -6,6 +6,7 @@ mod form;
 mod live_status;
 mod menu;
 mod multi_window;
+mod scroll_window;
 
 pub struct TemplateContext {
     pub project_slug: String,
@@ -69,6 +70,14 @@ pub fn multi_window_main_source(display_label: &str) -> String {
 
 pub fn multi_window_readme(context: &TemplateContext) -> String {
     multi_window::readme(context)
+}
+
+pub fn scroll_window_main_source(display_label: &str) -> String {
+    scroll_window::main_source(display_label)
+}
+
+pub fn scroll_window_readme(context: &TemplateContext) -> String {
+    scroll_window::readme(context)
 }
 
 pub(super) fn document_json(display_label: &str) -> String {
@@ -221,7 +230,7 @@ mod tests {
 
     use super::{
         TemplateContext, cargo_toml, document_json, form_main_source, live_status_main_source,
-        main_source, menu_main_source, multi_window_main_source,
+        main_source, menu_main_source, multi_window_main_source, scroll_window_main_source,
     };
 
     #[test]
@@ -308,5 +317,34 @@ mod tests {
             );
         }
         assert!(!source.contains("--native-template-client"));
+    }
+
+    #[test]
+    fn scroll_window_source_uses_only_the_explicit_version_two_secondary_route() {
+        let source = scroll_window_main_source("Scroll \"Window\" Template");
+        for method in [
+            "open_window_v2",
+            "replace_window_document_v2",
+            "read_window_actions",
+            "close_window",
+        ] {
+            assert!(source.contains(method), "generated source uses {method}");
+        }
+        for action in [
+            "template.scroll.open",
+            "template.scroll.reveal",
+            "template.scroll.complete",
+        ] {
+            assert!(
+                source.contains(action),
+                "generated source includes {action}"
+            );
+        }
+        assert!(!source.contains("open_window_v1"));
+        assert!(!source.contains("replace_window_document_v1"));
+        assert!(!source.contains("replace_document_v3"));
+        assert!(!source.contains("protocolVersion"));
+        assert!(!source.contains("--native-"));
+        assert!(!source.contains("scrollOffset"));
     }
 }

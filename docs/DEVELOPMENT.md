@@ -167,6 +167,16 @@ primary, **Replace this window** in the secondary, and **Close secondary and
 finish** in that same secondary. It creates no certificate, package, installer,
 or machine policy. See `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
 
+To exercise explicit v2 secondary scrolling, double-click
+`start-scroll-window-template.bat` in the repository root. It generates and
+builds a disposable first-party Rust executable, then opens it through the
+fixed development route. Activate **Open scrollable secondary window** in the
+primary. In the secondary, scroll until **Reveal updated scroll document** is
+visible and activate it; then scroll the replacement document until **Close
+secondary and finish** is visible and activate it. The host retains each
+scroll position and all native scroll input. The helper creates no certificate,
+package, installer, or machine policy. See `docs/NATIVE_SCROLL_WINDOW_TEMPLATE.md`.
+
 To exercise submit-time native form entry, double-click
 `start-form-template.bat` in the repository root. It generates and builds a
 disposable first-party Rust executable, then opens it through the fixed

@@ -411,6 +411,10 @@ or multi-window templates.
 live-status template. Its generator and fixed three-grant Windows route
 demonstrate three explicit v3 visible-status updates without adding an
 accessibility callback, listener check, or delivery result.
+`docs/NATIVE_SCROLL_WINDOW_TEMPLATE.md` defines the separate development-native
+scroll-window template. Its generator and fixed five-grant Windows route
+demonstrate explicit v2 secondary opening and replacement while native scroll
+state, input, accessibility behavior, and mappings remain host-owned.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.
@@ -449,6 +453,12 @@ Double-click `start-multi-window-template.bat` to build a temporary
 first-party multi-window template and exercise a typed secondary window open,
 targeted document replacement, tagged action pull, exact secondary close, and
 whole-session close. It uses no Node.js, webview, product package, or
+machine-policy change.
+
+Double-click `start-scroll-window-template.bat` to build a temporary
+first-party scroll-window template. It opens a v2 secondary view, requires
+local scrolling to reveal each action, replaces only that view, and then closes
+the view and its session. It uses no Node.js, webview, product package, or
 machine-policy change.
 
 Double-click `start-form-template.bat` to build a temporary first-party native

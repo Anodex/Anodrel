@@ -9,6 +9,7 @@ pub enum TemplateKind {
     LiveStatus,
     Menu,
     MultiWindow,
+    ScrollWindow,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -27,6 +28,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
         Some("init-live-status") => TemplateKind::LiveStatus,
         Some("init-menu") => TemplateKind::Menu,
         Some("init-multi-window") => TemplateKind::MultiWindow,
+        Some("init-scroll-window") => TemplateKind::ScrollWindow,
         _ => return Err(()),
     };
     let destination = arguments.next().ok_or(())?;
@@ -84,6 +86,23 @@ mod tests {
                 destination: PathBuf::from("out/live-status"),
                 project_slug: "live-status-app".to_owned(),
                 display_label: "Live Status App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(
+                [
+                    "init-scroll-window",
+                    "out/scroll-window",
+                    "scroll-window-app",
+                    "Scroll Window App",
+                ]
+                .map(String::from)
+            ),
+            Ok(InitCommand {
+                template_kind: TemplateKind::ScrollWindow,
+                destination: PathBuf::from("out/scroll-window"),
+                project_slug: "scroll-window-app".to_owned(),
+                display_label: "Scroll Window App".to_owned(),
             })
         );
         assert_eq!(

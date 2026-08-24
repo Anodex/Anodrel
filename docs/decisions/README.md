@@ -13,6 +13,9 @@ Each record should include:
 
 Current records (newest first):
 
+- 0103: Development native scroll-window template keeps scroll state
+  host-owned.
+
 - 0102: Secondary scroll documents stay explicit and host-owned.
 
 - 0101: Development native live-status templates keep status delivery one-way.
