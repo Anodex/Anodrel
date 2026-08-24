@@ -369,10 +369,10 @@ adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the Windows accessibility boundary. **UI
 Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11, an Inspect cross-check of every earlier flat
-published property passes, and the first-party `--uia-property-probe` verifies
-the fixed current UI Lab raw/control-view property/tree contract plus one
-fixed field rectangle, hit target, and read-only Value pattern through real
-Windows APIs. An enabled
+published property passes, and the first-party `--uia-property-probe` and
+`--uia-focus-probe` verify the fixed current UI Lab's raw/control-view
+property/tree contract, fixed field rectangle, hit target, read-only Value
+pattern, and `SetFocus` result through real Windows APIs. An enabled
 authenticated-session button now exposes one bounded Invoke action that joins
 the existing revision-bound semantic-event mailbox;
 the provider also reports and can move the host's keyboard-focus snapshot

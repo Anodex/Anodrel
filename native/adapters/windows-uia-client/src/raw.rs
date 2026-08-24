@@ -81,7 +81,7 @@ pub(crate) struct Automation {
 
 /// The prefix through `get_RawViewWalker` of `IUIAutomationVtbl`.
 ///
-/// Slots not used by this read-only adapter are retained as pointer-sized
+/// Slots not used by this host-only adapter are retained as pointer-sized
 /// placeholders to preserve the Windows SDK vtable offset of the next slot.
 #[repr(C)]
 pub(crate) struct AutomationVtable {
@@ -95,7 +95,8 @@ pub(crate) struct AutomationVtable {
         unsafe extern "system" fn(*mut Automation, isize, *mut *mut Element) -> Hresult,
     pub(crate) element_from_point:
         unsafe extern "system" fn(*mut Automation, Point, *mut *mut Element) -> Hresult,
-    pub(crate) get_focused_element: *const c_void,
+    pub(crate) get_focused_element:
+        unsafe extern "system" fn(*mut Automation, *mut *mut Element) -> Hresult,
     pub(crate) get_root_element_build_cache: *const c_void,
     pub(crate) element_from_handle_build_cache: *const c_void,
     pub(crate) element_from_point_build_cache: *const c_void,
@@ -119,7 +120,7 @@ pub(crate) struct ElementVtable {
     pub(crate) query_interface: *const c_void,
     pub(crate) add_ref: *const c_void,
     pub(crate) release: *const c_void,
-    pub(crate) set_focus: *const c_void,
+    pub(crate) set_focus: unsafe extern "system" fn(*mut Element) -> Hresult,
     pub(crate) get_runtime_id: *const c_void,
     pub(crate) find_first: *const c_void,
     pub(crate) find_all: *const c_void,
@@ -293,10 +294,18 @@ mod tests {
     }
 
     #[test]
-    fn geometry_methods_keep_their_windows_sdk_vtable_slots() {
+    fn client_methods_keep_their_windows_sdk_vtable_slots() {
         assert_eq!(
             core::mem::offset_of!(AutomationVtable, element_from_point),
             7 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
+            core::mem::offset_of!(AutomationVtable, get_focused_element),
+            8 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
+        assert_eq!(
+            core::mem::offset_of!(ElementVtable, set_focus),
+            3 * core::mem::size_of::<*const core::ffi::c_void>()
         );
         assert_eq!(
             core::mem::offset_of!(ElementVtable, current_bounding_rectangle),

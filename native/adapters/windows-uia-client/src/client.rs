@@ -1,4 +1,4 @@
-//! Read-only element lookup, tree walking, and property decoding.
+//! Host-only element lookup, tree walking, property decoding, and fixed focus.
 
 use std::{ffi::c_void, fmt, string::FromUtf16Error};
 
@@ -129,7 +129,7 @@ pub struct UiAutomationElement {
     raw: Com<raw::Element>,
 }
 
-/// A direct read-only UI Automation client and its raw/control tree walkers.
+/// A host-only UI Automation client and its raw/control tree walkers.
 pub struct UiAutomationClient {
     automation: Com<raw::Automation>,
     raw_view_walker: Com<raw::TreeWalker>,
@@ -167,6 +167,40 @@ impl UiAutomationClient {
         Ok(UiAutomationElement {
             raw: Com::from_out(element)?,
         })
+    }
+
+    /// Asks Windows to focus one element selected by a host diagnostic.
+    ///
+    /// The element cannot be constructed from application data. This method
+    /// exists only for the fixed UI Lab acceptance probe; it exposes no focus
+    /// target, result, input, event, or control surface to the protocol or SDK.
+    pub fn set_focus(&self, element: &UiAutomationElement) -> Result<(), UiAutomationError> {
+        // SAFETY: the element is live and the exact vtable slot is the
+        // documented `IUIAutomationElement::SetFocus` method.
+        let result = unsafe {
+            let vtable = (*element.raw.as_ptr()).vtable;
+            ((*vtable).set_focus)(element.raw.as_ptr())
+        };
+        if succeeded(result) {
+            Ok(())
+        } else {
+            Err(UiAutomationError::Query(result))
+        }
+    }
+
+    /// Returns Windows' current focused element for the host focus diagnostic.
+    ///
+    /// The returned interface remains private to the diagnostic. No caller can
+    /// select what is read or receive an identity, focus state, or subscription.
+    pub fn focused_element(&self) -> Result<Option<UiAutomationElement>, UiAutomationError> {
+        let mut element = core::ptr::null_mut();
+        // SAFETY: `automation` is live and `element` is writable storage for
+        // the optional focused element Windows returns.
+        let result = unsafe {
+            let vtable = (*self.automation.as_ptr()).vtable;
+            ((*vtable).get_focused_element)(self.automation.as_ptr(), &mut element)
+        };
+        optional_element(result, element)
     }
 
     /// Reads the closed property set this diagnostic is allowed to inspect.

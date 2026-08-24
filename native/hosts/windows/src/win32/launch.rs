@@ -301,7 +301,7 @@ fn prioritize_uia_point_probe(window: Hwnd) -> io::Result<()> {
     }
 }
 
-fn ui_lab_window() -> WindowDefinition {
+pub(super) fn ui_lab_window() -> WindowDefinition {
     let scale = primary_scale();
     WindowDefinition {
         title: "Anodrel UI Lab".to_owned(),

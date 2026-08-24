@@ -3,10 +3,12 @@
 ## Verification
 
 `--uia-property-probe` is the repeatable host-only property, raw-tree,
-control-view, fixed-geometry, and fixed-Value-pattern check for the UI Lab. It complements the
-manual checks below; it does not replace Narrator's spoken-output or Inspect's
-highlight verification. See
-`docs/UI_AUTOMATION_PROBE.md` and Decisions 0106, 0107, and 0108.
+control-view, fixed-geometry, and fixed-Value-pattern check for the UI Lab.
+`--uia-focus-probe` separately verifies its fixed UI Automation focus route.
+They complement the manual checks below; they do not replace Narrator's
+spoken-output or Inspect's highlight verification. See
+`docs/UI_AUTOMATION_PROBE.md`, `docs/UI_AUTOMATION_FOCUS_PROBE.md`, and
+Decisions 0106 through 0109.
 
 ### Automated UI Lab property/tree/geometry/Value-pattern acceptance
 
@@ -37,6 +39,21 @@ It intentionally did **not** call any interactive pattern, look up focus, or
 register an event handler. Its only field-text read is the compiled empty Value
 check described above. Arbitrary geometry, visible highlight placement, and
 interactive behavior remain distinct acceptance concerns.
+
+### Automated UI Lab focus acceptance
+
+This passed on Windows on 2026-08-24. A separate direct first-party MTA client
+attached to the temporary fixed UI Lab, found only its compiled `ui.lab.field`
+control, called standard `SetFocus`, and then received that same AutomationId
+from Windows' `GetFocusedElement`. This covers the real provider call, its
+private payload-free host route, the UI-thread focusability gate, and the
+observable focused result.
+
+It accepted no target or input from an operator or application, and did not
+read a value, invoke a control, register an event, test for assistive
+technology, or force foreground activation. It proves one fixed focus route,
+not Narrator speech, keyboard input, focus-event delivery, or arbitrary focus
+control. Re-run it with the command in `docs/UI_AUTOMATION_FOCUS_PROBE.md`.
 Re-run it with the command in
 `docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact property/tree boundary,
 including control-view navigation and one fixed hit-test target, not spoken

@@ -170,9 +170,9 @@ Status: **Direct Windows host in progress**
   rectangles, and hit testing. **The earlier flat UI Automation reading slice
   is verified:** Narrator reads an Anodrel surface aloud on Windows 11, and an
   Inspect cross-check of each then-published property passed with no failures.
-  The new hierarchical tree has focused automated coverage and a repeatable
-  first-party real-Windows raw/control-view property/tree check plus one fixed
-  rectangle, hit target, and read-only Value-pattern check; its separate manual screen-reader check remains
+  The new hierarchical tree has focused automated coverage plus repeatable
+  first-party real-Windows property/tree, geometry, Value-pattern, and fixed
+  `SetFocus` acceptance checks; its separate manual screen-reader check remains
   open. Reading is
   joined by one bounded action: an enabled button in an authenticated UI session
   exposes `IInvokeProvider`, which queues the same revision-bound semantic

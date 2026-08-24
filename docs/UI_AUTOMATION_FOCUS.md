@@ -1,7 +1,7 @@
 # Anodrel UI Automation focus
 
-**Status:** Implemented on Windows; manual screen-reader verification is still
-required.**
+**Status:** Implemented and fixed-probe verified on Windows; manual
+screen-reader verification is still required.**
 
 ## Purpose
 
@@ -74,6 +74,12 @@ A genuine move then raises one separate host-only focus-change event; see
 Automated tests cover the one-request route, busy and timeout recovery, the
 snapshot revision gate, the focusability gate, the COM result, and session
 isolation.
+
+The repeatable host-only `--uia-focus-probe` passed on Windows on 2026-08-24.
+It asks Windows to focus the compiled UI Lab field, then confirms Windows
+returns that same fixed field from `GetFocusedElement`. It proves the real
+provider-to-host focus route but not speech, input, focus events, or an
+arbitrary target. Run it with the command in `docs/UI_AUTOMATION_FOCUS_PROBE.md`.
 
 To verify with Narrator on Windows:
 
