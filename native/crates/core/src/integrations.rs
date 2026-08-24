@@ -277,4 +277,70 @@ impl CoreHost {
             ),
         }
     }
+
+    fn clipboard_failure(&self, request_id: String, error: ClipboardServiceError) -> JsonValue {
+        let (code, message) = match error {
+            ClipboardServiceError::Unavailable => (
+                ProtocolErrorCode::ClipboardUnavailable,
+                "clipboard is unavailable.",
+            ),
+            ClipboardServiceError::StoredTextInvalid => (
+                ProtocolErrorCode::ClipboardTextInvalid,
+                "clipboard text is invalid.",
+            ),
+            ClipboardServiceError::StoredTextTooLarge => (
+                ProtocolErrorCode::ClipboardTextTooLarge,
+                "clipboard text is too large.",
+            ),
+        };
+        self.failure(request_id, code, message, None)
+    }
+}
+
+fn clipboard_write_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("text"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
+/// Reads the exact two-field payload `notification.show` accepts.
+///
+/// Any extra field is a mismatch rather than something to ignore, so a future
+/// urgency, icon, or action field cannot be smuggled past this version.
+fn notification_show_payload(value: &JsonValue) -> Option<(&str, &str)> {
+    let fields = value.as_object()?;
+    if fields.len() != 2 {
+        return None;
+    }
+    let title = fields.get("title").and_then(JsonValue::as_string)?;
+    let body = fields.get("body").and_then(JsonValue::as_string)?;
+    Some((title, body))
+}
+
+/// Reads the exact one-field payload `external.open` accepts.
+///
+/// Extra fields are a mismatch rather than a future target, browser option,
+/// native command, or other escape hatch. The URL still receives explicit
+/// scheme and size validation before it reaches the host service.
+fn external_open_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("url"))
+        .flatten()
+        .and_then(JsonValue::as_string)
+}
+
+/// Reads the exact one-field payload `network.fetch_text` accepts.
+///
+/// Extra fields are a mismatch rather than a future method, body, header,
+/// cookie, credential, proxy, redirect, timeout, or native-handle escape
+/// hatch. That absence keeps the service a bounded data seam.
+fn network_fetch_text_payload(value: &JsonValue) -> Option<&str> {
+    let fields = value.as_object()?;
+    (fields.len() == 1)
+        .then(|| fields.get("url"))
+        .flatten()
+        .and_then(JsonValue::as_string)
 }

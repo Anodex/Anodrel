@@ -219,6 +219,10 @@ impl CoreHost {
     }
 }
 
+/// Reads the exact one-field payload `window.title.set` accepts.
+///
+/// Extra fields stay invalid, so a future target, position, size, or native
+/// style cannot be smuggled into this session-owned window command.
 fn window_title_set_payload(value: &JsonValue) -> Option<&str> {
     let fields = value.as_object()?;
     (fields.len() == 1)
