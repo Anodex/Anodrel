@@ -3,49 +3,14 @@
  * Values crossing the boundary must be JSON-compatible.
  */
 
-import { canonicalBase64UrlDecodedLength } from "./base64url.js";
+import { PROTOCOL_VERSION } from "./constants.js";
+import type { RequestEnvelope } from "./messages.js";
 import type { UiInteractionEvent, WindowUiInteractionEvent } from "./validators.js";
 
 export { encodeCanonicalBase64Url } from "./base64url.js";
 
-export const PROTOCOL_VERSION = { major: 1, minor: 27 } as const;
-export const MAX_REQUEST_ID_BYTES = 256;
-export const MAX_OPERATION_BYTES = 128;
-export const MAX_CANCELLATION_ID_BYTES = 256;
-export const MAX_UI_DOCUMENT_REQUEST_BYTES = 24 * 1024;
-export const MAX_CLIPBOARD_TEXT_REQUEST_BYTES = 24 * 1024;
-export const MAX_EXTERNAL_LINK_REQUEST_BYTES = 2 * 1024;
-/** Maximum UTF-8 bytes in the exact HTTPS text-fetch URL payload. */
-export const MAX_NETWORK_FETCH_REQUEST_BYTES = 2 * 1024;
-export const MAX_FILE_DIALOG_REQUEST_BYTES = 2 * 1024;
-export const MAX_FILE_DIALOG_FILTERS = 8;
-export const MAX_FILE_TEXT_RESPONSE_BYTES = 8 * 1024;
-export const MAX_FILE_TEXT_WRITE_BYTES = 8 * 1024;
-/** Maximum decoded bytes in one exact binary-output replacement. */
-export const MAX_FILE_BINARY_WRITE_BYTES = 32 * 1024;
-/** Maximum encoded JSON bytes in one complete native-menu replacement payload. */
-export const MAX_MENU_REPLACE_REQUEST_BYTES = 16 * 1024;
-export const MAX_MENUS = 8;
-export const MAX_MENU_ITEMS = 16;
-export const MAX_MENU_LABEL_BYTES = 32;
-export const MAX_MENU_ITEM_LABEL_BYTES = 96;
-export const MAX_MENU_ACTION_ID_BYTES = 64;
-export const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES = 24 * 1024;
-export const SELECTION_REFERENCE_BYTES = 22;
-/** Exact characters in a host-created save reference. */
-export const SAVE_REFERENCE_BYTES = 22;
-/** Maximum UTF-8 bytes in an exact credential name (ASCII only). */
-export const MAX_CREDENTIAL_NAME_BYTES = 64;
-/** Maximum characters in the canonical hexadecimal representation of a secret. */
-export const MAX_CREDENTIAL_SECRET_HEX_BYTES = 4_096;
-/** Smallest logical client width accepted by `window.size.set`. */
-export const MIN_WINDOW_CLIENT_WIDTH = 320;
-/** Largest logical client width accepted by `window.size.set`. */
-export const MAX_WINDOW_CLIENT_WIDTH = 3_840;
-/** Smallest logical client height accepted by `window.size.set`. */
-export const MIN_WINDOW_CLIENT_HEIGHT = 240;
-/** Largest logical client height accepted by `window.size.set`. */
-export const MAX_WINDOW_CLIENT_HEIGHT = 2_160;
+export * from "./constants.js";
+export * from "./messages.js";
 
 export interface ProtocolVersion {
   readonly major: number;
@@ -438,135 +403,6 @@ export type PayloadFor<TOperation extends PlatformOperation> =
   PlatformOperationMap[TOperation]["payload"];
 export type ResultFor<TOperation extends PlatformOperation> =
   PlatformOperationMap[TOperation]["result"];
-
-/**
- * The request constructed by the client SDK. The transport adapter binds it to
- * an authenticated application session before it reaches a host.
- */
-export interface RequestEnvelope<TOperation extends PlatformOperation = PlatformOperation> {
-  readonly protocolVersion: ProtocolVersion;
-  readonly kind: "request";
-  readonly requestId: string;
-  readonly operation: TOperation;
-  readonly payload: PayloadFor<TOperation>;
-  readonly cancellationId?: string;
-}
-
-/**
- * The host-authenticated context attached by the transport. A client must not
- * be able to supply or elevate these values.
- */
-export interface CapabilityContext {
-  readonly applicationId: string;
-  readonly sessionId: string;
-  readonly grantedCapabilities: readonly Capability[];
-}
-
-export type HostRequestEnvelope<TOperation extends PlatformOperation = PlatformOperation> =
-  RequestEnvelope<TOperation> & {
-    readonly capabilityContext: CapabilityContext;
-  };
-
-/** The shape used at a raw host boundary before the operation is recognized. */
-export interface WireRequestEnvelope {
-  readonly protocolVersion: ProtocolVersion;
-  readonly kind: "request";
-  readonly requestId: string;
-  readonly operation: string;
-  readonly payload: unknown;
-  readonly cancellationId?: string;
-}
-
-export interface CancellationEnvelope {
-  readonly protocolVersion: ProtocolVersion;
-  readonly kind: "cancel";
-  readonly cancellationId: string;
-}
-
-export interface ResponseDiagnostics {
-  /** A safe-to-expose host label; it must not contain paths, secrets, or raw errors. */
-  readonly hostName: string;
-}
-
-export type ProtocolErrorCode =
-  | "capability.denied"
-  | "operation.unsupported"
-  | "protocol.version_unsupported"
-  | "request.cancelled"
-  | "request.invalid"
-  | "request.payload_invalid"
-  | "clipboard.unavailable"
-  | "clipboard.text_invalid"
-  | "clipboard.text_too_large"
-  | "external.unavailable"
-  | "network.unavailable"
-  | "network.response_invalid"
-  | "dialog.unavailable"
-  | "file.unavailable"
-  | "file.text_invalid"
-  | "file.text_too_large"
-  | "file.binary_too_large"
-  | "storage.unavailable"
-  | "storage.snapshot_invalid"
-  | "storage.snapshot_too_large"
-  | "diagnostics.unavailable"
-  | "credential.unavailable"
-  | "credential.access_denied"
-  | "credential.stored_secret_invalid"
-  | "notification.unavailable"
-  | "notification.busy"
-  | "notification.text_invalid"
-  | "window.unavailable"
-  | "window.busy"
-  | "window.title_invalid"
-  | "ui.fields.unavailable"
-  | "menu.unavailable";
-
-export interface ProtocolError {
-  readonly code: ProtocolErrorCode;
-  readonly message: string;
-  readonly retryable: boolean;
-  readonly details?: Readonly<Record<string, string | number | boolean>>;
-}
-
-export interface SuccessResponseEnvelope<TOperation extends PlatformOperation = PlatformOperation> {
-  readonly protocolVersion: ProtocolVersion;
-  readonly kind: "response";
-  readonly requestId: string;
-  readonly status: "success";
-  readonly result: ResultFor<TOperation>;
-  readonly diagnostics: ResponseDiagnostics;
-}
-
-export interface FailureResponseEnvelope {
-  readonly protocolVersion: ProtocolVersion;
-  readonly kind: "response";
-  readonly requestId: string;
-  readonly status: "failure";
-  readonly error: ProtocolError;
-  readonly diagnostics: ResponseDiagnostics;
-}
-
-export type ResponseEnvelope<TOperation extends PlatformOperation = PlatformOperation> =
-  | SuccessResponseEnvelope<TOperation>
-  | FailureResponseEnvelope;
-
-export interface EventEnvelope<TPayload = unknown> {
-  readonly protocolVersion: ProtocolVersion;
-  readonly kind: "event";
-  readonly eventName: string;
-  readonly source: string;
-  readonly schemaVersion: ProtocolVersion;
-  readonly payload: TPayload;
-}
-
-/** A current, enabled semantic UI action observed by a native host. */
-export interface UiActionInvokedEvent
-  extends EventEnvelope<{ readonly revision: string; readonly action: string }> {
-  readonly eventName: "ui.action.invoked";
-  readonly source: "native.ui";
-  readonly schemaVersion: { readonly major: 1; readonly minor: 0 };
-}
 
 export function createRequest<TOperation extends PlatformOperation>(
   requestId: string,

@@ -396,23 +396,8 @@ background execution. Remaining acceptance work includes a production signing
 and packaging story, a capability bridge, and broader operation-specific native
 tests.
 
-## Startup Lab action tiles
-
-The Startup Lab shows every action the platform intends to offer, each in a
-declared **linked** or **planned** state (Decision 0014). This table is the
-list to work through: a tile moves to linked when its documented host operation
-exists and — where it is privileged — has a threat-model entry. Linking a tile
-is then a data change plus its operation, not a redesign.
-
-| Tile | State | Gate to link it |
-| --- | --- | --- |
-| Development Fixture | **Resolved at run time** | Its state is no longer a constant. A verification-only preflight — machine record, locked digest revalidation, Authenticode, publisher fingerprint — decides it before the surface opens. With the development fixture of Decision 0061 provisioned it is live and reads *Development only, not a product*; on any other machine it stays *Not provisioned*, dimmed, and inert. It is deliberately not called a product launch, and there is no product-launch tile: that waits on the deferred signing and packaging decision. |
-| Open Logs | **Linked** | Done. Shows only the bounded typed host events defined by `docs/LOGGING.md`; it exposes no application text, persistence, export, or capability. |
-| Inspect Package | **Linked** | Done. Displays facts already verified at startup; introduces no capability. |
-| Runtime Diagnostics | **Linked** | Done. Displays this process's own readings; introduces no capability. |
-
-Adding a tile beyond these four requires the same treatment: show it planned
-with its gate stated, and link it only once its underlying operation is real.
+The Startup Lab's linked and planned actions are maintained in
+[`docs/roadmap/STARTUP_LAB_TILES.md`](docs/roadmap/STARTUP_LAB_TILES.md).
 
 ## Phase 3 — Reusable SDK and tooling
 
@@ -515,37 +500,5 @@ route, isolated release build, and real child-session test are implemented.
 Manual window-action verification, production executable identity, registry
 publication, packaging, and non-Windows hosts remain separate work.
 
-## Phase 4 — Anodex adapter
-
-Status: **Planned**
-
-- Connect Anodex through the public Anodrel interfaces.
-- Keep Anodex's existing Electron adapter working during migration.
-- Move platform-specific operations behind the new adapter.
-- Compare behavior and performance between the old and new hosts.
-- Switch Anodex only after feature parity and recovery procedures are proven.
-
-Acceptance gate: Anodex can run on Anodrel without importing Electron APIs
-from its core application logic.
-
-## Phase 5 — Additional applications and platforms
-
-Status: **Planned**
-
-- Add a second sample application.
-- Add macOS and Linux host adapters as resources allow.
-- Stabilize the protocol and publish SDK documentation.
-- Define a long-term release and support policy.
-
-## Explicitly deferred
-
-- **Production signing identity, packaging, installation, and updates.**
-  Deferred by decision, not by oversight. Until it is made, the platform has no
-  production application identity, so the only thing it can provision is the
-  development fixture of Decision 0061, and toast notifications stay out of
-  reach because they need an Application User Model ID this platform cannot
-  honestly claim. Nothing built so far may be presented as production-ready.
-- A full native UI toolkit beyond the constrained foundation in Decision 0025.
-- Custom browser engine.
-- Custom operating system.
-- Full Anodex rewrite before the platform contracts are proven.
+Phase 4, Phase 5, and deliberate product deferrals are maintained in
+[`docs/roadmap/FUTURE.md`](docs/roadmap/FUTURE.md).

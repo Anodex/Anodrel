@@ -1,7 +1,10 @@
 //! Host-only element lookup, tree walking, property decoding, and fixed focus.
 
 mod events;
+mod geometry;
+mod model;
 mod patterns;
+mod tree;
 
 use std::{fmt, string::FromUtf16Error};
 
@@ -11,7 +14,14 @@ use crate::{
 };
 
 pub use events::{UiAutomationFocusSubscription, UiAutomationStructureSubscription};
+pub use geometry::UiAutomationRect;
+pub use model::{UiAutomationElement, UiAutomationNode, UiAutomationValue};
 pub use patterns::UiAutomationInvocation;
+
+use tree::{
+    TreeView, optional_element, text_property_from_raw, walker_child, walker_from,
+    walker_next_sibling,
+};
 
 /// A safe failure category from the direct Windows UI Automation client.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,84 +68,6 @@ impl From<FromUtf16Error> for UiAutomationError {
     fn from(_: FromUtf16Error) -> Self {
         Self::PropertyText
     }
-}
-
-/// The fixed properties a host diagnostic may read from one UI Automation node.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UiAutomationNode {
-    /// The published user-facing name, empty when the semantic role has none.
-    pub name: String,
-    /// The published semantic document identifier.
-    pub automation_id: String,
-    /// The published UI Automation control-type identifier.
-    pub control_type: i32,
-}
-
-/// One read-only Value-pattern snapshot from a fixed host diagnostic field.
-///
-/// This data stays inside the host diagnostic adapter. It is not an
-/// application protocol result and carries no field selector, write operation,
-/// or live subscription.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UiAutomationValue {
-    /// The field's copied UTF-16 value.
-    pub value: String,
-    /// Whether UI Automation may write the value.
-    pub is_read_only: bool,
-}
-
-/// A UI Automation screen rectangle in physical pixels.
-///
-/// It is copied from Windows only inside the host diagnostic adapter. The
-/// platform protocol and application SDK expose neither this geometry nor an
-/// operation that can choose a coordinate.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct UiAutomationRect {
-    /// Left edge in screen pixels.
-    pub left: i32,
-    /// Top edge in screen pixels.
-    pub top: i32,
-    /// Right edge in screen pixels.
-    pub right: i32,
-    /// Bottom edge in screen pixels.
-    pub bottom: i32,
-}
-
-impl UiAutomationRect {
-    /// Returns whether Windows reported no visible area for this rectangle.
-    #[must_use]
-    pub const fn is_empty(self) -> bool {
-        self.right <= self.left || self.bottom <= self.top
-    }
-
-    /// Returns whether another non-empty rectangle fits inside this one.
-    #[must_use]
-    pub const fn contains(self, other: Self) -> bool {
-        !self.is_empty()
-            && !other.is_empty()
-            && self.left <= other.left
-            && self.top <= other.top
-            && self.right >= other.right
-            && self.bottom >= other.bottom
-    }
-
-    fn center(self) -> Option<raw::Point> {
-        if self.is_empty() {
-            return None;
-        }
-        Some(raw::Point {
-            x: ((i64::from(self.left) + i64::from(self.right)) / 2) as i32,
-            y: ((i64::from(self.top) + i64::from(self.bottom)) / 2) as i32,
-        })
-    }
-}
-
-/// One owned immutable UI Automation element interface.
-///
-/// It deliberately exposes no raw pointer, COM operation, pattern, or mutable
-/// state. Only [`UiAutomationClient`] can read its closed diagnostic values.
-pub struct UiAutomationElement {
-    raw: Com<raw::Element>,
 }
 
 /// A host-only UI Automation client and its raw/control tree walkers.
@@ -431,161 +363,5 @@ impl UiAutomationClient {
         };
         let _pattern = Com::from_out(pattern.as_ptr())?;
         Ok(true)
-    }
-}
-
-/// Reads one BSTR property while Windows temporarily lends an element pointer.
-///
-/// The focus-event callback uses this for its sender while Windows guarantees
-/// that sender remains valid. It copies the text before the callback returns,
-/// so no UI Automation interface crosses from the callback thread to the
-/// waiting diagnostic worker.
-fn text_property_from_raw(
-    element: *mut raw::Element,
-    property: i32,
-) -> Result<String, UiAutomationError> {
-    if element.is_null() {
-        return Err(UiAutomationError::NullInterface);
-    }
-    let mut value = raw::Variant::empty();
-    // SAFETY: this helper is called only for a live owned element or a sender
-    // Windows temporarily lends to its callback. `value` is initialized
-    // writable VARIANT storage for the documented property result.
-    let result = unsafe {
-        let vtable = (*element).vtable;
-        ((*vtable).current_property_value)(element, property, &mut value)
-    };
-    if !succeeded(result) {
-        return Err(UiAutomationError::Query(result));
-    }
-    if value.vt != raw::VT_BSTR {
-        return Err(UiAutomationError::PropertyType);
-    }
-    // SAFETY: a `VT_BSTR` variant carries exactly one BSTR pointer, which may
-    // be null for an empty value. The Variant releases it on Drop.
-    let text = unsafe { value.value.bstr };
-    if text.is_null() {
-        return Ok(String::new());
-    }
-    // SAFETY: SysStringLen reads the BSTR allocation Windows returned.
-    let length = unsafe { raw::SysStringLen(text) } as usize;
-    // SAFETY: the BSTR has `length` UTF-16 code units and remains owned by
-    // `value` until this function returns.
-    let units = unsafe { core::slice::from_raw_parts(text, length) };
-    Ok(String::from_utf16(units)?)
-}
-
-#[derive(Clone, Copy)]
-enum TreeView {
-    Raw,
-    Control,
-}
-
-fn walker_from(
-    automation: &Com<raw::Automation>,
-    view: TreeView,
-) -> Result<Com<raw::TreeWalker>, UiAutomationError> {
-    let mut walker = core::ptr::null_mut();
-    // SAFETY: `automation` is a live `IUIAutomation` object, the selected
-    // vtable slot is documented by UIAutomationClient.h, and `walker` is
-    // writable storage for the one returned interface pointer.
-    let result = unsafe {
-        let vtable = (*automation.as_ptr()).vtable;
-        match view {
-            TreeView::Raw => ((*vtable).raw_view_walker)(automation.as_ptr(), &mut walker),
-            TreeView::Control => ((*vtable).control_view_walker)(automation.as_ptr(), &mut walker),
-        }
-    };
-    if !succeeded(result) {
-        return Err(UiAutomationError::Query(result));
-    }
-    Com::from_out(walker)
-}
-
-fn walker_child(
-    walker: &Com<raw::TreeWalker>,
-    parent: &UiAutomationElement,
-) -> Result<Option<UiAutomationElement>, UiAutomationError> {
-    let mut child = core::ptr::null_mut();
-    // SAFETY: the walker and parent element are live COM objects, and `child`
-    // is writable storage for an optional returned interface.
-    let result = unsafe {
-        let vtable = (*walker.as_ptr()).vtable;
-        ((*vtable).first_child)(walker.as_ptr(), parent.raw.as_ptr(), &mut child)
-    };
-    optional_element(result, child)
-}
-
-fn walker_next_sibling(
-    walker: &Com<raw::TreeWalker>,
-    element: &UiAutomationElement,
-) -> Result<Option<UiAutomationElement>, UiAutomationError> {
-    let mut sibling = core::ptr::null_mut();
-    // SAFETY: the walker and element are live COM objects, and `sibling` is
-    // writable storage for an optional returned interface.
-    let result = unsafe {
-        let vtable = (*walker.as_ptr()).vtable;
-        ((*vtable).next_sibling)(walker.as_ptr(), element.raw.as_ptr(), &mut sibling)
-    };
-    optional_element(result, sibling)
-}
-
-fn optional_element(
-    result: raw::Hresult,
-    pointer: *mut raw::Element,
-) -> Result<Option<UiAutomationElement>, UiAutomationError> {
-    if !succeeded(result) {
-        return Err(UiAutomationError::Query(result));
-    }
-    Ok(
-        core::ptr::NonNull::new(pointer).map(|pointer| UiAutomationElement {
-            raw: Com::from_out(pointer.as_ptr()).expect("non-null COM element remains non-null"),
-        }),
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::UiAutomationRect;
-
-    #[test]
-    fn rectangle_containment_rejects_empty_and_outside_rectangles() {
-        let root = UiAutomationRect {
-            left: -100,
-            top: -50,
-            right: 300,
-            bottom: 250,
-        };
-        assert!(root.contains(UiAutomationRect {
-            left: -100,
-            top: -50,
-            right: 300,
-            bottom: 250,
-        }));
-        assert!(!root.contains(UiAutomationRect {
-            left: 300,
-            top: 0,
-            right: 300,
-            bottom: 20,
-        }));
-        assert!(!root.contains(UiAutomationRect {
-            left: -101,
-            top: 0,
-            right: 20,
-            bottom: 20,
-        }));
-    }
-
-    #[test]
-    fn rectangle_centre_uses_wide_intermediate_arithmetic() {
-        let rectangle = UiAutomationRect {
-            left: i32::MIN,
-            top: i32::MIN,
-            right: i32::MAX,
-            bottom: i32::MAX,
-        };
-        let centre = rectangle.center().expect("spanning rectangle has a centre");
-        assert_eq!(centre.x, 0);
-        assert_eq!(centre.y, 0);
     }
 }

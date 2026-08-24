@@ -1,7 +1,15 @@
 //! Shared test fixtures and request builders.
 
+mod documents;
+mod notifications;
 mod requests;
 
+pub(super) use documents::{
+    field, ui_document_payload, valid_ui_document, valid_ui_document_v2, valid_ui_document_v3,
+};
+pub(super) use notifications::{
+    RecordingNotifications, host_with_notifications, notification_payload,
+};
 pub(super) use requests::{
     request, request_v1_1, request_v1_2, request_v1_3, request_v1_4, request_v1_5, request_v1_6,
     request_v1_7, request_v1_8, request_v1_9, request_v1_10, request_v1_12, request_v1_13,
@@ -517,82 +525,6 @@ pub(super) fn credential_host(
         HostPolicy::new("test.application", grants, "test-host").expect("test policy is valid"),
         credentials,
     )
-}
-
-pub(super) fn host_with_notifications(service: impl NotificationService + 'static) -> CoreHost {
-    CoreHost::with_services(
-        HostPolicy::new(
-            "test.application",
-            vec![Capability::NotificationShow],
-            "test-host",
-        )
-        .expect("test policy is valid"),
-        HostServices::unavailable().with_notifications(service),
-    )
-}
-
-/// A notification service that records what it was asked to show.
-#[derive(Debug, Default)]
-pub(super) struct RecordingNotifications {
-    pub(super) shown: std::sync::Mutex<Vec<(String, String)>>,
-    pub(super) result: Option<NotificationServiceError>,
-}
-
-impl RecordingNotifications {
-    pub(super) fn failing(error: NotificationServiceError) -> Self {
-        Self {
-            shown: std::sync::Mutex::new(Vec::new()),
-            result: Some(error),
-        }
-    }
-}
-
-impl NotificationService for RecordingNotifications {
-    fn show(&self, notification: &Notification) -> Result<(), NotificationServiceError> {
-        if let Some(error) = self.result {
-            return Err(error);
-        }
-        self.shown
-            .lock()
-            .expect("the fixture lock is usable")
-            .push((
-                notification.title().as_str().to_owned(),
-                notification.body().as_str().to_owned(),
-            ));
-        Ok(())
-    }
-}
-
-pub(super) fn notification_payload(title: &str, body: &str) -> String {
-    object([
-        ("body", JsonValue::String(body.to_owned())),
-        ("title", JsonValue::String(title.to_owned())),
-    ])
-    .to_json()
-}
-
-pub(super) fn ui_document_payload(document: &str) -> String {
-    object([("document", JsonValue::String(document.to_owned()))]).to_json()
-}
-
-pub(super) fn valid_ui_document(label: &str) -> String {
-    format!(
-        r#"{{"format":"anodrel.ui.document.v1","root":{{"id":"root","kind":"action","label":"{label}","fontSize":16,"enabled":true,"tone":"accent"}}}}"#
-    )
-}
-
-pub(super) fn valid_ui_document_v2() -> &'static str {
-    r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"content","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}}"#
-}
-
-pub(super) fn valid_ui_document_v3(value: &str, politeness: &str) -> String {
-    format!(
-        r#"{{"format":"anodrel.ui.document.v3","root":{{"id":"status","kind":"status","value":"{value}","fontSize":16,"tone":"accent","politeness":"{politeness}"}}}}"#
-    )
-}
-
-pub(super) fn field<'a>(value: &'a JsonValue, field: &str) -> &'a JsonValue {
-    &value.as_object().expect("response is an object")[field]
 }
 
 pub(crate) mod windows;

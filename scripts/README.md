@@ -6,6 +6,16 @@ release helpers.
 Scripts must be safe to run from a clean checkout, document their prerequisites,
 and avoid writing secrets or generated output into tracked source directories.
 
+## check-source-size.ps1
+
+Checks every tracked maintained source and documentation file against the
+repository's 550-line organization limit. It reads files only and exits with a
+failure that names each file exceeding the limit.
+
+~~~powershell
+.\scripts\check-source-size.ps1
+~~~
+
 ## provision-product-fixture.ps1
 
 Provisions or removes the development-only Windows product fixture described in

@@ -29,6 +29,9 @@ These instructions apply to the entire Anodrel repository.
 - tests/ contains cross-component tests that do not belong to one package.
 - Generated output, downloaded models, logs, credentials, and local runtime
   state must never be committed.
+- Maintained source and documentation files must stay at or below 550 physical
+  lines. Split a file by responsibility before it reaches that boundary; run
+  `scripts/check-source-size.ps1` after structural work.
 
 ## Documentation requirements
 
