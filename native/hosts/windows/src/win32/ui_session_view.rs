@@ -17,6 +17,7 @@ use anodrel_window::{
     WindowSizeMailbox, WindowState, WindowStateMailbox, WindowTitleMailbox,
 };
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_folder_access::WindowsFolderEntryService;
 use anodrel_windows_notifications::WindowsNotifications;
 use anodrel_windows_product_session::RunningProductSession;
 
@@ -39,6 +40,9 @@ pub(super) struct UiSessionView {
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    /// This session's retained selected-folder entry registry, when its core
+    /// services expose the Protocol 1.29 one-use route.
+    folder_entries: Option<WindowsFolderEntryService>,
     notifications: NotificationMailbox,
     /// This session's one-request menu replacement bridge, when it has one.
     ///
@@ -139,6 +143,7 @@ impl UiSessionView {
             close_signal,
             file_dialog_mailbox,
             file_text,
+            folder_entries: None,
             notifications,
             menu_mailbox: None,
             menu_bar: None,
@@ -169,6 +174,7 @@ impl UiSessionView {
             close_signal,
             file_dialog_mailbox,
             file_text,
+            folder_entries,
             notifications,
             window_title,
             display_name,
@@ -186,6 +192,7 @@ impl UiSessionView {
                 ui.close_signal(),
                 ui.file_dialog_mailbox(),
                 ui.file_text_service(),
+                ui.folder_entry_service(),
                 ui.notification_mailbox(),
                 ui.window_title_mailbox(),
                 ui.display_name().to_owned(),
@@ -206,6 +213,7 @@ impl UiSessionView {
             file_text,
             notifications,
         )
+        .with_folder_entries(folder_entries)
         .with_window_title(window_title, display_name)
         .with_menu(menu)
         .with_window_state(window_state)
@@ -262,6 +270,13 @@ impl UiSessionView {
     #[must_use]
     fn with_session_window(mut self, session_window: SessionWindowMember) -> Self {
         self.session_window = Some(session_window);
+        self
+    }
+
+    /// Connects this view to its same-session retained-folder registry.
+    #[must_use]
+    pub(super) fn with_folder_entries(mut self, service: WindowsFolderEntryService) -> Self {
+        self.folder_entries = Some(service);
         self
     }
 
@@ -366,6 +381,11 @@ impl UiSessionView {
     /// selection capture. The clone shares only session-local native state.
     pub(super) fn file_text_service(&self) -> WindowsFileTextService {
         self.file_text.clone()
+    }
+
+    /// Returns this view's retained selected-folder registry when configured.
+    pub(super) fn folder_entry_service(&self) -> Option<WindowsFolderEntryService> {
+        self.folder_entries.clone()
     }
 }
 

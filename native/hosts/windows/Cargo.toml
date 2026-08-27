@@ -14,6 +14,7 @@ anodrel-credentials = { path = "../../crates/credentials" }
 anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
+anodrel-folder-access = { path = "../../crates/folder-access" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-menu = { path = "../../crates/menu" }
 anodrel-network = { path = "../../crates/network" }
@@ -31,6 +32,7 @@ anodrel-windows-credentials = { path = "../../adapters/windows-credentials" }
 anodrel-windows-external-links = { path = "../../adapters/windows-external-links" }
 anodrel-windows-file-access = { path = "../../adapters/windows-file-access" }
 anodrel-windows-file-dialog = { path = "../../adapters/windows-file-dialog" }
+anodrel-windows-folder-access = { path = "../../adapters/windows-folder-access" }
 anodrel-windows-appearance = { path = "../../adapters/windows-appearance" }
 anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }
 anodrel-windows-crash = { path = "../../adapters/windows-crash" }

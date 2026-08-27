@@ -76,7 +76,7 @@ strict UTF-8, and reads only the retained regular-file handle. Public Protocol
 is single-use and the portable store
 holds at most 32 live references per session. Binary reads, multiple selection,
 persistent grants, bookmarks, drag-and-drop, and cross-session sharing remain
-deferred. `docs/FOLDER_ACCESS.md` separately specifies a planned one-use
+deferred. `docs/FOLDER_ACCESS.md` separately defines an implemented one-use
 folder-reference route for a bounded direct-entry snapshot; it does not reuse a
 file selection reference or grant file reading. Text and bounded binary writes have
 their own retained-output-object contracts rather than extending a read-side

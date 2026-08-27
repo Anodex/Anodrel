@@ -325,10 +325,11 @@ machine-selected origin policy for version 1.14 installed records.
 `docs/FOLDER_DIALOGS.md` defines the separate bounded folder-selection
 contract, its direct Windows Common Item Dialog adapter, and its remaining
 manual desktop check.
-`docs/FOLDER_ACCESS.md` defines the implemented portable, Protocol 1.29,
-SDK/mock, and core foundation for a separately granted, one-use retained-folder
-reference and bounded direct-entry snapshot. Its direct Windows adapter and
-host route are the next implementation section.
+`docs/FOLDER_ACCESS.md` defines the implemented Protocol 1.29, SDK/mock,
+policy, core, and direct Windows route for a separately granted, one-use
+retained-folder reference and bounded direct-entry snapshot. Windows enumerates
+from the retained directory handle rather than reopening a path; its final
+desktop picker check remains a manual verification step.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.
 `docs/FILE_WRITE.md` defines the separately scoped retained-output-object

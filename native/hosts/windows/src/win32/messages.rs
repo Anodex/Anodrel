@@ -201,7 +201,31 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                         })
                     }
                     FileDialogRequestKind::OpenFolderWithReference => {
-                        Err(anodrel_windows_file_dialog::FileDialogError::Unavailable)
+                        let folder_entries = registry::folder_entry_service(window).ok().flatten();
+                        match folder_entries {
+                            Some(folder_entries) => {
+                                anodrel_windows_file_dialog::open_folder_with_owner_and_capture(
+                                    window,
+                                    |path| {
+                                        let folder =
+                                            anodrel_windows_folder_access::open_selected_folder(
+                                                path,
+                                            )
+                                            .map_err(|_| ())?;
+                                        folder_entries.register(folder).map_err(|_| ())
+                                    },
+                                )
+                                .map(|selection| {
+                                    selection.map_or(
+                                        FileDialogSelection::Cancelled,
+                                        |(path, reference)| {
+                                            FileDialogSelection::CapturedFolder(path, reference)
+                                        },
+                                    )
+                                })
+                            }
+                            None => Err(anodrel_windows_file_dialog::FileDialogError::Unavailable),
+                        }
                     }
                     FileDialogRequestKind::Open => {
                         anodrel_windows_file_dialog::open_file_with_owner(window, request.filters())

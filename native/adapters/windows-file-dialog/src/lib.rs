@@ -54,6 +54,23 @@ pub fn open_folder_with_owner(
     folder::open(owner_window).map_err(|_| FileDialogError::Unavailable)
 }
 
+/// Opens one host-owned folder picker and captures its selection before return.
+///
+/// The capture callback runs synchronously on the caller's trusted UI thread
+/// only after Windows confirms a folder. It may retain adapter-private folder
+/// state, but it must not expose a native handle or filesystem failure through
+/// its result.
+pub fn open_folder_with_owner_and_capture<T>(
+    owner_window: isize,
+    capture: impl FnOnce(&SelectedFolderPath) -> Result<T, ()>,
+) -> Result<Option<(SelectedFolderPath, T)>, FileDialogError> {
+    let Some(path) = open_folder_with_owner(owner_window)? else {
+        return Ok(None);
+    };
+    let captured = capture(&path).map_err(|_| FileDialogError::Unavailable)?;
+    Ok(Some((path, captured)))
+}
+
 /// Opens one host-owned Windows save picker with the supplied strict filters.
 ///
 /// A returned destination is only a user choice. This function never creates,

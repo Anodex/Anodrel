@@ -399,6 +399,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-folder-access"
+version = "0.1.0"
+dependencies = [
+ "anodrel-file-dialog",
+ "anodrel-folder-access",
+]
+
+[[package]]
 name = "anodrel-windows-host"
 version = "0.1.0"
 dependencies = [
@@ -411,6 +419,7 @@ dependencies = [
  "anodrel-diagnostics",
  "anodrel-file-access",
  "anodrel-file-dialog",
+ "anodrel-folder-access",
  "anodrel-json",
  "anodrel-menu",
  "anodrel-network",
@@ -429,6 +438,7 @@ dependencies = [
  "anodrel-windows-external-links",
  "anodrel-windows-file-access",
  "anodrel-windows-file-dialog",
+ "anodrel-windows-folder-access",
  "anodrel-windows-instance",
  "anodrel-windows-launch",
  "anodrel-windows-network",
@@ -529,6 +539,7 @@ dependencies = [
  "anodrel-core",
  "anodrel-file-access",
  "anodrel-file-dialog",
+ "anodrel-folder-access",
  "anodrel-menu",
  "anodrel-notifications",
  "anodrel-protocol",
@@ -539,6 +550,7 @@ dependencies = [
  "anodrel-windows-credentials",
  "anodrel-windows-external-links",
  "anodrel-windows-file-access",
+ "anodrel-windows-folder-access",
  "anodrel-windows-network",
  "anodrel-windows-paths",
  "anodrel-windows-pipe",

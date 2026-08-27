@@ -9,6 +9,7 @@ use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_ui_session::{UiDocumentMailbox, UiFieldMailbox, UiInputMailbox};
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_folder_access::WindowsFolderEntryService;
 
 /// The complete set of host-only bridges consumed by one development session.
 ///
@@ -20,6 +21,7 @@ pub(crate) struct DevelopmentSessionUi {
     pub(crate) close: SessionCloseSignal,
     pub(crate) file_dialog: FileDialogMailbox,
     pub(crate) file_text: WindowsFileTextService,
+    pub(crate) folder_entries: WindowsFolderEntryService,
     pub(crate) notifications: anodrel_notifications::NotificationMailbox,
     pub(crate) menu: anodrel_menu::MenuMailbox,
     pub(crate) window_title: anodrel_window::WindowTitleMailbox,
@@ -40,6 +42,7 @@ impl DevelopmentSessionUi {
             close: SessionCloseSignal::default(),
             file_dialog: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
+            folder_entries: WindowsFolderEntryService::new(),
             notifications: anodrel_notifications::NotificationMailbox::new(),
             menu: anodrel_menu::MenuMailbox::new(),
             window_title: anodrel_window::WindowTitleMailbox::new(),

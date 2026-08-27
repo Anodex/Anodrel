@@ -127,6 +127,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         return sample::run_ui_session_with_open_folder_dialog(node_path, client_path);
     }
     if let [command, node_path, client_path] = arguments.as_slice()
+        && command == "--sample-ui-folder-entries-client"
+    {
+        return sample::run_ui_session_with_selected_folder_entries(node_path, client_path);
+    }
+    if let [command, node_path, client_path] = arguments.as_slice()
         && command == "--sample-ui-file-text-client"
     {
         return sample::run_ui_session_with_selected_file_text(node_path, client_path);

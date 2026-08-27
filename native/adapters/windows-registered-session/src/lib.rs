@@ -15,6 +15,7 @@ use anodrel_application::InstalledApplication;
 use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_file_access::{SaveFileDialogMailbox, SelectionFileDialogMailbox};
 use anodrel_file_dialog::FileDialogMailbox;
+use anodrel_folder_access::FolderFileDialogMailbox;
 use anodrel_menu::MenuMailbox;
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
@@ -29,6 +30,7 @@ use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
 use anodrel_windows_external_links::WindowsExternalLinks;
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_folder_access::WindowsFolderEntryService;
 use anodrel_windows_network::WindowsNetworkTextService;
 use anodrel_windows_paths::{WindowsPathsError, application_directories};
 use anodrel_windows_pipe::{SessionInvitation, WindowsPipeServer};
@@ -46,6 +48,7 @@ pub struct RegisteredSessionUi {
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    folder_entries: WindowsFolderEntryService,
     notification_mailbox: NotificationMailbox,
     menu_mailbox: MenuMailbox,
     window_title_mailbox: WindowTitleMailbox,
@@ -72,6 +75,7 @@ impl RegisteredSessionUi {
             close_signal: SessionCloseSignal::default(),
             file_dialog_mailbox: FileDialogMailbox::new(),
             file_text: WindowsFileTextService::new(),
+            folder_entries: WindowsFolderEntryService::new(),
             notification_mailbox: NotificationMailbox::new(),
             menu_mailbox: MenuMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
@@ -122,6 +126,12 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn file_text_service(&self) -> WindowsFileTextService {
         self.file_text.clone()
+    }
+
+    /// Returns this session's retained selected-folder entry service.
+    #[must_use]
+    pub fn folder_entry_service(&self) -> WindowsFolderEntryService {
+        self.folder_entries.clone()
     }
 
     /// Returns this session's one-request UI-thread notification mailbox.
@@ -327,6 +337,8 @@ fn registered_interactive_services(
         .with_file_dialogs(ui.file_dialog_mailbox())
         .with_file_selections(SelectionFileDialogMailbox::new(ui.file_dialog_mailbox()))
         .with_file_text(ui.file_text_service())
+        .with_folder_selections(FolderFileDialogMailbox::new(ui.file_dialog_mailbox()))
+        .with_folder_entries(ui.folder_entry_service())
         .with_file_save_selections(SaveFileDialogMailbox::new(ui.file_dialog_mailbox()))
         .with_file_text_write(ui.file_text_service().write_service())
         .with_file_binary_write(ui.file_text_service().binary_write_service())

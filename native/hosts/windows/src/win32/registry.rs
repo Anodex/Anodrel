@@ -16,6 +16,7 @@ use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 use anodrel_menu::MenuRequest;
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_folder_access::WindowsFolderEntryService;
 
 mod window_commands;
 
@@ -342,6 +343,15 @@ pub(super) fn file_text_service(window: Hwnd) -> io::Result<Option<WindowsFileTe
     let views = lock_views()?;
     match views.get(&window) {
         Some(View::UiSession(session)) => Ok(Some(session.file_text_service())),
+        _ => Ok(None),
+    }
+}
+
+/// Returns the session-local folder registry for the UI thread's capture flow.
+pub(super) fn folder_entry_service(window: Hwnd) -> io::Result<Option<WindowsFolderEntryService>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.folder_entry_service()),
         _ => Ok(None),
     }
 }

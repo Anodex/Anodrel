@@ -49,8 +49,9 @@ native failures.
 
 ## Revisit conditions
 
-Revisit before adding an initial folder, title, filters, multiple selection,
-folder access, directory enumeration, writing, a retained folder reference,
+Decision 0116 separately reconsidered and added the bounded retained-folder
+reference and direct-entry snapshot. Revisit before adding an initial folder,
+title, filters, multiple selection, recursive access, child access, writing,
 drag-and-drop, callbacks, background UI, a non-Windows adapter, packaging, or
 production identity. Each would broaden a capability or native-authority
 boundary and requires its own contract and threat-model review.

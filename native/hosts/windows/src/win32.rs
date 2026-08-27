@@ -56,6 +56,7 @@ use anodrel_notifications::NotificationMailbox;
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox, UiWindowGroup, UiWindowId};
 use anodrel_windows_file_access::WindowsFileTextService;
+use anodrel_windows_folder_access::WindowsFolderEntryService;
 use anodrel_windows_instance::PrimaryInstance;
 
 use anodrel_crash::{CrashSite, CrashSurface};

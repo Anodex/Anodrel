@@ -11,6 +11,7 @@ use anodrel_application::ApplicationManifest;
 use anodrel_core::HostPolicy;
 use anodrel_diagnostics::{Event, LogBook};
 use anodrel_file_access::SelectionFileDialogMailbox;
+use anodrel_folder_access::FolderFileDialogMailbox;
 use anodrel_windows_bootstrap::{BootstrapCommand, launch};
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
@@ -59,6 +60,18 @@ pub fn run_ui_session_with_open_folder_dialog(
     client_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::OpenFolder)
+}
+
+/// Runs the UI session diagnostic through one captured folder snapshot.
+pub fn run_ui_session_with_selected_folder_entries(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::OpenFolderWithReference,
+    )
 }
 
 /// Runs the UI session diagnostic and asks its client for a selection-scoped
@@ -293,6 +306,8 @@ fn run_with_optional_session_view(
                 .with_file_dialogs(ui.file_dialog.clone())
                 .with_file_selections(SelectionFileDialogMailbox::new(ui.file_dialog.clone()))
                 .with_file_text(ui.file_text.clone())
+                .with_folder_selections(FolderFileDialogMailbox::new(ui.file_dialog.clone()))
+                .with_folder_entries(ui.folder_entries.clone())
                 .with_file_save_selections(anodrel_file_access::SaveFileDialogMailbox::new(
                     ui.file_dialog.clone(),
                 ))
@@ -331,6 +346,9 @@ fn run_with_optional_session_view(
             SampleDialogRequest::None => command,
             SampleDialogRequest::OpenFile => command.arg("--request-open-file")?,
             SampleDialogRequest::OpenFolder => command.arg("--request-open-folder")?,
+            SampleDialogRequest::OpenFolderWithReference => {
+                command.arg("--request-selected-folder-entries")?
+            }
             SampleDialogRequest::OpenFileWithReference => {
                 command.arg("--request-selected-file-text")?
             }
@@ -369,6 +387,7 @@ fn run_with_optional_session_view(
             ui.close,
             ui.file_dialog,
             ui.file_text,
+            ui.folder_entries,
             ui.notifications,
             ui.menu,
             ui.window_title,

@@ -350,12 +350,12 @@ path, child reference, content read, metadata, write, deletion, creation,
 rename, watch, initial folder, title, native dialog setting, callback, or
 native handle.
 
-The host must reject a selected reparse folder, retain the selected directory's
-native identity, and compare that identity with a protected enumeration handle
-before it emits a name. Any malformed, absent, expired, cross-session,
-consumed, identity-mismatched, or native failure returns only
-`folder.unavailable`; it exposes no path, handle, raw operating-system status,
-or partial result. See `docs/FOLDER_ACCESS.md` and Decision 0116.
+The host must reject a selected reparse folder and enumerate directly from the
+retained directory handle; it must not reopen a path before it emits a name.
+Any malformed, absent, expired, cross-session, consumed, or native failure
+returns only `folder.unavailable`; it exposes no path, handle, raw
+operating-system status, or partial result. See `docs/FOLDER_ACCESS.md` and
+Decision 0116.
 
 ## `external.open`
 

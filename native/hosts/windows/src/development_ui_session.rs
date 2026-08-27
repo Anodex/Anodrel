@@ -311,6 +311,7 @@ where
                 ui.close,
                 ui.file_dialog,
                 ui.file_text,
+                ui.folder_entries,
                 ui.notifications,
                 ui.menu,
                 ui.window_title,

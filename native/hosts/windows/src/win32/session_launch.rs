@@ -17,6 +17,7 @@ pub fn run_ui_session(
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
@@ -34,6 +35,7 @@ pub fn run_ui_session(
         close_signal,
         file_dialog_mailbox,
         file_text,
+        folder_entries,
         notifications,
         menu,
         window_title,
@@ -57,6 +59,7 @@ pub(crate) fn run_ui_session_after_shown<F>(
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
@@ -78,6 +81,7 @@ where
         close_signal,
         file_dialog_mailbox,
         file_text,
+        folder_entries,
         notifications,
         menu,
         window_title,
@@ -125,6 +129,7 @@ pub fn run_authenticated_ui_session(
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
@@ -142,6 +147,7 @@ pub fn run_authenticated_ui_session(
         close_signal,
         file_dialog_mailbox,
         file_text,
+        folder_entries,
         notifications,
         menu,
         window_title,
@@ -162,6 +168,7 @@ fn run_authenticated_ui_session_after_shown<F>(
     close_signal: SessionCloseSignal,
     file_dialog_mailbox: FileDialogMailbox,
     file_text: WindowsFileTextService,
+    folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
@@ -191,6 +198,7 @@ where
                     file_text,
                     notifications,
                 )
+                .with_folder_entries(folder_entries)
                 .with_menu(menu)
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)

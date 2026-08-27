@@ -28,14 +28,14 @@ complete flag.
 The reference is 128 bits of host randomness encoded as exactly 22 unpadded
 base64url characters. It is session-bound and distinct from selected-file and
 save references. The portable layer manages only grammar and lifetime; the
-operating-system adapter owns all folder handles, identity comparison, and
+operating-system adapter owns all folder handles, identity capture, and
 enumeration.
 
-On Windows, capture rejects a selected reparse point, retains a directory
-handle that prevents target replacement, rename, and deletion, and verifies a
-private enumeration handle against the captured identity before it reads names.
-An identity change, a reparse point, an unreadable item, or any native failure
-returns only `folder.unavailable`.
+On Windows, capture rejects a selected reparse point and retains a directory
+handle that prevents target replacement, rename, and deletion. Enumeration
+reads directly from that same handle; it never reopens a private path. A
+reparse point, an unreadable item, or any native failure returns only
+`folder.unavailable`.
 
 ## Consequences
 

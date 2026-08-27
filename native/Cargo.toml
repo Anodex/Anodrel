@@ -49,6 +49,7 @@ members = [
   "adapters/windows-network",
   "adapters/windows-file-dialog",
   "adapters/windows-file-access",
+  "adapters/windows-folder-access",
   "adapters/windows-accessibility",
   "adapters/windows-uia",
   "adapters/windows-uia-client",

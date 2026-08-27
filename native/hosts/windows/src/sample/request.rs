@@ -7,6 +7,7 @@ pub(super) enum SampleDialogRequest {
     None,
     OpenFile,
     OpenFolder,
+    OpenFolderWithReference,
     OpenFileWithReference,
     SaveFile,
     SaveFileWithReference,
@@ -59,8 +60,14 @@ pub(super) fn sample_capabilities(dialog_request: SampleDialogRequest) -> Vec<Ca
     if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
         capabilities.push(Capability::WindowFocus);
     }
-    if matches!(dialog_request, SampleDialogRequest::OpenFolder) {
+    if matches!(
+        dialog_request,
+        SampleDialogRequest::OpenFolder | SampleDialogRequest::OpenFolderWithReference
+    ) {
         capabilities.push(Capability::DialogOpenFolder);
+    }
+    if matches!(dialog_request, SampleDialogRequest::OpenFolderWithReference) {
+        capabilities.push(Capability::FolderReadEntries);
     }
     if matches!(
         dialog_request,
@@ -110,6 +117,16 @@ mod tests {
         assert!(!ordinary.contains(&Capability::DialogOpenFolder));
         assert!(folder.contains(&Capability::DialogOpenFolder));
         assert_eq!(folder.len(), ordinary.len() + 1);
+    }
+
+    #[test]
+    fn folder_entry_grant_is_limited_to_the_retained_folder_diagnostic() {
+        let ordinary = sample_capabilities(SampleDialogRequest::OpenFolder);
+        let retained = sample_capabilities(SampleDialogRequest::OpenFolderWithReference);
+
+        assert!(!ordinary.contains(&Capability::FolderReadEntries));
+        assert!(retained.contains(&Capability::FolderReadEntries));
+        assert_eq!(retained.len(), ordinary.len() + 1);
     }
 
     #[test]

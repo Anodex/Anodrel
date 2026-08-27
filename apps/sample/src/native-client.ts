@@ -133,6 +133,21 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-selected-folder-entries")) {
+      const selection = await client.openFolderDialogWithReference();
+      if (selection.status === "selected") {
+        const entries = await client.readSelectedFolderEntries(selection.folderReference);
+        if (entries.status !== "entries" || entries.entries.length > 32) {
+          return 36;
+        }
+        // Deliberately prints only the bounded snapshot count. A diagnostic
+        // never needs to echo a selected path, opaque reference, or child name.
+        console.log(`Anodrel read ${entries.entries.length} direct folder entries.`);
+      } else if (selection.status !== "cancelled") {
+        return 36;
+      }
+    }
+
     if (process.argv.includes("--request-save-file")) {
       const dialog = await client.saveFileDialog([
         { label: "Documents", extensions: ["txt", "json", "md"] },

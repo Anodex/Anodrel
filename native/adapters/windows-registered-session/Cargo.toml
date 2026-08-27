@@ -9,6 +9,7 @@ anodrel-application = { path = "../../crates/application" }
 anodrel-core = { path = "../../crates/core" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
+anodrel-folder-access = { path = "../../crates/folder-access" }
 anodrel-menu = { path = "../../crates/menu" }
 anodrel-notifications = { path = "../../crates/notifications" }
 anodrel-window = { path = "../../crates/window" }
@@ -22,6 +23,7 @@ anodrel-windows-credentials = { path = "../windows-credentials" }
 anodrel-windows-clipboard = { path = "../windows-clipboard" }
 anodrel-windows-external-links = { path = "../windows-external-links" }
 anodrel-windows-file-access = { path = "../windows-file-access" }
+anodrel-windows-folder-access = { path = "../windows-folder-access" }
 anodrel-windows-network = { path = "../windows-network" }
 
 [dev-dependencies]

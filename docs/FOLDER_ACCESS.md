@@ -1,8 +1,9 @@
 # Selection-scoped folder-entry access
 
 **Status:** The portable contract, Protocol 1.29, SDK/mock, installed-policy,
-and core service foundation are implemented. The direct Windows adapter and
-host route are not yet implemented.
+core service, direct Windows adapter, and UI-session host route are
+implemented. The final selected and cancelled desktop-picker outcomes remain
+manual verification work.
 
 ## Purpose
 
@@ -71,8 +72,8 @@ the protocol has no cursor, page, continuation, or retry that exposes more.
 The entry order is unspecified. A reference is consumed whether the snapshot
 is complete, incomplete, or unavailable.
 
-Unknown, expired, cross-session, malformed, already-consumed, identity-mismatch,
-or native failures all map only to `folder.unavailable`. A malformed payload
+Unknown, expired, cross-session, malformed, already-consumed, or native
+failures all map only to `folder.unavailable`. A malformed payload
 uses the existing `request.payload_invalid` code. No result, error, event, or
 diagnostic carries a native handle, canonical path, folder identity, child path,
 entry count beyond the bounded response, timestamps, sizes, attributes, or
@@ -81,17 +82,16 @@ Windows status.
 ## Host-owned native identity
 
 The UI thread may issue v2 only after its native adapter captures the exact
-folder that Windows confirmed. On Windows, the adapter will open that folder
-with direct APIs in directory mode, reject a selected reparse point, retain its
-directory identity and a handle that denies replacement, rename, and deletion,
-and create the reference only after all capture checks pass.
+folder that Windows confirmed. On Windows, the adapter opens that folder in
+directory mode, rejects a selected reparse point, retains a handle that denies
+replacement, rename, and deletion, and creates the reference only after all
+capture checks pass.
 
-The later worker consumes that retained state. If it must reopen a private path
-to enumerate, it must take a second protected directory handle and compare its
-native identity to the captured one before reading any names. A changed,
-missing, reparse, or mismatched target is unavailable rather than an
-enumeration of a replacement. The protocol and portable layers never see the
-handle, private path, or identity value.
+The later worker consumes that retained state and enumerates directly from the
+same directory handle. It never reopens a private path. A missing, reparse, or
+native failure is unavailable rather than an enumeration of a replacement. The
+protocol and portable layers never see the handle, private path, or identity
+value.
 
 At most 32 live folder references may exist in one session. Session shutdown
 closes every retained folder object and revokes every remaining reference.
@@ -108,11 +108,21 @@ creation, deletion, rename, drag-and-drop, folder watches, persistent grants,
 initial folder policy, multi-selection, non-Windows adapters, packaging, and
 production identity.
 
-## Planned verification
+## Verification
 
-Portable tests will prove reference, entry, bound, one-use, and cross-session
-rules. Windows tests will prove directory and reparse rejection, protected
-identity comparison, bounded enumeration, cleanup, and no path-based fallback.
-A development diagnostic will require selecting a folder, observing one direct
-snapshot, and cancelling a second run; neither action may create, edit, or
-retain a folder permission.
+Portable tests prove reference, entry, bound, one-use, and cross-session rules.
+Windows tests prove CNG reference generation, retained-handle enumeration, the
+32-entry bound, one-use consumption, and handle release after a consumed
+snapshot. The adapter uses `CreateFileW` directory mode with reparse-point
+opening, then enumerates that same handle through
+`GetFileInformationByHandleEx`; it has no path-based enumeration fallback.
+
+For the final desktop check, build the workspace and select a folder through:
+
+~~~text
+native\\target\\release\\anodrel-windows-host.exe --sample-ui-folder-entries-client <node.exe> apps\\sample\\dist\\native-client.js
+~~~
+
+The child reports only the bounded direct-entry count. Cancel a second run.
+Both outcomes must close the matching session without creating, editing, or
+retaining a folder permission.

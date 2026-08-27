@@ -62,8 +62,9 @@ and any native failure remain adapter-private.
   multiple selection.
 - Initial-directory, title, owner-window, native-flag, or current-location
   control or readback.
-- A folder reference, except for the separately specified future
-  `dialog.open_folder.v2` capture route in `docs/FOLDER_ACCESS.md`.
+- A folder reference from the display-only `dialog.open_folder` route. The
+  separately implemented `dialog.open_folder.v2` capture route is defined in
+  `docs/FOLDER_ACCESS.md` and remains distinct from this path-only operation.
 - A background UI route, callbacks, or non-Windows adapter.
 
 Any folder-access operation needs its own capability, retained-identity rules,

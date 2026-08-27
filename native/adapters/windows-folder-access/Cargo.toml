@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-windows-folder-access"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-file-dialog = { path = "../../crates/file-dialog" }
+anodrel-folder-access = { path = "../../crates/folder-access" }

@@ -49,6 +49,7 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
         ui.close_signal(),
         ui.file_dialog_mailbox(),
         ui.file_text_service(),
+        ui.folder_entry_service(),
         ui.notification_mailbox(),
         ui.menu_mailbox(),
         ui.window_title_mailbox(),
