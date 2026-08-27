@@ -10,6 +10,8 @@
 
 mod binary;
 mod binary_write;
+mod save_selection;
+mod text;
 
 use std::fmt;
 
@@ -25,6 +27,14 @@ pub use anodrel_file_dialog::{
 pub use binary::{FileBinaryData, FileBinaryDataError, MAX_FILE_BINARY_WRITE_BYTES};
 pub use binary_write::{
     FileBinaryWriteService, FileBinaryWriteServiceError, UnavailableFileBinaryWriteService,
+};
+pub use save_selection::{
+    SaveFileDialogMailbox, SaveSelection, SaveSelectionResult, SaveSelectionService,
+    SaveSelectionServiceError, UnavailableSaveSelectionService,
+};
+pub use text::{
+    FileTextService, FileTextServiceError, FileTextWriteService, FileTextWriteServiceError,
+    UnavailableFileTextService, UnavailableFileTextWriteService,
 };
 
 /// Maximum live file selections for one authenticated session.
@@ -250,46 +260,6 @@ pub enum FileSelectionResult {
     Cancelled,
 }
 
-/// One display-safe destination paired with its opaque retained-output reference.
-///
-/// Constructing this portable value does not open or create a file. A native
-/// adapter may construct it only after capturing the Windows output object for
-/// the supplied reference.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SaveSelection {
-    path: anodrel_file_dialog::SaveFilePath,
-    reference: SaveReference,
-}
-
-impl SaveSelection {
-    /// Pairs one selected display destination with its host-retained reference.
-    #[must_use]
-    pub fn new(path: anodrel_file_dialog::SaveFilePath, reference: SaveReference) -> Self {
-        Self { path, reference }
-    }
-
-    /// Returns the display-safe selected destination.
-    #[must_use]
-    pub fn path(&self) -> &anodrel_file_dialog::SaveFilePath {
-        &self.path
-    }
-
-    /// Returns the opaque reference valid only in this host session.
-    #[must_use]
-    pub fn reference(&self) -> &SaveReference {
-        &self.reference
-    }
-}
-
-/// The bounded result from an output-capturing host-owned save picker.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SaveSelectionResult {
-    /// The host captured one selected output object and its private identity.
-    Selected(SaveSelection),
-    /// The user cancelled the host-owned picker.
-    Cancelled,
-}
-
 /// Captures selected-file identity while completing one host-owned picker.
 ///
 /// Implementations must not derive a selection from a caller-supplied path or
@@ -331,47 +301,6 @@ impl FileSelectionService for UnavailableFileSelectionService {
     }
 }
 
-/// Captures output-file identity while completing one host-owned save picker.
-///
-/// Implementations must not derive a selection from a caller-supplied path or
-/// reopen a path from the legacy save picker. The Windows implementation must
-/// run this work through its host UI-thread boundary.
-pub trait SaveSelectionService: fmt::Debug + Send {
-    /// Opens one bounded save picker and captures its output object before success.
-    fn save_file(
-        &self,
-        filters: &[FileDialogFilter],
-    ) -> Result<SaveSelectionResult, SaveSelectionServiceError>;
-}
-
-/// A safe output-selection-capture service failure category.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SaveSelectionServiceError {
-    /// The host could not show the picker or retain its selected output object.
-    Unavailable,
-}
-
-impl fmt::Display for SaveSelectionServiceError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("selected output identity is unavailable")
-    }
-}
-
-impl std::error::Error for SaveSelectionServiceError {}
-
-/// A safe default service for hosts without selection-time output capture.
-#[derive(Debug, Default)]
-pub struct UnavailableSaveSelectionService;
-
-impl SaveSelectionService for UnavailableSaveSelectionService {
-    fn save_file(
-        &self,
-        _filters: &[FileDialogFilter],
-    ) -> Result<SaveSelectionResult, SaveSelectionServiceError> {
-        Err(SaveSelectionServiceError::Unavailable)
-    }
-}
-
 /// Adapts the shared UI-thread dialog mailbox to selection-time identity capture.
 ///
 /// This type uses the same one-request limit as ordinary open and save dialogs.
@@ -409,130 +338,6 @@ impl FileSelectionService for SelectionFileDialogMailbox {
             }
             Err(FileDialogServiceError::Unavailable) => Err(FileSelectionServiceError::Unavailable),
         }
-    }
-}
-
-/// Adapts the shared UI-thread dialog mailbox to selected-output capture.
-///
-/// This type shares the same one-request limit as ordinary open and save
-/// dialogs. The UI thread must complete its `SaveWithReference` request with a
-/// captured output object; a regular selected save path is rejected.
-#[derive(Clone, Debug)]
-pub struct SaveFileDialogMailbox {
-    dialogs: FileDialogMailbox,
-}
-
-impl SaveFileDialogMailbox {
-    /// Binds output capture to one supplied shared dialog mailbox.
-    #[must_use]
-    pub fn new(dialogs: FileDialogMailbox) -> Self {
-        Self { dialogs }
-    }
-}
-
-impl SaveSelectionService for SaveFileDialogMailbox {
-    fn save_file(
-        &self,
-        filters: &[FileDialogFilter],
-    ) -> Result<SaveSelectionResult, SaveSelectionServiceError> {
-        match self.dialogs.save_file_with_reference(filters) {
-            Ok(FileDialogSelection::CapturedSave(path, reference)) => Ok(
-                SaveSelectionResult::Selected(SaveSelection::new(path, reference)),
-            ),
-            Ok(FileDialogSelection::Cancelled) => Ok(SaveSelectionResult::Cancelled),
-            Ok(FileDialogSelection::Selected(_))
-            | Ok(FileDialogSelection::Saved(_))
-            | Ok(FileDialogSelection::Folder(_))
-            | Ok(FileDialogSelection::Captured(_, _))
-            | Ok(FileDialogSelection::CapturedFolder(_, _)) => {
-                Err(SaveSelectionServiceError::Unavailable)
-            }
-            Err(FileDialogServiceError::Unavailable) => Err(SaveSelectionServiceError::Unavailable),
-        }
-    }
-}
-
-/// Reads bounded UTF-8 text from one session-bound selected-file reference.
-///
-/// Implementations must never accept a path, native handle, or caller-selected
-/// filesystem scope. A missing reference is intentionally indistinguishable
-/// from an unavailable host selection at this portable boundary.
-pub trait FileTextService: fmt::Debug + Send {
-    /// Consumes the reference's retained file object and returns bounded text.
-    fn read_text(&self, reference: &SelectionReference) -> Result<String, FileTextServiceError>;
-}
-
-/// A safe selected-file text service failure category.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum FileTextServiceError {
-    /// The selected reference was absent, expired, or could not be read.
-    Unavailable,
-    /// The retained file exceeded the fixed reader limit.
-    TooLarge,
-    /// The retained file did not contain valid UTF-8 text.
-    InvalidText,
-}
-
-impl fmt::Display for FileTextServiceError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("selected file text is unavailable")
-    }
-}
-
-impl std::error::Error for FileTextServiceError {}
-
-/// A safe default service for hosts that do not expose selected-file reads.
-#[derive(Debug, Default)]
-pub struct UnavailableFileTextService;
-
-impl FileTextService for UnavailableFileTextService {
-    fn read_text(&self, _reference: &SelectionReference) -> Result<String, FileTextServiceError> {
-        Err(FileTextServiceError::Unavailable)
-    }
-}
-
-/// Writes bounded UTF-8 text through one session-bound selected-output reference.
-///
-/// Implementations must never accept a path, native handle, or caller-selected
-/// filesystem scope. A missing reference is intentionally indistinguishable
-/// from an unavailable host output selection at this portable boundary.
-pub trait FileTextWriteService: fmt::Debug + Send {
-    /// Consumes the reference's retained output object and writes bounded text.
-    fn write_text(
-        &self,
-        reference: &SaveReference,
-        text: &str,
-    ) -> Result<(), FileTextWriteServiceError>;
-}
-
-/// A safe selected-output text-write failure category.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum FileTextWriteServiceError {
-    /// The selected output reference was absent, expired, or could not be written.
-    Unavailable,
-    /// The supplied text exceeded the fixed writer limit.
-    TooLarge,
-}
-
-impl fmt::Display for FileTextWriteServiceError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("selected output text is unavailable")
-    }
-}
-
-impl std::error::Error for FileTextWriteServiceError {}
-
-/// A safe default service for hosts that do not expose selected-file writes.
-#[derive(Debug, Default)]
-pub struct UnavailableFileTextWriteService;
-
-impl FileTextWriteService for UnavailableFileTextWriteService {
-    fn write_text(
-        &self,
-        _reference: &SaveReference,
-        _text: &str,
-    ) -> Result<(), FileTextWriteServiceError> {
-        Err(FileTextWriteServiceError::Unavailable)
     }
 }
 

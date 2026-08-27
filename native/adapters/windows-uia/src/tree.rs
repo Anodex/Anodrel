@@ -4,10 +4,7 @@
 //! layer holds only pointers and reference counts, and every rule about what a
 //! client can see is testable without Windows.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Mutex,
-};
+use std::{collections::BTreeMap, sync::Mutex};
 
 use anodrel_ui::ElementId;
 use anodrel_windows_accessibility::{
@@ -15,7 +12,9 @@ use anodrel_windows_accessibility::{
 };
 
 use crate::raw::{CONTROL_TYPE_WINDOW, Variant};
-use crate::raw2::{UiaRect, direction};
+use crate::raw2::UiaRect;
+#[cfg(test)]
+use crate::raw2::direction;
 use crate::raw4::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID;
 use crate::raw5::{UIA_VALUE_IS_READ_ONLY_PROPERTY_ID, UIA_VALUE_VALUE_PROPERTY_ID};
 use crate::raw6::{
@@ -25,9 +24,15 @@ use crate::raw6::{
     UIA_SCROLL_VERTICALLY_SCROLLABLE_PROPERTY_ID,
 };
 use crate::{
-    UiAutomationActionSink, UiAutomationFocusSink, UiAutomationScrollCommand,
-    UiAutomationScrollSink, UiAutomationScrollSnapshot,
+    UiAutomationActionSink, UiAutomationFocusSink, UiAutomationScrollSink,
+    UiAutomationScrollSnapshot,
 };
+
+mod relationships;
+mod scrolling;
+
+use relationships::Relationships;
+use scrolling::ScrollCapability;
 
 /// The fixed automation identifier for an Anodrel surface's root.
 ///
@@ -47,92 +52,6 @@ pub struct Tree {
     action_sink: Option<UiAutomationActionSink>,
     focus_sink: Option<UiAutomationFocusSink>,
     scroll: Option<ScrollCapability>,
-}
-
-/// The one host-selected vertical viewport that this immutable tree may expose.
-#[derive(Debug)]
-struct ScrollCapability {
-    snapshot: UiAutomationScrollSnapshot,
-    items: BTreeSet<ElementId>,
-    sink: UiAutomationScrollSink,
-}
-
-/// Immutable direct relationships derived from one mapped semantic snapshot.
-///
-/// The portable model emits preorder data, so a valid parent is earlier than
-/// its child. Rejecting every other value keeps an accidentally malformed
-/// mapping bounded and acyclic; it becomes a top-level child rather than a
-/// relationship the provider cannot safely navigate.
-#[derive(Debug)]
-struct Relationships {
-    parents: Vec<Option<usize>>,
-    children: Vec<Vec<usize>>,
-    root_children: Vec<usize>,
-}
-
-impl Relationships {
-    fn from_elements(elements: &[AccessibleElement]) -> Self {
-        let mut relationships = Self {
-            parents: vec![None; elements.len()],
-            children: (0..elements.len()).map(|_| Vec::new()).collect(),
-            root_children: Vec::new(),
-        };
-
-        for (index, element) in elements.iter().enumerate() {
-            let parent = element
-                .parent_index()
-                .filter(|parent| *parent < index && *parent < elements.len());
-            relationships.parents[index] = parent;
-            match parent {
-                Some(parent) => relationships.children[parent].push(index),
-                None => relationships.root_children.push(index),
-            }
-        }
-        relationships
-    }
-
-    fn step(&self, element: Option<usize>, towards: i32) -> Option<Option<usize>> {
-        match element {
-            // The root's parent belongs to Windows, not to this provider.
-            None => match towards {
-                direction::PARENT => None,
-                direction::FIRST_CHILD => self.root_children.first().copied().map(Some),
-                direction::LAST_CHILD => self.root_children.last().copied().map(Some),
-                _ => None,
-            },
-            Some(index) => {
-                let parent = *self.parents.get(index)?;
-                match towards {
-                    direction::PARENT => Some(parent),
-                    direction::FIRST_CHILD => self.children[index].first().copied().map(Some),
-                    direction::LAST_CHILD => self.children[index].last().copied().map(Some),
-                    direction::NEXT_SIBLING => {
-                        let siblings = self.siblings(index, parent)?;
-                        let position = siblings.iter().position(|sibling| *sibling == index)?;
-                        siblings.get(position + 1).copied().map(Some)
-                    }
-                    direction::PREVIOUS_SIBLING => {
-                        let siblings = self.siblings(index, parent)?;
-                        let position = siblings.iter().position(|sibling| *sibling == index)?;
-                        position
-                            .checked_sub(1)
-                            .and_then(|position| siblings.get(position))
-                            .copied()
-                            .map(Some)
-                    }
-                    _ => None,
-                }
-            }
-        }
-    }
-
-    fn siblings(&self, index: usize, parent: Option<usize>) -> Option<&[usize]> {
-        self.parents.get(index)?;
-        match parent {
-            Some(parent) => self.children.get(parent).map(Vec::as_slice),
-            None => Some(&self.root_children),
-        }
-    }
 }
 
 impl Tree {
@@ -414,64 +333,6 @@ impl Tree {
         true
     }
 
-    /// Whether one published Group exposes the bounded vertical ScrollPattern.
-    #[must_use]
-    pub(crate) fn supports_scroll(&self, index: usize) -> bool {
-        self.scroll_snapshot(index).is_some()
-    }
-
-    /// Whether one published descendant exposes `ScrollItemPattern`.
-    ///
-    /// The selected viewport itself remains only a Scroll provider. Each
-    /// accepted child identity came from the host's nearest-scroll-ancestor
-    /// walk, so a provider cannot use this route to select another viewport.
-    #[must_use]
-    pub(crate) fn supports_scroll_item(&self, index: usize) -> bool {
-        self.scroll_item_target(index).is_some()
-    }
-
-    /// Returns the published immutable scroll values for one selected group.
-    #[must_use]
-    pub(crate) fn scroll_snapshot(&self, index: usize) -> Option<&UiAutomationScrollSnapshot> {
-        let capability = self.scroll.as_ref()?;
-        let element = self.elements.get(index)?;
-        (element.control_type() == control_type::GROUP
-            && element.automation_id() == capability.snapshot.target().as_str())
-        .then_some(&capability.snapshot)
-    }
-
-    /// Offers one closed vertical command to the selected host-owned viewport.
-    ///
-    /// `false` combines every generic refusal. The provider has no route to an
-    /// application, a pointer stream, another viewport, or a failure detail.
-    pub(crate) fn scroll(&self, index: usize, command: UiAutomationScrollCommand) -> bool {
-        let capability = match (self.scroll.as_ref(), self.scroll_snapshot(index)) {
-            (Some(capability), Some(_)) => capability,
-            _ => return false,
-        };
-        capability
-            .sink
-            .scroll(capability.snapshot.target().clone(), command)
-    }
-
-    /// Asks the selected viewport to reveal one of its bounded descendants.
-    ///
-    /// A fully clipped element may use this one route, but it cannot gain
-    /// focus, invocation, or a field-value read merely by appearing in the
-    /// immutable navigation tree.
-    pub(crate) fn scroll_into_view(&self, index: usize) -> bool {
-        let Some(target) = self.scroll_item_target(index) else {
-            return false;
-        };
-        let Some(capability) = &self.scroll else {
-            return false;
-        };
-        capability.sink.scroll(
-            capability.snapshot.target().clone(),
-            UiAutomationScrollCommand::ScrollIntoView { item: target },
-        )
-    }
-
     fn invocation_id(&self, index: usize) -> Option<ElementId> {
         let element = self.elements.get(index)?;
         (self.is_visible(index)
@@ -496,14 +357,6 @@ impl Tree {
                     .map(Vec::as_slice)
             })
             .flatten()
-    }
-
-    fn scroll_item_target(&self, index: usize) -> Option<ElementId> {
-        let capability = self.scroll.as_ref()?;
-        let element = self.elements.get(index)?;
-        let id = ElementId::new(element.automation_id()).ok()?;
-        (id.as_str() != capability.snapshot.target().as_str() && capability.items.contains(&id))
-            .then_some(id)
     }
 
     fn is_visible(&self, index: usize) -> bool {
