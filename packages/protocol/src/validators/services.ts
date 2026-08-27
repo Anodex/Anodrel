@@ -9,6 +9,7 @@ import {
   MAX_FILE_DIALOG_FILTERS,
   MAX_FILE_DIALOG_REQUEST_BYTES,
   MAX_FILE_TEXT_WRITE_BYTES,
+  FOLDER_REFERENCE_BYTES,
   MAX_NETWORK_FETCH_REQUEST_BYTES,
   MAX_STORAGE_SNAPSHOT_REQUEST_BYTES,
   SAVE_REFERENCE_BYTES,
@@ -63,6 +64,19 @@ export function isFolderDialogOpenPayload(
   value: unknown,
 ): value is PayloadFor<"dialog.open_folder"> {
   return isRecord(value) && Object.keys(value).length === 0;
+}
+
+/** Validates one exact opaque folder reference for a bounded entry snapshot. */
+export function isFolderEntriesReadPayload(
+  value: unknown,
+): value is PayloadFor<"folder.read_entries"> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value.folderReference === "string" &&
+    value.folderReference.length === FOLDER_REFERENCE_BYTES &&
+    /^[A-Za-z0-9_-]+$/.test(value.folderReference)
+  );
 }
 
 /** Validates one exact opaque selection reference for a bounded file text read. */

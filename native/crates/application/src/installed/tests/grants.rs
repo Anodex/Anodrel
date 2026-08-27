@@ -3,6 +3,7 @@
 use super::*;
 
 mod folder;
+mod folder_access;
 mod network;
 
 #[test]

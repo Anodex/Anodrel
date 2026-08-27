@@ -49,6 +49,11 @@ use anodrel_file_access::{
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
 };
+use anodrel_folder_access::{
+    FolderEntryService, FolderEntryServiceError, FolderReference, FolderSelectionResult,
+    FolderSelectionService, FolderSelectionServiceError, UnavailableFolderEntryService,
+    UnavailableFolderSelectionService,
+};
 use anodrel_menu::{
     Menu, MenuAction, MenuActionId, MenuModel, MenuService, MenuSession, MenuShortcut, MenuText,
     UnavailableMenuService,
@@ -205,6 +210,8 @@ pub struct CoreHost {
     menu: Box<dyn MenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
+    folder_selections: Box<dyn FolderSelectionService>,
+    folder_entries: Box<dyn FolderEntryService>,
     file_selections: Box<dyn FileSelectionService>,
     file_text: Box<dyn FileTextService>,
     file_save_selections: Box<dyn SaveSelectionService>,

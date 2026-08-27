@@ -297,6 +297,27 @@ export class PlatformClient {
     return this.request("dialog.open_folder", {});
   }
 
+  /**
+   * Opens one host-owned folder picker and returns a one-use entry reference.
+   *
+   * The returned path remains display data. Present the opaque reference only
+   * to {@link readSelectedFolderEntries}; it is not a path, handle, permission,
+   * or reusable grant.
+   */
+  openFolderDialogWithReference(): Promise<ResultFor<"dialog.open_folder.v2">> {
+    return this.request("dialog.open_folder.v2", {});
+  }
+
+  /**
+   * Returns one bounded direct-entry snapshot from a selected folder.
+   *
+   * This consumes the reference once. It has no recursive, pagination, child
+   * path, metadata, content-read, mutation, or watch option.
+   */
+  readSelectedFolderEntries(folderReference: string): Promise<ResultFor<"folder.read_entries">> {
+    return this.request("folder.read_entries", { folderReference });
+  }
+
   saveFileDialog(
     filters: readonly { readonly label: string; readonly extensions: readonly string[] }[],
   ): Promise<ResultFor<"dialog.save_file">> {

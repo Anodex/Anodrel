@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 pub use anodrel_json::JsonValue;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
-pub const PROTOCOL_MINOR: u16 = 28;
+pub const PROTOCOL_MINOR: u16 = 29;
 pub const MAX_REQUEST_ID_BYTES: usize = 256;
 pub const MAX_OPERATION_BYTES: usize = 128;
 pub const MAX_CANCELLATION_ID_BYTES: usize = 256;
@@ -61,6 +61,12 @@ pub enum Capability {
     /// The result is a display path only. It creates no retained folder
     /// permission, enumeration route, handle, or filesystem access surface.
     DialogOpenFolder,
+    /// Read one bounded direct-entry snapshot through a selected-folder reference.
+    ///
+    /// This grant cannot select a folder, name a path, recurse, retrieve child
+    /// contents or metadata, mutate the filesystem, or retain access after its
+    /// one-use reference is consumed. See `docs/FOLDER_ACCESS.md`.
+    FolderReadEntries,
     DialogSaveFile,
     FileReadText,
     FileWriteText,
@@ -146,6 +152,7 @@ impl Capability {
             Self::NetworkFetch => "network.fetch",
             Self::DialogOpenFile => "dialog.open_file",
             Self::DialogOpenFolder => "dialog.open_folder",
+            Self::FolderReadEntries => "folder.read_entries",
             Self::DialogSaveFile => "dialog.save_file",
             Self::FileReadText => "file.read_text",
             Self::FileWriteText => "file.write_text",
@@ -189,6 +196,8 @@ pub enum ProtocolErrorCode {
     /// status-and-UTF-8-text value.
     NetworkResponseInvalid,
     DialogUnavailable,
+    /// A selected folder reference was unavailable or unsafe to enumerate.
+    FolderUnavailable,
     FileUnavailable,
     FileTextInvalid,
     FileTextTooLarge,
@@ -248,6 +257,7 @@ impl ProtocolErrorCode {
             Self::NetworkUnavailable => "network.unavailable",
             Self::NetworkResponseInvalid => "network.response_invalid",
             Self::DialogUnavailable => "dialog.unavailable",
+            Self::FolderUnavailable => "folder.unavailable",
             Self::FileUnavailable => "file.unavailable",
             Self::FileTextInvalid => "file.text_invalid",
             Self::FileTextTooLarge => "file.text_too_large",

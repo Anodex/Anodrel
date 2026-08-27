@@ -20,6 +20,7 @@ export {
   isFileBinaryWritePayload,
   isFileBinaryWritePayloadShape,
   isFileDialogOpenPayload,
+  isFolderEntriesReadPayload,
   isFolderDialogOpenPayload,
   isFileTextReadPayload,
   isFileTextWritePayload,

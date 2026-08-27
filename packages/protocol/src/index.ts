@@ -29,6 +29,7 @@ export type Capability =
   | "network.fetch"
   | "dialog.open_file"
   | "dialog.open_folder"
+  | "folder.read_entries"
   | "dialog.save_file"
   | "file.read_text"
   | "file.write_text"
@@ -51,6 +52,15 @@ export type Capability =
   | "menu.write";
 
 export type EmptyPayload = Record<string, never>;
+
+/** Conservative classification for one direct selected-folder entry. */
+export type FolderEntryKind = "file" | "directory" | "other";
+
+/** One direct child exposed by a consumed selected-folder reference. */
+export interface FolderEntry {
+  readonly name: string;
+  readonly kind: FolderEntryKind;
+}
 
 /** The complete set of presentation states an application may request. */
 export type WindowState = "minimized" | "maximized" | "restored";
@@ -353,6 +363,22 @@ export interface PlatformOperationMap {
     readonly result:
       | { readonly status: "selected"; readonly path: string }
       | { readonly status: "cancelled" };
+  };
+  /** Selects one folder while retaining a one-use folder-entry reference. */
+  "dialog.open_folder.v2": {
+    readonly payload: EmptyPayload;
+    readonly result:
+      | { readonly status: "selected"; readonly path: string; readonly folderReference: string }
+      | { readonly status: "cancelled" };
+  };
+  /** Returns one bounded direct-entry snapshot through a one-use folder reference. */
+  "folder.read_entries": {
+    readonly payload: { readonly folderReference: string };
+    readonly result: {
+      readonly status: "entries";
+      readonly entries: readonly FolderEntry[];
+      readonly complete: boolean;
+    };
   };
   "dialog.save_file": {
     readonly payload: {

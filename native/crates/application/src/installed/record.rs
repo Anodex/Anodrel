@@ -39,6 +39,7 @@ pub(super) enum RecordVersion {
     V1_13,
     V1_14,
     V1_15,
+    V1_16,
 }
 
 impl RecordVersion {
@@ -223,6 +224,9 @@ fn capability_for_record_version(
         "network.fetch" if version.accepts(RecordVersion::V1_14) => Some(Capability::NetworkFetch),
         "dialog.open_folder" if version.accepts(RecordVersion::V1_15) => {
             Some(Capability::DialogOpenFolder)
+        }
+        "folder.read_entries" if version.accepts(RecordVersion::V1_16) => {
+            Some(Capability::FolderReadEntries)
         }
         _ => None,
     }

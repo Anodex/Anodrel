@@ -137,10 +137,14 @@ Status: **Direct Windows host in progress**
   exact-empty `dialog.open_folder` operation. Its SDK, mock host,
   installed-record 1.15 policy, one-request UI-thread bridge, first-party
   Common Item Dialog adapter, and manual development diagnostic are complete
-  (Decision 0115). It returns only cancellation or one absolute display path;
-  enumeration, folder access, a retained reference, initial-folder control,
-  filters, and non-Windows adapters remain separate gates. The final selected
-  and cancelled desktop outcomes remain manual checks.
+  (Decision 0115). It returns only cancellation or one absolute display path.
+  Protocol 1.29 separately adds the portable, SDK/mock, installed-policy, and
+  core foundation for a one-use retained folder reference with at most 32
+  direct entry names and safe kinds (Decision 0116). Its direct Windows
+  capture/enumeration adapter remains the next gate; recursion, child paths,
+  writes, watches, initial-folder control, filters, and non-Windows adapters
+  remain separate gates. The final selected and cancelled desktop outcomes
+  remain manual checks.
 - Draw first-party surfaces with a software renderer. **Completed:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and

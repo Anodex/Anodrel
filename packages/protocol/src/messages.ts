@@ -71,6 +71,7 @@ export type ProtocolErrorCode =
   | "network.unavailable"
   | "network.response_invalid"
   | "dialog.unavailable"
+  | "folder.unavailable"
   | "file.unavailable"
   | "file.text_invalid"
   | "file.text_too_large"

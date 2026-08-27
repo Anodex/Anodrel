@@ -87,6 +87,18 @@ or native-dialog option because those are host policy. A selected path is displa
 data only, never a retained folder permission or later filesystem authority.
 See `docs/FOLDER_DIALOGS.md`.
 
+### Selected-folder entries
+
+Protocol 1.29 adds `openFolderDialogWithReference()` and
+`readSelectedFolderEntries(folderReference)`. The first retains a selected
+folder under the existing `dialog.open_folder` grant and returns either
+cancellation or display path plus an opaque, one-use folder reference. The
+second needs the separate `folder.read_entries` grant and returns at most 32
+direct `name` and conservative `kind` values, plus a `complete` flag. It has
+no recursive flag, cursor, child path, content read, metadata, write, delete,
+creation, rename, or watch option. The SDK never constructs a folder reference
+or turns a display path into authority. See `docs/FOLDER_ACCESS.md`.
+
 ### Host-authorized HTTPS text fetch
 
 Protocol 1.19 adds `fetchHttpsText(url)`. It sends exactly the supplied

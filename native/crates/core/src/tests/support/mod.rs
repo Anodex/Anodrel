@@ -13,7 +13,7 @@ pub(super) use notifications::{
 pub(super) use requests::{
     request, request_v1_1, request_v1_2, request_v1_3, request_v1_4, request_v1_5, request_v1_6,
     request_v1_7, request_v1_8, request_v1_9, request_v1_10, request_v1_12, request_v1_13,
-    request_v1_15, request_v1_28,
+    request_v1_15, request_v1_28, request_v1_29,
 };
 
 pub(super) use std::cell::RefCell;

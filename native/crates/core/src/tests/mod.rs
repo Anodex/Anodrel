@@ -2,6 +2,7 @@
 
 mod core;
 mod file_access;
+mod folder_access;
 mod folder_dialog;
 mod integrations;
 mod menu;

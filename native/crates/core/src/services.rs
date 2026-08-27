@@ -26,6 +26,8 @@ pub struct HostServices {
     pub(super) menu: Box<dyn MenuService>,
     pub(super) ui_fields: Box<dyn UiFieldReader>,
     pub(super) file_dialogs: Box<dyn FileDialogService>,
+    pub(super) folder_selections: Box<dyn FolderSelectionService>,
+    pub(super) folder_entries: Box<dyn FolderEntryService>,
     pub(super) file_selections: Box<dyn FileSelectionService>,
     pub(super) file_text: Box<dyn FileTextService>,
     pub(super) file_save_selections: Box<dyn SaveSelectionService>,
@@ -213,6 +215,8 @@ impl HostServices {
             menu: Box::new(UnavailableMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
+            folder_selections: Box::new(UnavailableFolderSelectionService),
+            folder_entries: Box::new(UnavailableFolderEntryService),
             file_selections: Box::new(UnavailableFileSelectionService),
             file_text: Box::new(UnavailableFileTextService),
             file_save_selections: Box::new(UnavailableSaveSelectionService),
@@ -345,6 +349,23 @@ impl HostServices {
     #[must_use]
     pub fn with_file_dialogs(mut self, service: impl FileDialogService + 'static) -> Self {
         self.file_dialogs = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's retained folder-selection service.
+    #[must_use]
+    pub fn with_folder_selections(
+        mut self,
+        service: impl FolderSelectionService + 'static,
+    ) -> Self {
+        self.folder_selections = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's bounded selected-folder entry service.
+    #[must_use]
+    pub fn with_folder_entries(mut self, service: impl FolderEntryService + 'static) -> Self {
+        self.folder_entries = Box::new(service);
         self
     }
 

@@ -1,7 +1,8 @@
 # Selection-scoped folder-entry access
 
-**Status:** The portable contract and service foundation are implemented. The
-protocol operation, native adapter, and host route are not yet implemented.
+**Status:** The portable contract, Protocol 1.29, SDK/mock, installed-policy,
+and core service foundation are implemented. The direct Windows adapter and
+host route are not yet implemented.
 
 ## Purpose
 

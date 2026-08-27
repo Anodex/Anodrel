@@ -5,6 +5,7 @@ import {
   isExternalOpenPayload,
   isFileBinaryWritePayloadShape,
   isFileDialogOpenPayload,
+  isFolderEntriesReadPayload,
   isFolderDialogOpenPayload,
   isFileTextReadPayload,
   isFileTextWritePayload,
@@ -210,6 +211,60 @@ export function dispatchServiceOperation(
         );
       }
       return context.success("dialog.open_folder", request.requestId, { status: "cancelled" });
+
+    case "dialog.open_folder.v2":
+      if (request.protocolVersion.minor < 29) {
+        return context.failure(
+          request.requestId,
+          "operation.unsupported",
+          "dialog.open_folder.v2 requires protocol 1.29 or later.",
+        );
+      }
+      if (!isFolderDialogOpenPayload(request.payload)) {
+        return context.failure(
+          request.requestId,
+          "request.payload_invalid",
+          "dialog.open_folder.v2 does not accept a payload.",
+        );
+      }
+      if (!context.hasCapability(sessionId, "dialog.open_folder")) {
+        return context.failure(
+          request.requestId,
+          "capability.denied",
+          "dialog.open_folder.v2 requires the dialog.open_folder capability.",
+          { capability: "dialog.open_folder" },
+        );
+      }
+      return context.success("dialog.open_folder.v2", request.requestId, { status: "cancelled" });
+
+    case "folder.read_entries":
+      if (request.protocolVersion.minor < 29) {
+        return context.failure(
+          request.requestId,
+          "operation.unsupported",
+          "folder.read_entries requires protocol 1.29 or later.",
+        );
+      }
+      if (!isFolderEntriesReadPayload(request.payload)) {
+        return context.failure(
+          request.requestId,
+          "request.payload_invalid",
+          "folder.read_entries requires one exact folder reference.",
+        );
+      }
+      if (!context.hasCapability(sessionId, "folder.read_entries")) {
+        return context.failure(
+          request.requestId,
+          "capability.denied",
+          "folder.read_entries requires the folder.read_entries capability.",
+          { capability: "folder.read_entries" },
+        );
+      }
+      return context.failure(
+        request.requestId,
+        "folder.unavailable",
+        "selected folder is unavailable.",
+      );
 
     case "dialog.save_file":
       if (request.protocolVersion.minor < 8) {

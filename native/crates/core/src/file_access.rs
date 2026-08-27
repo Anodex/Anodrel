@@ -4,6 +4,7 @@
 //! session policy. Native adapters own file identity capture and I/O.
 
 mod folder;
+mod folder_access;
 
 use super::*;
 

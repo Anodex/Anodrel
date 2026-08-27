@@ -1,6 +1,6 @@
 /** Fixed limits and protocol-version values shared by Anodrel boundaries. */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 28 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 29 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -26,6 +26,8 @@ export const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES = 24 * 1024;
 export const SELECTION_REFERENCE_BYTES = 22;
 /** Exact characters in a host-created save reference. */
 export const SAVE_REFERENCE_BYTES = 22;
+/** Exact characters in a host-created selected-folder reference. */
+export const FOLDER_REFERENCE_BYTES = 22;
 /** Maximum UTF-8 bytes in an exact credential name (ASCII only). */
 export const MAX_CREDENTIAL_NAME_BYTES = 64;
 /** Maximum characters in the canonical hexadecimal representation of a secret. */

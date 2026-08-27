@@ -1,8 +1,8 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.28, including bounded semantic
+**Status:** Implemented through version 1.29, including bounded semantic
 live-status documents, exact scroll documents for session-owned secondary
-views, and one separately granted folder-selection request.
+views, folder selection, and one separately granted direct-entry snapshot.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -30,8 +30,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.28 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 28}`.
+the host's. Version 1.29 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 29}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -93,6 +93,8 @@ The implemented operations are:
 | `network.fetch_text` | `{ "url": string }` | bounded UTF-8 text plus HTTP status | `network.fetch` |
 | `dialog.open_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path or cancellation | `dialog.open_file` |
 | `dialog.open_folder` | `{}` | selected folder path or cancellation | `dialog.open_folder` |
+| `dialog.open_folder.v2` | `{}` | selected path plus folder reference, or cancellation | `dialog.open_folder` |
+| `folder.read_entries` | `{ "folderReference": string }` | bounded direct entry snapshot | `folder.read_entries` |
 | `dialog.save_file` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | save destination or cancellation | `dialog.save_file` |
 | `dialog.open_file.v2` | `{ "filters": [{ "label": string, "extensions": [string] }] }` | selected path plus selection reference, or cancellation | `dialog.open_file` |
 | `file.read_text` | `{ "selectionReference": string }` | bounded UTF-8 text | `file.read_text` |
@@ -148,6 +150,9 @@ errors, clipboard text, or external-link URLs. Protocol 1.6 adds
 `external.unavailable`.
 Protocol 1.7 adds `dialog.unavailable`.
 Protocol 1.28 reuses `dialog.unavailable` for an unavailable folder picker.
+Protocol 1.29 adds `folder.unavailable` for an absent, consumed, unsafe, or
+unavailable retained folder. Malformed folder-reference payloads reuse
+`request.payload_invalid`.
 Protocol 1.9 adds `file.unavailable`, `file.text_invalid`, and
 `file.text_too_large`.
 Protocol 1.17 reuses `file.unavailable` and `file.text_too_large` for the

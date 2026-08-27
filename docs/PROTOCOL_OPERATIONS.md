@@ -312,6 +312,51 @@ the safe `dialog.unavailable` category, without a path or native detail.
 
 See `docs/FOLDER_DIALOGS.md` and Decision 0115.
 
+## `dialog.open_folder.v2` and `folder.read_entries`
+
+Protocol 1.29 adds a separate retained-folder route. `dialog.open_folder.v2`
+requires the existing `dialog.open_folder` capability and accepts exactly
+`{}`. Its result is `{ "status": "cancelled" }` or
+`{ "status": "selected", "path": string, "folderReference": string }`.
+The path has the same display-only rules as `dialog.open_folder`. The reference
+is an opaque, exact 22-character unpadded base64url value derived by the host
+from 128 bits of cryptographic randomness only after it retains a selected
+non-reparse folder identity. It is session-bound, one-use, and distinct from
+both file-read and file-write references. A session has at most 32 live folder
+references, which are revoked when its host session closes.
+
+`folder.read_entries` requires the separate `folder.read_entries` capability
+and accepts exactly `{ "folderReference": string }`. It consumes a valid
+reference before enumerating and returns only:
+
+~~~json
+{
+  "status": "entries",
+  "entries": [
+    { "name": "notes.txt", "kind": "file" },
+    { "name": "assets", "kind": "directory" }
+  ],
+  "complete": true
+}
+~~~
+
+The response contains at most 32 direct entries. Every `name` is 1 through
+1,024 UTF-8 bytes, is never `.` or `..`, and contains no control character,
+`/`, or `\\`. `kind` is exactly `file`, `directory`, or `other`; a reparse
+point or an entry that cannot be safely classified is `other`. `complete` is
+false if more direct entries existed than fit in the response. Entry order is
+unspecified. There is no cursor, page, continuation, recursive flag, child
+path, child reference, content read, metadata, write, deletion, creation,
+rename, watch, initial folder, title, native dialog setting, callback, or
+native handle.
+
+The host must reject a selected reparse folder, retain the selected directory's
+native identity, and compare that identity with a protected enumeration handle
+before it emits a name. Any malformed, absent, expired, cross-session,
+consumed, identity-mismatched, or native failure returns only
+`folder.unavailable`; it exposes no path, handle, raw operating-system status,
+or partial result. See `docs/FOLDER_ACCESS.md` and Decision 0116.
+
 ## `external.open`
 
 Protocol 1.6 adds one external-link handoff operation. It requires the

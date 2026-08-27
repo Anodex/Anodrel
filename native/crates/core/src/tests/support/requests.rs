@@ -60,6 +60,10 @@ pub(crate) fn request_v1_28(operation: &str, payload: &str) -> String {
     request_at(28, operation, payload)
 }
 
+pub(crate) fn request_v1_29(operation: &str, payload: &str) -> String {
+    request_at(29, operation, payload)
+}
+
 fn request_at(minor: u16, operation: &str, payload: &str) -> String {
     format!(
         r#"{{"protocolVersion":{{"major":1,"minor":{minor}}},"kind":"request","requestId":"request-1","operation":"{operation}","payload":{payload}}}"#

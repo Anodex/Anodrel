@@ -49,6 +49,41 @@ test("SDK and host keep folder selection separately granted and payload-free", a
   );
 });
 
+test("selected-folder entries need a separate grant and one exact reference", async () => {
+  const selectionClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["dialog.open_folder"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  assert.deepEqual(await selectionClient.openFolderDialogWithReference(), { status: "cancelled" });
+
+  await assert.rejects(
+    () => selectionClient.readSelectedFolderEntries("AbCdEfGhIjKlMnOpQrStUv"),
+    (error: unknown) =>
+      error instanceof PlatformRemoteError &&
+      error.code === "capability.denied" &&
+      error.details?.capability === "folder.read_entries",
+  );
+
+  const entriesClient = new PlatformClient(
+    new MockHost({
+      applicationId: "test.application",
+      grantedCapabilities: ["folder.read_entries"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+  await assert.rejects(
+    () => entriesClient.readSelectedFolderEntries("AbCdEfGhIjKlMnOpQrStUv"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "folder.unavailable",
+  );
+  await assert.rejects(
+    () => entriesClient.readSelectedFolderEntries("C:/private"),
+    (error: unknown) => error instanceof PlatformRemoteError && error.code === "request.payload_invalid",
+  );
+});
+
 test("file dialog validates filters and its independent host grant", async () => {
   const denied = new PlatformClient(
     new MockHost({ applicationId: "test.application" }).createTransport(),
