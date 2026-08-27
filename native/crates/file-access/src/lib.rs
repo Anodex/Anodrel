@@ -403,7 +403,8 @@ impl FileSelectionService for SelectionFileDialogMailbox {
             Ok(FileDialogSelection::Selected(_))
             | Ok(FileDialogSelection::Saved(_))
             | Ok(FileDialogSelection::Folder(_))
-            | Ok(FileDialogSelection::CapturedSave(_, _)) => {
+            | Ok(FileDialogSelection::CapturedSave(_, _))
+            | Ok(FileDialogSelection::CapturedFolder(_, _)) => {
                 Err(FileSelectionServiceError::Unavailable)
             }
             Err(FileDialogServiceError::Unavailable) => Err(FileSelectionServiceError::Unavailable),
@@ -442,7 +443,8 @@ impl SaveSelectionService for SaveFileDialogMailbox {
             Ok(FileDialogSelection::Selected(_))
             | Ok(FileDialogSelection::Saved(_))
             | Ok(FileDialogSelection::Folder(_))
-            | Ok(FileDialogSelection::Captured(_, _)) => {
+            | Ok(FileDialogSelection::Captured(_, _))
+            | Ok(FileDialogSelection::CapturedFolder(_, _)) => {
                 Err(SaveSelectionServiceError::Unavailable)
             }
             Err(FileDialogServiceError::Unavailable) => Err(SaveSelectionServiceError::Unavailable),

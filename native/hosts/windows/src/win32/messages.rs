@@ -200,6 +200,9 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                             path.map_or(FileDialogSelection::Cancelled, FileDialogSelection::Folder)
                         })
                     }
+                    FileDialogRequestKind::OpenFolderWithReference => {
+                        Err(anodrel_windows_file_dialog::FileDialogError::Unavailable)
+                    }
                     FileDialogRequestKind::Open => {
                         anodrel_windows_file_dialog::open_file_with_owner(window, request.filters())
                             .map(|path| {

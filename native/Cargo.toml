@@ -28,6 +28,7 @@ members = [
   "crates/network",
   "crates/file-dialog",
   "crates/file-access",
+  "crates/folder-access",
   "adapters/windows-pipe",
   "adapters/windows-bootstrap",
   "adapters/windows-client",

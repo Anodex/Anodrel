@@ -9,11 +9,13 @@
 #![deny(missing_docs)]
 
 mod folder;
+mod folder_reference;
 mod mailbox;
 
 use std::{fmt, path::PathBuf};
 
 pub use folder::SelectedFolderPath;
+pub use folder_reference::{FolderReference, FolderReferenceError};
 pub use mailbox::{
     FileDialogMailbox, FileDialogRequest, FileDialogRequestKind, FileDialogSelection,
     FileDialogService, FileDialogServiceError,
@@ -27,6 +29,8 @@ pub const MAX_SELECTED_PATH_BYTES: usize = 32 * 1024;
 pub const SELECTION_REFERENCE_BYTES: usize = 22;
 /// Exact UTF-8 byte length of a Version 1 opaque save reference.
 pub const SAVE_REFERENCE_BYTES: usize = 22;
+/// Exact UTF-8 byte length of a Version 1 opaque folder reference.
+pub const FOLDER_REFERENCE_BYTES: usize = 22;
 
 /// One visible filter and its allowed filename extensions.
 #[derive(Clone, Debug, Eq, PartialEq)]

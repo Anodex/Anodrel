@@ -1,7 +1,7 @@
 # Selection-scoped folder-entry access
 
-**Status:** Specified. No portable service, protocol operation, native adapter,
-or host route is implemented yet.
+**Status:** The portable contract and service foundation are implemented. The
+protocol operation, native adapter, and host route are not yet implemented.
 
 ## Purpose
 

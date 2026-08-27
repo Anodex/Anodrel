@@ -48,7 +48,8 @@ impl CoreHost {
             Ok(FileDialogSelection::Saved(_))
             | Ok(FileDialogSelection::Folder(_))
             | Ok(FileDialogSelection::Captured(_, _))
-            | Ok(FileDialogSelection::CapturedSave(_, _)) => self.failure(
+            | Ok(FileDialogSelection::CapturedSave(_, _))
+            | Ok(FileDialogSelection::CapturedFolder(_, _)) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::DialogUnavailable,
                 "file dialog returned an incompatible result.",
@@ -104,6 +105,7 @@ impl CoreHost {
             | Ok(FileDialogSelection::Folder(_))
             | Ok(FileDialogSelection::Captured(_, _))
             | Ok(FileDialogSelection::CapturedSave(_, _))
+            | Ok(FileDialogSelection::CapturedFolder(_, _))
             | Err(FileDialogServiceError::Unavailable) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::DialogUnavailable,

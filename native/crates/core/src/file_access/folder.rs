@@ -36,6 +36,7 @@ impl CoreHost {
             | Ok(FileDialogSelection::Saved(_))
             | Ok(FileDialogSelection::Captured(_, _))
             | Ok(FileDialogSelection::CapturedSave(_, _))
+            | Ok(FileDialogSelection::CapturedFolder(_, _))
             | Err(FileDialogServiceError::Unavailable) => self.failure(
                 request.request_id,
                 ProtocolErrorCode::DialogUnavailable,

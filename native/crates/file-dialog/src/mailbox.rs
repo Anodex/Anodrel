@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    FileDialogFilter, SaveFilePath, SaveReference, SelectedFilePath, SelectedFolderPath,
-    SelectionReference,
+    FileDialogFilter, FolderReference, SaveFilePath, SaveReference, SelectedFilePath,
+    SelectedFolderPath, SelectionReference,
 };
 
 /// Maximum time a protocol worker may wait for its host UI thread to respond.
@@ -45,6 +45,11 @@ pub trait FileDialogService: fmt::Debug + Send {
         Err(FileDialogServiceError::Unavailable)
     }
 
+    /// Requests one folder selection that must carry a retained reference.
+    fn open_folder_with_reference(&self) -> Result<FileDialogSelection, FileDialogServiceError> {
+        Err(FileDialogServiceError::Unavailable)
+    }
+
     /// Requests one save destination that must carry a retained output reference.
     fn save_file_with_reference(
         &self,
@@ -67,6 +72,8 @@ pub enum FileDialogSelection {
     Captured(SelectedFilePath, SelectionReference),
     /// The UI thread captured one selected output object and its opaque reference.
     CapturedSave(SaveFilePath, SaveReference),
+    /// The UI thread captured one selected folder and its opaque reference.
+    CapturedFolder(SelectedFolderPath, FolderReference),
     /// The user dismissed the host-owned picker.
     Cancelled,
 }
@@ -80,6 +87,8 @@ pub enum FileDialogRequestKind {
     Save,
     /// Select one existing filesystem folder.
     OpenFolder,
+    /// Select one existing folder while retaining its native identity.
+    OpenFolderWithReference,
     /// Select one existing file while retaining its native identity.
     OpenWithReference,
     /// Select one save destination while retaining its native output object.
@@ -283,6 +292,10 @@ impl FileDialogService for FileDialogMailbox {
         self.request(FileDialogRequestKind::OpenFolder, &[])
     }
 
+    fn open_folder_with_reference(&self) -> Result<FileDialogSelection, FileDialogServiceError> {
+        self.request(FileDialogRequestKind::OpenFolderWithReference, &[])
+    }
+
     fn save_file_with_reference(
         &self,
         filters: &[FileDialogFilter],
@@ -310,6 +323,10 @@ fn selection_matches_kind(
                 | (
                     FileDialogRequestKind::OpenFolder,
                     Ok(FileDialogSelection::Folder(_))
+                )
+                | (
+                    FileDialogRequestKind::OpenFolderWithReference,
+                    Ok(FileDialogSelection::CapturedFolder(_, _))
                 )
                 | (
                     FileDialogRequestKind::OpenWithReference,
@@ -352,8 +369,7 @@ mod tests {
         FileDialogServiceError,
     };
     use crate::{
-        FileDialogFilter, SaveFilePath, SaveReference, SelectedFilePath, SelectedFolderPath,
-        SelectionReference,
+        FileDialogFilter, SaveFilePath, SelectedFilePath, SelectedFolderPath, SelectionReference,
     };
 
     fn filter() -> FileDialogFilter {
@@ -513,28 +529,8 @@ mod tests {
             Ok(FileDialogSelection::Folder(folder))
         );
     }
-
-    #[test]
-    fn captures_a_save_destination_only_for_the_save_reference_request_kind() {
-        let mailbox = FileDialogMailbox::new();
-        let worker = mailbox.clone();
-        let waiting = thread::spawn(move || worker.save_file_with_reference(&[filter()]));
-        let request = loop {
-            if let Some(request) = mailbox.take() {
-                break request;
-            }
-            thread::yield_now();
-        };
-        assert_eq!(request.kind(), FileDialogRequestKind::SaveWithReference);
-        let path = SaveFilePath::new(r"C:\\Users\\Owner\\note.txt").expect("path is valid");
-        let reference = SaveReference::new("AbCdEfGhIjKlMnOpQrStUv").expect("reference is valid");
-        assert!(mailbox.complete(
-            request.id(),
-            FileDialogSelection::CapturedSave(path.clone(), reference.clone()),
-        ));
-        assert_eq!(
-            waiting.join().expect("worker did not panic"),
-            Ok(FileDialogSelection::CapturedSave(path, reference))
-        );
-    }
 }
+
+#[cfg(test)]
+#[path = "mailbox_save_tests.rs"]
+mod save_tests;

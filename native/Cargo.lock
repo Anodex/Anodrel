@@ -95,6 +95,13 @@ name = "anodrel-file-dialog"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-folder-access"
+version = "0.1.0"
+dependencies = [
+ "anodrel-file-dialog",
+]
+
+[[package]]
 name = "anodrel-json"
 version = "0.1.0"
 
