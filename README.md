@@ -325,6 +325,8 @@ machine-selected origin policy for version 1.14 installed records.
 `docs/FOLDER_DIALOGS.md` defines the separate bounded folder-selection
 contract, its direct Windows Common Item Dialog adapter, and its remaining
 manual desktop check.
+`docs/FOLDER_ACCESS.md` specifies the separate planned, one-use retained-folder
+reference boundary for a bounded direct-entry snapshot; it is not implemented.
 `docs/FILE_ACCESS.md` defines the implemented selection-scoped file-access
 boundary.
 `docs/FILE_WRITE.md` defines the separately scoped retained-output-object

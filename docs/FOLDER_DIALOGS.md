@@ -62,14 +62,14 @@ and any native failure remain adapter-private.
   multiple selection.
 - Initial-directory, title, owner-window, native-flag, or current-location
   control or readback.
-- A folder reference that could survive this one response or authorize later
-  filesystem work.
+- A folder reference, except for the separately specified future
+  `dialog.open_folder.v2` capture route in `docs/FOLDER_ACCESS.md`.
 - A background UI route, callbacks, or non-Windows adapter.
 
 Any folder-access operation needs its own capability, retained-identity rules,
 threat model, and decision. The existing selected-file and selected-output
 boundaries remain unchanged; see `docs/FILE_DIALOGS.md`,
-`docs/FILE_ACCESS.md`, and `docs/FILE_WRITE.md`.
+`docs/FILE_ACCESS.md`, `docs/FOLDER_ACCESS.md`, and `docs/FILE_WRITE.md`.
 
 ## Verification
 

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0116: Folder-entry access uses one retained folder identity.
+
 - 0115: Folder selection is a separate user-mediated capability.
 
 - 0114: Windows UI Automation structure-event probe separates setup from replacement.

@@ -74,9 +74,11 @@ The native text reader is currently limited to **32 KiB** of bytes, requires
 strict UTF-8, and reads only the retained regular-file handle. Public Protocol
 1.9 exposure will apply its stricter 8 KiB response bound. A selection reference
 is single-use and the portable store
-holds at most 32 live references per session. Binary reads, directories,
-multiple selection, persistent grants, bookmarks, drag-and-drop, and
-cross-session sharing remain deferred. Text and bounded binary writes have
+holds at most 32 live references per session. Binary reads, multiple selection,
+persistent grants, bookmarks, drag-and-drop, and cross-session sharing remain
+deferred. `docs/FOLDER_ACCESS.md` separately specifies a planned one-use
+folder-reference route for a bounded direct-entry snapshot; it does not reuse a
+file selection reference or grant file reading. Text and bounded binary writes have
 their own retained-output-object contracts rather than extending a read-side
 selection reference; see `docs/FILE_WRITE.md`, `docs/FILE_BINARY_WRITE.md`,
 and Decisions 0079 and 0087.
