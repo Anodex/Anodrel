@@ -18,8 +18,20 @@ use anodrel_menu::MenuRequest;
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_folder_access::WindowsFolderEntryService;
 
+mod accessibility;
+mod session;
 mod window_commands;
 
+pub(super) use accessibility::{
+    accessibility_snapshot, service_accessibility_focus, service_accessibility_scroll,
+};
+pub(super) use session::{
+    attach_menu, complete_field_read, complete_file_dialog_request, complete_menu_request,
+    complete_notification_request, file_text_service, folder_entry_service, offer_menu_command,
+    offer_menu_shortcut, poll_ui_session, register_ui_session_window, take_field_read,
+    take_file_dialog_request, take_menu_request, take_notification_request,
+    take_secondary_close_windows, take_secondary_open_request,
+};
 pub(super) use window_commands::{
     complete_window_focus_request, complete_window_fullscreen_request,
     complete_window_size_request, complete_window_state_request, complete_window_title_request,
@@ -127,235 +139,6 @@ pub(super) fn with_ui_lab<R>(
     }
 }
 
-/// Polls one session view's explicitly supplied mailbox on the UI thread.
-pub(super) fn poll_ui_session(window: Hwnd) -> io::Result<Option<UiSessionPoll>> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.poll())),
-        _ => Ok(None),
-    }
-}
-
-/// Registers a group-owned session view against the just-created native window.
-///
-/// The caller performs this before it shows the window. A legacy diagnostic
-/// session returns `Some(false)`: it deliberately has no logical group mapping
-/// to register.
-pub(super) fn register_ui_session_window(window: Hwnd) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.register_native_window(window))),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one group-owned secondary-view creation handoff on the UI thread.
-///
-/// Any member may receive the timer message, but the portable group makes the
-/// handoff take-once. The request retains neither a native handle nor an
-/// application-visible mapping.
-pub(super) fn take_secondary_open_request(
-    window: Hwnd,
-) -> io::Result<Option<super::session_window_group::SessionWindowOpenRequest>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_secondary_open_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Takes host-private native secondary windows requested for close by this
-/// session group. The caller must invoke `DestroyWindow` only after this
-/// registry lock has been released.
-pub(super) fn take_secondary_close_windows(window: Hwnd) -> io::Result<Vec<Hwnd>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_secondary_close_windows()),
-        _ => Ok(Vec::new()),
-    }
-}
-
-/// Takes one pending modal dialog request only from its associated UI session.
-pub(super) fn take_file_dialog_request(window: Hwnd) -> io::Result<Option<FileDialogRequest>> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_file_dialog_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one request from its owning native UI session.
-pub(super) fn complete_file_dialog_request(
-    window: Hwnd,
-    request_id: u64,
-    selection: Result<FileDialogSelection, anodrel_windows_file_dialog::FileDialogError>,
-) -> io::Result<Option<bool>> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => Ok(Some(
-            session.complete_file_dialog_request(request_id, selection),
-        )),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending notification only from its associated UI session.
-///
-/// The session's existing entry comes back with it so the Shell32 call can run
-/// outside this lock.
-pub(super) fn take_notification_request(
-    window: Hwnd,
-) -> io::Result<
-    Option<(
-        anodrel_notifications::NotificationRequest,
-        Option<std::sync::Arc<anodrel_windows_notifications::WindowsNotifications>>,
-    )>,
-> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_notification_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one notification from its owning native UI session, recording the
-/// entry when this was the session's first.
-pub(super) fn complete_notification_request(
-    window: Hwnd,
-    request_id: u64,
-    shown: bool,
-    entry: Option<std::sync::Arc<anodrel_windows_notifications::WindowsNotifications>>,
-) -> io::Result<Option<bool>> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => {
-            if let Some(entry) = entry {
-                session.set_notification_entry(entry);
-            }
-            Ok(Some(
-                session.complete_notification_request(request_id, shown),
-            ))
-        }
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending menu replacement only from its associated UI session.
-///
-/// The resulting model has no native object yet, so User32 construction can
-/// occur before the view registry is locked again to attach it.
-pub(super) fn take_menu_request(window: Hwnd) -> io::Result<Option<MenuRequest>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_menu_request()),
-        _ => Ok(None),
-    }
-}
-
-/// Attaches one constructed native menu only to its associated UI session.
-pub(super) fn attach_menu(window: Hwnd, menu: UnattachedMenu) -> io::Result<Option<bool>> {
-    let mut views = lock_views()?;
-    match views.get_mut(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.attach_menu(window, menu))),
-        _ => Ok(None),
-    }
-}
-
-/// Completes one menu replacement only through its associated UI session.
-pub(super) fn complete_menu_request(
-    window: Hwnd,
-    request_id: u64,
-    applied: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => {
-            Ok(Some(session.complete_menu_request(request_id, applied)))
-        }
-        _ => Ok(None),
-    }
-}
-
-/// Offers one current private native-menu command to its shared session queue.
-///
-/// A non-menu `WM_COMMAND`, an accelerator, a control notification, or an
-/// unknown/stale numeric ID all answer `false` and retain default processing.
-pub(super) fn offer_menu_command(
-    window: Hwnd,
-    wparam: usize,
-    lparam: isize,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.offer_menu_command(wparam, lparam))),
-        _ => Ok(None),
-    }
-}
-
-/// Offers one current local menu shortcut to its shared session queue.
-///
-/// The caller has already limited this to one first `WM_KEYDOWN` and copied the
-/// current modifier state. No keyboard value crosses the registry boundary.
-pub(super) fn offer_menu_shortcut(
-    window: Hwnd,
-    key: usize,
-    control_down: bool,
-    shift_down: bool,
-    alt_down: bool,
-) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.offer_menu_shortcut(
-            key,
-            control_down,
-            shift_down,
-            alt_down,
-        ))),
-        _ => Ok(None),
-    }
-}
-
-/// Takes one pending field read only from its associated UI session.
-pub(super) fn take_field_read(window: Hwnd) -> io::Result<Option<u64>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.take_field_read()),
-        _ => Ok(None),
-    }
-}
-
-/// Answers one field read from its owning native UI session.
-///
-/// The snapshot is built while this lock is held, unlike the notification and
-/// title calls that are deliberately released first. It is a copy of a handful
-/// of short strings with no operating-system call in it, so there is nothing
-/// here that a slow system could block every other window behind.
-pub(super) fn complete_field_read(window: Hwnd, request_id: u64) -> io::Result<Option<bool>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.complete_field_read(request_id))),
-        _ => Ok(None),
-    }
-}
-
-/// Returns the session-local file registry for the UI thread's capture flow.
-pub(super) fn file_text_service(window: Hwnd) -> io::Result<Option<WindowsFileTextService>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(Some(session.file_text_service())),
-        _ => Ok(None),
-    }
-}
-
-/// Returns the session-local folder registry for the UI thread's capture flow.
-pub(super) fn folder_entry_service(window: Hwnd) -> io::Result<Option<WindowsFolderEntryService>> {
-    let views = lock_views()?;
-    match views.get(&window) {
-        Some(View::UiSession(session)) => Ok(session.folder_entry_service()),
-        _ => Ok(None),
-    }
-}
-
 /// Mutates only the explicitly associated native UI session view.
 pub(super) fn with_ui_session<R>(
     window: Hwnd,
@@ -366,79 +149,6 @@ pub(super) fn with_ui_session<R>(
         Some(View::UiSession(session)) => Ok(Some(change(session))),
         _ => Ok(None),
     }
-}
-
-/// Derives accessibility semantics for whichever view a window carries.
-///
-/// Only the two views that render a UI document have semantics to publish. A
-/// document or Startup Lab window reports none, so assistive technology sees
-/// the window itself and nothing inside it.
-pub(super) fn accessibility_snapshot(
-    window: Hwnd,
-    width: f32,
-    height: f32,
-) -> io::Result<Option<AccessibilityPublication>> {
-    let views = lock_views()?;
-    Ok(match views.get(&window) {
-        // A UI Lab is host-owned diagnostic state. Its local action tiles have
-        // no authenticated-session mailbox, so they are readable but
-        // intentionally expose no UI Automation Invoke pattern.
-        Some(View::UiLab(lab)) => Some(AccessibilityPublication {
-            snapshot: lab.accessibility_snapshot(width, height),
-            action_sink: None,
-            focus_route: Some(lab.accessibility_focus_route(None)),
-            scroll_snapshot: lab.accessibility_scroll_snapshot(width, height),
-            scroll_items: lab.accessibility_scroll_items(width, height),
-            scroll_route: Some(lab.accessibility_scroll_route(None)),
-            focused: lab.accessibility_focus(),
-            field_values: lab.accessibility_field_values(),
-        }),
-        Some(View::UiSession(session)) => Some(AccessibilityPublication {
-            snapshot: session.lab().accessibility_snapshot(width, height),
-            action_sink: session.accessibility_action_sink(),
-            focus_route: Some(session.accessibility_focus_route()),
-            scroll_snapshot: session.lab().accessibility_scroll_snapshot(width, height),
-            scroll_items: session.lab().accessibility_scroll_items(width, height),
-            scroll_route: Some(session.accessibility_scroll_route()),
-            focused: session.lab().accessibility_focus(),
-            field_values: session.lab().accessibility_field_values(),
-        }),
-        _ => None,
-    })
-}
-
-/// Takes and revalidates a private UI Automation focus request on one view.
-///
-/// It is intentionally not a generic focus API: the only caller is the
-/// host's payload-free UIA wake message, and it cannot choose a view or target.
-pub(super) fn service_accessibility_focus(
-    window: Hwnd,
-    width: f32,
-    height: f32,
-) -> io::Result<Option<AccessibilityFocusResult>> {
-    let mut views = lock_views()?;
-    Ok(match views.get_mut(&window) {
-        Some(View::UiLab(lab)) => lab.service_accessibility_focus(None, width, height),
-        Some(View::UiSession(session)) => session.service_accessibility_focus(width, height),
-        _ => None,
-    })
-}
-
-/// Takes and revalidates a private UI Automation scroll request on one view.
-///
-/// The caller is the host's payload-free UIA wake message. Its target and
-/// command came from the one active host-owned route, not from a window message.
-pub(super) fn service_accessibility_scroll(
-    window: Hwnd,
-    width: f32,
-    height: f32,
-) -> io::Result<Option<AccessibilityScrollResult>> {
-    let mut views = lock_views()?;
-    Ok(match views.get_mut(&window) {
-        Some(View::UiLab(lab)) => lab.service_accessibility_scroll(None, width, height),
-        Some(View::UiSession(session)) => session.service_accessibility_scroll(width, height),
-        _ => None,
-    })
 }
 
 /// Removes a window and returns the number of host windows that remain.
