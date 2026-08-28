@@ -117,8 +117,13 @@ fn parse_record(buffer: &[u8], offset: usize) -> io::Result<DirectoryRecord> {
         .checked_add(name_length)
         .filter(|end| *end <= record_end && *end <= buffer.len() && *end >= header_end)
         .ok_or_else(|| io::Error::other("Windows directory name was truncated"))?;
-    let units = buffer[name_start..name_end]
-        .chunks_exact(2)
+    let (name_units, remainder) = buffer[name_start..name_end].as_chunks::<2>();
+    debug_assert!(
+        remainder.is_empty(),
+        "the checked UTF-16 byte length is even"
+    );
+    let units = name_units
+        .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect::<Vec<_>>();
     let name = String::from_utf16(&units)

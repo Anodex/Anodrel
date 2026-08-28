@@ -47,8 +47,13 @@ impl Image {
         if bytes.len() != expected {
             return None;
         }
-        let pixels = bytes
-            .chunks_exact(4)
+        let (pixel_bytes, remainder) = bytes.as_chunks::<4>();
+        debug_assert!(
+            remainder.is_empty(),
+            "the checked image length is divisible by four"
+        );
+        let pixels = pixel_bytes
+            .iter()
             .map(|pixel| Color::rgba(pixel[2], pixel[1], pixel[0], pixel[3]))
             .collect();
         Self::from_pixels(width, height, pixels)

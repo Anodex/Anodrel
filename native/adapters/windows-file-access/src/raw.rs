@@ -141,7 +141,12 @@ pub(super) fn new_reference_value() -> io::Result<String> {
 fn base64url_128(bytes: &[u8; 16]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut encoded = String::with_capacity(22);
-    for chunk in bytes[..15].chunks_exact(3) {
+    let (chunks, remainder) = bytes[..15].as_chunks::<3>();
+    debug_assert!(
+        remainder.is_empty(),
+        "the fixed prefix is divisible by three"
+    );
+    for chunk in chunks {
         encoded.push(ALPHABET[(chunk[0] >> 2) as usize] as char);
         encoded.push(ALPHABET[((chunk[0] & 0b0000_0011) << 4 | chunk[1] >> 4) as usize] as char);
         encoded.push(ALPHABET[((chunk[1] & 0b0000_1111) << 2 | chunk[2] >> 6) as usize] as char);
