@@ -26,8 +26,8 @@ application, another session, or a host diagnostic window.
 
 ## Boundary
 
-This is a write-only presentation request, not a window-inspection or
-management API. It does **not** let an application:
+This Protocol 1.16 capability is a write-only presentation request, not a
+window-inspection or management API. It does **not** let an application:
 
 - create, close, enumerate, identify, read, move, resize, focus, hide, show,
   or inject into a window;
@@ -96,10 +96,14 @@ other host window may change. `docs/DEVELOPMENT_DIAGNOSTICS.md` gives the exact 
 
 ## Compatibility
 
-This capability is complete as specified. Reading state, setting bounds,
-foregrounding, creating another window, targeting a window, and lifecycle
-events are each separate capabilities with their own protocol version, grant,
-decision, and threat-model entry. The separate `window.focus.request` contract
-now covers only an authenticated session asking Windows to foreground its own
-window; it does not expand this state command. The private multi-window host foundation in
-`docs/WINDOW_LIFECYCLE.md` remains private; this contract does not expose it.
+This capability is complete as specified. Protocol 1.30 separately specifies a
+pull-only read of the same closed state under a distinct `window.state.read`
+grant; it does not change this command's payload or acceptance-only response.
+See `docs/WINDOW_STATE_OBSERVATION.md` and Decision 0117. State-change events,
+setting bounds, foregrounding, creating another window, targeting a window,
+and lifecycle events are each separate capabilities with their own protocol
+version, grant, decision, and threat-model entry. The separate
+`window.focus.request` contract now covers only an authenticated session asking
+Windows to foreground its own window; it does not expand this state command.
+The private multi-window host foundation in `docs/WINDOW_LIFECYCLE.md` remains
+private; this contract does not expose it.

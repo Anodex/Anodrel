@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0117: Session window state observation stays pull-only.
+
 - 0116: Folder-entry access uses one retained folder identity.
 
 - 0115: Folder selection is a separate user-mediated capability.

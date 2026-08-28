@@ -452,6 +452,9 @@ state, input, accessibility behavior, and mappings remain host-owned.
 native window-controls template. Its generator and fixed eight-grant Windows
 route demonstrate every existing targetless session-window control without
 broadening any earlier template's authority or exposing native readback.
+`docs/WINDOW_STATE_OBSERVATION.md` specifies the separate pull-only
+session-window state read planned for Protocol 1.30. `docs/ANODEX_ADAPTER.md`
+records the first Anodex migration boundary and its deliberate limits.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

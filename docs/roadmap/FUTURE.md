@@ -2,9 +2,13 @@
 
 ## Phase 4 — Anodex adapter
 
-Status: **Planned**
+Status: **First migration boundary specified; implementation planned**
 
 - Connect Anodex through the public Anodrel interfaces.
+- **First boundary specified:** Anodex's title bar needs a session-owned
+  maximise-state snapshot. Decision 0117 defines the separate pull-only
+  `window.state.read` capability before an adapter is written; it does not
+  claim that Anodex's React runtime can run on Anodrel.
 - Keep Anodex's existing Electron adapter working during migration.
 - Move platform-specific operations behind the new adapter.
 - Compare behavior and performance between the old and new hosts.
