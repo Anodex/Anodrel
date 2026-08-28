@@ -1,0 +1,54 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    name: TypeScript SDK and contracts
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Type-check the workspace
+        run: npm run check
+      - name: Run SDK and contract tests
+        run: npm test
+
+  native:
+    name: Native Windows host and documentation
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check native formatting
+        run: cargo fmt --manifest-path native/Cargo.toml --all --check
+      - name: Lint native workspace
+        run: cargo clippy --manifest-path native/Cargo.toml --workspace --all-targets -- -D warnings
+      - name: Run native workspace tests
+        run: cargo test --manifest-path native/Cargo.toml --workspace
+      - name: Enforce maintained-source size limit
+        shell: powershell
+        run: ./scripts/check-source-size.ps1
+      - name: Verify documentation links
+        shell: powershell
+        run: ./scripts/check-documentation-links.ps1

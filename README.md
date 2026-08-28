@@ -286,6 +286,8 @@ Anodrel/
 - docs/ARCHITECTURE.md — system boundaries and data flow.
 - docs/ARCHITECTURE_FOUNDATIONS.md — cross-cutting architecture rules.
 - docs/DEVELOPMENT.md — local workflow and verification.
+- docs/CONTINUOUS_INTEGRATION.md — automated repository verification and its
+  deliberate limits.
 - docs/DEVELOPMENT_DIAGNOSTICS.md — native diagnostics and product-fixture checks.
 - docs/PROTOCOL.md — boundary, compatibility, responses, and security rules.
 - docs/PROTOCOL_OPERATIONS.md — request-specific payload and operation rules.
