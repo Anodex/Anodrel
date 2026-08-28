@@ -1,0 +1,10 @@
+{
+  "manifestVersion": { "major": 1, "minor": 0 },
+  "applicationId": "org.anodrel.compass",
+  "displayName": "Anodrel Compass",
+  "content": {
+    "format": "anodrel.text.v1",
+    "path": "content/main.txt",
+    "sha256": "b2899d426fe684d50b56932380c20998cf0ad025a1ef91d2b6d77dfa925a62b5"
+  }
+}

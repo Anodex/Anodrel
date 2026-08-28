@@ -1,10 +1,11 @@
-//! Validates the sample package this repository actually ships.
+//! Validates the application packages this repository actually ships.
 //!
 //! The unit tests in this crate build their own fixtures, which proves the
-//! validator works but says nothing about `apps/sample`. That gap let a commit
-//! reword the sample's content without updating its manifest digest: every test
-//! passed, and `start.bat` failed with `ContentDigestMismatch` because the
-//! Startup Lab validates the real package before opening a window.
+//! validator works but says nothing about the packages under `apps/`. That gap
+//! let a commit reword the sample's content without updating its manifest
+//! digest: every test passed, and `start.bat` failed with
+//! `ContentDigestMismatch` because the Startup Lab validates the real package
+//! before opening a window.
 //!
 //! These tests close it. The manifest and its content are a matched pair, and
 //! anything that edits one without the other fails here rather than at launch.
@@ -24,6 +25,10 @@ fn repository_root() -> PathBuf {
 
 fn sample_manifest() -> PathBuf {
     repository_root().join("apps/sample/anodrel.application.json")
+}
+
+fn compass_manifest() -> PathBuf {
+    repository_root().join("apps/compass/anodrel.application.json")
 }
 
 #[test]
@@ -79,5 +84,22 @@ fn the_shipped_manifest_digest_matches_its_content() {
             .chars()
             .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase()),
         "the digest must be lower-case hexadecimal"
+    );
+}
+
+#[test]
+fn the_shipped_compass_package_passes_every_check() {
+    // Compass is a distinct desktop sample, so it must remain independently
+    // valid rather than relying on the startup package's identity or digest.
+    let package = ApplicationPackage::load(compass_manifest())
+        .expect("the shipped Compass package must validate");
+
+    assert_eq!(package.identity().application_id(), "org.anodrel.compass");
+    assert_eq!(package.identity().display_name(), "Anodrel Compass");
+    assert_eq!(package.content().format(), TEXT_CONTENT_FORMAT);
+    assert_eq!(package.content().path(), "content/main.txt");
+    assert!(
+        !package.text().is_empty(),
+        "the Compass surface would render blank"
     );
 }

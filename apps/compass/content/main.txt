@@ -1,0 +1,3 @@
+A second independent Anodrel desktop package.
+It proves the verified package boundary supports another application identity.
+It imports no Anodex code or browser runtime.

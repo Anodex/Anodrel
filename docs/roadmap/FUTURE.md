@@ -15,9 +15,12 @@ from its core application logic.
 
 ## Phase 5 — Additional applications and platforms
 
-Status: **Planned**
+Status: **Second-sample foundation implemented; platform expansion planned**
 
-- Add a second sample application.
+- Add a second sample application. **Completed for the current static package
+  boundary:** `apps/compass` carries a distinct application identity and its
+  own digest-verified text surface, validated in the shipped-package test. It
+  adds no executable runtime, capability, native bridge, or Anodex dependency.
 - Add macOS and Linux host adapters as resources allow.
 - Stabilize the protocol and publish SDK documentation.
 - Define a long-term release and support policy.
