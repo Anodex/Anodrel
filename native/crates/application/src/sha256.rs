@@ -108,7 +108,9 @@ pub fn parse_lower_hex(input: &str) -> Option<[u8; 32]> {
     }
 
     let mut output = [0_u8; 32];
-    for (index, pair) in input.as_bytes().chunks_exact(2).enumerate() {
+    let (pairs, remainder) = input.as_bytes().as_chunks::<2>();
+    debug_assert!(remainder.is_empty(), "the checked input length is even");
+    for (index, pair) in pairs.iter().enumerate() {
         output[index] = (hex_digit(pair[0])? << 4) | hex_digit(pair[1])?;
     }
     Some(output)
