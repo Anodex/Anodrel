@@ -202,27 +202,34 @@ mod tests {
 
     struct TestDirectory {
         path: std::path::PathBuf,
+        parent: std::path::PathBuf,
     }
 
     impl TestDirectory {
         fn new() -> Self {
             let sequence = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-            let temporary = std::env::temp_dir();
-            let path = temporary.join(format!(
+            let parent = crate::paths::anodrel_root()
+                .expect("locate checkout for native-app-tool test directory")
+                .join("target");
+            fs::create_dir_all(&parent).expect("create repository target directory for tests");
+            let path = parent.join(format!(
                 "anodrel-native-app-tool-test-{}-{sequence}",
                 std::process::id()
             ));
             fs::create_dir(&path).expect("create unique native-app-tool test directory");
-            Self { path }
+            Self { path, parent }
         }
     }
 
     impl Drop for TestDirectory {
         fn drop(&mut self) {
-            let temporary = std::env::temp_dir();
             let expected_prefix = format!("anodrel-native-app-tool-test-{}-", std::process::id());
             let name = self.path.file_name().and_then(|name| name.to_str());
-            if self.path.parent() == Some(temporary.as_path())
+            let expected_parent = crate::paths::anodrel_root()
+                .ok()
+                .map(|root| root.join("target"));
+            if expected_parent.as_deref() == Some(self.parent.as_path())
+                && self.path.parent() == Some(self.parent.as_path())
                 && name.is_some_and(|name| name.starts_with(&expected_prefix))
             {
                 let _ = fs::remove_dir_all(&self.path);
@@ -237,6 +244,13 @@ mod tests {
         fs::create_dir(&destination).expect("create existing destination");
         assert!(initialize(&destination, "existing-app", "Existing App").is_err());
         assert!(!destination.join("Cargo.toml").exists());
+    }
+
+    #[test]
+    fn test_projects_share_the_checkout_volume() {
+        let temporary = TestDirectory::new();
+        let root = crate::paths::anodrel_root().expect("locate checkout");
+        assert!(crate::paths::relative_path(&temporary.path, &root).is_ok());
     }
 
     #[test]
