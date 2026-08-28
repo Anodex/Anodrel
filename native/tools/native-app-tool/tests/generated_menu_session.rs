@@ -2,13 +2,15 @@
 
 #![forbid(unsafe_code)]
 
+mod support;
+
 use std::{
-    fs,
     process::Command,
-    sync::atomic::{AtomicUsize, Ordering},
     thread,
     time::{Duration, Instant},
 };
+
+use support::TestDirectory;
 
 use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_menu::{MenuActionId, MenuMailbox};
@@ -21,40 +23,6 @@ const MENU_ACTION: &str = "template.menu.complete";
 const CHILD_TIMEOUT_MILLISECONDS: u32 = 30_000;
 const DOCUMENT_WAIT: Duration = Duration::from_secs(20);
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
-static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
-
-struct TestDirectory {
-    path: std::path::PathBuf,
-}
-
-impl TestDirectory {
-    fn new() -> Self {
-        let sequence = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-        let temporary = std::env::temp_dir();
-        let path = temporary.join(format!(
-            "anodrel-native-menu-app-session-test-{}-{sequence}",
-            std::process::id()
-        ));
-        fs::create_dir(&path).expect("create unique native-menu-app session test directory");
-        Self { path }
-    }
-}
-
-impl Drop for TestDirectory {
-    fn drop(&mut self) {
-        let temporary = std::env::temp_dir();
-        let expected_prefix = format!(
-            "anodrel-native-menu-app-session-test-{}-",
-            std::process::id()
-        );
-        let name = self.path.file_name().and_then(|name| name.to_str());
-        if self.path.parent() == Some(temporary.as_path())
-            && name.is_some_and(|name| name.starts_with(&expected_prefix))
-        {
-            let _ = fs::remove_dir_all(&self.path);
-        }
-    }
-}
 
 #[test]
 fn generated_menu_project_completes_one_fixed_authenticated_menu_session() {
