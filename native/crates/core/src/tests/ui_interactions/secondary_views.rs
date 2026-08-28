@@ -1,5 +1,6 @@
 use super::super::support::*;
 use crate::*;
+use anodrel_ui_session::UiWindowGroup;
 
 #[test]
 fn protocol_v1_25_opens_targets_reads_and_closes_only_session_owned_views() {

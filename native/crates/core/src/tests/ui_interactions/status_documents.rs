@@ -1,5 +1,6 @@
 use super::super::support::*;
 use crate::*;
+use anodrel_ui_session::UiWindowGroup;
 
 #[test]
 fn protocol_v1_26_keeps_status_documents_explicit_for_secondary_views() {

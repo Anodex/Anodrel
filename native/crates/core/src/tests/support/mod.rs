@@ -55,7 +55,7 @@ pub(super) use anodrel_storage::{
 };
 pub(super) use anodrel_ui::{ElementId, UiEvent};
 pub(super) use anodrel_ui_session::{
-    MenuInputCandidate, UiDocumentMailbox, UiInputCandidate, UiInputMailbox, UiWindowGroup,
+    MenuInputCandidate, UiDocumentMailbox, UiInputCandidate, UiInputMailbox,
 };
 pub(super) use anodrel_window::{
     WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
