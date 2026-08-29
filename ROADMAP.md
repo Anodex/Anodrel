@@ -181,7 +181,10 @@ Status: **Direct Windows host in progress**
   client completes a semantic action revealed at the bottom. It has no product
   lifecycle. Operating-system accessibility adapters, public window lifecycle,
   subscriptions, gestures, and broader action-event transport remain
-  separate gates.
+  separate gates. Decision 0120 now defines the next bounded native popup
+  command surface: a primary-view-only, pointer-originated semantic context
+  menu with a distinct grant and no browser selection, link, coordinate,
+  callback, or handle bridge. Its implementation remains pending.
   The direct Windows UI Lab and session view now also substitute the user's
   fixed high-contrast system colours for their host palette without changing
   the portable document model (Decision 0055).
