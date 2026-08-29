@@ -174,8 +174,11 @@ a public window API or a substitute for signed application provisioning.
 Protocol 1.16 adds the second narrow public window capability:
 an authenticated session carrying the separate `window.state` grant can ask the
 host UI thread to minimise, maximise, or restore the one native window it
-already owns. It has no target, handle, geometry, focus, state readback, or
-event surface; see `docs/WINDOW_STATE.md`.
+already owns. It has no target, handle, geometry, focus, or event surface; see
+`docs/WINDOW_STATE.md`. Protocol 1.30 separately adds the pull-only
+`window.state.read` capability. It returns only one immediate closed state for
+that same session window, with no target, handle, geometry, focus, timestamp,
+subscription, or event; see `docs/WINDOW_STATE_OBSERVATION.md`.
 
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.
@@ -452,9 +455,11 @@ state, input, accessibility behavior, and mappings remain host-owned.
 native window-controls template. Its generator and fixed eight-grant Windows
 route demonstrate every existing targetless session-window control without
 broadening any earlier template's authority or exposing native readback.
-`docs/WINDOW_STATE_OBSERVATION.md` specifies the separate pull-only
-session-window state read planned for Protocol 1.30. `docs/ANODEX_ADAPTER.md`
-records the first Anodex migration boundary and its deliberate limits.
+`docs/WINDOW_STATE_OBSERVATION.md` documents the implemented separate pull-only
+session-window state read. `packages/anodex-adapter` maps that narrow snapshot
+to a title-bar maximize/restore action without importing Electron;
+`docs/ANODEX_ADAPTER.md` records the migration boundary and its deliberate
+limits.
 
 The repository's GitHub Pages landing page lives in `docs/index.html` and uses
 only hand-authored HTML and CSS.

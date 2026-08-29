@@ -22,6 +22,7 @@ pub fn run_ui_session(
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
+    window_state_read: WindowStateReadMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -40,6 +41,7 @@ pub fn run_ui_session(
         menu,
         window_title,
         window_state,
+        window_state_read,
         window_focus,
         window_fullscreen,
         window_size,
@@ -64,6 +66,7 @@ pub(crate) fn run_ui_session_after_shown<F>(
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
+    window_state_read: WindowStateReadMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -86,6 +89,7 @@ where
         menu,
         window_title,
         window_state,
+        window_state_read,
         window_focus,
         window_fullscreen,
         window_size,
@@ -111,6 +115,10 @@ where
 /// this same host-selected window. It is a closed command bridge, not a native
 /// handle or a window-management API; see `docs/WINDOW_STATE.md`.
 ///
+/// `window_state_read` carries only a pull-only closed-state snapshot for this
+/// same host-selected window. It has no target, native handle, geometry, focus,
+/// timing, subscription, or event; see `docs/WINDOW_STATE_OBSERVATION.md`.
+///
 /// `window_focus` carries only a request to foreground this same host-selected
 /// window. It exposes no target, input, retry, or observed focus state; see
 /// `docs/WINDOW_FOCUS.md`.
@@ -134,6 +142,7 @@ pub fn run_authenticated_ui_session(
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
+    window_state_read: WindowStateReadMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -152,6 +161,7 @@ pub fn run_authenticated_ui_session(
         menu,
         window_title,
         window_state,
+        window_state_read,
         window_focus,
         window_fullscreen,
         window_size,
@@ -173,6 +183,7 @@ fn run_authenticated_ui_session_after_shown<F>(
     menu: MenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
+    window_state_read: WindowStateReadMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -202,6 +213,7 @@ where
                 .with_menu(menu)
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
+                .with_window_state_read(window_state_read)
                 .with_window_focus(window_focus)
                 .with_window_fullscreen(window_fullscreen)
                 .with_window_size(window_size)

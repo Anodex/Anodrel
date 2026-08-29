@@ -1,8 +1,9 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.29, including bounded semantic
+**Status:** Implemented through version 1.30, including bounded semantic
 live-status documents, exact scroll documents for session-owned secondary
-views, folder selection, and one separately granted direct-entry snapshot.
+views, folder selection, a direct-entry snapshot, and pull-only state
+observation for the requesting session window.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -30,8 +31,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.29 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 29}`.
+the host's. Version 1.30 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 30}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -70,6 +71,7 @@ The implemented operations are:
 | `window.title.set` | `{ "title": string }` | `{ "status": "applied" }` | `window.title` |
 | `ui.fields.read` | `{}` | whole-surface current values | `ui.fields.read` |
 | `window.state.set` | `{ "state": "minimized" \| "maximized" \| "restored" }` | `{ "status": "applied" }` | `window.state` |
+| `window.state.get` | `{}` | immediate `{ "state": "minimized" \| "maximized" \| "restored" }` snapshot | `window.state.read` |
 | `window.focus.request` | `{}` | `{ "status": "requested" }` | `window.focus` |
 | `window.fullscreen.set` | `{ "mode": "fullscreen" \| "windowed" }` | `{ "status": "applied" }` | `window.fullscreen` |
 | `window.size.set` | `{ "width": integer, "height": integer }` | `{ "status": "applied" }` | `window.size` |
@@ -167,6 +169,8 @@ Protocol 1.21 adds no error code; its fullscreen request reuses the same safe
 `window.unavailable` and `window.busy` categories.
 Protocol 1.23 adds no error code; its client-size request reuses the same safe
 `window.unavailable` and `window.busy` categories.
+Protocol 1.30 adds no error code; its pull-only session state observation
+reuses those same safe categories.
 Protocol 1.24 adds no error code; malformed, duplicate, or premature menu
 shortcuts reuse `request.payload_invalid`.
 Protocol 1.22 adds `file.binary_too_large`; malformed binary encodings reuse

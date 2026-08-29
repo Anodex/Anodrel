@@ -19,6 +19,7 @@ pub(super) enum SampleDialogRequest {
     Notification,
     WindowTitle,
     WindowState,
+    WindowStateRead,
     WindowFocus,
     WindowFullscreen,
     WindowSize,
@@ -59,6 +60,9 @@ pub(super) fn sample_capabilities(dialog_request: SampleDialogRequest) -> Vec<Ca
     // exact grant rather than silently widening a broad diagnostic.
     if matches!(dialog_request, SampleDialogRequest::WindowFocus) {
         capabilities.push(Capability::WindowFocus);
+    }
+    if matches!(dialog_request, SampleDialogRequest::WindowStateRead) {
+        capabilities.push(Capability::WindowStateRead);
     }
     if matches!(
         dialog_request,
@@ -138,6 +142,16 @@ mod tests {
         assert!(size.contains(&Capability::WindowSize));
         assert_eq!(size.len(), ordinary.len() + 1);
         assert!(!size.contains(&Capability::WindowFullscreen));
+    }
+
+    #[test]
+    fn window_state_read_grant_is_limited_to_the_explicit_read_diagnostic() {
+        let ordinary = sample_capabilities(SampleDialogRequest::None);
+        let read = sample_capabilities(SampleDialogRequest::WindowStateRead);
+
+        assert!(!ordinary.contains(&Capability::WindowStateRead));
+        assert!(read.contains(&Capability::WindowStateRead));
+        assert_eq!(read.len(), ordinary.len() + 1);
     }
 
     #[test]

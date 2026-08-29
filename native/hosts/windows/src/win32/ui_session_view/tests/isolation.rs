@@ -27,6 +27,31 @@ fn one_session_cannot_take_another_sessions_state_command() {
 }
 
 #[test]
+fn one_session_cannot_take_another_sessions_state_observation() {
+    let (first, first_mailbox) = view_with_state_read();
+    let (second, _second_mailbox) = view_with_state_read();
+    let worker = first_mailbox.clone();
+    let waiting =
+        std::thread::spawn(move || anodrel_window::WindowStateReadService::read_state(&worker));
+
+    let request_id = loop {
+        assert!(
+            second.take_window_state_read_request().is_none(),
+            "a session took another session's state observation"
+        );
+        if let Some(request_id) = first.take_window_state_read_request() {
+            break request_id;
+        }
+        std::thread::yield_now();
+    };
+    assert!(first.complete_window_state_read_request(request_id, Some(WindowState::Maximized)));
+    assert_eq!(
+        waiting.join().expect("the worker did not panic"),
+        Ok(WindowState::Maximized)
+    );
+}
+
+#[test]
 fn one_session_cannot_take_another_sessions_focus_request() {
     let (first, first_mailbox) = view_with_focus();
     let (second, _second_mailbox) = view_with_focus();

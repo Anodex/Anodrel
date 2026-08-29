@@ -267,6 +267,24 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-window-state-read")) {
+      // Reading starts with the host's actual initial state, then confirms the
+      // snapshots after this session's own requests. No native window detail
+      // or promise of a durable state crosses the protocol boundary.
+      if ((await client.getWindowState()).state !== "restored") {
+        return 37;
+      }
+      for (const state of ["maximized", "restored"] as const) {
+        if ((await client.setWindowState(state)).status !== "applied") {
+          return 37;
+        }
+        if ((await client.getWindowState()).state !== state) {
+          return 37;
+        }
+        await delay(650);
+      }
+    }
+
     if (process.argv.includes("--request-window-focus")) {
       // Give an operator a short window to bring another application forward.
       // The result still says only that Anodrel asked Windows; Windows may

@@ -245,6 +245,8 @@ unsafe extern "system" {
         lparam: Lparam,
     ) -> Lresult;
     pub(super) fn ShowWindow(window: Hwnd, command: i32) -> Bool;
+    pub(super) fn IsIconic(window: Hwnd) -> Bool;
+    pub(super) fn IsZoomed(window: Hwnd) -> Bool;
     pub(super) fn UpdateWindow(window: Hwnd) -> Bool;
     pub(super) fn SetForegroundWindow(window: Hwnd) -> Bool;
     pub(super) fn DestroyWindow(window: Hwnd) -> Bool;

@@ -5,6 +5,7 @@ use super::*;
 mod folder;
 mod folder_access;
 mod network;
+mod window_state_read;
 
 #[test]
 fn loads_a_record_that_binds_package_executable_and_publisher() {

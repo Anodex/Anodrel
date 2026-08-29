@@ -308,6 +308,20 @@ of the closed commands was not accepted.
 This manual check is not yet recorded as passed. See `docs/WINDOW_STATE.md` for
 the deliberately absent targeting, geometry, focus, and readback APIs.
 
+To exercise the separate pull-only state observation, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-state-read-client $nodePath $clientPath
+~~~
+
+The client first confirms that its newly created session window is **restored**.
+It then requests **maximized** and **restored**, checking an immediate snapshot
+after each request, before waiting for the normal semantic action to close the
+session. The operator can see both transitions, but the client receives only
+the three portable state names. A safe stage-37 stop means the host could not
+return the expected state for that session's own window. No other Anodrel
+window should change. See `docs/WINDOW_STATE_OBSERVATION.md`.
+
 To exercise the separately granted session-window foreground request, run:
 
 ~~~powershell

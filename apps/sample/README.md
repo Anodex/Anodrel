@@ -45,6 +45,12 @@ Use `--sample-ui-window-state-client` to exercise the separately granted
 to minimise, maximise, and restore; it never receives a handle, target, or
 state readback. See `docs/WINDOW_STATE.md` and `docs/DEVELOPMENT.md`.
 
+Use `--sample-ui-window-state-read-client` to exercise the separately granted
+`window.state.read` capability. It observes its own starting state, requests
+maximised and restored in turn, and confirms the immediate snapshot after each
+request. It receives no native handle, bounds, monitor, focus, or event stream.
+See `docs/WINDOW_STATE_OBSERVATION.md`.
+
 Use `--sample-ui-window-fullscreen-client` to exercise the separately granted
 `window.fullscreen.set` command. The development client asks only for
 borderless fullscreen and then windowed restoration of its own session window;

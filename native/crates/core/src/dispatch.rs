@@ -101,6 +101,9 @@ impl CoreHost {
             "window.state.set" if request.protocol_version.minor >= 16 => {
                 self.handle_window_state_set(request)
             }
+            "window.state.get" if request.protocol_version.minor >= 30 => {
+                self.handle_window_state_get(request)
+            }
             "window.focus.request" if request.protocol_version.minor >= 20 => {
                 self.handle_window_focus_request(request)
             }

@@ -54,6 +54,30 @@ pub(crate) fn complete_window_state_request(
     }
 }
 
+/// Takes one pending pull-only state observation from its associated UI session.
+pub(crate) fn take_window_state_read_request(window: Hwnd) -> io::Result<Option<u64>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_window_state_read_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one state observation through its owning native UI session.
+pub(crate) fn complete_window_state_read_request(
+    window: Hwnd,
+    request_id: u64,
+    state: Option<anodrel_window::WindowState>,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_window_state_read_request(request_id, state),
+        )),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending foreground request only from its associated UI session.
 pub(crate) fn take_window_focus_request(window: Hwnd) -> io::Result<Option<u64>> {
     let views = lock_views()?;

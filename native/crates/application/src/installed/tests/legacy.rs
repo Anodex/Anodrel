@@ -57,6 +57,29 @@ fn an_earlier_record_cannot_name_the_folder_entry_grant() {
 }
 
 #[test]
+fn an_earlier_record_cannot_name_the_window_state_read_grant() {
+    for minor in 0..=16 {
+        let fixture = fixture();
+        let record = fs::read_to_string(&fixture.record_path)
+            .expect("record is read")
+            .replace("\"minor\": 0", &format!("\"minor\": {minor}"))
+            .replace(
+                "\"publisher\": {",
+                "\"capabilities\": [\"window.state.read\"], \"publisher\": {",
+            );
+        fs::write(&fixture.record_path, record).expect("record is updated");
+        assert!(
+            matches!(
+                InstalledApplication::load(&fixture.record_path, &fixture.policy_root),
+                Err(InstalledApplicationError::InvalidRecord)
+            ),
+            "record version 1.{minor} accepted a 1.17 grant"
+        );
+        fixture.remove();
+    }
+}
+
+#[test]
 fn an_earlier_record_cannot_name_session_window_grants() {
     for minor in 0..=12 {
         let fixture = fixture();

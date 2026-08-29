@@ -37,32 +37,45 @@ impl<T> WindowCommandRequest<T> {
     }
 }
 
-/// One pending command shared by a session worker and its owning UI thread.
+/// One pending request shared by a session worker and its owning UI thread.
+///
+/// The response type stays private to this crate. Public window services wrap
+/// it in focused mailboxes, so applications never receive a bridge identity or
+/// a native host detail.
 #[derive(Clone, Debug)]
-pub(crate) struct WindowCommandMailbox<T> {
-    state: Arc<Mutex<State<T>>>,
+pub(crate) struct WindowMailbox<T, R> {
+    state: Arc<Mutex<State<T, R>>>,
 }
 
 #[derive(Debug)]
-struct State<T> {
+struct State<T, R> {
     next_id: u64,
-    active: Option<ActiveRequest<T>>,
+    active: Option<ActiveRequest<T, R>>,
 }
 
 #[derive(Debug)]
-struct ActiveRequest<T> {
+struct ActiveRequest<T, R> {
     request: WindowCommandRequest<T>,
     taken: bool,
-    response: Arc<ResponseSlot>,
+    response: Arc<ResponseSlot<R>>,
 }
 
-#[derive(Debug, Default)]
-struct ResponseSlot {
-    value: Mutex<Option<Result<(), WindowCommandError>>>,
+#[derive(Debug)]
+struct ResponseSlot<R> {
+    value: Mutex<Option<Result<R, WindowCommandError>>>,
     ready: Condvar,
 }
 
-impl<T> Default for WindowCommandMailbox<T> {
+impl<R> Default for ResponseSlot<R> {
+    fn default() -> Self {
+        Self {
+            value: Mutex::new(None),
+            ready: Condvar::new(),
+        }
+    }
+}
+
+impl<T, R> Default for WindowMailbox<T, R> {
     fn default() -> Self {
         Self {
             state: Arc::new(Mutex::new(State {
@@ -73,7 +86,7 @@ impl<T> Default for WindowCommandMailbox<T> {
     }
 }
 
-impl<T: Clone> WindowCommandMailbox<T> {
+impl<T: Clone, R> WindowMailbox<T, R> {
     /// Creates an empty UI-thread window-command mailbox.
     pub(crate) fn new() -> Self {
         Self::default()
@@ -92,13 +105,14 @@ impl<T: Clone> WindowCommandMailbox<T> {
     }
 
     /// Reports that the host UI thread applied the command.
-    pub(crate) fn complete(&self, request_id: u64) -> bool {
-        self.respond(request_id, Ok(()))
-    }
-
     /// Completes the matching request with a safe unavailable result.
     pub(crate) fn fail(&self, request_id: u64) -> bool {
         self.respond(request_id, Err(WindowCommandError::Unavailable))
+    }
+
+    /// Completes the matching request with a host-owned portable result.
+    pub(crate) fn complete_with(&self, request_id: u64, value: R) -> bool {
+        self.respond(request_id, Ok(value))
     }
 
     /// Hands a command to the UI thread and waits for its bounded answer.
@@ -106,7 +120,7 @@ impl<T: Clone> WindowCommandMailbox<T> {
         &self,
         value: T,
         timeout: Duration,
-    ) -> Result<(), WindowCommandError> {
+    ) -> Result<R, WindowCommandError> {
         let response = Arc::new(ResponseSlot::default());
         let request_id = {
             let state = &mut *lock(&self.state);
@@ -143,7 +157,7 @@ impl<T: Clone> WindowCommandMailbox<T> {
         result.unwrap_or(Err(WindowCommandError::Unavailable))
     }
 
-    fn respond(&self, request_id: u64, result: Result<(), WindowCommandError>) -> bool {
+    fn respond(&self, request_id: u64, result: Result<R, WindowCommandError>) -> bool {
         let response = {
             let state = &mut *lock(&self.state);
             let Some(active) = state.active.as_ref() else {
@@ -163,10 +177,10 @@ impl<T: Clone> WindowCommandMailbox<T> {
     }
 }
 
-fn wait_for_response(
-    response: &ResponseSlot,
+fn wait_for_response<R>(
+    response: &ResponseSlot<R>,
     timeout: Duration,
-) -> Option<Result<(), WindowCommandError>> {
+) -> Option<Result<R, WindowCommandError>> {
     let value = lock(&response.value);
     let (mut value, timed_out) = response
         .ready
@@ -176,6 +190,16 @@ fn wait_for_response(
         None
     } else {
         value.take()
+    }
+}
+
+/// A pending command whose only success response is acceptance.
+pub(crate) type WindowCommandMailbox<T> = WindowMailbox<T, ()>;
+
+impl<T: Clone> WindowMailbox<T, ()> {
+    /// Reports that the host UI thread applied the command.
+    pub(crate) fn complete(&self, request_id: u64) -> bool {
+        self.complete_with(request_id, ())
     }
 }
 

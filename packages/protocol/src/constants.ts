@@ -1,6 +1,6 @@
 /** Fixed limits and protocol-version values shared by Anodrel boundaries. */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 29 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 30 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;

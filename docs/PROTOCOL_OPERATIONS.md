@@ -68,6 +68,22 @@ private restore facts. A concurrent request returns `window.busy`; neither
 result reveals native geometry or current presentation. See
 `docs/WINDOW_SIZE.md` and Decision 0088.
 
+## Session-window presentation-state snapshot
+
+Protocol 1.30 implements `window.state.get` behind the separate
+`window.state.read` grant. It accepts exactly `{}` and returns exactly one
+portable snapshot: `{ "state": "minimized" | "maximized" | "restored" }`.
+The snapshot is read only from the authenticated session's own native window.
+
+The operation cannot name a target, window handle, process, bounds, monitor,
+fullscreen state, focus, visibility, z-order, timestamp, callback, event, or
+subscription. It permits one in-flight read per session and reports
+`window.busy` for another; an unavailable UI bridge or a read that does not
+complete within five seconds reports `window.unavailable`. The response can
+be stale as soon as it is returned. It never confirms a previous
+`window.state.set` request took effect. See `docs/WINDOW_STATE_OBSERVATION.md`
+and Decision 0117.
+
 ## Session-owned secondary views
 
 Protocol 1.25 adds `window.open`, `window.close`,

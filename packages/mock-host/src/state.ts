@@ -1,12 +1,15 @@
 /** Per-transport state that models a bounded group of mock UI windows. */
 export interface UiWindowState {
   nextSecondaryId: number;
+  /** A deterministic stand-in for the host's session-owned state snapshot. */
+  presentationState: "minimized" | "maximized" | "restored";
   readonly revisions: Map<string, number>;
 }
 
 export function createUiWindowState(): UiWindowState {
   return {
     nextSecondaryId: 1,
+    presentationState: "restored",
     revisions: new Map([["main", 0]]),
   };
 }

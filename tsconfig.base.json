@@ -17,6 +17,7 @@
     "paths": {
       "@anodrel/protocol": ["packages/protocol/src/index.ts"],
       "@anodrel/sdk": ["packages/sdk/src/index.ts"],
+      "@anodrel/anodex-adapter": ["packages/anodex-adapter/src/index.ts"],
       "@anodrel/mock-host": ["packages/mock-host/src/index.ts"],
       "@anodrel/windows-transport": ["packages/windows-transport/src/index.ts"]
     }

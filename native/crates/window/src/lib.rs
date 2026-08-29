@@ -19,6 +19,7 @@ mod focus;
 mod fullscreen;
 mod size;
 mod state;
+mod state_read;
 mod title;
 
 use std::fmt;
@@ -35,6 +36,10 @@ pub use size::{
 };
 pub use state::{
     WINDOW_STATE_RESPONSE_TIMEOUT, WindowStateMailbox, WindowStateRequest, WindowStateService,
+};
+pub use state_read::{
+    WINDOW_STATE_READ_RESPONSE_TIMEOUT, WindowStateReadMailbox, WindowStateReadRequest,
+    WindowStateReadService,
 };
 pub use title::{WINDOW_TITLE_RESPONSE_TIMEOUT, WindowTitleMailbox, WindowTitleRequest};
 
@@ -140,8 +145,9 @@ pub trait WindowTitleService: fmt::Debug + Send {
 ///
 /// This is a closed set rather than a native command or style value. The host
 /// resolves the window from the authenticated session; applications cannot name
-/// a target, observe the resulting state, or extend the list with another
-/// User32 operation. See `docs/WINDOW_STATE.md` and Decision 0072.
+/// a target or extend the list with another User32 operation. A separately
+/// granted pull-only state observation is defined in `docs/WINDOW_STATE_OBSERVATION.md`.
+/// See `docs/WINDOW_STATE.md`, Decision 0072, and Decision 0117.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WindowState {
     /// Put the session's window in the normal Windows minimised state.
@@ -247,6 +253,13 @@ pub type WindowTitleServiceError = WindowCommandError;
 /// State commands use the same unavailable and busy meanings as title
 /// commands; their protocol mapping remains the shared `window.*` codes.
 pub type WindowStateServiceError = WindowCommandError;
+
+/// Failure returned by a portable pull-only window-state observation service.
+///
+/// Observation has the same unavailable and busy meanings as session-window
+/// commands. The common categories intentionally reveal no native failure
+/// reason or host topology.
+pub type WindowStateReadServiceError = WindowCommandError;
 
 /// Errors shared by the focused session-window service and its host bridge.
 pub type WindowFocusServiceError = WindowCommandError;

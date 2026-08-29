@@ -1,6 +1,7 @@
 # Anodrel Window State Observation
 
-**Status:** Specified for Protocol 1.30; implementation is pending.
+**Status:** Implemented on Windows for Protocol 1.30. Manual verification of
+the signed product fixture remains open because it requires local machine trust.
 
 ## Purpose
 
@@ -57,19 +58,31 @@ and returns `window.unavailable` so a stuck UI thread cannot strand a session.
 ## Anodex migration use
 
 Anodex's existing Electron title bar reads its own maximised state when it
-mounts. A future adapter can use this operation for that initial snapshot and
-after its own request, while retaining the current Electron adapter during
-migration. This specification does not add a React or browser renderer to
-Anodrel and does not claim Anodex can run on Anodrel today. See
+mounts. `@anodrel/anodex-adapter` now uses this operation for an initial
+snapshot and after its own request, while the Electron adapter remains in use
+during migration. This specification does not add a React or browser renderer
+to Anodrel and does not claim Anodex can run on Anodrel today. See
 `docs/ANODEX_ADAPTER.md` and Decision 0117.
 
-## Verification required for implementation
+## Verification
 
-- protocol, SDK, mock-host, and core tests for the exact empty payload,
+- Protocol, SDK, mock-host, and core tests cover the exact empty payload,
   independent grant/version gate, closed response, unavailable/busy mapping,
   and no leaked observation fields;
-- mailbox tests for take-once completion, timeout cleanup, and isolation;
-- Windows-host tests for session-owned UI-thread routing and exhaustive native
-  state mapping without exposing a native handle; and
-- one adapter-level test showing an Anodex-shaped title bar can obtain its
-  initial maximised/restored label without Electron APIs.
+- mailbox tests cover take-once completion, timeout cleanup, and isolation;
+- Windows-host tests cover session-owned UI-thread routing and exhaustive
+  `IsIconic`/`IsZoomed` reduction without exposing a native handle; and
+- the `@anodrel/anodex-adapter` contract test proves an Anodex-shaped title bar
+  reads its initial label and refreshes after its own request without Electron.
+
+The direct development diagnostic completes the Windows native check without
+changing machine trust:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-state-read-client $nodePath $clientPath
+~~~
+
+It verifies the newly created window starts restored, then observes maximized
+and restored after its own requests. The separately provisioned signed fixture
+does not yet declare this version-1.17 grant, so it is not presented as product
+fixture evidence for this new capability.

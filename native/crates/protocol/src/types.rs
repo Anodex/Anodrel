@@ -105,9 +105,16 @@ pub enum Capability {
     /// Request one standard presentation state for the session's own window.
     ///
     /// The state is a closed minimise/maximise/restore value. There is no
-    /// target, readback, event, or native command surface. See
-    /// `docs/WINDOW_STATE.md` and Decision 0072.
+    /// target, event, or native command surface. See `docs/WINDOW_STATE.md`
+    /// and Decision 0072.
     WindowState,
+    /// Read one current standard state of the session's own window.
+    ///
+    /// This separate grant allows only one immediate minimized/maximized/
+    /// restored snapshot. It exposes no target, handle, geometry, monitor,
+    /// focus, fullscreen state, timestamp, or change event. See
+    /// `docs/WINDOW_STATE_OBSERVATION.md` and Decision 0117.
+    WindowStateRead,
     /// Ask Windows to foreground the session's own host window.
     ///
     /// The request has no target or focus-state readback. Windows may refuse
@@ -180,6 +187,7 @@ impl Capability {
             Self::NotificationShow => "notification.show",
             Self::WindowTitle => "window.title",
             Self::WindowState => "window.state",
+            Self::WindowStateRead => "window.state.read",
             Self::WindowFocus => "window.focus",
             Self::WindowFullscreen => "window.fullscreen",
             Self::WindowSize => "window.size",

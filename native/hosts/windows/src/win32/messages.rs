@@ -189,6 +189,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_menu(window);
             service_window_title(window);
             service_window_state(window);
+            service_window_state_read(window);
             service_window_focus(window);
             service_window_fullscreen(window);
             service_window_size(window);

@@ -7,10 +7,5 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../../packages/protocol" },
-    { "path": "../../packages/sdk" },
-    { "path": "../../packages/anodex-adapter" },
-    { "path": "../../packages/mock-host" }
-  ]
+  "references": [{ "path": "../protocol" }]
 }

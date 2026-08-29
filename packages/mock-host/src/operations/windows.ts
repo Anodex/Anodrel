@@ -56,9 +56,25 @@ export function dispatchWindowOperation(
       if (!context.hasCapability(sessionId, "window.state")) {
         return context.failure(request.requestId, "capability.denied", "window.state.set requires the window.state capability.", { capability: "window.state" });
       }
-      // The mock deliberately reports acceptance only. It has no native
-      // window and cannot reveal a resulting state, handle, or geometry.
+      // This is not native observation: the mock records only the closed state
+      // it accepted so a separately granted Protocol 1.30 snapshot can model
+      // the documented host boundary deterministically.
+      sessionWindows.presentationState = request.payload.state;
       return context.success("window.state.set", request.requestId, { status: "applied" });
+
+    case "window.state.get":
+      if (request.protocolVersion.minor < 30) {
+        return context.failure(request.requestId, "operation.unsupported", "window.state.get requires protocol 1.30 or later.");
+      }
+      if (!isEmptyPayload(request.payload)) {
+        return context.failure(request.requestId, "request.payload_invalid", "window.state.get accepts no payload fields.");
+      }
+      if (!context.hasCapability(sessionId, "window.state.read")) {
+        return context.failure(request.requestId, "capability.denied", "window.state.get requires the window.state.read capability.", { capability: "window.state.read" });
+      }
+      return context.success("window.state.get", request.requestId, {
+        state: sessionWindows.presentationState,
+      });
 
     case "window.focus.request":
       if (request.protocolVersion.minor < 20) {

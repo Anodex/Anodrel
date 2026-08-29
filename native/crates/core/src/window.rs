@@ -98,6 +98,50 @@ impl CoreHost {
         }
     }
 
+    /// Reads one immediate standard state of this session's own window.
+    ///
+    /// This is intentionally separate from `window.state.set`: it requires its
+    /// own grant, carries an exact empty payload, and returns only the closed
+    /// state at the owning UI thread's sampling instant. It cannot name a
+    /// window or reveal geometry, focus, fullscreen state, timing, or future
+    /// changes. See `docs/WINDOW_STATE_OBSERVATION.md` and Decision 0117.
+    pub(super) fn handle_window_state_get(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.state.get accepts no payload fields.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::WindowStateRead) {
+            return self.capability_denied(request.request_id, "window.state.get");
+        }
+
+        match self.window_state_read.read_state() {
+            Ok(state) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([(
+                    "state",
+                    JsonValue::String(window_state_name(state).to_owned()),
+                )]),
+            ),
+            Err(WindowStateReadServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no session window is available to observe.",
+                None,
+            ),
+            Err(WindowStateReadServiceError::Busy) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowBusy,
+                "a window state observation is already pending.",
+                None,
+            ),
+        }
+    }
+
     /// Applies one reversible fullscreen mode to this session's own window.
     ///
     /// The payload is one closed mode rather than a monitor, rectangle,
@@ -246,6 +290,18 @@ fn window_state_set_payload(value: &JsonValue) -> Option<WindowState> {
         "maximized" => Some(WindowState::Maximized),
         "restored" => Some(WindowState::Restored),
         _ => None,
+    }
+}
+
+/// Converts the portable closed state into its protocol spelling.
+///
+/// The mapping is exhaustive so neither a native command code nor an expanded
+/// presentation vocabulary can enter the public response by accident.
+const fn window_state_name(state: WindowState) -> &'static str {
+    match state {
+        WindowState::Minimized => "minimized",
+        WindowState::Maximized => "maximized",
+        WindowState::Restored => "restored",
     }
 }
 

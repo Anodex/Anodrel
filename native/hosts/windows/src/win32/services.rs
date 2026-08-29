@@ -9,10 +9,10 @@ use super::*;
 mod window_presentation;
 
 #[cfg(test)]
-pub(super) use window_presentation::presentation_command;
+pub(super) use window_presentation::{observed_presentation_state, presentation_command};
 pub(super) use window_presentation::{
     service_window_focus, service_window_fullscreen, service_window_size, service_window_state,
-    service_window_title,
+    service_window_state_read, service_window_title,
 };
 
 /// Opens an additional native window while the message loop is running.

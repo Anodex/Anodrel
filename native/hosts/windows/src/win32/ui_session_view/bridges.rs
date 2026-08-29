@@ -29,6 +29,16 @@ impl UiSessionView {
         self
     }
 
+    /// Attaches this session's pull-only presentation-state observation bridge.
+    #[must_use]
+    pub(in crate::win32) fn with_window_state_read(
+        mut self,
+        mailbox: WindowStateReadMailbox,
+    ) -> Self {
+        self.window_state_read = Some(mailbox);
+        self
+    }
+
     /// Attaches this session's guarded foreground-request bridge.
     #[must_use]
     pub(in crate::win32) fn with_window_focus(mut self, mailbox: WindowFocusMailbox) -> Self {
@@ -169,6 +179,26 @@ impl UiSessionView {
         } else {
             mailbox.fail(request_id)
         }
+    }
+
+    /// Takes one pending state observation for this window's owning UI thread.
+    pub(in crate::win32) fn take_window_state_read_request(&self) -> Option<u64> {
+        Some(self.window_state_read.as_ref()?.take()?.id())
+    }
+
+    /// Completes one state observation with the UI thread's immediate sample.
+    pub(in crate::win32) fn complete_window_state_read_request(
+        &self,
+        request_id: u64,
+        state: Option<WindowState>,
+    ) -> bool {
+        let Some(mailbox) = self.window_state_read.as_ref() else {
+            return false;
+        };
+        state.map_or_else(
+            || mailbox.fail(request_id),
+            |state| mailbox.complete(request_id, state),
+        )
     }
 
     /// Takes one pending foreground request for this window's owning UI thread.

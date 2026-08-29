@@ -2,8 +2,12 @@
 
 use super::{
     Body, Canvas, Instant, MIN_CLIENT_HEIGHT, MIN_CLIENT_WIDTH, PackageFacts, PreflightOutcome,
-    StartupLab, action_document, document, input::mouse_position, input::wheel_delta,
-    launch::startup_log_book, services::presentation_command, startup_lab, window_size_for_client,
+    StartupLab, action_document, document,
+    input::mouse_position,
+    input::wheel_delta,
+    launch::startup_log_book,
+    services::{observed_presentation_state, presentation_command},
+    startup_lab, window_size_for_client,
 };
 /// Representative surface state, matching the shipped sample package.
 pub(super) fn sample_lab() -> StartupLab {
@@ -74,6 +78,22 @@ fn a_closed_presentation_state_maps_to_only_its_documented_user32_command() {
     assert_eq!(
         presentation_command(anodrel_window::WindowState::Restored),
         super::SW_RESTORE
+    );
+}
+
+#[test]
+fn a_standard_window_snapshot_reduces_to_the_closed_portable_state() {
+    assert_eq!(
+        observed_presentation_state(true, true),
+        anodrel_window::WindowState::Minimized
+    );
+    assert_eq!(
+        observed_presentation_state(false, true),
+        anodrel_window::WindowState::Maximized
+    );
+    assert_eq!(
+        observed_presentation_state(false, false),
+        anodrel_window::WindowState::Restored
     );
 }
 

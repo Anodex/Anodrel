@@ -54,6 +54,7 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
         ui.menu_mailbox(),
         ui.window_title_mailbox(),
         ui.window_state_mailbox(),
+        ui.window_state_read_mailbox(),
         ui.window_focus_mailbox(),
         ui.window_fullscreen_mailbox(),
         ui.window_size_mailbox(),

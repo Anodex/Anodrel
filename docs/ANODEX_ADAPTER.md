@@ -1,7 +1,7 @@
 # Anodex Adapter Plan
 
-**Status:** First migration boundary specified; no Anodex runtime is hosted by
-Anodrel yet.
+**Status:** First migration boundary implemented and contract-tested; no
+Anodex runtime is hosted by Anodrel yet.
 
 ## Purpose
 
@@ -20,7 +20,7 @@ The current Anodex title bar uses four Electron-backed behaviours:
 | minimise its own window | `window.state.set` with `minimized` | Implemented |
 | choose maximise or restore | `window.state.set` with a closed value | Implemented |
 | close the current application | `session.close` | Semantically different; requires lifecycle review |
-| show the correct initial maximise/restore glyph | `window.state.get` | Specified for Protocol 1.30 |
+| show the correct initial maximise/restore glyph | `window.state.get` | Implemented in `@anodrel/anodex-adapter` |
 
 Anodrel intentionally has no native equivalent of Electron's maximise-change
 event. The first adapter must use one initial state snapshot and refresh after
@@ -30,8 +30,8 @@ domain services.
 
 ## Migration sequence
 
-1. Implement and verify the separate `window.state.read` protocol capability.
-2. Add a small Anodex-specific adapter package outside the platform core. It
+1. **Completed:** implement and verify the separate `window.state.read` protocol capability.
+2. **Completed:** add a small Anodex-specific adapter package outside the platform core. It
    maps only the closed title-bar service contract and has no Electron import.
 3. Add the corresponding Electron adapter in Anodex, preserving its current
    renderer-facing contract while both adapters are verified against the same

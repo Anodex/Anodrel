@@ -15,6 +15,19 @@ pub(crate) const fn presentation_command(state: WindowState) -> i32 {
     }
 }
 
+/// Reduces the two documented User32 standard-state facts to the portable
+/// closed vocabulary. A minimized window wins because Windows can retain a
+/// maximized restored placement while it is currently iconic.
+pub(crate) const fn observed_presentation_state(minimized: bool, maximized: bool) -> WindowState {
+    if minimized {
+        WindowState::Minimized
+    } else if maximized {
+        WindowState::Maximized
+    } else {
+        WindowState::Restored
+    }
+}
+
 /// Applies one pending window title for a session window, if it has one.
 ///
 /// The `SetWindowTextW` call runs outside the window registry's lock, matching
@@ -51,6 +64,24 @@ pub(crate) fn service_window_state(window: Hwnd) {
     // one of the three documented User32 presentation-state values above.
     unsafe { ShowWindow(window, command) };
     let _ = registry::complete_window_state_request(window, request_id, true);
+}
+
+/// Answers one pull-only standard-state observation for this session window.
+///
+/// The only native facts sampled are the two documented standard-state flags
+/// of the same UI-thread-owned window. Neither flag, a handle, nor a timing
+/// detail crosses the registry boundary; the worker receives only one closed
+/// value through its own separately granted mailbox.
+pub(crate) fn service_window_state_read(window: Hwnd) {
+    let Ok(Some(request_id)) = registry::take_window_state_read_request(window) else {
+        return;
+    };
+    // SAFETY: this runs on the thread that created `window`, which is the only
+    // host-selected window associated with this request. The calls inspect no
+    // other window and return only User32 boolean state flags.
+    let state =
+        unsafe { observed_presentation_state(IsIconic(window) != 0, IsZoomed(window) != 0) };
+    let _ = registry::complete_window_state_read_request(window, request_id, Some(state));
 }
 
 /// Asks Windows to foreground this session window for one pending request.

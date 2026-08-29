@@ -99,6 +99,17 @@ no recursive flag, cursor, child path, content read, metadata, write, delete,
 creation, rename, or watch option. The SDK never constructs a folder reference
 or turns a display path into authority. See `docs/FOLDER_ACCESS.md`.
 
+### Session-window state observation
+
+Protocol 1.30 adds `getWindowState()`. It sends exactly `{}` and needs the
+separate `window.state.read` grant. Its result is one immediate `minimized`,
+`maximized`, or `restored` snapshot for the requesting session's own native
+window. There is no window argument, target, handle, geometry, monitor, focus,
+fullscreen state, timestamp, subscription, or change event. The value may be
+stale as soon as it arrives; code that uses `setWindowState()` must refresh
+with `getWindowState()` rather than infer a result from action acceptance. See
+`docs/WINDOW_STATE_OBSERVATION.md`.
+
 ### Host-authorized HTTPS text fetch
 
 Protocol 1.19 adds `fetchHttpsText(url)`. It sends exactly the supplied

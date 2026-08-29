@@ -21,7 +21,8 @@ use services::{
     UnavailableClipboard, UnavailableCredentials, UnavailableDiagnostics, UnavailableExternalLinks,
     UnavailableFileDialogs, UnavailableNetwork, UnavailableNotifications, UnavailableStorage,
     UnavailableUiFields, UnavailableWindowFocus, UnavailableWindowFullscreen,
-    UnavailableWindowSize, UnavailableWindowState, UnavailableWindowTitle,
+    UnavailableWindowSize, UnavailableWindowState, UnavailableWindowStateRead,
+    UnavailableWindowTitle,
 };
 
 use std::{
@@ -75,8 +76,8 @@ use anodrel_ui_session::{
 use anodrel_window::{
     WindowFocusService, WindowFocusServiceError, WindowFullscreenMode, WindowFullscreenService,
     WindowFullscreenServiceError, WindowSize, WindowSizeService, WindowSizeServiceError,
-    WindowState, WindowStateService, WindowStateServiceError, WindowTitleProposal,
-    WindowTitleService, WindowTitleServiceError,
+    WindowState, WindowStateReadService, WindowStateReadServiceError, WindowStateService,
+    WindowStateServiceError, WindowTitleProposal, WindowTitleService, WindowTitleServiceError,
 };
 
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -204,6 +205,7 @@ pub struct CoreHost {
     notifications: Box<dyn NotificationService>,
     window_title: Box<dyn WindowTitleService>,
     window_state: Box<dyn WindowStateService>,
+    window_state_read: Box<dyn WindowStateReadService>,
     window_focus: Box<dyn WindowFocusService>,
     window_fullscreen: Box<dyn WindowFullscreenService>,
     window_size: Box<dyn WindowSizeService>,

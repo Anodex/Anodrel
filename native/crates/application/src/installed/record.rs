@@ -40,6 +40,7 @@ pub(super) enum RecordVersion {
     V1_14,
     V1_15,
     V1_16,
+    V1_17,
 }
 
 impl RecordVersion {
@@ -227,6 +228,9 @@ fn capability_for_record_version(
         }
         "folder.read_entries" if version.accepts(RecordVersion::V1_16) => {
             Some(Capability::FolderReadEntries)
+        }
+        "window.state.read" if version.accepts(RecordVersion::V1_17) => {
+            Some(Capability::WindowStateRead)
         }
         _ => None,
     }

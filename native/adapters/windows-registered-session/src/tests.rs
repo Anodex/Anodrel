@@ -121,6 +121,35 @@ fn each_session_carries_its_own_closed_window_state_bridge() {
 }
 
 #[test]
+fn each_session_carries_its_own_pull_only_window_state_read_bridge() {
+    let first = RegisteredSessionUi::new("First Application");
+    let second = RegisteredSessionUi::new("Second Application");
+    let bridge = first.window_state_read_mailbox();
+    let waiting =
+        std::thread::spawn(move || anodrel_window::WindowStateReadService::read_state(&bridge));
+
+    let request_id = loop {
+        assert!(
+            second.window_state_read_mailbox().take().is_none(),
+            "a session took another session's presentation-state observation"
+        );
+        if let Some(request) = first.window_state_read_mailbox().take() {
+            break request.id();
+        }
+        std::thread::yield_now();
+    };
+    assert!(
+        first
+            .window_state_read_mailbox()
+            .complete(request_id, anodrel_window::WindowState::Maximized)
+    );
+    assert_eq!(
+        waiting.join().expect("the worker did not panic"),
+        Ok(anodrel_window::WindowState::Maximized)
+    );
+}
+
+#[test]
 fn each_session_carries_its_own_bounded_window_size_bridge() {
     let first = RegisteredSessionUi::new("First Application");
     let second = RegisteredSessionUi::new("Second Application");

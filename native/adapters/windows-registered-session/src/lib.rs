@@ -24,7 +24,7 @@ use anodrel_ui_session::{
 };
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowSizeMailbox, WindowStateMailbox,
-    WindowTitleMailbox, WindowTitleProposal,
+    WindowStateReadMailbox, WindowTitleMailbox, WindowTitleProposal,
 };
 use anodrel_windows_clipboard::WindowsClipboard;
 use anodrel_windows_credentials::WindowsCredentialService;
@@ -53,6 +53,7 @@ pub struct RegisteredSessionUi {
     menu_mailbox: MenuMailbox,
     window_title_mailbox: WindowTitleMailbox,
     window_state_mailbox: WindowStateMailbox,
+    window_state_read_mailbox: WindowStateReadMailbox,
     window_focus_mailbox: WindowFocusMailbox,
     window_fullscreen_mailbox: WindowFullscreenMailbox,
     window_size_mailbox: WindowSizeMailbox,
@@ -80,6 +81,7 @@ impl RegisteredSessionUi {
             menu_mailbox: MenuMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
             window_state_mailbox: WindowStateMailbox::new(),
+            window_state_read_mailbox: WindowStateReadMailbox::new(),
             window_focus_mailbox: WindowFocusMailbox::new(),
             window_fullscreen_mailbox: WindowFullscreenMailbox::new(),
             window_size_mailbox: WindowSizeMailbox::new(),
@@ -163,6 +165,16 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn window_state_mailbox(&self) -> WindowStateMailbox {
         self.window_state_mailbox.clone()
+    }
+
+    /// Returns this session's pull-only UI-thread state-observation mailbox.
+    ///
+    /// It transfers only one immediate closed presentation snapshot. The
+    /// native window remains resolved by the host, and no target, geometry,
+    /// focus, timestamp, or event reaches the application.
+    #[must_use]
+    pub fn window_state_read_mailbox(&self) -> WindowStateReadMailbox {
+        self.window_state_read_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread window-focus mailbox.
@@ -354,6 +366,9 @@ fn registered_interactive_services(
         // A presentation state takes the same host-only UI-thread path and is
         // still resolved from this session rather than a caller-supplied target.
         .with_window_state(ui.window_state_mailbox())
+        // Pull-only observation uses a distinct bridge and remains unavailable
+        // unless the installed record explicitly grants window.state.read.
+        .with_window_state_read(ui.window_state_read_mailbox())
         // Foregrounding stays in the same session-owned UI-thread boundary.
         // The policy parser admits this mailbox only for record version 1.9.
         .with_window_focus(ui.window_focus_mailbox())

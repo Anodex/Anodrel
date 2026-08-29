@@ -260,6 +260,7 @@ where
         let services = HostServices::unavailable()
             .with_window_title(ui.window_title.clone())
             .with_window_state(ui.window_state.clone())
+            .with_window_state_read(ui.window_state_read.clone())
             .with_window_focus(ui.window_focus.clone())
             .with_window_fullscreen(ui.window_fullscreen.clone())
             .with_window_size(ui.window_size.clone());
@@ -316,6 +317,7 @@ where
                 ui.menu,
                 ui.window_title,
                 ui.window_state,
+                ui.window_state_read,
                 ui.window_focus,
                 ui.window_fullscreen,
                 ui.window_size,

@@ -44,6 +44,7 @@ export type Capability =
   | "window.title"
   | "ui.fields.read"
   | "window.state"
+  | "window.state.read"
   | "window.focus"
   | "window.fullscreen"
   | "window.size"
@@ -62,7 +63,7 @@ export interface FolderEntry {
   readonly kind: FolderEntryKind;
 }
 
-/** The complete set of presentation states an application may request. */
+/** The complete set of presentation states an application may request or observe. */
 export type WindowState = "minimized" | "maximized" | "restored";
 
 /** The only reversible fullscreen modes an application may request. */
@@ -182,12 +183,24 @@ export interface PlatformOperationMap {
    * Requests one standard presentation state for this session's own window.
    *
    * The host resolves the window from the authenticated session. There is no
-   * target, native handle, geometry, state readback, or change event; success
-   * means only that the host UI thread accepted the closed action.
+   * target, native handle, geometry, or change event; success means only that
+   * the host UI thread accepted the closed action.
    */
   "window.state.set": {
     readonly payload: { readonly state: WindowState };
     readonly result: { readonly status: "applied" };
+  };
+  /**
+   * Takes one immediate snapshot of the requesting session's own standard
+   * window state. The distinct `window.state.read` grant is required.
+   *
+   * There is no target, handle, geometry, monitor, focus, fullscreen state,
+   * timestamp, subscription, or change event. The returned value can be stale
+   * as soon as it is received; see `docs/WINDOW_STATE_OBSERVATION.md`.
+   */
+  "window.state.get": {
+    readonly payload: EmptyPayload;
+    readonly result: { readonly state: WindowState };
   };
   /**
    * Asks Windows to foreground this session's one host-owned window.

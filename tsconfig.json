@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/protocol" },
     { "path": "./packages/sdk" },
+    { "path": "./packages/anodex-adapter" },
     { "path": "./packages/mock-host" },
     { "path": "./packages/windows-transport" },
     { "path": "./apps/sample" },

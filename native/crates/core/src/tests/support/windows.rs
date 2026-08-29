@@ -152,6 +152,42 @@ pub(crate) fn host_with_window_state(service: impl WindowStateService + 'static)
     )
 }
 
+/// A pull-only state service that returns one host-owned portable snapshot.
+#[derive(Debug)]
+pub(crate) struct RecordingWindowStateRead {
+    pub(crate) state: WindowState,
+    pub(crate) result: Option<WindowStateReadServiceError>,
+}
+
+impl Default for RecordingWindowStateRead {
+    fn default() -> Self {
+        Self {
+            state: WindowState::Restored,
+            result: None,
+        }
+    }
+}
+
+impl WindowStateReadService for RecordingWindowStateRead {
+    fn read_state(&self) -> Result<WindowState, WindowStateReadServiceError> {
+        self.result.map_or(Ok(self.state), Err)
+    }
+}
+
+pub(crate) fn host_with_window_state_read(
+    service: impl WindowStateReadService + 'static,
+) -> CoreHost {
+    CoreHost::with_services(
+        HostPolicy::new(
+            "test.application",
+            vec![Capability::WindowStateRead],
+            "test-host",
+        )
+        .expect("test policy is valid"),
+        HostServices::unavailable().with_window_state_read(service),
+    )
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct RecordingWindowFocus {
     pub(crate) requested: Arc<Mutex<u8>>,

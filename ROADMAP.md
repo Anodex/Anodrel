@@ -88,9 +88,14 @@ Status: **Direct Windows host in progress**
   UI-thread bridge, private placement restoration, direct User32 and monitor
   adapter, product-session composition, and development diagnostic are
   implemented (Decision 0086); its desktop entry-and-restore check remains
-  manual. Window creation, cross-session closing, geometry, enumeration,
-  exclusive display control, monitor selection, state or focus readback, and
-  every other window property remain deferred, each needing its own grant,
+  manual. Protocol 1.30 separately adds `window.state.get`: an installed
+  record at version 1.17 may grant its pull-only `window.state.read`
+  counterpart. The SDK, mock, policy parser, session-local bridge, direct
+  `IsIconic`/`IsZoomed` adapter, and small Anodex title-bar adapter are
+  implemented (Decision 0117). It returns no target, handle, geometry, focus,
+  event, or timing data. Window creation, cross-session closing, geometry,
+  enumeration, exclusive display control, monitor selection, focus readback,
+  and every other window property remain deferred, each needing its own grant,
   decision, and threat-model entry. Protocol 1.23 `window.size.set` is the
   fifth narrow public capability: it chooses only a bounded logical client area
   for that same session window, without a position, target, monitor, DPI,

@@ -84,11 +84,23 @@ export class PlatformClient {
    * Requests a standard presentation state for this session's own window.
    *
    * This is deliberately a command, not a window object: there is no target,
-   * native handle, current-state readback, or state-change event. A successful
-   * result means the host UI thread accepted the closed request.
+   * native handle, or state-change event. A successful result means the host
+   * UI thread accepted the closed request.
    */
   setWindowState(state: WindowState): Promise<ResultFor<"window.state.set">> {
     return this.request("window.state.set", { state });
+  }
+
+  /**
+   * Reads one immediate standard state of this session's own window.
+   *
+   * This requires the separate `window.state.read` capability. The result is
+   * only a minimized/maximized/restored snapshot; it has no target, native
+   * handle, geometry, focus, timestamp, subscription, or state-change event.
+   * It may be stale immediately, so refresh after requesting a state change.
+   */
+  getWindowState(): Promise<ResultFor<"window.state.get">> {
+    return this.request("window.state.get", {});
   }
 
   /**

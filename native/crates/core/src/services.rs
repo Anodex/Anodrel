@@ -20,6 +20,7 @@ pub struct HostServices {
     pub(super) notifications: Box<dyn NotificationService>,
     pub(super) window_title: Box<dyn WindowTitleService>,
     pub(super) window_state: Box<dyn WindowStateService>,
+    pub(super) window_state_read: Box<dyn WindowStateReadService>,
     pub(super) window_focus: Box<dyn WindowFocusService>,
     pub(super) window_fullscreen: Box<dyn WindowFullscreenService>,
     pub(super) window_size: Box<dyn WindowSizeService>,
@@ -105,6 +106,15 @@ pub(super) struct UnavailableWindowState;
 impl WindowStateService for UnavailableWindowState {
     fn set_state(&self, _state: WindowState) -> Result<(), WindowStateServiceError> {
         Err(WindowStateServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct UnavailableWindowStateRead;
+
+impl WindowStateReadService for UnavailableWindowStateRead {
+    fn read_state(&self) -> Result<WindowState, WindowStateReadServiceError> {
+        Err(WindowStateReadServiceError::Unavailable)
     }
 }
 
@@ -209,6 +219,7 @@ impl HostServices {
             notifications: Box::new(UnavailableNotifications),
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
+            window_state_read: Box::new(UnavailableWindowStateRead),
             window_focus: Box::new(UnavailableWindowFocus),
             window_fullscreen: Box::new(UnavailableWindowFullscreen),
             window_size: Box::new(UnavailableWindowSize),
@@ -293,6 +304,20 @@ impl HostServices {
     #[must_use]
     pub fn with_window_state(mut self, service: impl WindowStateService + 'static) -> Self {
         self.window_state = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's pull-only window-state observation service.
+    ///
+    /// The service samples only the requesting session's own window from the
+    /// host UI thread. It accepts no target and returns no native detail or
+    /// change stream; see `docs/WINDOW_STATE_OBSERVATION.md`.
+    #[must_use]
+    pub fn with_window_state_read(
+        mut self,
+        service: impl WindowStateReadService + 'static,
+    ) -> Self {
+        self.window_state_read = Box::new(service);
         self
     }
 
