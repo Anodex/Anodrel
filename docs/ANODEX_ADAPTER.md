@@ -19,7 +19,7 @@ The current Anodex title bar uses four Electron-backed behaviours:
 | --- | --- | --- |
 | minimise its own window | `window.state.set` with `minimized` | Implemented |
 | choose maximise or restore | `window.state.set` with a closed value | Implemented |
-| close the current application | `session.close` | Semantically different; requires lifecycle review |
+| request close of the current application | `session.close` | Implemented as an accepted session-end request; it is not close completion |
 | show the correct initial maximise/restore glyph | `window.state.get` | Implemented in `@anodrel/anodex-adapter` |
 | react to an ordinary Windows maximise/restore change | `window.state.changes.read` | Implemented as explicit coalesced refresh; no hidden polling or callback shim |
 
@@ -37,10 +37,13 @@ domain services.
    maps only the closed title-bar service contract and has no Electron import.
 3. **Completed:** extend that adapter with one explicit coalesced refresh method.
    It returns an optional title-bar state and owns no polling, listener, or timer.
-4. Add the corresponding Electron adapter in Anodex, preserving its current
+4. **Completed:** map the title-bar close intent to the current session's
+   existing `session.close` request. Its accepted response does not claim that a
+   native window or process has ended.
+5. Add the corresponding Electron adapter in Anodex, preserving its current
    renderer-facing contract while both adapters are verified against the same
    adapter tests.
-5. Compare behaviour in an explicit development route before moving another
+6. Compare behaviour in an explicit development route before moving another
    desktop service. A failure must leave the Electron adapter selectable.
 
 ## Non-goals
@@ -58,4 +61,4 @@ domain services.
 Every later adapter slice needs a documented mapping, contract tests shared by
 both adapters, a native-host verification, a comparison against the Electron
 behaviour, and a rollback path. See `docs/WINDOW_STATE_OBSERVATION.md`,
-Decisions 0117–0118, and Phase 4 in `docs/roadmap/FUTURE.md`.
+Decisions 0117–0119, and Phase 4 in `docs/roadmap/FUTURE.md`.

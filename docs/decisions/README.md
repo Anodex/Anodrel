@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0119: Anodex title-bar close requests its owned session end.
+
 - 0118: Session window-state changes stay coalesced and pull-only.
 
 - 0117: Session window state observation stays pull-only.
