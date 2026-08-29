@@ -41,6 +41,7 @@ pub(super) enum RecordVersion {
     V1_15,
     V1_16,
     V1_17,
+    V1_18,
 }
 
 impl RecordVersion {
@@ -231,6 +232,9 @@ fn capability_for_record_version(
         }
         "window.state.read" if version.accepts(RecordVersion::V1_17) => {
             Some(Capability::WindowStateRead)
+        }
+        "window.state.observe" if version.accepts(RecordVersion::V1_18) => {
+            Some(Capability::WindowStateObserve)
         }
         _ => None,
     }

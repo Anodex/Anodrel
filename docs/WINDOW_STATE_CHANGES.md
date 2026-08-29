@@ -1,15 +1,15 @@
 # Anodrel Window State Changes
 
-**Status:** Specified for Protocol 1.31; not implemented yet.
+**Status:** Implemented on Windows for Protocol 1.31.
 
 ## Purpose
 
-`window.state.changes.read` is the planned companion to the immediate
+`window.state.changes.read` is the implemented companion to the immediate
 `window.state.get` snapshot. It lets an owned title bar notice the most recent
 ordinary Windows presentation change without receiving a native handle or a
 continuous event stream.
 
-## Planned contract
+## Contract
 
 | Field | Value |
 | --- | --- |
@@ -32,25 +32,37 @@ state is required.
 
 ## Boundaries
 
-This proposed API accepts no selector, target, window ID, native handle,
+This API accepts no selector, target, window ID, native handle,
 position, bounds, monitor, DPI, fullscreen value, focus, visibility, z-order,
 wait duration, callback, subscription, event count, history, or delivery
 confirmation. It never waits for a later change and never starts a background
 receiver. An application chooses whether and when to make another ordinary
 request.
 
-`window.state.observe` will be independent from `window.state` and
+`window.state.observe` is independent from `window.state` and
 `window.state.read`. A policy can therefore allow a title-bar refresh without
 allowing a presentation request, or allow a one-time snapshot without granting
-change observation. Record version 1.18 will be the first version that can
+change observation. Record version 1.18 is the first version that can
 name the new grant.
 
 ## Anodex migration use
 
 Anodex's Electron title bar currently has an `onMaximizedChanged` callback.
-The planned Anodrel adapter will not imitate that callback with a hidden
+The Anodrel adapter does not imitate that callback with a hidden
 background loop. It can expose one explicit refresh method that maps the
 latest coalesced state to the same maximise/restore glyph. Any future
 persistent listener needs its own platform contract.
 
 See Decision 0118 and `docs/WINDOW_STATE_OBSERVATION.md`.
+
+## Verification
+
+The portable mailbox establishes a baseline, consumes one value, coalesces
+rapid transitions, and ignores repeated state in unit tests. Core, installed
+policy, TypeScript contract, registered-session, and native-view isolation
+tests verify the separate 1.31 grant and targetless pull boundary. The Windows
+development diagnostic performs its initial empty read, requests maximised and
+restored presentation, then consumes the matching coalesced values before the
+normal semantic close action. Its desktop acceptance run remains an explicit
+manual check after the interrupted verification attempt. See
+`docs/DEVELOPMENT_DIAGNOSTICS.md`.

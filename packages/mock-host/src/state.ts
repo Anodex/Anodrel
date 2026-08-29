@@ -3,6 +3,8 @@ export interface UiWindowState {
   nextSecondaryId: number;
   /** A deterministic stand-in for the host's session-owned state snapshot. */
   presentationState: "minimized" | "maximized" | "restored";
+  /** The latest unread deterministic stand-in for a native state transition. */
+  pendingPresentationState: "minimized" | "maximized" | "restored" | null;
   readonly revisions: Map<string, number>;
 }
 
@@ -10,6 +12,7 @@ export function createUiWindowState(): UiWindowState {
   return {
     nextSecondaryId: 1,
     presentationState: "restored",
+    pendingPresentationState: null,
     revisions: new Map([["main", 0]]),
   };
 }

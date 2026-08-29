@@ -115,6 +115,14 @@ pub enum Capability {
     /// focus, fullscreen state, timestamp, or change event. See
     /// `docs/WINDOW_STATE_OBSERVATION.md` and Decision 0117.
     WindowStateRead,
+    /// Read one coalesced presentation-state change for the session's own
+    /// window.
+    ///
+    /// The result is only a latest minimized, maximized, or restored value,
+    /// or no retained change. It exposes no target, handle, timestamp,
+    /// sequence, history, wait, callback, or subscription. See
+    /// `docs/WINDOW_STATE_CHANGES.md` and Decision 0118.
+    WindowStateObserve,
     /// Ask Windows to foreground the session's own host window.
     ///
     /// The request has no target or focus-state readback. Windows may refuse
@@ -188,6 +196,7 @@ impl Capability {
             Self::WindowTitle => "window.title",
             Self::WindowState => "window.state",
             Self::WindowStateRead => "window.state.read",
+            Self::WindowStateObserve => "window.state.observe",
             Self::WindowFocus => "window.focus",
             Self::WindowFullscreen => "window.fullscreen",
             Self::WindowSize => "window.size",

@@ -322,6 +322,21 @@ the three portable state names. A safe stage-37 stop means the host could not
 return the expected state for that session's own window. No other Anodrel
 window should change. See `docs/WINDOW_STATE_OBSERVATION.md`.
 
+To exercise the separately granted coalesced state-change pull, run:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --sample-ui-window-state-changes-client $nodePath $clientPath
+~~~
+
+The first read must return `null`: the host's initial native observation only
+establishes a baseline. The client then requests **maximized** and **restored**
+in turn, waits briefly for each visible Windows transition, and consumes that
+latest closed state. It learns no target, handle, bounds, focus, timestamp,
+history, callback, or subscription. Complete the normal semantic action to
+close the session. A safe stage-38 stop means the initial empty pull or a later
+coalesced state did not match the expected session window. No other Anodrel
+window should change. See `docs/WINDOW_STATE_CHANGES.md`.
+
 To exercise the separately granted session-window foreground request, run:
 
 ~~~powershell

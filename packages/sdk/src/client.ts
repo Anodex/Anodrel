@@ -104,6 +104,18 @@ export class PlatformClient {
   }
 
   /**
+   * Consumes the latest coalesced presentation change for this session's own
+   * window.
+   *
+   * `null` means that no unread change is retained. This is an immediate pull,
+   * not a listener, wait, callback, or subscription; callers choose their own
+   * refresh cadence. See `docs/WINDOW_STATE_CHANGES.md`.
+   */
+  readWindowStateChanges(): Promise<ResultFor<"window.state.changes.read">> {
+    return this.request("window.state.changes.read", {});
+  }
+
+  /**
    * Asks Windows to foreground this session's own host window.
    *
    * There is no window argument, focus result, prior-foreground observation,

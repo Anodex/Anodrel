@@ -339,6 +339,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         }
         WM_SIZE => {
             set_ambient_running(window, wparam != SIZE_MINIMIZED);
+            record_window_state_change(window);
             let rect = client_rect(window);
             let _ = registry::with_ui_lab(window, |lab| {
                 lab.clamp_scroll_offsets(rect.width() as f32, rect.height() as f32);

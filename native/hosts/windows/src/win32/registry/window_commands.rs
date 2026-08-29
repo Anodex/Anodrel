@@ -78,6 +78,18 @@ pub(crate) fn complete_window_state_read_request(
     }
 }
 
+/// Records one observed state only in its associated UI session mailbox.
+pub(crate) fn record_window_state_change(
+    window: Hwnd,
+    state: anodrel_window::WindowState,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.record_window_state_change(state))),
+        _ => Ok(None),
+    }
+}
+
 /// Takes one pending foreground request only from its associated UI session.
 pub(crate) fn take_window_focus_request(window: Hwnd) -> io::Result<Option<u64>> {
     let views = lock_views()?;

@@ -5,6 +5,7 @@ use super::*;
 mod folder;
 mod folder_access;
 mod network;
+mod window_state_changes;
 mod window_state_read;
 
 #[test]

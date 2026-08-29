@@ -178,7 +178,11 @@ already owns. It has no target, handle, geometry, focus, or event surface; see
 `docs/WINDOW_STATE.md`. Protocol 1.30 separately adds the pull-only
 `window.state.read` capability. It returns only one immediate closed state for
 that same session window, with no target, handle, geometry, focus, timestamp,
-subscription, or event; see `docs/WINDOW_STATE_OBSERVATION.md`.
+subscription, or event; see `docs/WINDOW_STATE_OBSERVATION.md`. Protocol 1.31
+adds a separate `window.state.observe` grant and immediate coalesced
+`window.state.changes.read` pull. It retains only one later state or `null`,
+with no target, timing, history, wait, callback, or subscription; see
+`docs/WINDOW_STATE_CHANGES.md`.
 
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.

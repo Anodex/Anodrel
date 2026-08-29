@@ -19,6 +19,7 @@ mod focus;
 mod fullscreen;
 mod size;
 mod state;
+mod state_changes;
 mod state_read;
 mod title;
 
@@ -36,6 +37,9 @@ pub use size::{
 };
 pub use state::{
     WINDOW_STATE_RESPONSE_TIMEOUT, WindowStateMailbox, WindowStateRequest, WindowStateService,
+};
+pub use state_changes::{
+    WindowStateChangesMailbox, WindowStateChangesService, WindowStateChangesServiceError,
 };
 pub use state_read::{
     WINDOW_STATE_READ_RESPONSE_TIMEOUT, WindowStateReadMailbox, WindowStateReadRequest,

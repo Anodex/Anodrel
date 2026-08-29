@@ -63,7 +63,8 @@ use anodrel_crash::{CrashSite, CrashSurface};
 use anodrel_ui_session::UiFieldMailbox;
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSizeMailbox,
-    WindowStateMailbox, WindowStateReadMailbox, WindowTitleMailbox, WindowTitleProposal,
+    WindowStateChangesMailbox, WindowStateMailbox, WindowStateReadMailbox, WindowTitleMailbox,
+    WindowTitleProposal,
 };
 
 use crate::product::PreflightOutcome;

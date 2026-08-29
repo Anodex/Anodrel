@@ -45,6 +45,7 @@ export type Capability =
   | "ui.fields.read"
   | "window.state"
   | "window.state.read"
+  | "window.state.observe"
   | "window.focus"
   | "window.fullscreen"
   | "window.size"
@@ -201,6 +202,19 @@ export interface PlatformOperationMap {
   "window.state.get": {
     readonly payload: EmptyPayload;
     readonly result: { readonly state: WindowState };
+  };
+  /**
+   * Consumes the latest coalesced native presentation change for this
+   * session's own window. The distinct `window.state.observe` grant is
+   * required.
+   *
+   * There is no target, native handle, timestamp, sequence, history, wait,
+   * callback, or subscription. `null` says only that no unread change is
+   * retained; see `docs/WINDOW_STATE_CHANGES.md`.
+   */
+  "window.state.changes.read": {
+    readonly payload: EmptyPayload;
+    readonly result: { readonly state: WindowState | null };
   };
   /**
    * Asks Windows to foreground this session's one host-owned window.

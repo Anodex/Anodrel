@@ -110,6 +110,18 @@ stale as soon as it arrives; code that uses `setWindowState()` must refresh
 with `getWindowState()` rather than infer a result from action acceptance. See
 `docs/WINDOW_STATE_OBSERVATION.md`.
 
+### Session-window state changes
+
+Protocol 1.31 adds `readWindowStateChanges()`. It sends exactly `{}` and needs
+the separate `window.state.observe` grant. Its result holds either one latest
+coalesced `minimized`, `maximized`, or `restored` transition for the requesting
+session's own native window, or `null` when no unread transition exists. The
+first native observation establishes a baseline, so use `getWindowState()` for
+initial state. This is an immediate pull: it does not wait, subscribe, invoke a
+callback, or create a background listener. It cannot take a target, handle,
+geometry, focus, timestamp, sequence, history, or event-count option. See
+`docs/WINDOW_STATE_CHANGES.md`.
+
 ### Host-authorized HTTPS text fetch
 
 Protocol 1.19 adds `fetchHttpsText(url)`. It sends exactly the supplied

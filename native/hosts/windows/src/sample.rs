@@ -199,6 +199,21 @@ pub fn run_ui_session_with_window_state_read(
     run_ui_session_with_dialog(node_path, client_path, SampleDialogRequest::WindowStateRead)
 }
 
+/// Runs the UI-session diagnostic through coalesced state-change reads.
+///
+/// The child consumes only the latest native transition for its own window; it
+/// receives no callback, timing, queue, or subscription.
+pub fn run_ui_session_with_window_state_changes(
+    node_path: &str,
+    client_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    run_ui_session_with_dialog(
+        node_path,
+        client_path,
+        SampleDialogRequest::WindowStateChanges,
+    )
+}
+
 /// Runs the UI-session diagnostic through one guarded foreground request.
 ///
 /// An operator brings another application forward during the short client
@@ -330,6 +345,7 @@ fn run_with_optional_session_view(
                 .with_window_title(ui.window_title.clone())
                 .with_window_state(ui.window_state.clone())
                 .with_window_state_read(ui.window_state_read.clone())
+                .with_window_state_changes(ui.window_state_changes.clone())
                 .with_window_focus(ui.window_focus.clone())
                 .with_window_fullscreen(ui.window_fullscreen.clone())
                 .with_window_size(ui.window_size.clone())
@@ -377,6 +393,9 @@ fn run_with_optional_session_view(
             SampleDialogRequest::WindowTitle => command.arg("--request-window-title")?,
             SampleDialogRequest::WindowState => command.arg("--request-window-state")?,
             SampleDialogRequest::WindowStateRead => command.arg("--request-window-state-read")?,
+            SampleDialogRequest::WindowStateChanges => {
+                command.arg("--request-window-state-changes")?
+            }
             SampleDialogRequest::WindowFocus => command.arg("--request-window-focus")?,
             SampleDialogRequest::WindowFullscreen => command.arg("--request-window-fullscreen")?,
             SampleDialogRequest::WindowSize => command.arg("--request-window-size")?,
@@ -404,6 +423,7 @@ fn run_with_optional_session_view(
             ui.window_title,
             ui.window_state,
             ui.window_state_read,
+            ui.window_state_changes,
             ui.window_focus,
             ui.window_fullscreen,
             ui.window_size,

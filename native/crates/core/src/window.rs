@@ -142,6 +142,45 @@ impl CoreHost {
         }
     }
 
+    /// Consumes one coalesced state change for this session's own window.
+    ///
+    /// The response is either one closed later state or null. It never waits
+    /// for a future native event, names a window, or reveals timing, history,
+    /// sequence, callback, subscription, or desktop detail. See
+    /// `docs/WINDOW_STATE_CHANGES.md` and Decision 0118.
+    pub(super) fn handle_window_state_changes_read(&self, request: RequestEnvelope) -> JsonValue {
+        if !is_empty_object(&request.payload) {
+            return self.failure(
+                request.request_id,
+                ProtocolErrorCode::RequestPayloadInvalid,
+                "window.state.changes.read accepts no payload fields.",
+                None,
+            );
+        }
+        if !self.policy.has(Capability::WindowStateObserve) {
+            return self.capability_denied(request.request_id, "window.state.changes.read");
+        }
+
+        match self.window_state_changes.read_change() {
+            Ok(change) => ResponseEnvelope::success(
+                request.request_id,
+                &self.policy.host_name,
+                object([(
+                    "state",
+                    change.map_or(JsonValue::Null, |state| {
+                        JsonValue::String(window_state_name(state).to_owned())
+                    }),
+                )]),
+            ),
+            Err(WindowStateChangesServiceError::Unavailable) => self.failure(
+                request.request_id,
+                ProtocolErrorCode::WindowUnavailable,
+                "no session window state changes are available.",
+                None,
+            ),
+        }
+    }
+
     /// Applies one reversible fullscreen mode to this session's own window.
     ///
     /// The payload is one closed mode rather than a monitor, rectangle,

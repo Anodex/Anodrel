@@ -59,7 +59,10 @@ export function dispatchWindowOperation(
       // This is not native observation: the mock records only the closed state
       // it accepted so a separately granted Protocol 1.30 snapshot can model
       // the documented host boundary deterministically.
-      sessionWindows.presentationState = request.payload.state;
+      if (sessionWindows.presentationState !== request.payload.state) {
+        sessionWindows.presentationState = request.payload.state;
+        sessionWindows.pendingPresentationState = request.payload.state;
+      }
       return context.success("window.state.set", request.requestId, { status: "applied" });
 
     case "window.state.get":
@@ -75,6 +78,21 @@ export function dispatchWindowOperation(
       return context.success("window.state.get", request.requestId, {
         state: sessionWindows.presentationState,
       });
+
+    case "window.state.changes.read": {
+      if (request.protocolVersion.minor < 31) {
+        return context.failure(request.requestId, "operation.unsupported", "window.state.changes.read requires protocol 1.31 or later.");
+      }
+      if (!isEmptyPayload(request.payload)) {
+        return context.failure(request.requestId, "request.payload_invalid", "window.state.changes.read accepts no payload fields.");
+      }
+      if (!context.hasCapability(sessionId, "window.state.observe")) {
+        return context.failure(request.requestId, "capability.denied", "window.state.changes.read requires the window.state.observe capability.", { capability: "window.state.observe" });
+      }
+      const state = sessionWindows.pendingPresentationState;
+      sessionWindows.pendingPresentationState = null;
+      return context.success("window.state.changes.read", request.requestId, { state });
+    }
 
     case "window.focus.request":
       if (request.protocolVersion.minor < 20) {

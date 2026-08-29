@@ -84,6 +84,18 @@ pub(crate) fn service_window_state_read(window: Hwnd) {
     let _ = registry::complete_window_state_read_request(window, request_id, Some(state));
 }
 
+/// Records this UI-thread window's latest standard presentation state.
+///
+/// Only the closed portable value reaches the session-local coalescing mailbox.
+/// There is no worker wakeup, state query operation, timing record, or queue.
+pub(crate) fn record_window_state_change(window: Hwnd) {
+    // SAFETY: the window belongs to this UI thread and these calls inspect only
+    // its ordinary User32 presentation flags.
+    let state =
+        unsafe { observed_presentation_state(IsIconic(window) != 0, IsZoomed(window) != 0) };
+    let _ = registry::record_window_state_change(window, state);
+}
+
 /// Asks Windows to foreground this session window for one pending request.
 ///
 /// This runs on the thread that created `window` and obtains the target only

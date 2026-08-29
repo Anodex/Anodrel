@@ -182,7 +182,9 @@ The existing primary-only session-window commands remain deliberately narrower
 than the private lifecycle: `window.title.set` proposes a title the host
 composes with a validated application name, `window.state.set` selects one
 closed minimise, maximise, or restore action, and `window.state.get` returns
-one separately granted pull-only closed-state snapshot. `window.focus.request`
+one separately granted pull-only closed-state snapshot.
+`window.state.changes.read` consumes one separately granted coalesced later
+state or `null`. `window.focus.request`
 asks Windows to foreground that same session-owned window.
 `window.fullscreen.set` chooses only reversible borderless fullscreen or
 windowed restoration for that same window; `window.size.set` chooses only a
@@ -190,7 +192,8 @@ bounded logical client area for it. All cross a per-session, one-request bridge
 to the window's owning UI thread; none exposes a target, handle, geometry,
 monitor, display mode, focus readback, input, retry, event, position, DPI, or
 bounds readback. `window.state.get` has no future change notification and may
-be stale immediately. The focus request does not control semantic UI focus or
+be stale immediately; `window.state.changes.read` has no callback, wait,
+history, timestamp, or subscription. The focus request does not control semantic UI focus or
 bypass Windows foreground policy; fullscreen retains its native placement facts
 privately and is not exclusive display control.
 
@@ -203,9 +206,9 @@ the UI thread through a private map. `ui.document.replace.window` can update
 revision-checked actions tagged by their logical view. Neither operation
 enumerates, looks up, or observes a native window. See
 `docs/MULTI_WINDOW.md`, `docs/WINDOW_TITLE.md`, `docs/WINDOW_STATE.md`,
-`docs/WINDOW_STATE_OBSERVATION.md`, `docs/WINDOW_FOCUS.md`,
+`docs/WINDOW_STATE_OBSERVATION.md`, `docs/WINDOW_STATE_CHANGES.md`, `docs/WINDOW_FOCUS.md`,
 `docs/WINDOW_FULLSCREEN.md`, `docs/WINDOW_SIZE.md`, and Decisions 0066, 0072,
-0117, 0085, 0086, 0088, 0092, and 0093.
+0117, 0118, 0085, 0086, 0088, 0092, and 0093.
 
 Protocol 1.26 adds parallel exact-v3 document operations for the primary and
 these session-owned views. A v3 document may carry one visible semantic status.

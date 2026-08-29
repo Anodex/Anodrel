@@ -8,6 +8,11 @@ export interface AnodexWindowStateClient {
   ): Promise<{ readonly status: "applied" }>;
 }
 
+/** The extra pull boundary used for one explicit title-bar refresh. */
+export interface AnodexWindowStateChangesClient {
+  readWindowStateChanges(): Promise<{ readonly state: WindowState | null }>;
+}
+
 /** The complete presentation state one title bar needs to render its action. */
 export interface AnodexTitleBarState {
   readonly isMaximized: boolean;
@@ -44,4 +49,18 @@ export async function toggleAnodexTitleBarState(
   const { state } = await client.getWindowState();
   await client.setWindowState(state === "maximized" ? "restored" : "maximized");
   return readAnodexTitleBarState(client);
+}
+
+/**
+ * Reads one latest native presentation change as an optional title-bar state.
+ *
+ * This does not subscribe, schedule a retry, or keep local state. The caller
+ * decides whether and when to make another pull, preserving Anodrel's bounded
+ * coalesced contract rather than imitating Electron's callback API.
+ */
+export async function readAnodexTitleBarChange(
+  client: AnodexWindowStateChangesClient,
+): Promise<AnodexTitleBarState | null> {
+  const { state } = await client.readWindowStateChanges();
+  return state === null ? null : anodexTitleBarState(state);
 }

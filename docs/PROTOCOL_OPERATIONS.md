@@ -84,6 +84,22 @@ be stale as soon as it is returned. It never confirms a previous
 `window.state.set` request took effect. See `docs/WINDOW_STATE_OBSERVATION.md`
 and Decision 0117.
 
+## Session-window coalesced presentation-state change
+
+Protocol 1.31 implements `window.state.changes.read` behind the separate
+`window.state.observe` grant. It accepts exactly `{}` and returns exactly one
+field: `{ "state": "minimized" | "maximized" | "restored" | null }`.
+A non-null value is the latest unread state transition seen for the
+authenticated session's own native window; a newer transition replaces it.
+`null` says only that no unread change is retained.
+
+The first native observation establishes a baseline, so callers use
+`window.state.get` when they need an initial state. This operation never waits
+for a later change and cannot name a target, window handle, process, bounds,
+monitor, fullscreen state, focus, visibility, z-order, timestamp, sequence,
+count, history, callback, event, or subscription. An absent UI surface returns
+`window.unavailable`. See `docs/WINDOW_STATE_CHANGES.md` and Decision 0118.
+
 ## Session-owned secondary views
 
 Protocol 1.25 adds `window.open`, `window.close`,

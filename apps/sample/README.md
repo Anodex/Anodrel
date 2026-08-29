@@ -51,6 +51,13 @@ maximised and restored in turn, and confirms the immediate snapshot after each
 request. It receives no native handle, bounds, monitor, focus, or event stream.
 See `docs/WINDOW_STATE_OBSERVATION.md`.
 
+Use `--sample-ui-window-state-changes-client` to exercise the separately
+granted `window.state.observe` capability. The development client first reads
+`null`, then requests maximized and restored states and consumes one coalesced
+state after each visible transition. It receives no native handle, bounds,
+monitor, focus, timing, history, callback, or event stream. See
+`docs/WINDOW_STATE_CHANGES.md`.
+
 Use `--sample-ui-window-fullscreen-client` to exercise the separately granted
 `window.fullscreen.set` command. The development client asks only for
 borderless fullscreen and then windowed restoration of its own session window;

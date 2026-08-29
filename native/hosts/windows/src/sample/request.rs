@@ -20,6 +20,7 @@ pub(super) enum SampleDialogRequest {
     WindowTitle,
     WindowState,
     WindowStateRead,
+    WindowStateChanges,
     WindowFocus,
     WindowFullscreen,
     WindowSize,
@@ -63,6 +64,9 @@ pub(super) fn sample_capabilities(dialog_request: SampleDialogRequest) -> Vec<Ca
     }
     if matches!(dialog_request, SampleDialogRequest::WindowStateRead) {
         capabilities.push(Capability::WindowStateRead);
+    }
+    if matches!(dialog_request, SampleDialogRequest::WindowStateChanges) {
+        capabilities.push(Capability::WindowStateObserve);
     }
     if matches!(
         dialog_request,
@@ -152,6 +156,17 @@ mod tests {
         assert!(!ordinary.contains(&Capability::WindowStateRead));
         assert!(read.contains(&Capability::WindowStateRead));
         assert_eq!(read.len(), ordinary.len() + 1);
+    }
+
+    #[test]
+    fn window_state_change_grant_is_limited_to_the_explicit_change_diagnostic() {
+        let ordinary = sample_capabilities(SampleDialogRequest::None);
+        let changes = sample_capabilities(SampleDialogRequest::WindowStateChanges);
+
+        assert!(!ordinary.contains(&Capability::WindowStateObserve));
+        assert!(changes.contains(&Capability::WindowStateObserve));
+        assert_eq!(changes.len(), ordinary.len() + 1);
+        assert!(!changes.contains(&Capability::WindowStateRead));
     }
 
     #[test]

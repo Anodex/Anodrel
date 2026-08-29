@@ -150,6 +150,27 @@ fn each_session_carries_its_own_pull_only_window_state_read_bridge() {
 }
 
 #[test]
+fn each_session_carries_its_own_coalesced_window_state_change_mailbox() {
+    let first = RegisteredSessionUi::new("First Application");
+    let second = RegisteredSessionUi::new("Second Application");
+    let first_mailbox = first.window_state_changes_mailbox();
+    let second_mailbox = second.window_state_changes_mailbox();
+
+    first_mailbox.record_state(anodrel_window::WindowState::Restored);
+    second_mailbox.record_state(anodrel_window::WindowState::Restored);
+    first_mailbox.record_state(anodrel_window::WindowState::Maximized);
+
+    assert_eq!(
+        anodrel_window::WindowStateChangesService::read_change(&first_mailbox),
+        Ok(Some(anodrel_window::WindowState::Maximized))
+    );
+    assert_eq!(
+        anodrel_window::WindowStateChangesService::read_change(&second_mailbox),
+        Ok(None)
+    );
+}
+
+#[test]
 fn each_session_carries_its_own_bounded_window_size_bridge() {
     let first = RegisteredSessionUi::new("First Application");
     let second = RegisteredSessionUi::new("Second Application");

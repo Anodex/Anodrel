@@ -11,8 +11,8 @@ use anodrel_windows_file_access::WindowsFileTextService;
 
 use super::{
     UiSessionPoll, UiSessionView, WindowFocusMailbox, WindowFullscreenMailbox,
-    WindowFullscreenMode, WindowSize, WindowSizeMailbox, WindowState, WindowStateMailbox,
-    WindowStateReadMailbox, WindowTitleMailbox,
+    WindowFullscreenMode, WindowSize, WindowSizeMailbox, WindowState, WindowStateChangesMailbox,
+    WindowStateMailbox, WindowStateReadMailbox, WindowTitleMailbox,
 };
 
 mod isolation;
@@ -164,6 +164,21 @@ fn view_with_state_read() -> (UiSessionView, WindowStateReadMailbox) {
         NotificationMailbox::new(),
     )
     .with_window_state_read(mailbox.clone());
+    (view, mailbox)
+}
+
+/// A session view with its own coalesced pull-only state-change mailbox.
+fn view_with_state_changes() -> (UiSessionView, WindowStateChangesMailbox) {
+    let mailbox = WindowStateChangesMailbox::new();
+    let view = UiSessionView::new(
+        UiDocumentMailbox::new(),
+        UiInputMailbox::new(),
+        SessionCloseSignal::default(),
+        FileDialogMailbox::new(),
+        WindowsFileTextService::new(),
+        NotificationMailbox::new(),
+    )
+    .with_window_state_changes(mailbox.clone());
     (view, mailbox)
 }
 
@@ -364,6 +379,19 @@ fn a_session_without_a_state_read_bridge_answers_nothing_and_completes_nothing()
     );
     assert!(view.take_window_state_read_request().is_none());
     assert!(!view.complete_window_state_read_request(1, Some(WindowState::Restored)));
+}
+
+#[test]
+fn a_session_without_a_state_change_mailbox_records_nothing() {
+    let view = UiSessionView::new(
+        UiDocumentMailbox::new(),
+        UiInputMailbox::new(),
+        SessionCloseSignal::default(),
+        FileDialogMailbox::new(),
+        WindowsFileTextService::new(),
+        NotificationMailbox::new(),
+    );
+    assert!(!view.record_window_state_change(WindowState::Restored));
 }
 
 #[test]

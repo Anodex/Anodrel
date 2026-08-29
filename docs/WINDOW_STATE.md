@@ -96,10 +96,13 @@ other host window may change. `docs/DEVELOPMENT_DIAGNOSTICS.md` gives the exact 
 
 ## Compatibility
 
-This capability is complete as specified. Protocol 1.30 separately specifies a
+This capability is complete as specified. Protocol 1.30 separately implements a
 pull-only read of the same closed state under a distinct `window.state.read`
 grant; it does not change this command's payload or acceptance-only response.
-See `docs/WINDOW_STATE_OBSERVATION.md` and Decision 0117. State-change events,
+Protocol 1.31 separately implements a coalesced pull under
+`window.state.observe`; it is not a state-change event or subscription. See
+`docs/WINDOW_STATE_OBSERVATION.md`, `docs/WINDOW_STATE_CHANGES.md`, and
+Decisions 0117–0118. State-change events,
 setting bounds, foregrounding, creating another window, targeting a window,
 and lifecycle events are each separate capabilities with their own protocol
 version, grant, decision, and threat-model entry. The separate

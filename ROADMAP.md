@@ -93,7 +93,14 @@ Status: **Direct Windows host in progress**
   counterpart. The SDK, mock, policy parser, session-local bridge, direct
   `IsIconic`/`IsZoomed` adapter, and small Anodex title-bar adapter are
   implemented (Decision 0117). It returns no target, handle, geometry, focus,
-  event, or timing data. Window creation, cross-session closing, geometry,
+  event, or timing data. Protocol 1.31 separately adds the coalesced
+  `window.state.changes.read` pull behind `window.state.observe` and record
+  version 1.18. Its SDK, mock, installed-policy parser, session-local mailbox,
+  direct Windows `WM_SIZE` observer, product-session composition, development
+  diagnostic, and explicit Anodex adapter refresh are implemented (Decision
+  0118). It retains one latest later state or `null`, never a target, handle,
+  timing, sequence, history, wait, callback, or subscription. Window creation,
+  cross-session closing, geometry,
   enumeration, exclusive display control, monitor selection, focus readback,
   and every other window property remain deferred, each needing its own grant,
   decision, and threat-model entry. Protocol 1.23 `window.size.set` is the

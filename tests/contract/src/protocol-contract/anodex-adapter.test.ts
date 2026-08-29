@@ -1,4 +1,5 @@
 import {
+  readAnodexTitleBarChange,
   readAnodexTitleBarState,
   toggleAnodexTitleBarState,
 } from "@anodrel/anodex-adapter";
@@ -15,7 +16,7 @@ test("the Anodex adapter renders and refreshes only the closed title-bar state",
   const client = new PlatformClient(
     new MockHost({
       applicationId: "org.anodex.title-bar-test",
-      grantedCapabilities: ["window.state", "window.state.read"],
+      grantedCapabilities: ["window.state", "window.state.read", "window.state.observe"],
     }).createTransport(),
     new SequenceRequestIds(),
   );
@@ -32,4 +33,9 @@ test("the Anodex adapter renders and refreshes only the closed title-bar state",
     isMaximized: false,
     actionLabel: "Maximize",
   });
+  assert.deepEqual(await readAnodexTitleBarChange(client), {
+    isMaximized: false,
+    actionLabel: "Maximize",
+  });
+  assert.equal(await readAnodexTitleBarChange(client), null);
 });

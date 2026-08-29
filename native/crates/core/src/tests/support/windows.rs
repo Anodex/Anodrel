@@ -188,6 +188,33 @@ pub(crate) fn host_with_window_state_read(
     )
 }
 
+/// A coalesced state-change service with a host-owned latest value.
+#[derive(Debug, Default)]
+pub(crate) struct RecordingWindowStateChanges {
+    pub(crate) change: Option<WindowState>,
+    pub(crate) result: Option<WindowStateChangesServiceError>,
+}
+
+impl WindowStateChangesService for RecordingWindowStateChanges {
+    fn read_change(&self) -> Result<Option<WindowState>, WindowStateChangesServiceError> {
+        self.result.map_or(Ok(self.change), Err)
+    }
+}
+
+pub(crate) fn host_with_window_state_changes(
+    service: impl WindowStateChangesService + 'static,
+) -> CoreHost {
+    CoreHost::with_services(
+        HostPolicy::new(
+            "test.application",
+            vec![Capability::WindowStateObserve],
+            "test-host",
+        )
+        .expect("test policy is valid"),
+        HostServices::unavailable().with_window_state_changes(service),
+    )
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct RecordingWindowFocus {
     pub(crate) requested: Arc<Mutex<u8>>,

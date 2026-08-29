@@ -1,6 +1,6 @@
 # Decision 0118: Session window-state changes stay coalesced and pull-only
 
-**Status:** Accepted for the next protocol slice; not implemented yet.
+**Status:** Accepted and implemented on Windows for Protocol 1.31.
 
 **Date:** 2026-08-29
 
@@ -18,7 +18,7 @@ the public platform.
 
 ## Decision
 
-The next protocol slice is 1.31. It adds a distinct `window.state.observe`
+Protocol 1.31 adds a distinct `window.state.observe`
 capability and an exact `window.state.changes.read` operation. The payload is
 exactly `{}`. Its result is exactly one field:
 
@@ -38,7 +38,7 @@ focus, geometry, monitor, fullscreen state, or visibility field. It never
 blocks waiting for a future change. A missing or expired session surface
 returns `window.unavailable`.
 
-Installed record version 1.18 will be the first version allowed to name
+Installed record version 1.18 is the first version allowed to name
 `window.state.observe`, as a strict superset of 1.17. It is separate from both
 the write-only `window.state` and snapshot-only `window.state.read` grants.
 

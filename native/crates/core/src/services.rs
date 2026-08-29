@@ -21,6 +21,7 @@ pub struct HostServices {
     pub(super) window_title: Box<dyn WindowTitleService>,
     pub(super) window_state: Box<dyn WindowStateService>,
     pub(super) window_state_read: Box<dyn WindowStateReadService>,
+    pub(super) window_state_changes: Box<dyn WindowStateChangesService>,
     pub(super) window_focus: Box<dyn WindowFocusService>,
     pub(super) window_fullscreen: Box<dyn WindowFullscreenService>,
     pub(super) window_size: Box<dyn WindowSizeService>,
@@ -115,6 +116,15 @@ pub(super) struct UnavailableWindowStateRead;
 impl WindowStateReadService for UnavailableWindowStateRead {
     fn read_state(&self) -> Result<WindowState, WindowStateReadServiceError> {
         Err(WindowStateReadServiceError::Unavailable)
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct UnavailableWindowStateChanges;
+
+impl WindowStateChangesService for UnavailableWindowStateChanges {
+    fn read_change(&self) -> Result<Option<WindowState>, WindowStateChangesServiceError> {
+        Err(WindowStateChangesServiceError::Unavailable)
     }
 }
 
@@ -220,6 +230,7 @@ impl HostServices {
             window_title: Box::new(UnavailableWindowTitle),
             window_state: Box::new(UnavailableWindowState),
             window_state_read: Box::new(UnavailableWindowStateRead),
+            window_state_changes: Box::new(UnavailableWindowStateChanges),
             window_focus: Box::new(UnavailableWindowFocus),
             window_fullscreen: Box::new(UnavailableWindowFullscreen),
             window_size: Box::new(UnavailableWindowSize),
@@ -318,6 +329,21 @@ impl HostServices {
         service: impl WindowStateReadService + 'static,
     ) -> Self {
         self.window_state_read = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's coalesced window-state change reader.
+    ///
+    /// The service retains at most one latest state change captured for this
+    /// session's own native window. It accepts no target and exposes no
+    /// history, timing, callback, subscription, or native detail; see
+    /// `docs/WINDOW_STATE_CHANGES.md`.
+    #[must_use]
+    pub fn with_window_state_changes(
+        mut self,
+        service: impl WindowStateChangesService + 'static,
+    ) -> Self {
+        self.window_state_changes = Box::new(service);
         self
     }
 

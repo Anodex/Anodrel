@@ -285,6 +285,24 @@ async function run(): Promise<number> {
       }
     }
 
+    if (process.argv.includes("--request-window-state-changes")) {
+      // The initial visible size only establishes the host baseline. Later
+      // requests cause ordinary native size messages; each pull consumes the
+      // one coalesced current change without receiving timing or a listener.
+      if ((await client.readWindowStateChanges()).state !== null) {
+        return 38;
+      }
+      for (const state of ["maximized", "restored"] as const) {
+        if ((await client.setWindowState(state)).status !== "applied") {
+          return 38;
+        }
+        await delay(650);
+        if ((await client.readWindowStateChanges()).state !== state) {
+          return 38;
+        }
+      }
+    }
+
     if (process.argv.includes("--request-window-focus")) {
       // Give an operator a short window to bring another application forward.
       // The result still says only that Anodrel asked Windows; Windows may

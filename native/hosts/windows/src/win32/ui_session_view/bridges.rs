@@ -39,6 +39,16 @@ impl UiSessionView {
         self
     }
 
+    /// Attaches this session's coalesced pull-only state-change mailbox.
+    #[must_use]
+    pub(in crate::win32) fn with_window_state_changes(
+        mut self,
+        mailbox: WindowStateChangesMailbox,
+    ) -> Self {
+        self.window_state_changes = Some(mailbox);
+        self
+    }
+
     /// Attaches this session's guarded foreground-request bridge.
     #[must_use]
     pub(in crate::win32) fn with_window_focus(mut self, mailbox: WindowFocusMailbox) -> Self {
@@ -199,6 +209,18 @@ impl UiSessionView {
             || mailbox.fail(request_id),
             |state| mailbox.complete(request_id, state),
         )
+    }
+
+    /// Records one UI-thread state observation in this view's bounded mailbox.
+    ///
+    /// The mailbox itself establishes a baseline and coalesces later values,
+    /// so this bridge never allocates an event queue or starts a receiver.
+    pub(in crate::win32) fn record_window_state_change(&self, state: WindowState) -> bool {
+        let Some(mailbox) = self.window_state_changes.as_ref() else {
+            return false;
+        };
+        mailbox.record_state(state);
+        true
     }
 
     /// Takes one pending foreground request for this window's owning UI thread.

@@ -21,11 +21,12 @@ The current Anodex title bar uses four Electron-backed behaviours:
 | choose maximise or restore | `window.state.set` with a closed value | Implemented |
 | close the current application | `session.close` | Semantically different; requires lifecycle review |
 | show the correct initial maximise/restore glyph | `window.state.get` | Implemented in `@anodrel/anodex-adapter` |
-| react to an ordinary Windows maximise/restore change | `window.state.changes.read` | Specified; no hidden polling or callback shim |
+| react to an ordinary Windows maximise/restore change | `window.state.changes.read` | Implemented as explicit coalesced refresh; no hidden polling or callback shim |
 
-Anodrel intentionally has no native equivalent of Electron's maximise-change
-event. The first adapter must use one initial state snapshot and refresh after
-its own request; it must not invent a background event channel. Anodrel also
+Anodrel intentionally has no persistent native equivalent of Electron's
+maximise-change event. The adapter can use one initial state snapshot and one
+explicit coalesced refresh; it must not invent a background event channel.
+Anodrel also
 does not yet host Anodex's React renderer, workspace, model runtime, or its
 domain services.
 
@@ -34,10 +35,12 @@ domain services.
 1. **Completed:** implement and verify the separate `window.state.read` protocol capability.
 2. **Completed:** add a small Anodex-specific adapter package outside the platform core. It
    maps only the closed title-bar service contract and has no Electron import.
-3. Add the corresponding Electron adapter in Anodex, preserving its current
+3. **Completed:** extend that adapter with one explicit coalesced refresh method.
+   It returns an optional title-bar state and owns no polling, listener, or timer.
+4. Add the corresponding Electron adapter in Anodex, preserving its current
    renderer-facing contract while both adapters are verified against the same
    adapter tests.
-4. Compare behaviour in an explicit development route before moving another
+5. Compare behaviour in an explicit development route before moving another
    desktop service. A failure must leave the Electron adapter selectable.
 
 ## Non-goals
@@ -55,4 +58,4 @@ domain services.
 Every later adapter slice needs a documented mapping, contract tests shared by
 both adapters, a native-host verification, a comparison against the Electron
 behaviour, and a rollback path. See `docs/WINDOW_STATE_OBSERVATION.md`,
-Decision 0117, and Phase 4 in `docs/roadmap/FUTURE.md`.
+Decisions 0117–0118, and Phase 4 in `docs/roadmap/FUTURE.md`.

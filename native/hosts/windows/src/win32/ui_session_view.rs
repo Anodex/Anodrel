@@ -14,7 +14,8 @@ use anodrel_ui_session::{
 };
 use anodrel_window::{
     WindowFocusMailbox, WindowFullscreenMailbox, WindowFullscreenMode, WindowSize,
-    WindowSizeMailbox, WindowState, WindowStateMailbox, WindowStateReadMailbox, WindowTitleMailbox,
+    WindowSizeMailbox, WindowState, WindowStateChangesMailbox, WindowStateMailbox,
+    WindowStateReadMailbox, WindowTitleMailbox,
 };
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_folder_access::WindowsFolderEntryService;
@@ -75,6 +76,11 @@ pub(super) struct UiSessionView {
     /// state. It intentionally has no listener, event, geometry, or focus
     /// surface; see `docs/WINDOW_STATE_OBSERVATION.md`.
     window_state_read: Option<WindowStateReadMailbox>,
+    /// This session's coalesced pull-only presentation-change mailbox.
+    ///
+    /// It retains at most one later closed state. No timing, history, wait,
+    /// callback, or subscription reaches this view or its application.
+    window_state_changes: Option<WindowStateChangesMailbox>,
     /// This session's one-request foreground bridge, when it has one.
     ///
     /// The view supplies no target or native handle. Its owning UI thread can
@@ -157,6 +163,7 @@ impl UiSessionView {
             window_title: None,
             window_state: None,
             window_state_read: None,
+            window_state_changes: None,
             window_focus: None,
             window_fullscreen: None,
             window_size: None,
@@ -188,6 +195,7 @@ impl UiSessionView {
             menu,
             window_state,
             window_state_read,
+            window_state_changes,
             window_focus,
             window_fullscreen,
             window_size,
@@ -207,6 +215,7 @@ impl UiSessionView {
                 ui.menu_mailbox(),
                 ui.window_state_mailbox(),
                 ui.window_state_read_mailbox(),
+                ui.window_state_changes_mailbox(),
                 ui.window_focus_mailbox(),
                 ui.window_fullscreen_mailbox(),
                 ui.window_size_mailbox(),
@@ -227,6 +236,7 @@ impl UiSessionView {
         .with_menu(menu)
         .with_window_state(window_state)
         .with_window_state_read(window_state_read)
+        .with_window_state_changes(window_state_changes)
         .with_window_focus(window_focus)
         .with_window_fullscreen(window_fullscreen)
         .with_window_size(window_size)

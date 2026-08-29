@@ -15,5 +15,6 @@ mod ui_interactions;
 mod window_focus;
 mod window_presentation;
 mod window_state;
+mod window_state_changes;
 mod window_state_read;
 mod window_title;

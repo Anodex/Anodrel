@@ -35,9 +35,10 @@ pub(super) use session::{
 pub(super) use window_commands::{
     complete_window_focus_request, complete_window_fullscreen_request,
     complete_window_size_request, complete_window_state_read_request,
-    complete_window_state_request, complete_window_title_request, set_window_fullscreen_restore,
-    take_window_focus_request, take_window_fullscreen_request, take_window_size_request,
-    take_window_state_read_request, take_window_state_request, take_window_title_request,
+    complete_window_state_request, complete_window_title_request, record_window_state_change,
+    set_window_fullscreen_restore, take_window_focus_request, take_window_fullscreen_request,
+    take_window_size_request, take_window_state_read_request, take_window_state_request,
+    take_window_title_request,
 };
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();

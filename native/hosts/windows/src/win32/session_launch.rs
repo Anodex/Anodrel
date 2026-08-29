@@ -23,6 +23,7 @@ pub fn run_ui_session(
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
+    window_state_changes: WindowStateChangesMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -42,6 +43,7 @@ pub fn run_ui_session(
         window_title,
         window_state,
         window_state_read,
+        window_state_changes,
         window_focus,
         window_fullscreen,
         window_size,
@@ -67,6 +69,7 @@ pub(crate) fn run_ui_session_after_shown<F>(
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
+    window_state_changes: WindowStateChangesMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -90,6 +93,7 @@ where
         window_title,
         window_state,
         window_state_read,
+        window_state_changes,
         window_focus,
         window_fullscreen,
         window_size,
@@ -119,6 +123,11 @@ where
 /// same host-selected window. It has no target, native handle, geometry, focus,
 /// timing, subscription, or event; see `docs/WINDOW_STATE_OBSERVATION.md`.
 ///
+/// `window_state_changes` retains only one latest state change for this same
+/// host-selected window. A worker consumes it immediately, without a target,
+/// history, timestamp, wait, callback, or subscription; see
+/// `docs/WINDOW_STATE_CHANGES.md`.
+///
 /// `window_focus` carries only a request to foreground this same host-selected
 /// window. It exposes no target, input, retry, or observed focus state; see
 /// `docs/WINDOW_FOCUS.md`.
@@ -143,6 +152,7 @@ pub fn run_authenticated_ui_session(
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
+    window_state_changes: WindowStateChangesMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -162,6 +172,7 @@ pub fn run_authenticated_ui_session(
         window_title,
         window_state,
         window_state_read,
+        window_state_changes,
         window_focus,
         window_fullscreen,
         window_size,
@@ -184,6 +195,7 @@ fn run_authenticated_ui_session_after_shown<F>(
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
+    window_state_changes: WindowStateChangesMailbox,
     window_focus: WindowFocusMailbox,
     window_fullscreen: WindowFullscreenMailbox,
     window_size: WindowSizeMailbox,
@@ -214,6 +226,7 @@ where
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
                 .with_window_state_read(window_state_read)
+                .with_window_state_changes(window_state_changes)
                 .with_window_focus(window_focus)
                 .with_window_fullscreen(window_fullscreen)
                 .with_window_size(window_size)

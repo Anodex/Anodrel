@@ -52,6 +52,25 @@ fn one_session_cannot_take_another_sessions_state_observation() {
 }
 
 #[test]
+fn one_session_cannot_record_another_sessions_state_change() {
+    let (first, first_mailbox) = view_with_state_changes();
+    let (second, second_mailbox) = view_with_state_changes();
+
+    assert!(first.record_window_state_change(WindowState::Restored));
+    assert!(second.record_window_state_change(WindowState::Restored));
+    assert!(first.record_window_state_change(WindowState::Maximized));
+
+    assert_eq!(
+        anodrel_window::WindowStateChangesService::read_change(&first_mailbox),
+        Ok(Some(WindowState::Maximized))
+    );
+    assert_eq!(
+        anodrel_window::WindowStateChangesService::read_change(&second_mailbox),
+        Ok(None)
+    );
+}
+
+#[test]
 fn one_session_cannot_take_another_sessions_focus_request() {
     let (first, first_mailbox) = view_with_focus();
     let (second, _second_mailbox) = view_with_focus();

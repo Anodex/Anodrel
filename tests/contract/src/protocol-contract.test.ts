@@ -8,3 +8,4 @@ import "./protocol-contract/protocol-boundaries.test.js";
 import "./protocol-contract/ui-documents.test.js";
 import "./protocol-contract/window-controls.test.js";
 import "./protocol-contract/window-state-observation.test.js";
+import "./protocol-contract/window-state-changes.test.js";

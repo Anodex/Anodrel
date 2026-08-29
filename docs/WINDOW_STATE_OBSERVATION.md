@@ -64,7 +64,7 @@ during migration. This specification does not add a React or browser renderer
 to Anodrel and does not claim Anodex can run on Anodrel today. See
 `docs/ANODEX_ADAPTER.md` and Decision 0117.
 
-The separately specified `window.state.changes.read` companion will cover one
+The separately implemented `window.state.changes.read` companion covers one
 coalesced later state only; it does not change this snapshot operation or add a
 subscription. See `docs/WINDOW_STATE_CHANGES.md` and Decision 0118.
 
