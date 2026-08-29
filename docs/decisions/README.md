@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0118: Session window-state changes stay coalesced and pull-only.
+
 - 0117: Session window state observation stays pull-only.
 
 - 0116: Folder-entry access uses one retained folder identity.

@@ -21,6 +21,7 @@ The current Anodex title bar uses four Electron-backed behaviours:
 | choose maximise or restore | `window.state.set` with a closed value | Implemented |
 | close the current application | `session.close` | Semantically different; requires lifecycle review |
 | show the correct initial maximise/restore glyph | `window.state.get` | Implemented in `@anodrel/anodex-adapter` |
+| react to an ordinary Windows maximise/restore change | `window.state.changes.read` | Specified; no hidden polling or callback shim |
 
 Anodrel intentionally has no native equivalent of Electron's maximise-change
 event. The first adapter must use one initial state snapshot and refresh after
