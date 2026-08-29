@@ -2,6 +2,7 @@ import {
   readAnodexTitleBarChange,
   readAnodexTitleBarState,
   requestAnodexTitleBarClose,
+  requestAnodexTitleBarMinimize,
   toggleAnodexTitleBarState,
 } from "@anodrel/anodex-adapter";
 
@@ -39,6 +40,21 @@ test("the Anodex adapter renders and refreshes only the closed title-bar state",
     actionLabel: "Maximize",
   });
   assert.equal(await readAnodexTitleBarChange(client), null);
+});
+
+test("the Anodex title-bar minimize requests only its accepted state change", async () => {
+  const client = new PlatformClient(
+    new MockHost({
+      applicationId: "org.anodex.title-bar-minimize-test",
+      grantedCapabilities: ["window.state", "window.state.read"],
+    }).createTransport(),
+    new SequenceRequestIds(),
+  );
+
+  assert.deepEqual(await requestAnodexTitleBarMinimize(client), {
+    status: "applied",
+  });
+  assert.deepEqual(await client.getWindowState(), { state: "minimized" });
 });
 
 test("the Anodex title-bar close requests only its accepted session end", async () => {

@@ -37,6 +37,18 @@ export async function readAnodexTitleBarState(
 }
 
 /**
+ * Requests minimisation of the current title bar's session-owned window.
+ *
+ * The response proves only that the host accepted the closed state request; it
+ * does not report the resulting native state or expose a native window target.
+ */
+export function requestAnodexTitleBarMinimize(
+  client: AnodexWindowStateClient,
+): Promise<{ readonly status: "applied" }> {
+  return client.setWindowState("minimized");
+}
+
+/**
  * Requests the opposite maximize/restore state, then takes a fresh snapshot.
  *
  * A state-set response proves acceptance only, so the refresh is required for

@@ -17,7 +17,7 @@ The current Anodex title bar uses four Electron-backed behaviours:
 
 | Anodex need | Existing Anodrel boundary | Migration status |
 | --- | --- | --- |
-| minimise its own window | `window.state.set` with `minimized` | Implemented |
+| minimise its own window | `window.state.set` with `minimized` | Implemented as an accepted state request |
 | choose maximise or restore | `window.state.set` with a closed value | Implemented |
 | request close of the current application | `session.close` | Implemented as an accepted session-end request; it is not close completion |
 | show the correct initial maximise/restore glyph | `window.state.get` | Implemented in `@anodrel/anodex-adapter` |

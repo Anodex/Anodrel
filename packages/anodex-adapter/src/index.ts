@@ -2,6 +2,7 @@ export {
   anodexTitleBarState,
   readAnodexTitleBarChange,
   readAnodexTitleBarState,
+  requestAnodexTitleBarMinimize,
   toggleAnodexTitleBarState,
   type AnodexTitleBarState,
   type AnodexWindowStateChangesClient,
