@@ -5,9 +5,12 @@
 Status: **First migration boundary implemented; broader migration planned**
 
 - Connect Anodex through the public Anodrel interfaces.
-- **First boundary implemented:** Anodex's title bar can use the separate
-  pull-only `window.state.read` capability through `@anodrel/anodex-adapter`.
-  It does not claim that Anodex's React runtime can run on Anodrel.
+- **First boundary implemented:** `@anodrel/anodex-adapter` maps Anodex's
+  title-bar minimize, maximize/restore, initial state snapshot, explicit
+  coalesced state refresh, and current-session close request to existing
+  separately granted Anodrel operations. Every response remains an acceptance
+  or bounded snapshot rather than Electron-style completion or callback
+  semantics. It does not claim that Anodex's React runtime can run on Anodrel.
 - Keep Anodex's existing Electron adapter working during migration.
 - Move platform-specific operations behind the new adapter.
 - Compare behavior and performance between the old and new hosts.
