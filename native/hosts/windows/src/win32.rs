@@ -18,6 +18,7 @@
 #![allow(non_snake_case)]
 
 mod appicon;
+mod context_menu;
 mod crash;
 mod document;
 mod dpi;
@@ -51,7 +52,7 @@ use anodrel_canvas::{Canvas, Rect as CanvasRect, point};
 use anodrel_core::SessionCloseSignal;
 use anodrel_diagnostics::LogBook;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequestKind, FileDialogSelection};
-use anodrel_menu::MenuMailbox;
+use anodrel_menu::{ContextMenuMailbox, MenuMailbox};
 use anodrel_notifications::NotificationMailbox;
 use anodrel_ui::UiDocument;
 use anodrel_ui_session::{UiDocumentMailbox, UiInputMailbox, UiWindowGroup, UiWindowId};

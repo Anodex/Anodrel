@@ -20,6 +20,7 @@ pub fn run_ui_session(
     folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
+    context_menu: ContextMenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -40,6 +41,7 @@ pub fn run_ui_session(
         folder_entries,
         notifications,
         menu,
+        context_menu,
         window_title,
         window_state,
         window_state_read,
@@ -66,6 +68,7 @@ pub(crate) fn run_ui_session_after_shown<F>(
     folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
+    context_menu: ContextMenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -90,6 +93,7 @@ where
         folder_entries,
         notifications,
         menu,
+        context_menu,
         window_title,
         window_state,
         window_state_read,
@@ -149,6 +153,7 @@ pub fn run_authenticated_ui_session(
     folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
+    context_menu: ContextMenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -169,6 +174,7 @@ pub fn run_authenticated_ui_session(
         folder_entries,
         notifications,
         menu,
+        context_menu,
         window_title,
         window_state,
         window_state_read,
@@ -192,6 +198,7 @@ fn run_authenticated_ui_session_after_shown<F>(
     folder_entries: WindowsFolderEntryService,
     notifications: NotificationMailbox,
     menu: MenuMailbox,
+    context_menu: ContextMenuMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -223,6 +230,7 @@ where
                 )
                 .with_folder_entries(folder_entries)
                 .with_menu(menu)
+                .with_context_menu(context_menu)
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
                 .with_window_state_read(window_state_read)

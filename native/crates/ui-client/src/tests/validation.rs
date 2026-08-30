@@ -51,6 +51,21 @@ fn invalid_menus_fail_before_they_can_create_a_protocol_request() {
 }
 
 #[test]
+fn invalid_context_menus_fail_before_they_can_create_a_protocol_request() {
+    let (mut session, written) = session_with_responses([]);
+
+    assert_eq!(
+        session.replace_context_menu_v1(r#"{"items":[]}"#),
+        Err(UiClientError::ContextMenuInvalid)
+    );
+    assert_eq!(
+        messages(&written).len(),
+        1,
+        "only authentication was written"
+    );
+}
+
+#[test]
 fn invalid_multi_window_title_or_identity_fails_closed() {
     let (mut session, written) = session_with_responses([]);
     assert_eq!(
@@ -79,6 +94,17 @@ fn menu_revisions_must_be_nonzero_canonical_decimal_values() {
 
     assert_eq!(
         session.replace_menu_v1(MENU),
+        Err(UiClientError::ResponseInvalid)
+    );
+}
+
+#[test]
+fn context_menu_events_require_their_own_schema_and_revision_fields() {
+    let malformed = r#"{"events":[{"kind":"event","eventName":"menu.context.action.invoked","source":"native.context_menu","protocolVersion":{"major":1,"minor":32},"schemaVersion":{"major":1,"minor":32},"payload":{"menuRevision":"1","action":"template.context.complete"}}],"dropped":0,"discarded":0}"#;
+    let (mut session, _) = session_with_responses([response("anodrel-ui-1", malformed)]);
+
+    assert_eq!(
+        session.read_context_menu_actions(),
         Err(UiClientError::ResponseInvalid)
     );
 }

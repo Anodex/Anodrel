@@ -184,13 +184,14 @@ adds a separate `window.state.observe` grant and immediate coalesced
 with no target, timing, history, wait, callback, or subscription; see
 `docs/WINDOW_STATE_CHANGES.md`.
 
-Protocol 1.32 adds the portable protocol and core boundary for a native
-context menu. Its distinct `menu.context.write` grant replaces one complete
-semantic model of up to sixteen ID, label, and enabled-state items. It exposes
-no browser selection, link, coordinate, target, callback, shortcut, native
-handle, command identifier, or result readback. The SDK, mock host,
+Protocol 1.32 adds the direct Windows-native context-menu route. Its distinct
+`menu.context.write` grant replaces one complete semantic model of up to
+sixteen ID, label, and enabled-state items. The UI thread owns the local
+pointer trigger, User32 popup, private command mapping, and action routing; it
+exposes no browser selection, link, coordinate, target, callback, shortcut,
+native handle, command identifier, or result readback. The SDK, mock host,
 installed-record 1.19 policy, and revision-checked `ui.events.read` delivery
-are implemented; the direct Windows popup bridge remains the next work. See
+are implemented through the direct Windows popup bridge. See
 `docs/CONTEXT_MENUS.md`.
 
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
@@ -360,7 +361,9 @@ UI-session host.
 the implemented direct Windows adapter, canonical local keyboard shortcuts,
 its explicit ownership boundary, and the remaining manual verification.
 `docs/CONTEXT_MENUS.md` defines the separate bounded native context-menu
-contract and its pending direct Windows popup bridge.
+contract and its implemented direct Windows popup bridge.
+`docs/NATIVE_CONTEXT_MENU_TEMPLATE.md` defines the matching first-party Rust
+development template and its explicit four-grant host route.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

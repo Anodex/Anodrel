@@ -30,6 +30,7 @@ pub(super) const WM_PAINT: Uint = 0x000F;
 pub(super) const WM_ERASEBKGND: Uint = 0x0014;
 pub(super) const WM_SETTINGCHANGE: Uint = 0x001A;
 pub(super) const WM_GETMINMAXINFO: Uint = 0x0024;
+pub(super) const WM_CONTEXTMENU: Uint = 0x007B;
 pub(super) const WM_SETICON: Uint = 0x0080;
 pub(super) const WM_COMMAND: Uint = 0x0111;
 pub(super) const WM_SETCURSOR: Uint = 0x0020;
@@ -253,6 +254,15 @@ unsafe extern "system" {
     pub(super) fn CreateMenu() -> Hmenu;
     pub(super) fn CreatePopupMenu() -> Hmenu;
     pub(super) fn AppendMenuW(menu: Hmenu, flags: Uint, new_item: usize, text: *const u16) -> Bool;
+    pub(super) fn TrackPopupMenu(
+        menu: Hmenu,
+        flags: Uint,
+        x: i32,
+        y: i32,
+        reserved: i32,
+        window: Hwnd,
+        exclusion: *const Rect,
+    ) -> Uint;
     pub(super) fn SetMenu(window: Hwnd, menu: Hmenu) -> Bool;
     pub(super) fn DrawMenuBar(window: Hwnd) -> Bool;
     pub(super) fn DestroyMenu(menu: Hmenu) -> Bool;

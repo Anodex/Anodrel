@@ -454,6 +454,21 @@ fn a_session_without_a_menu_bridge_has_no_menu_request_or_command_route() {
 }
 
 #[test]
+fn a_session_without_a_context_menu_bridge_has_no_context_menu_route() {
+    let view = UiSessionView::new(
+        UiDocumentMailbox::new(),
+        UiInputMailbox::new(),
+        SessionCloseSignal::default(),
+        FileDialogMailbox::new(),
+        WindowsFileTextService::new(),
+        NotificationMailbox::new(),
+    );
+    assert!(view.take_context_menu_request().is_none());
+    assert!(!view.complete_context_menu_request(1, true));
+    assert!(view.context_menu().is_none());
+}
+
+#[test]
 fn consumes_only_its_supplied_session_close_signal() {
     let signal = SessionCloseSignal::default();
     let mut view = UiSessionView::new(

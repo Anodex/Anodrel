@@ -237,8 +237,10 @@ the SDK cannot provide a coordinate, target, selection, link, callback,
 shortcut, native handle, or command number. A host may later deliver one
 current enabled action through the existing granted `readUiEvents()` route as
 `menu.context.action.invoked`. The event includes only the action ID and the
-opaque context-menu revision, never pointer or popup data. The current direct
-Windows host does not yet attach this surface. See `docs/CONTEXT_MENUS.md`.
+opaque context-menu revision, never pointer or popup data. The direct Windows
+host attaches this surface only to its session's primary native view and only
+for a local pointer-originated context-menu message. See
+`docs/CONTEXT_MENUS.md`.
 
 ## Windows development transport
 

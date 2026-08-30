@@ -15,8 +15,8 @@ use std::env;
 
 use arguments::{TemplateKind, parse};
 use init::{
-    initialize, initialize_form, initialize_live_status, initialize_menu, initialize_multi_window,
-    initialize_scroll_window, initialize_window_controls,
+    initialize, initialize_context_menu, initialize_form, initialize_live_status, initialize_menu,
+    initialize_multi_window, initialize_scroll_window, initialize_window_controls,
 };
 
 const USAGE: &str = concat!(
@@ -25,6 +25,7 @@ const USAGE: &str = concat!(
     "  anodrel-native-app-tool init-form <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-live-status <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-menu <destination> <project-slug> <display-label>\n",
+    "  anodrel-native-app-tool init-context-menu <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-multi-window <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-scroll-window <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-window-controls <destination> <project-slug> <display-label>"
@@ -49,6 +50,11 @@ fn main() {
                 &command.display_label,
             ),
             TemplateKind::Menu => initialize_menu(
+                &command.destination,
+                &command.project_slug,
+                &command.display_label,
+            ),
+            TemplateKind::ContextMenu => initialize_context_menu(
                 &command.destination,
                 &command.project_slug,
                 &command.display_label,

@@ -342,6 +342,7 @@ fn run_with_optional_session_view(
                 .with_credentials(sample_credentials()?)
                 .with_notifications(ui.notifications.clone())
                 .with_menu(ui.menu.clone())
+                .with_context_menu(ui.context_menu.clone())
                 .with_window_title(ui.window_title.clone())
                 .with_window_state(ui.window_state.clone())
                 .with_window_state_read(ui.window_state_read.clone())
@@ -420,6 +421,7 @@ fn run_with_optional_session_view(
             ui.folder_entries,
             ui.notifications,
             ui.menu,
+            ui.context_menu,
             ui.window_title,
             ui.window_state,
             ui.window_state_read,

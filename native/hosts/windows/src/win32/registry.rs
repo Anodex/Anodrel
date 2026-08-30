@@ -8,13 +8,14 @@ use std::{
 
 use super::{
     Hwnd, StartupLab, View,
+    context_menu::ContextMenu,
     menu::UnattachedMenu,
     ui_lab::{AccessibilityFocusResult, AccessibilityScrollResult, UiLab},
     ui_session_view::UiSessionPoll,
 };
 use anodrel_crash::CrashSurface;
 use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
-use anodrel_menu::MenuRequest;
+use anodrel_menu::{ContextMenuRequest, MenuRequest};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_folder_access::WindowsFolderEntryService;
 
@@ -26,10 +27,11 @@ pub(super) use accessibility::{
     accessibility_snapshot, service_accessibility_focus, service_accessibility_scroll,
 };
 pub(super) use session::{
-    attach_menu, complete_field_read, complete_file_dialog_request, complete_menu_request,
-    complete_notification_request, file_text_service, folder_entry_service, offer_menu_command,
-    offer_menu_shortcut, poll_ui_session, register_ui_session_window, take_field_read,
-    take_file_dialog_request, take_menu_request, take_notification_request,
+    attach_menu, complete_context_menu_request, complete_field_read, complete_file_dialog_request,
+    complete_menu_request, complete_notification_request, context_menu, file_text_service,
+    folder_entry_service, offer_context_menu_candidate, offer_menu_command, offer_menu_shortcut,
+    poll_ui_session, register_ui_session_window, replace_context_menu, take_context_menu_request,
+    take_field_read, take_file_dialog_request, take_menu_request, take_notification_request,
     take_secondary_close_windows, take_secondary_open_request,
 };
 pub(super) use window_commands::{

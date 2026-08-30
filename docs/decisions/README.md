@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0121: Development native context-menu templates stay explicit.
+
 - 0120: Context menus stay host-owned and semantic.
 
 - 0119: Anodex title-bar close requests its owned session end.

@@ -187,6 +187,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_session_window_close(window);
             service_notification(window);
             service_menu(window);
+            service_context_menu(window);
             service_window_title(window);
             service_window_state(window);
             service_window_state_read(window);
@@ -322,6 +323,24 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
                 // SAFETY: unknown commands, accelerators, and controls retain
                 // documented default Win32 handling unchanged.
                 unsafe { DefWindowProcW(window, message, wparam, lparam) }
+            }
+        }
+        WM_CONTEXTMENU => {
+            let outcome = registry::context_menu(window)
+                .ok()
+                .flatten()
+                .and_then(|menu| menu.show_for_pointer(window, lparam));
+            match outcome {
+                Some(context_menu::ContextMenuDisplay::Selected(candidate)) => {
+                    let _ = registry::offer_context_menu_candidate(window, candidate);
+                    0
+                }
+                Some(context_menu::ContextMenuDisplay::Dismissed) => 0,
+                None => {
+                    // Keyboard-originated context menus and views without a
+                    // retained model keep documented Win32 processing.
+                    unsafe { DefWindowProcW(window, message, wparam, lparam) }
+                }
             }
         }
         WM_SETTINGCHANGE => {

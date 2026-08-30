@@ -25,6 +25,7 @@ const DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v1","root":{"id":"root"
 const SCROLL_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v2","root":{"id":"viewport","kind":"scroll","child":{"id":"continue","kind":"action","label":"Continue","fontSize":16,"enabled":true,"tone":"accent"}}}"#;
 const STATUS_DOCUMENT: &str = r#"{"format":"anodrel.ui.document.v3","root":{"id":"status","kind":"status","value":"Saved","fontSize":16,"tone":"accent","politeness":"polite"}}"#;
 const MENU: &str = r#"{"menus":[{"label":"File","items":[{"id":"template.menu.complete","label":"Complete menu template session","enabled":true,"shortcut":"Ctrl+Shift+M"}]}]}"#;
+const CONTEXT_MENU: &str = r#"{"items":[{"id":"template.context.complete","label":"Complete context-menu template session","enabled":true}]}"#;
 
 type WriteLog = Arc<Mutex<Vec<Vec<u8>>>>;
 
@@ -162,6 +163,65 @@ fn native_menu_session_uses_the_fixed_protocol_1_24_surface() {
             .as_object()
             .and_then(|fields| fields.get("payload")),
         Some(&JsonValue::parse(MENU).expect("fixed menu is JSON"))
+    );
+}
+
+#[test]
+fn native_context_menu_session_uses_the_fixed_protocol_1_32_surface() {
+    let (mut session, written) = session_with_responses([
+        response("anodrel-ui-1", r#"{"revision":"1"}"#),
+        response(
+            "anodrel-ui-2",
+            &context_menu_event_batch("template.context.complete", "1"),
+        ),
+        response("anodrel-ui-3", r#"{"status":"accepted"}"#),
+    ]);
+
+    assert_eq!(
+        session
+            .replace_context_menu_v1(CONTEXT_MENU)
+            .expect("context menu is accepted")
+            .value(),
+        1
+    );
+    let batch = session
+        .read_context_menu_actions()
+        .expect("context-menu action batch is typed");
+    assert_eq!(batch.dropped(), 0);
+    assert_eq!(batch.discarded(), 0);
+    let [action] = batch.actions() else {
+        panic!("the fixed native context-menu action is preserved");
+    };
+    assert_eq!(action.revision().value(), 1);
+    assert_eq!(action.action(), "template.context.complete");
+    session.close().expect("close is accepted");
+
+    let messages = messages(&written);
+    let operations = messages
+        .iter()
+        .skip(1)
+        .map(|message| request_field(message, "operation"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        operations,
+        [
+            Some("menu.context.replace".to_owned()),
+            Some("ui.events.read".to_owned()),
+            Some("session.close".to_owned()),
+        ]
+    );
+    let minors = messages
+        .iter()
+        .skip(1)
+        .map(|message| request_protocol_minor(message))
+        .collect::<Vec<_>>();
+    assert_eq!(minors, [Some(32), Some(32), Some(3)]);
+    let context_request = JsonValue::parse(&messages[1]).expect("context-menu request is JSON");
+    assert_eq!(
+        context_request
+            .as_object()
+            .and_then(|fields| fields.get("payload")),
+        Some(&JsonValue::parse(CONTEXT_MENU).expect("fixed context menu is JSON"))
     );
 }
 
@@ -398,6 +458,12 @@ fn event_batch(action: &str, revision: &str) -> String {
 fn menu_event_batch(action: &str, revision: &str) -> String {
     format!(
         r#"{{"events":[{{"kind":"event","eventName":"menu.action.invoked","source":"native.menu","protocolVersion":{{"major":1,"minor":18}},"schemaVersion":{{"major":1,"minor":18}},"payload":{{"menuRevision":"{revision}","action":"{action}"}}}}],"dropped":0,"discarded":0}}"#
+    )
+}
+
+fn context_menu_event_batch(action: &str, revision: &str) -> String {
+    format!(
+        r#"{{"events":[{{"kind":"event","eventName":"menu.context.action.invoked","source":"native.context_menu","protocolVersion":{{"major":1,"minor":32}},"schemaVersion":{{"major":1,"minor":32}},"payload":{{"contextMenuRevision":"{revision}","action":"{action}"}}}}],"dropped":0,"discarded":0}}"#
     )
 }
 

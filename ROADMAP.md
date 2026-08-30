@@ -185,8 +185,10 @@ Status: **Direct Windows host in progress**
   command surface: a primary-view-only, pointer-originated semantic context
   menu with a distinct grant and no browser selection, link, coordinate,
   callback, or handle bridge. Its portable model, protocol core, SDK, mock
-  host, installed-policy grant, and revision-checked event delivery are
-  implemented; the direct Windows popup bridge remains pending.
+  host, installed-policy grant, revision-checked event delivery, direct User32
+  popup bridge, first-party Rust SDK, and generated context-menu template are
+  implemented. The one remaining acceptance check is a real Windows
+  pointer-originated right-click; no synthetic input test claims that proof.
   The direct Windows UI Lab and session view now also substitute the user's
   fixed high-contrast system colours for their host palette without changing
   the portable document model (Decision 0055).
@@ -463,7 +465,13 @@ Status: **First starter-package slice in progress**
   template. A generated child has completed the full authenticated
   shortcut-bearing menu sequence in a real pipe test; manual activation by
   both menu click and keyboard shortcut remains the explicit desktop acceptance
-  check. Decision 0094 now adds a third, separately selected native template:
+  check. Decision 0121 now adds a separately selected native context-menu
+  template: its `init-context-menu` generator and fixed four-grant Windows
+  host route exercise Protocol 1.32 without broadening any earlier template.
+  A generated child has completed a real-pipe session with its complete model,
+  revision-bound context action, and self-close. The remaining acceptance check
+  is the documented real User32 right-click. Decision 0094 now adds a third,
+  separately selected native template:
   its `init-multi-window` generator and fixed five-grant Windows host route
   exercise Protocol 1.25 without broadening the regular or menu templates.
   A generated child has completed the full authenticated group walkthrough in
@@ -503,7 +511,7 @@ Status: **First starter-package slice in progress**
   focus readback. **Decision 0104 now stabilizes the in-repository Windows
   application surface:** `anodrel-windows-ui-sdk` consumes the private standard-
   input invitation, opens only its exact invited pipe, authenticates, and exposes
-  only the existing typed UI-session operations. All seven generated templates
+  only the existing typed UI-session operations. All eight generated templates
   now depend on that one facade rather than the three lower-level client crates;
   their isolated release builds and real invited-pipe sessions verify it. It is
   not registry-published and adds no capability, packaging, identity, or

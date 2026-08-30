@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anodrel_canvas::Point;
 use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
-use anodrel_menu::{MenuMailbox, MenuRequest};
+use anodrel_menu::{ContextMenuMailbox, ContextMenuRequest, MenuMailbox, MenuRequest};
 use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::{ElementId, Status, UiEvent};
 use anodrel_ui_session::{
@@ -27,6 +27,7 @@ mod interaction;
 
 use super::{
     Hwnd, Lparam, Wparam,
+    context_menu::ContextMenu,
     menu::{MenuBar, UnattachedMenu},
     session_window_group::{SessionWindowMember, SessionWindowOpenRequest},
     ui_lab::{AccessibilityFocusResult, AccessibilityScrollResult, UiLab},
@@ -52,6 +53,10 @@ pub(super) struct UiSessionView {
     menu_mailbox: Option<MenuMailbox>,
     /// The currently attached native menu and its private command mapping.
     menu_bar: Option<MenuBar>,
+    /// This session's one-request context-menu replacement bridge, when it has one.
+    context_menu_mailbox: Option<ContextMenuMailbox>,
+    /// The current host-retained context-menu model and private command mapping.
+    context_menu: Option<ContextMenu>,
     /// This session's notification-area entry, created the first time it
     /// actually shows something.
     ///
@@ -159,6 +164,8 @@ impl UiSessionView {
             notifications,
             menu_mailbox: None,
             menu_bar: None,
+            context_menu_mailbox: None,
+            context_menu: None,
             notification_entry: None,
             window_title: None,
             window_state: None,
@@ -193,6 +200,7 @@ impl UiSessionView {
             window_title,
             display_name,
             menu,
+            context_menu,
             window_state,
             window_state_read,
             window_state_changes,
@@ -213,6 +221,7 @@ impl UiSessionView {
                 ui.window_title_mailbox(),
                 ui.display_name().to_owned(),
                 ui.menu_mailbox(),
+                ui.context_menu_mailbox(),
                 ui.window_state_mailbox(),
                 ui.window_state_read_mailbox(),
                 ui.window_state_changes_mailbox(),
@@ -234,6 +243,7 @@ impl UiSessionView {
         .with_folder_entries(folder_entries)
         .with_window_title(window_title, display_name)
         .with_menu(menu)
+        .with_context_menu(context_menu)
         .with_window_state(window_state)
         .with_window_state_read(window_state_read)
         .with_window_state_changes(window_state_changes)

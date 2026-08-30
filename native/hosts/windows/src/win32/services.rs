@@ -407,3 +407,18 @@ pub(super) fn service_menu(window: Hwnd) {
         .unwrap_or(false);
     let _ = registry::complete_menu_request(window, request.id(), applied);
 }
+
+/// Constructs and retains one pending context-menu model on its owning UI thread.
+///
+/// User32 allocation and label conversion finish before the registry lock is
+/// acquired. A failed replacement therefore preserves the prior model and
+/// resolves as the portable service's one safe unavailable outcome.
+pub(super) fn service_context_menu(window: Hwnd) {
+    let Ok(Some(request)) = registry::take_context_menu_request(window) else {
+        return;
+    };
+    let applied = context_menu::ContextMenu::build(&request)
+        .and_then(|menu| registry::replace_context_menu(window, menu).ok().flatten())
+        .unwrap_or(false);
+    let _ = registry::complete_context_menu_request(window, request.id(), applied);
+}

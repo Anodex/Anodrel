@@ -127,6 +127,67 @@ pub(crate) fn take_menu_request(window: Hwnd) -> io::Result<Option<MenuRequest>>
     }
 }
 
+/// Takes one pending context-menu replacement only from its associated UI session.
+///
+/// The resulting model contains no native popup yet, so User32 construction
+/// occurs before the view registry is locked again to retain it.
+pub(crate) fn take_context_menu_request(window: Hwnd) -> io::Result<Option<ContextMenuRequest>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.take_context_menu_request()),
+        _ => Ok(None),
+    }
+}
+
+/// Replaces one already constructed context-menu model on its associated view.
+pub(crate) fn replace_context_menu(window: Hwnd, menu: ContextMenu) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.replace_context_menu(menu))),
+        _ => Ok(None),
+    }
+}
+
+/// Completes one context-menu replacement only through its associated view.
+pub(crate) fn complete_context_menu_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(
+            session.complete_context_menu_request(request_id, applied),
+        )),
+        _ => Ok(None),
+    }
+}
+
+/// Returns a clone of one current context-menu model for local popup display.
+///
+/// The native popup call itself runs after this registry lock is released. A
+/// later model replacement remains safe because the core revalidates the
+/// returned candidate against its revision before it exposes an event.
+pub(crate) fn context_menu(window: Hwnd) -> io::Result<Option<ContextMenu>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.context_menu()),
+        _ => Ok(None),
+    }
+}
+
+/// Offers one selected host-private context-menu action to its session queue.
+pub(crate) fn offer_context_menu_candidate(
+    window: Hwnd,
+    candidate: anodrel_ui_session::ContextMenuInputCandidate,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.offer_context_menu_candidate(candidate))),
+        _ => Ok(None),
+    }
+}
+
 /// Attaches one constructed native menu only to its associated UI session.
 pub(crate) fn attach_menu(window: Hwnd, menu: UnattachedMenu) -> io::Result<Option<bool>> {
     let mut views = lock_views()?;

@@ -35,6 +35,12 @@ const MENU_GRANTS: [Capability; 4] = [
     Capability::MenuWrite,
     Capability::SessionClose,
 ];
+const CONTEXT_MENU_GRANTS: [Capability; 4] = [
+    Capability::UiDocumentWrite,
+    Capability::UiEventsRead,
+    Capability::ContextMenuWrite,
+    Capability::SessionClose,
+];
 const MULTI_WINDOW_GRANTS: [Capability; 5] = [
     Capability::UiDocumentWrite,
     Capability::UiEventsRead,
@@ -58,6 +64,7 @@ enum DevelopmentUiSessionKind {
     Document,
     Form,
     Menu,
+    ContextMenu,
     MultiWindow,
     WindowControls,
 }
@@ -124,6 +131,23 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration whose only additional permission is a complete
+    /// host-owned context-menu replacement.
+    pub(crate) const fn with_context_menu(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::ContextMenu,
+        }
+    }
+
     /// Creates a configuration for the explicit bounded multi-window route.
     ///
     /// Window creation and secondary close are additional fixed grants on this
@@ -165,6 +189,7 @@ impl DevelopmentUiSessionConfig {
             DevelopmentUiSessionKind::Document => &UI_GRANTS,
             DevelopmentUiSessionKind::Form => &FORM_GRANTS,
             DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
+            DevelopmentUiSessionKind::ContextMenu => &CONTEXT_MENU_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
             DevelopmentUiSessionKind::WindowControls => &WINDOW_CONTROLS_GRANTS,
         }
@@ -172,6 +197,10 @@ impl DevelopmentUiSessionConfig {
 
     const fn supports_menu(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::Menu)
+    }
+
+    const fn supports_context_menu(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::ContextMenu)
     }
 
     const fn supports_fields(self) -> bool {
@@ -245,6 +274,17 @@ where
                 HostServices::unavailable().with_menu(ui.menu.clone()),
             )?;
         (server, invitation, None)
+    } else if config.supports_context_menu() {
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                HostServices::unavailable().with_context_menu(ui.context_menu.clone()),
+            )?;
+        (server, invitation, None)
     } else if config.supports_fields() {
         let (server, invitation) =
             WindowsPipeServer::create_with_session_components_and_service_bundle(
@@ -316,6 +356,7 @@ where
                 ui.folder_entries,
                 ui.notifications,
                 ui.menu,
+                ui.context_menu,
                 ui.window_title,
                 ui.window_state,
                 ui.window_state_read,
@@ -372,8 +413,8 @@ mod tests {
     use anodrel_protocol::Capability;
 
     use super::{
-        DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS, MULTI_WINDOW_GRANTS, UI_GRANTS,
-        WINDOW_CONTROLS_GRANTS,
+        CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS,
+        MULTI_WINDOW_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
     };
 
     #[test]
@@ -395,6 +436,12 @@ mod tests {
             "test-form-session",
             "Anodrel Form Test",
             "completed form",
+        );
+        let context_menu = DevelopmentUiSessionConfig::with_context_menu(
+            "anodrel.test-context-menu",
+            "test-context-menu-session",
+            "Anodrel Context Menu Test",
+            "completed context menu",
         );
         let multi_window = DevelopmentUiSessionConfig::with_multi_window(
             "anodrel.test-multi-window",
@@ -420,6 +467,9 @@ mod tests {
         assert!(!form.supports_menu());
         assert_eq!(menu.grants(), MENU_GRANTS);
         assert!(menu.supports_menu());
+        assert_eq!(context_menu.grants(), CONTEXT_MENU_GRANTS);
+        assert!(context_menu.supports_context_menu());
+        assert!(!context_menu.supports_menu());
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
         assert!(!multi_window.supports_menu());
         assert!(multi_window.supports_multi_window());
@@ -451,6 +501,15 @@ mod tests {
                 Capability::UiDocumentWrite,
                 Capability::UiEventsRead,
                 Capability::MenuWrite,
+                Capability::SessionClose,
+            ]
+        );
+        assert_eq!(
+            CONTEXT_MENU_GRANTS,
+            [
+                Capability::UiDocumentWrite,
+                Capability::UiEventsRead,
+                Capability::ContextMenuWrite,
                 Capability::SessionClose,
             ]
         );

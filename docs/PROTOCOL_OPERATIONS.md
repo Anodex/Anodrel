@@ -175,7 +175,7 @@ ownership rule.
 
 Protocol 1.32 defines `menu.context.replace` behind its distinct
 `menu.context.write` grant. The exact model, safe failure behavior,
-revision-checked event, and pending direct Windows popup bridge are defined in
+revision-checked event, and direct Windows User32 popup bridge are defined in
 `docs/CONTEXT_MENUS.md` and Decision 0120.
 
 ## Diagnostic entries

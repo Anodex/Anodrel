@@ -16,7 +16,7 @@ use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_file_access::{SaveFileDialogMailbox, SelectionFileDialogMailbox};
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_folder_access::FolderFileDialogMailbox;
-use anodrel_menu::MenuMailbox;
+use anodrel_menu::{ContextMenuMailbox, MenuMailbox};
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{
@@ -51,6 +51,7 @@ pub struct RegisteredSessionUi {
     folder_entries: WindowsFolderEntryService,
     notification_mailbox: NotificationMailbox,
     menu_mailbox: MenuMailbox,
+    context_menu_mailbox: ContextMenuMailbox,
     window_title_mailbox: WindowTitleMailbox,
     window_state_mailbox: WindowStateMailbox,
     window_state_read_mailbox: WindowStateReadMailbox,
@@ -80,6 +81,7 @@ impl RegisteredSessionUi {
             folder_entries: WindowsFolderEntryService::new(),
             notification_mailbox: NotificationMailbox::new(),
             menu_mailbox: MenuMailbox::new(),
+            context_menu_mailbox: ContextMenuMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
             window_state_mailbox: WindowStateMailbox::new(),
             window_state_read_mailbox: WindowStateReadMailbox::new(),
@@ -152,6 +154,16 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn menu_mailbox(&self) -> MenuMailbox {
         self.menu_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread context-menu mailbox.
+    ///
+    /// The complete semantic model stays distinct from the session menu bar.
+    /// The Windows view owns local triggers, popup placement, native command
+    /// IDs, and action routing; see `docs/CONTEXT_MENUS.md`.
+    #[must_use]
+    pub fn context_menu_mailbox(&self) -> ContextMenuMailbox {
+        self.context_menu_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread window-title mailbox.
@@ -372,6 +384,9 @@ fn registered_interactive_services(
         // A complete semantic menu reaches User32 only through this session's
         // owning UI thread; no pipe worker gains a native menu handle.
         .with_menu(ui.menu_mailbox())
+        // Context menus use their own capability, mailbox, and local User32
+        // popup route. The service carries no target, coordinate, or handle.
+        .with_context_menu(ui.context_menu_mailbox())
         // A window caption reaches User32 the same way, and the UI thread holds
         // the validated display name it composes with.
         .with_window_title(ui.window_title_mailbox())

@@ -80,6 +80,60 @@ impl UiSessionView {
         self
     }
 
+    /// Attaches this session's one-request native context-menu bridge.
+    #[must_use]
+    pub(in crate::win32) fn with_context_menu(mut self, mailbox: ContextMenuMailbox) -> Self {
+        self.context_menu_mailbox = Some(mailbox);
+        self
+    }
+
+    /// Takes one pending validated context-menu replacement for this UI thread.
+    pub(in crate::win32) fn take_context_menu_request(&self) -> Option<ContextMenuRequest> {
+        self.context_menu_mailbox.as_ref()?.take()
+    }
+
+    /// Atomically retains one complete host-built context-menu model.
+    ///
+    /// Native construction completed before the registry lock was acquired, so
+    /// a failed build leaves the prior model and future popup route intact.
+    pub(in crate::win32) fn replace_context_menu(&mut self, next: ContextMenu) -> bool {
+        self.context_menu = Some(next);
+        true
+    }
+
+    /// Completes one context-menu replacement after the UI thread retained it.
+    pub(in crate::win32) fn complete_context_menu_request(
+        &self,
+        request_id: u64,
+        applied: bool,
+    ) -> bool {
+        let Some(mailbox) = self.context_menu_mailbox.as_ref() else {
+            return false;
+        };
+        if applied {
+            mailbox.complete(request_id)
+        } else {
+            mailbox.fail(request_id)
+        }
+    }
+
+    /// Clones the current host-retained context menu for a local popup route.
+    pub(in crate::win32) fn context_menu(&self) -> Option<ContextMenu> {
+        self.context_menu.clone()
+    }
+
+    /// Offers a selected current context-menu action to the shared queue.
+    pub(in crate::win32) fn offer_context_menu_candidate(
+        &self,
+        candidate: anodrel_ui_session::ContextMenuInputCandidate,
+    ) -> bool {
+        if self.context_menu.is_none() {
+            return false;
+        }
+        self.input_mailbox.push(candidate);
+        true
+    }
+
     /// Takes one pending validated menu replacement for this UI thread.
     pub(in crate::win32) fn take_menu_request(&self) -> Option<MenuRequest> {
         self.menu_mailbox.as_ref()?.take()

@@ -1,7 +1,7 @@
 # Decision 0120: Context menus stay host-owned and semantic
 
-**Status:** Accepted; portable model, protocol core, and event revalidation
-are implemented. Windows-host integration remains pending.
+**Status:** Accepted and implemented in the direct Windows host and both
+first-party SDKs.
 
 **Date:** 2026-08-29
 
@@ -21,12 +21,12 @@ back-channel for browser facts or pointer telemetry.
 
 ## Decision
 
-The next additive protocol slice will add `menu.context.replace`, protected by
+Protocol 1.32 adds `menu.context.replace`, protected by
 the separate `menu.context.write` capability. It accepts one exact complete
 model of one through sixteen items. Every item has only a bounded semantic ID,
 display label, and explicit enabled flag.
 
-The direct Windows host will show that model only when it receives a normal
+The direct Windows host shows that model only when it receives a normal
 pointer-originated `WM_CONTEXTMENU` for the requesting session's primary native
 view. The host keeps the coordinate, native popup handle, private numeric
 command mapping, menu opening and dismissal, and command selection entirely on
@@ -36,7 +36,7 @@ this first slice.
 
 An enabled selection becomes one revision-bound semantic candidate in the
 existing bounded interaction mailbox. The existing `ui.events.read` operation
-will revalidate it before returning `menu.context.action.invoked`. That event
+revalidates it before returning `menu.context.action.invoked`. That event
 will include only an opaque context-menu revision and the semantic action ID.
 It will not report position, pointer state, opening, dismissal, selection,
 keyboard state, command number, or evidence that a person saw the popup.

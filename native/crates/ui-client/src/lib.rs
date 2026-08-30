@@ -9,6 +9,8 @@
 //! host authority. See `docs/NATIVE_UI_TEMPLATE.md`,
 //! `docs/NATIVE_MENU_TEMPLATE.md`, and `docs/NATIVE_MULTI_WINDOW_TEMPLATE.md`.
 
+mod context_menu_model;
+mod context_menu_revision;
 mod error;
 mod events;
 mod fields;
@@ -20,10 +22,12 @@ mod window_controls;
 mod window_id;
 
 pub use anodrel_window::{WindowFullscreenMode, WindowSize, WindowState};
+pub use context_menu_revision::ContextMenuRevision;
 pub use error::UiClientError;
 pub use events::{
-    MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, UiAction, UiActionBatch, UiEvent,
-    UiEventBatch, UiMenuAction, WindowUiAction, WindowUiActionBatch,
+    MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, UiAction, UiActionBatch,
+    UiContextMenuAction, UiContextMenuActionBatch, UiEvent, UiEventBatch, UiMenuAction,
+    WindowUiAction, WindowUiActionBatch,
 };
 pub use fields::{UiFieldSnapshot, UiFieldValue};
 pub use menu_revision::MenuRevision;

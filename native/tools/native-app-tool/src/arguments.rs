@@ -8,6 +8,7 @@ pub enum TemplateKind {
     Form,
     LiveStatus,
     Menu,
+    ContextMenu,
     MultiWindow,
     ScrollWindow,
     WindowControls,
@@ -28,6 +29,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
         Some("init-form") => TemplateKind::Form,
         Some("init-live-status") => TemplateKind::LiveStatus,
         Some("init-menu") => TemplateKind::Menu,
+        Some("init-context-menu") => TemplateKind::ContextMenu,
         Some("init-multi-window") => TemplateKind::MultiWindow,
         Some("init-scroll-window") => TemplateKind::ScrollWindow,
         Some("init-window-controls") => TemplateKind::WindowControls,
@@ -131,6 +133,23 @@ mod tests {
                 destination: PathBuf::from("out/menu"),
                 project_slug: "menu-app".to_owned(),
                 display_label: "Menu App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(
+                [
+                    "init-context-menu",
+                    "out/context-menu",
+                    "context-menu-app",
+                    "Context Menu App",
+                ]
+                .map(String::from)
+            ),
+            Ok(InitCommand {
+                template_kind: TemplateKind::ContextMenu,
+                destination: PathBuf::from("out/context-menu"),
+                project_slug: "context-menu-app".to_owned(),
+                display_label: "Context Menu App".to_owned(),
             })
         );
         assert_eq!(

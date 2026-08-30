@@ -1,9 +1,9 @@
 # Native session context menus
 
-**Status:** Portable model, revision, revalidation state, bounded interaction
-mailbox, Protocol 1.32 core operation, SDK, mock host, and installed-policy
-grant are implemented. The direct Windows UI-thread bridge and popup remain
-pending, so this is not yet available from a Windows native session.
+**Status:** Implemented for the direct Windows host, including the bounded
+Protocol 1.32 model, installed-policy grant, UI-thread mailbox, User32 popup,
+revision revalidation, TypeScript SDK, first-party Rust SDK, and generated
+native development template.
 
 ## Purpose
 
@@ -17,9 +17,9 @@ menu. That menu derives choices from browser text selection and link data;
 those values are neither present in nor appropriate for Anodrel's native UI
 contract.
 
-## Planned public boundary
+## Public boundary
 
-Protocol 1.32 will add `menu.context.replace`, requiring a host-issued
+Protocol 1.32 adds `menu.context.replace`, requiring a host-issued
 `menu.context.write` capability. Its payload will be exactly:
 
 ~~~json
@@ -58,7 +58,7 @@ preference. A host with no attached context-menu surface will return
 
 ## Local activation and delivery
 
-The direct Windows host will react only to a pointer-originated
+The direct Windows host reacts only to a pointer-originated
 `WM_CONTEXTMENU` message for the authenticated session's primary native view.
 Windows selects the popup's screen position from that message; the position
 never enters a request, response, event, log, or callback. Keyboard-originated
@@ -71,7 +71,7 @@ fixed ordered interaction mailbox used by document actions and the menu bar.
 No selection calls application code, runs a native operation, or creates a
 separate queue.
 
-The existing granted `ui.events.read` operation will deliver a revalidated
+The existing granted `ui.events.read` operation delivers a revalidated
 candidate in this event shape:
 
 ~~~json
@@ -97,14 +97,30 @@ owning UI thread. The mailbox retains at most one request and clears a timed
 out slot by identity, so a late completion cannot affect a later model.
 
 The host retains the active portable model and every native object. An
-installed record at version 1.19 will be the first permitted to name
+installed record at version 1.19 is the first permitted to name
 `menu.context.write`; it will be a strict superset of version 1.18. Older
 records or protocol versions cannot name the grant or operation.
 
-The first implementation has no keyboard invocation, separator, submenu,
+The implementation has no keyboard invocation, separator, submenu,
 radio/check state, icon, shortcut, dynamic enablement, opening callback,
 selection or link fact, document target, coordinate, menu-state readback,
 secondary view, persistent configuration, non-Windows adapter, or browser
 integration.
+
+## Windows implementation and manual verification
+
+The Windows adapter uses only direct User32 calls. It validates a full model on
+the owning UI thread before replacing the retained mapping. Each pointer
+activation creates a transient `CreatePopupMenu` handle, maps only private
+host command values, calls `TrackPopupMenu` with the coordinates carried by
+that one Windows message, and destroys the handle before returning. No native
+handle, point, or numeric command escapes the host.
+
+To build a minimal first-party native app that demonstrates the complete
+route, use `anodrel-native-app-tool init-context-menu`. Its generated README
+has the exact build and host command. Right-click inside the resulting
+**Anodrel Native Context Menu Template** window and choose its one action. A
+successful run proves the complete action path through the real popup, rather
+than a document button or menu-bar command.
 
 See Decision 0120, `docs/MENUS.md`, and `docs/THREAT_MODEL.md`.

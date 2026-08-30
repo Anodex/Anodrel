@@ -16,9 +16,10 @@ use anodrel_windows_client::WindowsClientStream;
 
 pub use anodrel_client::InteractivePollSchedule;
 pub use anodrel_ui_client::{
-    DocumentRevision, MenuRevision, SecondaryWindowId, SessionWindowId, UiAction, UiActionBatch,
-    UiClientError, UiEvent, UiEventBatch, UiFieldSnapshot, UiFieldValue, WindowFullscreenMode,
-    WindowSize, WindowState, WindowUiAction, WindowUiActionBatch,
+    ContextMenuRevision, DocumentRevision, MenuRevision, SecondaryWindowId, SessionWindowId,
+    UiAction, UiActionBatch, UiClientError, UiContextMenuAction, UiContextMenuActionBatch, UiEvent,
+    UiEventBatch, UiFieldSnapshot, UiFieldValue, WindowFullscreenMode, WindowSize, WindowState,
+    WindowUiAction, WindowUiActionBatch,
 };
 
 /// Closed outcomes while establishing one invited Windows UI session.
@@ -100,9 +101,22 @@ impl WindowsUiSession {
         self.session.replace_menu_v1(menu)
     }
 
+    /// Replaces this session's complete host-owned native context-menu model.
+    pub fn replace_context_menu_v1(
+        &mut self,
+        menu: &str,
+    ) -> Result<ContextMenuRevision, UiClientError> {
+        self.session.replace_context_menu_v1(menu)
+    }
+
     /// Drains one bounded batch of document and native-menu semantic events.
     pub fn read_events(&mut self) -> Result<UiEventBatch, UiClientError> {
         self.session.read_events()
+    }
+
+    /// Drains one batch containing only local context-menu semantic actions.
+    pub fn read_context_menu_actions(&mut self) -> Result<UiContextMenuActionBatch, UiClientError> {
+        self.session.read_context_menu_actions()
     }
 
     /// Proposes a title for this session's own host window.

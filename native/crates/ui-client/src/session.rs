@@ -8,8 +8,9 @@ use anodrel_ui_document::{decode, decode_v2, decode_v3};
 use anodrel_window::WindowTitleProposal;
 
 use crate::{
-    DocumentRevision, MenuRevision, SecondaryWindowId, UiActionBatch, UiClientError, UiEventBatch,
-    UiFieldSnapshot, WindowUiActionBatch, menu_model::decode_menu_model,
+    ContextMenuRevision, DocumentRevision, MenuRevision, SecondaryWindowId, UiActionBatch,
+    UiClientError, UiContextMenuActionBatch, UiEventBatch, UiFieldSnapshot, WindowUiActionBatch,
+    context_menu_model::decode_context_menu_model, menu_model::decode_menu_model,
 };
 
 /// The smallest protocol version that provides every typed UI-session operation.
@@ -18,6 +19,8 @@ const UI_DOCUMENT_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(3);
 const UI_FIELD_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(15);
 /// The first protocol version that also carries canonical local menu shortcuts.
 const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(24);
+/// The first protocol version with host-owned semantic context menus.
+const UI_CONTEXT_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(32);
 /// The first protocol version with bounded session-owned secondary views.
 const UI_MULTI_WINDOW_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(25);
 /// The first protocol version with explicit visible live-status documents.
@@ -130,6 +133,28 @@ where
             .and_then(MenuRevision::parse)
     }
 
+    /// Replaces this session's complete host-owned native context-menu model.
+    ///
+    /// The model is locally checked before transport. It has no native point,
+    /// target, callback, shortcut, command number, or handle; the host owns
+    /// its local trigger and popup construction.
+    pub fn replace_context_menu_v1(
+        &mut self,
+        menu: &str,
+    ) -> Result<ContextMenuRevision, UiClientError> {
+        let result = self.request(
+            UI_CONTEXT_MENU_PROTOCOL,
+            "menu.context.replace",
+            decode_context_menu_model(menu)?,
+        )?;
+        result
+            .as_object()
+            .and_then(|fields| fields.get("revision"))
+            .and_then(JsonValue::as_string)
+            .ok_or(UiClientError::ResponseInvalid)
+            .and_then(ContextMenuRevision::parse)
+    }
+
     /// Drains one bounded batch of every currently documented semantic event.
     ///
     /// Unlike [`Self::read_actions`], this method accepts both document and
@@ -142,6 +167,19 @@ where
             JsonValue::Object(Default::default()),
         )
         .and_then(|result| UiEventBatch::parse(&result))
+    }
+
+    /// Drains one batch containing only local context-menu actions.
+    ///
+    /// This dedicated protocol-1.32 route prevents the established document
+    /// and menu APIs from silently accepting a newly added event kind.
+    pub fn read_context_menu_actions(&mut self) -> Result<UiContextMenuActionBatch, UiClientError> {
+        self.request(
+            UI_CONTEXT_MENU_PROTOCOL,
+            "ui.events.read",
+            JsonValue::Object(Default::default()),
+        )
+        .and_then(|result| UiContextMenuActionBatch::parse(&result))
     }
 
     /// Opens one bounded secondary view with a strict v1 document.

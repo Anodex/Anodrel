@@ -1,8 +1,8 @@
 # Anodrel Protocol v1
 
 **Status:** Implemented through version 1.32, including a distinct bounded
-semantic context-menu core boundary and revision-checked event delivery. Its
-direct Windows popup adapter remains pending.
+semantic context-menu core boundary, direct Windows popup adapter, and
+revision-checked event delivery.
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
