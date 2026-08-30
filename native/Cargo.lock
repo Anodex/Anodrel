@@ -103,6 +103,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-font"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-json"
 version = "0.1.0"
 

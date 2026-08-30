@@ -8,6 +8,7 @@ members = [
   "crates/ui-document",
   "crates/ui-session",
   "crates/brand",
+  "crates/font",
   "crates/linux-lab-surface",
   "crates/diagnostics",
   "crates/crash",

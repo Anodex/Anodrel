@@ -322,7 +322,8 @@ digest-verified native text package without reaching into host source code.
 typed request helper and host-owned native authority.
 `docs/WINDOWS_NATIVE_SDK.md` defines the stable in-repository Windows native
 application facade over one authenticated invited session.
-`docs/RENDERER.md` documents the renderer and brand API.
+`docs/RENDERER.md` documents the renderer and brand API; `docs/FONTS.md`
+defines the owned Unicode-to-glyph parsing foundation for a future native text path.
 `docs/LOGGING.md` defines the bounded host diagnostic-log boundary.
 `docs/CRASH_REPORTS.md` defines the host-only bounded record of a contained
 panic. It is written to the host's own location, carries no panic payload, and
