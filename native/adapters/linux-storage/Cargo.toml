@@ -1,0 +1,11 @@
+[package]
+name = "anodrel-linux-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-linux-paths = { path = "../linux-paths" }
+anodrel-paths = { path = "../../crates/paths" }
+anodrel-storage = { path = "../../crates/storage" }

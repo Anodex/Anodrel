@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0125: Linux state storage uses private directory descriptors.
+
 - 0124: Linux application paths use the effective account home.
 
 - 0123: Linux child bootstrap stays distinct from Windows.

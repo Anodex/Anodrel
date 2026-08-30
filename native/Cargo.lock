@@ -136,6 +136,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-linux-storage"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-linux-paths",
+ "anodrel-paths",
+ "anodrel-storage",
+]
+
+[[package]]
 name = "anodrel-menu"
 version = "0.1.0"
 

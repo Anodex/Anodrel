@@ -1,8 +1,8 @@
 # Application state storage v1
 
-**Status:** Implemented portable value, direct Windows host service, Protocol
-1.10 development-session path, and identity-bound registered Windows session
-composition.
+**Status:** Implemented portable value, direct Windows host service, direct
+Linux host adapter, Protocol 1.10 development-session path, and
+identity-bound registered Windows session composition.
 
 ## Purpose and boundary
 
@@ -43,9 +43,24 @@ only the derived directory tree, rejects reparse points for each derived
 directory and state file, and keeps a bounded prior committed snapshot as a
 recovery candidate. It writes a complete new snapshot to a fixed host-chosen
 staging file and flushes it before moving the prior state to the backup and the
-staged state into place through direct Windows rename operations. A failed or
-interrupted write leaves either the prior complete snapshot or a complete new
-snapshot available; it never returns a partial value.
+staged state into place through direct Windows rename operations.
+
+The direct Linux adapter derives the same layout from the effective account
+root and opens the pre-existing account home component by component. It creates
+only the fixed Anodrel subtree with private 0700 directories and opens the
+three fixed state names through the resulting `data` directory descriptor.
+Every state object must be an effective-account-owned single-link regular file
+with private 0600 permissions; a symbolic link, directory, hard link, malformed
+component, or unexpected ownership fails closed. The adapter writes and syncs a
+new staging file, moves the prior state to the fixed backup, moves staging into
+the current location, and syncs the data directory after each rename.
+
+On both systems, a failed or interrupted replacement leaves either the prior
+complete snapshot or a complete new snapshot available; it never returns a
+partial value. Reading prefers current state, then one valid backup. Staging is
+never readable state. Clear removes only the fixed state files. Multiple host
+processes writing one identity are not a v1 policy and must not be inferred
+from the per-service operation lock.
 
 Snapshot contents, absolute paths, temporary names, native status values, and
 recovery details must not appear in protocol diagnostics or the typed host log.
@@ -85,10 +100,12 @@ concurrent multi-process writer policy require separate decisions.
 The portable foundation tests absent versus empty state, the fixed size limit,
 value redaction, and error categories. The Windows adapter tests whole-value
 replacement, recovery from an interrupted staging file, and path redaction.
-Its direct file boundary rejects directories and reparse points. Shared
+Its direct file boundary rejects directories and reparse points. The Linux
+adapter tests whole-value replacement, recovery, private modes, and rejected
+symbolic-link or hard-link state files through a real Linux filesystem. Shared
 protocol contract tests cover the exact read, replace, and clear messages,
 their independent grants, and the protocol request bound. The Windows
 development UI-session diagnostic replaces, reads, and clears one test snapshot
 through the authenticated pipe before completing its semantic UI round trip.
 
-Decisions 0051 and 0052 record these boundaries.
+Decisions 0051, 0052, and 0125 record these boundaries.

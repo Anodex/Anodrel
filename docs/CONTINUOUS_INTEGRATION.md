@@ -23,22 +23,24 @@ documented manual Windows checks for visual rendering, foreground policy,
 native dialogs, screen-reader speech, or the development product fixture. A
 green workflow must never be used to claim those acceptance checks passed.
 
-## Linux local transport
+## Linux host foundations
 
 The Ubuntu runner installs stable Rust, checks all native formatting, then
 lints and tests the Linux transport, strict invitation adapter, direct
-effective-account paths adapter, and fixed compiled child probe. Its tests
-create real Linux abstract Unix-domain sockets, exercise the same-UID peer
-check, authenticated health round trip, failed authentication closure, and
-host-only stop paths, then prove a separate child process can consume one ANLI
-record and complete health. The paths tests exercise the current effective
-account without exposing its name or home directory. This keeps the
+effective-account paths adapter, direct bounded state adapter, and fixed
+compiled child probe. Its tests create real Linux abstract Unix-domain sockets,
+exercise the same-UID peer check, authenticated health round trip, failed
+authentication closure, and host-only stop paths, then prove a separate child
+process can consume one ANLI record and complete health. The paths tests
+exercise the current effective account without exposing its name or home
+directory. The storage tests use a real temporary filesystem to prove atomic
+snapshot recovery, private modes, and link rejection. This keeps the
 Linux-specific code from being treated as verified merely because the Windows
 workspace compiles its intentionally empty non-Linux facade.
 
-This job verifies only the documented Linux transport and fixed-child proof. It
-does not claim a Linux native window, reusable launcher, application SDK,
-packaging, or any macOS implementation.
+This job verifies only the documented Linux transport, storage, and fixed-child
+proof. It does not claim a Linux native window, reusable launcher, application
+SDK, packaging, or any macOS implementation.
 
 ## Repository policy
 

@@ -15,9 +15,8 @@ shipping a browser runtime.
 
 It is not an application itself, an Anodex source mirror, or a finished
 Electron replacement. Production packaging, signing, installation, updates,
-and macOS/Linux desktop hosts remain planned work. Linux now has a direct
-authenticated local transport and a separately tested private child transport,
-not a desktop host or product launcher.
+and macOS/Linux desktop hosts remain planned work. Linux has authenticated local
+transport, a private child transport, and a bounded state store—not a desktop host or product launcher.
 
 Anodex will be the first application built on Anodrel. Anodex is not being
 moved into this repository yet; it remains an independent project until the
@@ -149,10 +148,11 @@ The authenticated protocol also exposes a bounded read of the host's closed
 diagnostic catalogue through its existing diagnostics grant; it accepts no
 application log text, native error, filter, or export request. The
 application-state foundation now has a portable whole-snapshot contract,
-a direct Windows adapter that keeps one recovered prior snapshot, and a
-Protocol 1.10 capability surface. The development UI-session diagnostic
-exercises its read, replace, and clear path end to end. Installed-application
-policy remains a separate integration gate.
+direct Windows/Linux adapters that retain one recovered prior snapshot, and a
+Protocol 1.10 capability surface. Linux uses private descriptor-anchored fixed
+files but is not attached to a desktop host; the development UI-session
+diagnostic exercises the Windows read, replace, and clear path end to end;
+installed-application policy remains a separate integration gate.
 
 Protocol 1.12 now exposes separately granted exact credential read, write, and
 delete operations through an injected service bound to the host-validated

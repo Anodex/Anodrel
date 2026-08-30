@@ -71,9 +71,9 @@ The native host owns operating-system integration:
 - update and packaging integration;
 - native security and isolation controls.
 
-The first host targets Windows. Linux now has a shared local-transport adapter
-and a separately tested private child transport; its desktop host and
-operating-system services remain later work.
+The first host targets Windows. Linux now has a shared local-transport adapter,
+a separately tested private child transport, and a bounded direct state-store
+adapter; its desktop host and most operating-system services remain later work.
 Other operating systems should be added as adapters behind the same service
 contracts.
 
@@ -85,9 +85,11 @@ webview, script runtime, navigation, or application bridge. The Linux transport
 adapter uses direct abstract Unix sockets and same-UID peer verification. Its
 fixed ANLI child proof opens only a host-issued endpoint and does not create a
 Linux window, reusable launcher, or application service. A direct Linux paths
-adapter derives only an effective-user default data root before applying the
-portable layout; it exposes no filesystem capability. macOS and a Linux
-desktop host will follow the same ownership rule through their respective
+adapter derives an effective-user default data root before applying the
+portable layout. The direct Linux state adapter uses that host-owned layout
+only to retain one bounded recoverable snapshot through private directory
+descriptors; it exposes no filesystem capability. macOS and a Linux desktop
+host will follow the same ownership rule through their respective
 operating-system APIs.
 
 Drawing is not a host responsibility. Every first-party surface is composed by
@@ -153,18 +155,21 @@ signing identity remain separate work. See `docs/SIGNING.md`, `docs/LAUNCH.md`,
 `docs/PRODUCT_FIXTURE.md`, and Decisions 0017 through 0020 and 0061.
 
 The Windows paths adapter reads the current user's Local AppData known folder
-and passes it to a portable layout builder. That builder derives fixed
+and passes it to a portable layout builder. The Linux paths adapter obtains the
+same kind of root from its effective account. That builder derives fixed
 per-application `data`, `cache`, and `logs` locations solely from the validated
 application identity; it never creates, enumerates, or exposes those paths to
 the protocol. The portable state-store foundation reserves one bounded opaque
-snapshot below `data`; its direct Windows adapter stages and flushes complete
-values before retaining the prior committed state as a recovery candidate.
-Protocol 1.10 exposes that service only through separate immediate state read,
-replace, and clear grants. The development UI-session diagnostic supplies the
+snapshot below `data`. Its direct Windows adapter stages and flushes complete
+values before retaining the prior committed state as a recovery candidate; its
+direct Linux counterpart opens and creates only private fixed-name files
+through directory descriptors and retains the same one backup. Protocol 1.10
+exposes that service only through separate immediate state read, replace, and
+clear grants. The development UI-session diagnostic supplies the Windows
 host-derived service explicitly; installed-application policy integration
 remains separate work. Logging and future storage services define their own
 permission, creation, and recovery rules on top of this layout. See
-`docs/PATHS.md`, `docs/STORAGE.md`, Decisions 0021, 0051, and 0052.
+`docs/PATHS.md`, `docs/STORAGE.md`, Decisions 0021, 0051, 0052, and 0125.
 
 The Windows credential adapter stores a bounded secret only under the exact
 target derived from a validated application identity and credential name. It
