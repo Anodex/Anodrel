@@ -184,8 +184,9 @@ Status: **Direct Windows host in progress**
   separate gates. Decision 0120 now defines the next bounded native popup
   command surface: a primary-view-only, pointer-originated semantic context
   menu with a distinct grant and no browser selection, link, coordinate,
-  callback, or handle bridge. Its portable model and mailbox are implemented;
-  protocol and host integration remain pending.
+  callback, or handle bridge. Its portable model, protocol core, SDK, mock
+  host, installed-policy grant, and revision-checked event delivery are
+  implemented; the direct Windows popup bridge remains pending.
   The direct Windows UI Lab and session view now also substitute the user's
   fixed high-contrast system colours for their host palette without changing
   the portable document model (Decision 0055).

@@ -1,5 +1,6 @@
 //! Behavior-focused tests for the core request boundary.
 
+mod context_menu;
 mod core;
 mod file_access;
 mod folder_access;

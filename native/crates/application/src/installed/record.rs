@@ -42,6 +42,7 @@ pub(super) enum RecordVersion {
     V1_16,
     V1_17,
     V1_18,
+    V1_19,
 }
 
 impl RecordVersion {
@@ -235,6 +236,9 @@ fn capability_for_record_version(
         }
         "window.state.observe" if version.accepts(RecordVersion::V1_18) => {
             Some(Capability::WindowStateObserve)
+        }
+        "menu.context.write" if version.accepts(RecordVersion::V1_19) => {
+            Some(Capability::ContextMenuWrite)
         }
         _ => None,
     }

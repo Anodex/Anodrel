@@ -1,5 +1,6 @@
 import "./protocol-contract/clipboard-external.test.js";
 import "./protocol-contract/anodex-adapter.test.js";
+import "./protocol-contract/context-menus.test.js";
 import "./protocol-contract/core.test.js";
 import "./protocol-contract/file-and-network.test.js";
 import "./protocol-contract/notifications.test.js";

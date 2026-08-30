@@ -1,5 +1,6 @@
 import {
   MAX_UI_DOCUMENT_REQUEST_BYTES,
+  isContextMenuReplacePayload,
   isEmptyPayload,
   isMenuReplacePayload,
   isRecord,
@@ -17,6 +18,7 @@ import {
 
 import {
   secondaryDocumentOperationMinor,
+  type ContextMenuState,
   type MenuState,
   type UiWindowState,
 } from "../state.js";
@@ -28,6 +30,7 @@ export function dispatchWindowOperation(
   sessionId: string,
   sessionWindows: UiWindowState,
   menu: MenuState,
+  contextMenu: ContextMenuState,
 ): ResponseEnvelope | undefined {
   switch (request.operation) {
     case "window.title.set":
@@ -281,6 +284,34 @@ export function dispatchWindowOperation(
       menu.revision += 1;
       return context.success("menu.replace", request.requestId, {
         revision: menu.revision.toString(),
+      });
+
+    case "menu.context.replace":
+      if (request.protocolVersion.minor < 32) {
+        return context.failure(
+          request.requestId,
+          "operation.unsupported",
+          "menu.context.replace requires protocol 1.32 or later.",
+        );
+      }
+      if (!isContextMenuReplacePayload(request.payload)) {
+        return context.failure(
+          request.requestId,
+          "request.payload_invalid",
+          "menu.context.replace requires one exact bounded complete context-menu model.",
+        );
+      }
+      if (!context.hasCapability(sessionId, "menu.context.write")) {
+        return context.failure(
+          request.requestId,
+          "capability.denied",
+          "menu.context.replace requires the menu.context.write capability.",
+          { capability: "menu.context.write" },
+        );
+      }
+      contextMenu.revision += 1;
+      return context.success("menu.context.replace", request.requestId, {
+        revision: contextMenu.revision.toString(),
       });
 
   }

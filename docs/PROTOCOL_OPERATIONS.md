@@ -171,6 +171,13 @@ diagnostic's remaining checks are a real desktop menu click and local shortcut.
 `docs/MENUS.md` defines the exact model, menu-action event, and Windows
 ownership rule.
 
+## Native context menus
+
+Protocol 1.32 defines `menu.context.replace` behind its distinct
+`menu.context.write` grant. The exact model, safe failure behavior,
+revision-checked event, and pending direct Windows popup bridge are defined in
+`docs/CONTEXT_MENUS.md` and Decision 0120.
+
 ## Diagnostic entries
 
 Protocol 1.11 adds `diagnostics.entries.read`. It accepts exactly `{}` and
@@ -483,9 +490,11 @@ state as potentially out of date and may replace the document again.
 Version 1.2 defines the document event envelope below. Protocol 1.18 also
 defines `menu.action.invoked` with `source: "native.menu"`,
 `schemaVersion: { "major": 1, "minor": 18 }`, and exactly
-`{ "menuRevision": string, "action": string }` as its payload. Both are
-carried in the read result because Wire 1.0 has request/response framing; they
-are not unsolicited pipe writes.
+`{ "menuRevision": string, "action": string }` as its payload. Protocol 1.32
+adds `menu.context.action.invoked` with source `native.context_menu`, schema
+version 1.32, and exactly `{ "contextMenuRevision": string, "action": string
+}`. All are carried in the read result because Wire 1.0 has request/response
+framing; they are not unsolicited pipe writes.
 
 ~~~json
 {

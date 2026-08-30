@@ -56,7 +56,8 @@ use anodrel_folder_access::{
     UnavailableFolderSelectionService,
 };
 use anodrel_menu::{
-    Menu, MenuAction, MenuActionId, MenuModel, MenuService, MenuSession, MenuShortcut, MenuText,
+    ContextMenuModel, ContextMenuService, ContextMenuSession, Menu, MenuAction, MenuActionId,
+    MenuModel, MenuService, MenuSession, MenuShortcut, MenuText, UnavailableContextMenuService,
     UnavailableMenuService,
 };
 use anodrel_network::{NetworkTextService, NetworkTextServiceError, NetworkUrl};
@@ -93,6 +94,8 @@ pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
 pub const MAX_FILE_TEXT_WRITE_BYTES: usize = 8 * 1024;
 /// Maximum encoded JSON bytes in one complete native-menu replacement payload.
 pub const MAX_MENU_REPLACE_REQUEST_BYTES: usize = 16 * 1024;
+/// Maximum encoded JSON bytes in one complete native context-menu replacement.
+pub const MAX_CONTEXT_MENU_REPLACE_REQUEST_BYTES: usize = 8 * 1024;
 pub const MAX_STORAGE_SNAPSHOT_REQUEST_BYTES: usize = 24 * 1024;
 
 /// The exact external UI document format selected by one protocol operation.
@@ -197,6 +200,7 @@ pub struct CoreHost {
     ui_document_session: Option<RefCell<UiDocumentSession>>,
     ui_window_group: Option<UiWindowGroup<WindowTitleProposal>>,
     menu_session: RefCell<MenuSession>,
+    context_menu_session: RefCell<ContextMenuSession>,
     ui_input_mailbox: Option<UiInputMailbox>,
     session_close_signal: SessionCloseSignal,
     pending_ui_document_update: Option<RefCell<Option<UiDocumentSnapshot>>>,
@@ -212,6 +216,7 @@ pub struct CoreHost {
     window_fullscreen: Box<dyn WindowFullscreenService>,
     window_size: Box<dyn WindowSizeService>,
     menu: Box<dyn MenuService>,
+    context_menu: Box<dyn ContextMenuService>,
     ui_fields: Box<dyn UiFieldReader>,
     file_dialogs: Box<dyn FileDialogService>,
     folder_selections: Box<dyn FolderSelectionService>,

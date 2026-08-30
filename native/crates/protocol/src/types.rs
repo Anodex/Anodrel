@@ -164,6 +164,12 @@ pub enum Capability {
     /// A host owns native identifiers, window attachment, and activation
     /// routing; see `docs/MENUS.md`.
     MenuWrite,
+    /// Replace the complete host-owned context menu for this session.
+    ///
+    /// The application supplies only bounded semantic items. The host alone
+    /// owns local trigger handling, placement, native popup construction, and
+    /// command routing; see `docs/CONTEXT_MENUS.md`.
+    ContextMenuWrite,
 }
 
 impl Capability {
@@ -204,6 +210,7 @@ impl Capability {
             Self::WindowClose => "window.close",
             Self::UiFieldsRead => "ui.fields.read",
             Self::MenuWrite => "menu.write",
+            Self::ContextMenuWrite => "menu.context.write",
         }
     }
 }

@@ -22,6 +22,11 @@ export interface MenuState {
   revision: number;
 }
 
+/** Per-transport revision state for the mock's complete context menu. */
+export interface ContextMenuState {
+  revision: number;
+}
+
 export function secondaryDocumentOperationMinor(
   operation:
     | "window.open"

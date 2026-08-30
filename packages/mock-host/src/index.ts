@@ -25,6 +25,7 @@ import {
   createUiWindowState,
   extractRequestId,
   isWellFormedUnicode,
+  type ContextMenuState,
   type MenuState,
   type UiWindowState,
 } from "./state.js";export interface MockHostOptions {
@@ -117,12 +118,13 @@ export class MockHost {
     const cancelled = new Set<string>();
     const sessionWindows = createUiWindowState();
     const menu = { revision: 0 };
+    const contextMenu = { revision: 0 };
 
     return {
       send: async <TOperation extends PlatformOperation>(
         request: RequestEnvelope<TOperation>,
       ) =>
-        this.handle(request, sessionId, cancelled, sessionWindows, menu) as Promise<ResponseEnvelope<TOperation>>,
+        this.handle(request, sessionId, cancelled, sessionWindows, menu, contextMenu) as Promise<ResponseEnvelope<TOperation>>,
       cancel: async (cancellation: CancellationEnvelope) => {
         if (!isCancellationEnvelope(cancellation)) {
           throw new Error("MockHost received an invalid cancellation envelope.");
@@ -143,6 +145,7 @@ export class MockHost {
     cancelled: ReadonlySet<string> = new Set(),
     sessionWindows: UiWindowState = createUiWindowState(),
     menu: MenuState = { revision: 0 },
+    contextMenu: ContextMenuState = { revision: 0 },
   ): Promise<ResponseEnvelope> {
     const requestId = extractRequestId(request);
 
@@ -166,7 +169,7 @@ export class MockHost {
       );
     }
 
-    return this.dispatch(request, sessionId, sessionWindows, menu);
+    return this.dispatch(request, sessionId, sessionWindows, menu, contextMenu);
   }
 
   private dispatch(
@@ -174,6 +177,7 @@ export class MockHost {
     sessionId: string,
     sessionWindows: UiWindowState,
     menu: MenuState,
+    contextMenu: ContextMenuState,
   ): ResponseEnvelope {
     const context: MockOperationContext = {
       applicationId: this.applicationId,
@@ -192,7 +196,14 @@ export class MockHost {
       ): ResponseEnvelope<TOperation> => this.success(operation, requestId, result),
       failure: (requestId, code, message, details) => this.failure(requestId, code, message, details),
     };
-    const response = dispatchMockOperation(context, request, sessionId, sessionWindows, menu);
+    const response = dispatchMockOperation(
+      context,
+      request,
+      sessionId,
+      sessionWindows,
+      menu,
+      contextMenu,
+    );
     this.clipboardText = context.clipboardText;
     this.storageSnapshot = context.storageSnapshot;
     return response;

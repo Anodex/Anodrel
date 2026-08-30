@@ -2,6 +2,7 @@
 
 use super::*;
 
+mod context_menu;
 mod folder;
 mod folder_access;
 mod network;

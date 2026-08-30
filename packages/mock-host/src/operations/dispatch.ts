@@ -1,6 +1,6 @@
 import type { ResponseEnvelope, WireRequestEnvelope } from "@anodrel/protocol";
 
-import type { MenuState, UiWindowState } from "../state.js";
+import type { ContextMenuState, MenuState, UiWindowState } from "../state.js";
 import type { MockOperationContext } from "./context.js";
 import { dispatchPlatformOperation } from "./platform.js";
 import { dispatchServiceOperation } from "./services.js";
@@ -14,13 +14,21 @@ export function dispatchMockOperation(
   sessionId: string,
   sessionWindows: UiWindowState,
   menu: MenuState,
+  contextMenu: ContextMenuState,
 ): ResponseEnvelope {
   const platformResponse = dispatchPlatformOperation(context, request, sessionId);
   if (platformResponse !== undefined) {
     return platformResponse;
   }
 
-  const windowResponse = dispatchWindowOperation(context, request, sessionId, sessionWindows, menu);
+  const windowResponse = dispatchWindowOperation(
+    context,
+    request,
+    sessionId,
+    sessionWindows,
+    menu,
+    contextMenu,
+  );
   if (windowResponse !== undefined) {
     return windowResponse;
   }

@@ -83,13 +83,25 @@ export interface MenuActionInvokedEvent
   readonly schemaVersion: { readonly major: 1; readonly minor: 18 };
 }
 
+/** One current enabled semantic command selected from a native context menu. */
+export interface ContextMenuActionInvokedEvent
+  extends EventEnvelope<{ readonly contextMenuRevision: string; readonly action: string }> {
+  readonly eventName: "menu.context.action.invoked";
+  readonly source: "native.context_menu";
+  readonly schemaVersion: { readonly major: 1; readonly minor: 32 };
+}
+
 /** A semantic interaction delivered by the bounded `ui.events.read` result. */
-export type UiInteractionEvent = UiActionInvokedEvent | MenuActionInvokedEvent;
+export type UiInteractionEvent =
+  | UiActionInvokedEvent
+  | MenuActionInvokedEvent
+  | ContextMenuActionInvokedEvent;
 
 /** A UI or primary-menu action tagged with the logical view that produced it. */
 export type WindowUiInteractionEvent =
   | (UiActionInvokedEvent & { readonly windowId: SessionWindowId })
-  | (MenuActionInvokedEvent & { readonly windowId: SessionWindowId });
+  | (MenuActionInvokedEvent & { readonly windowId: SessionWindowId })
+  | (ContextMenuActionInvokedEvent & { readonly windowId: SessionWindowId });
 
 /**
  * Returns whether a value is exactly one closed session-window state request.

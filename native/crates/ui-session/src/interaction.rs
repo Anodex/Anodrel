@@ -1,6 +1,6 @@
 //! Typed native semantic candidates for one shared session interaction queue.
 
-use anodrel_menu::{MenuActionId, MenuRevision};
+use anodrel_menu::{ContextMenuRevision, MenuActionId, MenuRevision};
 use anodrel_ui::UiEvent;
 
 use crate::UiDocumentRevision;
@@ -47,6 +47,27 @@ impl MenuInputCandidate {
     }
 }
 
+/// One host-mapped native context-menu interaction awaiting session validation.
+#[derive(Clone, Debug)]
+pub struct ContextMenuInputCandidate {
+    revision: ContextMenuRevision,
+    action: MenuActionId,
+}
+
+impl ContextMenuInputCandidate {
+    /// Builds one candidate from a host-owned context-menu revision and semantic ID.
+    #[must_use]
+    pub const fn new(revision: ContextMenuRevision, action: MenuActionId) -> Self {
+        Self { revision, action }
+    }
+
+    /// Splits this candidate into its revision and semantic action ID.
+    #[must_use]
+    pub fn into_parts(self) -> (ContextMenuRevision, MenuActionId) {
+        (self.revision, self.action)
+    }
+}
+
 /// One native semantic interaction in the session's shared ordered mailbox.
 #[derive(Clone, Debug)]
 pub enum SessionInteractionCandidate {
@@ -54,6 +75,8 @@ pub enum SessionInteractionCandidate {
     Ui(UiInputCandidate),
     /// A menu command derived from the host's current native-ID mapping.
     Menu(MenuInputCandidate),
+    /// A local popup command derived from the host's current native-ID mapping.
+    ContextMenu(ContextMenuInputCandidate),
 }
 
 impl From<UiInputCandidate> for SessionInteractionCandidate {
@@ -65,5 +88,11 @@ impl From<UiInputCandidate> for SessionInteractionCandidate {
 impl From<MenuInputCandidate> for SessionInteractionCandidate {
     fn from(candidate: MenuInputCandidate) -> Self {
         Self::Menu(candidate)
+    }
+}
+
+impl From<ContextMenuInputCandidate> for SessionInteractionCandidate {
+    fn from(candidate: ContextMenuInputCandidate) -> Self {
+        Self::ContextMenu(candidate)
     }
 }

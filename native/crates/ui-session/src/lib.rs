@@ -34,7 +34,9 @@ pub use fields::{
     UiFieldValue,
 };
 pub use input_mailbox::{UI_INPUT_QUEUE_CAPACITY, UiInputBatch, UiInputMailbox};
-pub use interaction::{MenuInputCandidate, SessionInteractionCandidate, UiInputCandidate};
+pub use interaction::{
+    ContextMenuInputCandidate, MenuInputCandidate, SessionInteractionCandidate, UiInputCandidate,
+};
 pub use mailbox::UiDocumentMailbox;
 pub use revision::UiDocumentRevision;
 pub use session::UiDocumentSession;

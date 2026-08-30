@@ -6,6 +6,8 @@
 
 use super::*;
 
+mod context_menu;
+
 const MENU_ACTION_EVENT_SCHEMA_VERSION: ProtocolVersion = ProtocolVersion {
     major: 1,
     minor: 18,
@@ -137,6 +139,17 @@ impl CoreHost {
                         Err(_) => discarded = discarded.saturating_add(1),
                     }
                 }
+                SessionInteractionCandidate::ContextMenu(candidate) => {
+                    let (revision, action) = candidate.into_parts();
+                    match self
+                        .context_menu_session
+                        .borrow()
+                        .accept_action(revision, action)
+                    {
+                        Ok(event) => events.push(context_menu::action_event(event)),
+                        Err(_) => discarded = discarded.saturating_add(1),
+                    }
+                }
             }
         }
         ResponseEnvelope::success(
@@ -203,6 +216,22 @@ impl CoreHost {
                     SessionInteractionCandidate::Menu(_) => {
                         // A secondary receives no menu bridge. If a malformed
                         // host route ever places one there, fail it closed.
+                        discarded = discarded.saturating_add(1);
+                    }
+                    SessionInteractionCandidate::ContextMenu(candidate) if id.is_primary() => {
+                        let (revision, action) = candidate.into_parts();
+                        match self
+                            .context_menu_session
+                            .borrow()
+                            .accept_action(revision, action)
+                        {
+                            Ok(event) => events.push(context_menu::window_action_event(&id, event)),
+                            Err(_) => discarded = discarded.saturating_add(1),
+                        }
+                    }
+                    SessionInteractionCandidate::ContextMenu(_) => {
+                        // Context menus are intentionally primary-view-only.
+                        // A malformed host route cannot widen that boundary.
                         discarded = discarded.saturating_add(1);
                     }
                 }

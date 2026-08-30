@@ -1,9 +1,9 @@
 # Native session context menus
 
-**Status:** Portable model, revision, revalidation state, and bounded
-UI-thread mailbox are implemented. The Protocol 1.32 operation, SDK/mock,
-installed-policy grant, and Windows host remain pending, so this is not yet an
-available operation or installed-application grant.
+**Status:** Portable model, revision, revalidation state, bounded interaction
+mailbox, Protocol 1.32 core operation, SDK, mock host, and installed-policy
+grant are implemented. The direct Windows UI-thread bridge and popup remain
+pending, so this is not yet available from a Windows native session.
 
 ## Purpose
 

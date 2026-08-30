@@ -1,6 +1,8 @@
 //! Validation of a bounded native session-menu snapshot.
 
 import {
+  MAX_CONTEXT_MENU_ITEMS,
+  MAX_CONTEXT_MENU_REPLACE_REQUEST_BYTES,
   MAX_MENU_ACTION_ID_BYTES,
   MAX_MENU_ITEM_LABEL_BYTES,
   MAX_MENU_ITEMS,
@@ -30,6 +32,38 @@ export function isMenuReplacePayload(
   const actionIds = new Set<string>();
   const shortcuts = new Set<string>();
   return value.menus.every((menu) => isNativeSessionMenu(menu, actionIds, shortcuts, shortcutsAllowed));
+}
+
+/** Validates one exact bounded native context-menu replacement. */
+export function isContextMenuReplacePayload(
+  value: unknown,
+): value is PayloadFor<"menu.context.replace"> {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 1 ||
+    !Array.isArray(value.items) ||
+    value.items.length === 0 ||
+    value.items.length > MAX_CONTEXT_MENU_ITEMS ||
+    !hasAtMostEncodedJsonBytes(value, MAX_CONTEXT_MENU_REPLACE_REQUEST_BYTES)
+  ) {
+    return false;
+  }
+
+  const actionIds = new Set<string>();
+  return value.items.every((item) => {
+    if (
+      !isRecord(item) ||
+      Object.keys(item).length !== 3 ||
+      !isMenuActionId(item.id) ||
+      !isMenuText(item.label, MAX_MENU_ITEM_LABEL_BYTES) ||
+      typeof item.enabled !== "boolean" ||
+      actionIds.has(item.id)
+    ) {
+      return false;
+    }
+    actionIds.add(item.id);
+    return true;
+  });
 }
 
 function isNativeSessionMenu(

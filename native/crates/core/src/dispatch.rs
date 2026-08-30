@@ -131,6 +131,9 @@ impl CoreHost {
             "menu.replace" if request.protocol_version.minor >= 18 => {
                 self.handle_menu_replace(request)
             }
+            "menu.context.replace" if request.protocol_version.minor >= 32 => {
+                self.handle_context_menu_replace(request)
+            }
             "ui.document.replace" if request.protocol_version.minor >= 1 => {
                 self.handle_ui_document_replace(request, UiDocumentFormat::V1)
             }

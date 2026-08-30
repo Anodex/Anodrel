@@ -1,6 +1,6 @@
 /** Fixed limits and protocol-version values shared by Anodrel boundaries. */
 
-export const PROTOCOL_VERSION = { major: 1, minor: 31 } as const;
+export const PROTOCOL_VERSION = { major: 1, minor: 32 } as const;
 export const MAX_REQUEST_ID_BYTES = 256;
 export const MAX_OPERATION_BYTES = 128;
 export const MAX_CANCELLATION_ID_BYTES = 256;
@@ -17,8 +17,11 @@ export const MAX_FILE_TEXT_WRITE_BYTES = 8 * 1024;
 export const MAX_FILE_BINARY_WRITE_BYTES = 32 * 1024;
 /** Maximum encoded JSON bytes in one complete native-menu replacement payload. */
 export const MAX_MENU_REPLACE_REQUEST_BYTES = 16 * 1024;
+/** Maximum encoded JSON bytes in one complete native context-menu replacement. */
+export const MAX_CONTEXT_MENU_REPLACE_REQUEST_BYTES = 8 * 1024;
 export const MAX_MENUS = 8;
 export const MAX_MENU_ITEMS = 16;
+export const MAX_CONTEXT_MENU_ITEMS = 16;
 export const MAX_MENU_LABEL_BYTES = 32;
 export const MAX_MENU_ITEM_LABEL_BYTES = 96;
 export const MAX_MENU_ACTION_ID_BYTES = 64;

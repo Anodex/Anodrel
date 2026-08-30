@@ -228,6 +228,18 @@ deliver one current enabled action through the existing granted
 `readUiEvents()` route, with the same revision revalidation as a menu click.
 See `docs/MENUS.md`.
 
+### Native context menus
+
+Protocol 1.32 adds `replaceContextMenu(items)`. It requires the distinct
+`menu.context.write` grant and returns only an opaque host-owned revision. An
+item contains only its semantic ID, display label, and explicit enabled flag;
+the SDK cannot provide a coordinate, target, selection, link, callback,
+shortcut, native handle, or command number. A host may later deliver one
+current enabled action through the existing granted `readUiEvents()` route as
+`menu.context.action.invoked`. The event includes only the action ID and the
+opaque context-menu revision, never pointer or popup data. The current direct
+Windows host does not yet attach this surface. See `docs/CONTEXT_MENUS.md`.
+
 ## Windows development transport
 
 `@anodrel/windows-transport` is a separate development-only Node-core adapter

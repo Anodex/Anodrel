@@ -51,7 +51,8 @@ export type Capability =
   | "window.size"
   | "window.open"
   | "window.close"
-  | "menu.write";
+  | "menu.write"
+  | "menu.context.write";
 
 export type EmptyPayload = Record<string, never>;
 
@@ -106,6 +107,13 @@ export interface NativeMenuItem {
 export interface NativeSessionMenu {
   readonly label: string;
   readonly items: readonly NativeMenuItem[];
+}
+
+/** One enabled or disabled semantic command in a native context menu. */
+export interface NativeContextMenuItem {
+  readonly id: string;
+  readonly label: string;
+  readonly enabled: boolean;
 }
 
 export interface PlatformOperationMap {
@@ -283,6 +291,17 @@ export interface PlatformOperationMap {
    */
   "menu.replace": {
     readonly payload: { readonly menus: readonly NativeSessionMenu[] };
+    readonly result: { readonly revision: string };
+  };
+  /**
+   * Replaces this session's complete host-owned native context-menu model.
+   *
+   * The application supplies no native placement, view target, selection,
+   * link, callback, handle, shortcut, or command identifier. A successful
+   * revision is host-owned and opaque to the SDK.
+   */
+  "menu.context.replace": {
+    readonly payload: { readonly items: readonly NativeContextMenuItem[] };
     readonly result: { readonly revision: string };
   };
   /**

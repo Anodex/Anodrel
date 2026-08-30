@@ -29,7 +29,7 @@ export {
   isStorageStateReplacePayload,
 } from "./validators/services.js";
 export type { FileBinaryWritePayloadStatus } from "./validators/services.js";
-export { isMenuReplacePayload } from "./validators/menus.js";
+export { isContextMenuReplacePayload, isMenuReplacePayload } from "./validators/menus.js";
 export {
   MAX_WINDOW_TITLE_UTF16_UNITS,
   isCanonicalSecondaryWindowId,

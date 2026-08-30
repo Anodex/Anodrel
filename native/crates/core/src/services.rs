@@ -26,6 +26,7 @@ pub struct HostServices {
     pub(super) window_fullscreen: Box<dyn WindowFullscreenService>,
     pub(super) window_size: Box<dyn WindowSizeService>,
     pub(super) menu: Box<dyn MenuService>,
+    pub(super) context_menu: Box<dyn ContextMenuService>,
     pub(super) ui_fields: Box<dyn UiFieldReader>,
     pub(super) file_dialogs: Box<dyn FileDialogService>,
     pub(super) folder_selections: Box<dyn FolderSelectionService>,
@@ -235,6 +236,7 @@ impl HostServices {
             window_fullscreen: Box::new(UnavailableWindowFullscreen),
             window_size: Box::new(UnavailableWindowSize),
             menu: Box::new(UnavailableMenuService),
+            context_menu: Box::new(UnavailableContextMenuService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
             folder_selections: Box::new(UnavailableFolderSelectionService),
@@ -393,6 +395,17 @@ impl HostServices {
     #[must_use]
     pub fn with_menu(mut self, service: impl MenuService + 'static) -> Self {
         self.menu = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed native context-menu service.
+    ///
+    /// The supplied service must retain only this session's validated semantic
+    /// model and show it only through a host-owned local interaction route.
+    /// It accepts no application coordinate, target, callback, or handle.
+    #[must_use]
+    pub fn with_context_menu(mut self, service: impl ContextMenuService + 'static) -> Self {
+        self.context_menu = Box::new(service);
         self
     }
 

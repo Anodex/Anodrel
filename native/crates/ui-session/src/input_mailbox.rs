@@ -102,12 +102,13 @@ fn lock(value: &Mutex<UiInputMailboxState>) -> MutexGuard<'_, UiInputMailboxStat
 
 #[cfg(test)]
 mod tests {
-    use anodrel_menu::{MenuActionId, MenuRevision};
+    use anodrel_menu::{ContextMenuRevision, MenuActionId, MenuRevision};
     use anodrel_ui::{ElementId, UiEvent};
 
     use super::{UI_INPUT_QUEUE_CAPACITY, UiInputMailbox};
     use crate::{
-        MenuInputCandidate, SessionInteractionCandidate, UiDocumentRevision, UiInputCandidate,
+        ContextMenuInputCandidate, MenuInputCandidate, SessionInteractionCandidate,
+        UiDocumentRevision, UiInputCandidate,
     };
 
     fn candidate() -> UiInputCandidate {
@@ -141,6 +142,9 @@ mod tests {
         let menu_revision = MenuRevision::INITIAL
             .next()
             .expect("the first menu revision exists");
+        let context_menu_revision = ContextMenuRevision::INITIAL
+            .next()
+            .expect("the first context-menu revision exists");
         mailbox.push(UiInputCandidate::new(
             document_revision,
             UiEvent::ActionInvoked(ElementId::new("document.action").expect("test ID is valid")),
@@ -149,9 +153,13 @@ mod tests {
             menu_revision,
             MenuActionId::new("menu.action").expect("test ID is valid"),
         ));
+        mailbox.push(ContextMenuInputCandidate::new(
+            context_menu_revision,
+            MenuActionId::new("context-menu.action").expect("test ID is valid"),
+        ));
 
         let candidates = mailbox.drain().into_candidates();
-        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates.len(), 3);
         let SessionInteractionCandidate::Ui(document) = &candidates[0] else {
             panic!("the first candidate is a document action");
         };
@@ -166,5 +174,11 @@ mod tests {
         let (revision, action) = menu.clone().into_parts();
         assert_eq!(revision, menu_revision);
         assert_eq!(action.as_str(), "menu.action");
+        let SessionInteractionCandidate::ContextMenu(context_menu) = &candidates[2] else {
+            panic!("the third candidate is a context-menu action");
+        };
+        let (revision, action) = context_menu.clone().into_parts();
+        assert_eq!(revision, context_menu_revision);
+        assert_eq!(action.as_str(), "context-menu.action");
     }
 }

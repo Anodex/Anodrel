@@ -8,6 +8,7 @@ import {
   type PlatformOperation,
   type RequestEnvelope,
   type ResultFor,
+  type NativeContextMenuItem,
   type NativeSessionMenu,
   type SessionWindowId,
   type SecondarySessionWindowId,
@@ -208,6 +209,20 @@ export class PlatformClient {
     menus: readonly NativeSessionMenu[],
   ): Promise<ResultFor<"menu.replace">> {
     return this.request("menu.replace", { menus });
+  }
+
+  /**
+   * Replaces this session's complete host-owned native context menu.
+   *
+   * A context menu appears only through the host's documented local input
+   * route. This call supplies semantic display items only: it has no point,
+   * selection, link, target, native handle, callback, shortcut, or command
+   * number. The returned revision is host-owned and opaque.
+   */
+  replaceContextMenu(
+    items: readonly NativeContextMenuItem[],
+  ): Promise<ResultFor<"menu.context.replace">> {
+    return this.request("menu.context.replace", { items });
   }
 
   replaceUiDocument(document: string): Promise<ResultFor<"ui.document.replace">> {

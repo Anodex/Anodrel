@@ -184,6 +184,15 @@ adds a separate `window.state.observe` grant and immediate coalesced
 with no target, timing, history, wait, callback, or subscription; see
 `docs/WINDOW_STATE_CHANGES.md`.
 
+Protocol 1.32 adds the portable protocol and core boundary for a native
+context menu. Its distinct `menu.context.write` grant replaces one complete
+semantic model of up to sixteen ID, label, and enabled-state items. It exposes
+no browser selection, link, coordinate, target, callback, shortcut, native
+handle, command identifier, or result readback. The SDK, mock host,
+installed-record 1.19 policy, and revision-checked `ui.events.read` delivery
+are implemented; the direct Windows popup bridge remains the next work. See
+`docs/CONTEXT_MENUS.md`.
+
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.
 The verified Windows product-session adapter joins that pipe, one locked
@@ -350,6 +359,8 @@ UI-session host.
 `docs/MENUS.md` defines the bounded native session-menu contract and records
 the implemented direct Windows adapter, canonical local keyboard shortcuts,
 its explicit ownership boundary, and the remaining manual verification.
+`docs/CONTEXT_MENUS.md` defines the separate bounded native context-menu
+contract and its pending direct Windows popup bridge.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

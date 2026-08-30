@@ -43,7 +43,10 @@ Version 1.12 adds the separately scoped `window.size` grant defined by Decision
 0088. Version 1.13 adds the separately scoped `window.open` and `window.close`
 grants defined by Decisions 0092 and 0093. Version 1.14 adds the separately
 scoped `network.fetch` grant and required exact `networkOrigins` policy defined
-by Decision 0099.
+by Decision 0099. Version 1.15 adds `dialog.open_folder`; 1.16 adds
+`folder.read_entries`; 1.17 adds `window.state.read`; 1.18 adds
+`window.state.observe`; and 1.19 adds the separately scoped
+`menu.context.write` grant defined by Decision 0120.
 Unknown, missing, duplicate, and wrongly typed fields are rejected.
 
 ~~~json
@@ -70,7 +73,7 @@ Unknown, missing, duplicate, and wrongly typed fields are rejected.
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
 | `executable.sha256` | Lowercase hexadecimal SHA-256 of raw executable bytes. Files above **128 MiB** are rejected. |
 | `publisher.leafCertificateSha256` | Lowercase hexadecimal SHA-256 fingerprint expected from the accepted embedded Authenticode leaf certificate. It is internal comparison data, never display text. |
-| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 adds `notification.show`; 1.4 adds `window.title`; 1.5 adds `ui.fields.read`; 1.6 adds `window.state`; 1.7 adds `file.write_text`; 1.8 adds `menu.write`; 1.9 adds `window.focus`; 1.10 adds `window.fullscreen`; 1.11 adds `file.write_binary`; 1.12 adds `window.size`; 1.13 adds `window.open` plus `window.close`; 1.14 adds `network.fetch`; and 1.15 adds `dialog.open_folder`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
+| `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 adds `notification.show`; 1.4 adds `window.title`; 1.5 adds `ui.fields.read`; 1.6 adds `window.state`; 1.7 adds `file.write_text`; 1.8 adds `menu.write`; 1.9 adds `window.focus`; 1.10 adds `window.fullscreen`; 1.11 adds `file.write_binary`; 1.12 adds `window.size`; 1.13 adds `window.open` plus `window.close`; 1.14 adds `network.fetch`; 1.15 adds `dialog.open_folder`; 1.16 adds `folder.read_entries`; 1.17 adds `window.state.read`; 1.18 adds `window.state.observe`; and 1.19 adds `menu.context.write`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
 | `networkOrigins` | Required in 1.14 and later. An array of zero through eight exact `{ "host", "port" }` objects. Each host is a valid canonicalizable DNS hostname and each port is an integer from 1 through 65,535. Entries must be unique after host canonicalization. The array must contain one through eight values exactly when `capabilities` contains `network.fetch`; otherwise it must be empty. It is machine-policy data and never a protocol, renderer, or application-configuration value. |
 
 The package root must contain `anodrel.application.json`. The parser loads it

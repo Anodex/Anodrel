@@ -1,7 +1,7 @@
 # Decision 0120: Context menus stay host-owned and semantic
 
-**Status:** Accepted; portable model and mailbox implemented. Protocol and
-Windows-host integration remain pending.
+**Status:** Accepted; portable model, protocol core, and event revalidation
+are implemented. Windows-host integration remains pending.
 
 **Date:** 2026-08-29
 
