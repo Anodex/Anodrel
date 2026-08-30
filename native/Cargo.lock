@@ -107,6 +107,16 @@ name = "anodrel-json"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-linux-pipe"
+version = "0.1.0"
+dependencies = [
+ "anodrel-core",
+ "anodrel-protocol",
+ "anodrel-transport",
+ "anodrel-wire",
+]
+
+[[package]]
 name = "anodrel-menu"
 version = "0.1.0"
 

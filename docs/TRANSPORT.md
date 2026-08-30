@@ -1,9 +1,10 @@
 # Anodrel Native Transport v1
 
 **Status:** Foundation contract. The frame codec, authenticated host session,
-one-client Windows named-pipe adapter, and private child-bootstrap adapter are
-implemented. A separate no-script application package surface is
-implemented in `docs/APPLICATIONS.md`; it does not use this transport.
+one-client Windows named-pipe adapter, first Linux abstract Unix-socket adapter,
+and private Windows child-bootstrap adapter are implemented. A separate
+no-script application package surface is implemented in `docs/APPLICATIONS.md`;
+it does not use this transport.
 
 ## Purpose
 
@@ -18,10 +19,12 @@ local byte stream -> anodrel-wire -> anodrel-transport -> anodrel-core
                     frame limits       session bounds      host policy
 ~~~
 
-The first operating-system adapter is a direct Windows named pipe. It accepts
-one client on a worker thread. A private bootstrap adapter can hand its
-invitation to one launched child process. A pipe name alone is never
-authentication.
+The first operating-system adapter is a direct Windows named pipe. Linux now
+has a separate direct abstract Unix-domain socket adapter. Both accept one
+client on a worker thread and require host-created authentication material; an
+endpoint name alone is never authentication. The private bootstrap adapter is
+currently Windows-specific and can hand its invitation to one launched child
+process.
 
 ## Frame format
 
@@ -192,6 +195,20 @@ measure the pipe, wire, transport, and core together, but it does not measure
 process creation, bootstrap delivery, application startup, memory, rendering,
 or another application runtime. See `docs/PERFORMANCE.md` for the output
 fields and comparison rules.
+
+## Linux abstract Unix-socket adapter
+
+`anodrel-linux-pipe` is the first Linux-native transport foundation. It creates
+one randomly named abstract `AF_UNIX` stream endpoint, verifies the accepted
+peer's effective UID through Linux `SO_PEERCRED`, and still requires the
+existing independent 32-byte authentication token before the shared transport
+session receives a frame. The abstract endpoint has no filesystem entry and no
+TCP address. It accepts one client, runs only on a worker thread, and has a
+host-only stop signal with no protocol representation.
+
+It does not provide a Linux window, application client, child launcher,
+bootstrap delivery, policy store, service adapter, or macOS implementation.
+`docs/LINUX_TRANSPORT.md` and Decision 0122 define the full boundary.
 
 ## Private child bootstrap
 

@@ -40,6 +40,8 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
+          rustup component add rustfmt
+          rustup component add clippy
       - name: Check native formatting
         run: cargo fmt --manifest-path native/Cargo.toml --all --check
       - name: Lint native workspace
@@ -52,3 +54,23 @@ jobs:
       - name: Verify documentation links
         shell: powershell
         run: ./scripts/check-documentation-links.ps1
+
+  linux-transport:
+    name: Linux transport adapter
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Check native formatting
+        run: cargo fmt --manifest-path native/Cargo.toml --all --check
+      - name: Lint the Linux transport adapter
+        run: cargo clippy --manifest-path native/Cargo.toml -p anodrel-linux-pipe --all-targets -- -D warnings
+      - name: Run real Linux transport tests
+        run: cargo test --manifest-path native/Cargo.toml -p anodrel-linux-pipe

@@ -1,7 +1,7 @@
 # Continuous verification
 
 Anodrel runs its owned verification workflow on every pull request and every
-push to `main`. The workflow is intentionally split by the two source
+push to `main`. The workflow is intentionally split by the three source
 boundaries the repository ships today.
 
 ## TypeScript SDK and contracts
@@ -23,9 +23,22 @@ documented manual Windows checks for visual rendering, foreground policy,
 native dialogs, screen-reader speech, or the development product fixture. A
 green workflow must never be used to claim those acceptance checks passed.
 
+## Linux local transport
+
+The Ubuntu runner installs stable Rust, checks all native formatting, then
+lints and tests `anodrel-linux-pipe`. Its tests create real Linux abstract
+Unix-domain sockets and exercise the same-UID peer check, authenticated health
+round trip, failed authentication closure, and host-only stop paths. This keeps
+the Linux-specific code from being treated as verified merely because the
+Windows workspace compiles its intentionally empty non-Linux facade.
+
+This job verifies only the documented Linux transport foundation. It does not
+claim a Linux native window, launcher, application client, packaging, or any
+macOS implementation.
+
 ## Repository policy
 
-After the first successful run, repository administrators should require both
+After the first successful run, repository administrators should require all
 workflow jobs before changes enter `main`. That GitHub setting is intentionally
 outside the repository: Anodrel can publish the checks, but it must not assume
 authority to change a maintainer's review or merge policy.

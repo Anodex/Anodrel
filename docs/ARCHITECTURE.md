@@ -71,15 +71,19 @@ The native host owns operating-system integration:
 - update and packaging integration;
 - native security and isolation controls.
 
-The first host is expected to target Windows. Other operating systems should be
-added as adapters behind the same service contracts.
+The first host targets Windows. Linux now has the first shared local-transport
+adapter; its desktop host and operating-system services remain later work.
+Other operating systems should be added as adapters behind the same service
+contracts.
 
 The current Windows host uses direct Anodrel modules over User32,
 Kernel32, and GDI APIs. Its raw FFI is isolated from the portable protocol and
 policy layers. It paints an internal diagnostics view and a bounded,
 digest-verified `anodrel.text.v1` application package surface; it has no
-webview, script runtime, navigation, or application bridge. macOS and Linux
-hosts will follow the same ownership rule through their respective
+webview, script runtime, navigation, or application bridge. The Linux transport
+adapter uses direct abstract Unix sockets and same-UID peer verification but
+does not yet create a Linux window or application service. macOS and a Linux
+desktop host will follow the same ownership rule through their respective
 operating-system APIs.
 
 Drawing is not a host responsibility. Every first-party surface is composed by
