@@ -35,6 +35,7 @@ members = [
   "adapters/linux-paths",
   "adapters/linux-storage",
   "adapters/linux-crash",
+  "adapters/linux-bootstrap",
   "adapters/windows-bootstrap",
   "adapters/windows-client",
   "adapters/windows-ui-sdk",

@@ -31,8 +31,10 @@ Status: **Second-sample foundation implemented; platform expansion planned**
   child proof implemented:** `anodrel-linux-pipe` gives a future Linux host one
   direct, same-UID, authenticated abstract Unix-domain stream without a
   filesystem socket or TCP listener (Decision 0122), and a fixed compiled child
-  proves the separate ANLI invitation route (Decision 0123). It is not yet a
-  Linux desktop host, reusable launcher, policy store, or service adapter.
+  proves the separate ANLI invitation route (Decision 0123). The direct
+  development launcher now provides the fixed host-selected child mechanics
+  (Decision 0127). It is not yet a Linux desktop host, product launcher,
+  identity policy, or service adapter.
   The Linux current-user path foundation is also implemented through the direct
   effective-account lookup in Decision 0124. A direct Linux state adapter now
   retains one bounded, recoverable snapshot in that layout through private

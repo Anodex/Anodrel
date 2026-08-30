@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-linux-bootstrap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-linux-client = { path = "../linux-client" }

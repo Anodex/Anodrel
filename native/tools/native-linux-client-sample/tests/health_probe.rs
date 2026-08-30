@@ -1,13 +1,14 @@
 #![cfg(target_os = "linux")]
 
 use std::{
-    io::Write,
+    path::Path,
     process::{Child, Command, ExitStatus, Stdio},
     thread,
     time::{Duration, Instant},
 };
 
 use anodrel_core::HostPolicy;
+use anodrel_linux_bootstrap::{LinuxBootstrapProgram, launch};
 use anodrel_linux_pipe::LinuxPipeServer;
 use anodrel_protocol::Capability;
 
@@ -28,25 +29,19 @@ fn compiled_probe_completes_one_invited_linux_health_round_trip() {
     let bootstrap = invitation
         .bootstrap_invitation()
         .expect("transport invitation converts");
-    let encoded = bootstrap.encode().expect("bootstrap encodes");
     let worker = thread::spawn(move || server.serve_one());
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_anodrel-native-linux-client-sample"))
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("probe starts");
-    child
-        .stdin
-        .take()
-        .expect("probe receives private standard input")
-        .write_all(&encoded)
-        .expect("bootstrap writes");
+    let program = LinuxBootstrapProgram::new(Path::new(env!(
+        "CARGO_BIN_EXE_anodrel-native-linux-client-sample"
+    )))
+    .expect("compiled probe path is absolute and host-selected");
+    let child = launch(&program, bootstrap).expect("probe starts through the owned launcher");
 
     assert_eq!(
-        wait_for_exit(&mut child).code(),
-        Some(0),
+        child
+            .wait_for_exit(CHILD_TIMEOUT)
+            .expect("probe exits inside its host timeout"),
+        0,
         "the Linux probe stopped at one of its safe stages"
     );
     worker

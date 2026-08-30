@@ -28,21 +28,23 @@ green workflow must never be used to claim those acceptance checks passed.
 The Ubuntu runner installs stable Rust, checks all native formatting, then
 lints and tests the Linux transport, strict invitation adapter, direct
 effective-account paths adapter, direct bounded state adapter, direct
-host-only crash store, and fixed compiled child probe. Its tests create real
-Linux abstract Unix-domain sockets, exercise the same-UID peer check,
-authenticated health round trip, failed authentication closure, and host-only
-stop paths, then prove a separate child process can consume one ANLI record and
-complete health. The paths tests exercise the current effective account without
-exposing its name or home directory. The storage tests use a real temporary
-filesystem to prove atomic snapshot recovery, private modes, and link
-rejection. The crash-store tests prove private record creation, retention,
-bounded enumeration, and link rejection. This keeps the Linux-specific code
-from being treated as verified merely because the Windows workspace compiles
-its intentionally empty non-Linux facade.
+host-only crash store, direct development launcher, and fixed compiled child
+probe. Its tests create real Linux abstract Unix-domain sockets, exercise the
+same-UID peer check, authenticated health round trip, failed authentication
+closure, and host-only stop paths, then prove a separate child process can
+consume one ANLI record and complete health through the owned launcher. The
+paths tests exercise the current effective account without exposing its name or
+home directory. The storage tests use a real temporary filesystem to prove
+atomic snapshot recovery, private modes, and link rejection. The crash-store
+tests prove private record creation, retention, bounded enumeration, and link
+rejection. This keeps the Linux-specific code from being treated as verified
+merely because the Windows workspace compiles its intentionally empty
+non-Linux facade.
 
 This job verifies only the documented Linux transport, storage, crash-record,
-and fixed-child proof. It does not claim a Linux native window, reusable
-launcher, application SDK, packaging, or any macOS implementation.
+development-launch, and fixed-child proof. It does not claim a Linux native
+window, application identity, product launcher, SDK, packaging, or macOS
+implementation.
 
 ## Repository policy
 

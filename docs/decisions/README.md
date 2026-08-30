@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0127: Linux development launcher uses an exact execve child.
+
 - 0126: Linux crash records use a private bounded directory.
 
 - 0125: Linux state storage uses private directory descriptors.

@@ -48,7 +48,7 @@ The abstract endpoint disappears when the listener is dropped.
 
 ## Explicitly absent
 
-- a reusable Linux child-process launcher or executable identity policy;
+- Linux executable identity policy, a product launcher, or product lifecycle;
 - a Linux native window, renderer blit, dialogs, clipboard, logging,
   notification, credential, network, or policy adapter;
 - a filesystem socket, TCP endpoint, multiple-client server, or cross-user

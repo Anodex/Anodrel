@@ -107,6 +107,13 @@ name = "anodrel-json"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-linux-bootstrap"
+version = "0.1.0"
+dependencies = [
+ "anodrel-linux-client",
+]
+
+[[package]]
 name = "anodrel-linux-client"
 version = "0.1.0"
 dependencies = [
@@ -193,6 +200,7 @@ dependencies = [
  "anodrel-client",
  "anodrel-core",
  "anodrel-json",
+ "anodrel-linux-bootstrap",
  "anodrel-linux-client",
  "anodrel-linux-pipe",
  "anodrel-protocol",

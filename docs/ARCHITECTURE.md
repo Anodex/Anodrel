@@ -72,8 +72,8 @@ The native host owns operating-system integration:
 - native security and isolation controls.
 
 The first host targets Windows. Linux now has a shared local-transport adapter,
-a separately tested private child transport, a bounded direct state-store
-adapter, and a host-only crash store; its desktop host and most
+a separately tested private child transport, a direct development child
+launcher, a bounded direct state-store adapter, and a host-only crash store; its desktop host and most
 operating-system services remain later work.
 Other operating systems should be added as adapters behind the same service
 contracts.
@@ -84,8 +84,10 @@ policy layers. It paints an internal diagnostics view and a bounded,
 digest-verified `anodrel.text.v1` application package surface; it has no
 webview, script runtime, navigation, or application bridge. The Linux transport
 adapter uses direct abstract Unix sockets and same-UID peer verification. Its
-fixed ANLI child proof opens only a host-issued endpoint and does not create a
-Linux window, reusable launcher, or application service. A direct Linux paths
+fixed ANLI child proof opens only a host-issued endpoint, while the direct
+development launcher starts only a host-selected exact executable with private
+standard input. Neither creates a Linux window, application identity, or
+product service. A direct Linux paths
 adapter derives an effective-user default data root before applying the
 portable layout. The direct Linux state adapter uses that host-owned layout
 only to retain one bounded recoverable snapshot through private directory

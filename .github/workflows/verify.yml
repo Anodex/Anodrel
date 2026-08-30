@@ -56,7 +56,7 @@ jobs:
         run: ./scripts/check-documentation-links.ps1
 
   linux-foundation:
-    name: Linux transport, storage, crash records, and invited child
+    name: Linux foundations and invited child
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -71,6 +71,6 @@ jobs:
       - name: Check native formatting
         run: cargo fmt --manifest-path native/Cargo.toml --all --check
       - name: Lint Linux host foundation modules
-        run: cargo clippy --manifest-path native/Cargo.toml -p anodrel-linux-client -p anodrel-linux-pipe -p anodrel-linux-paths -p anodrel-linux-storage -p anodrel-linux-crash -p anodrel-native-linux-client-sample --all-targets -- -D warnings
+        run: cargo clippy --manifest-path native/Cargo.toml -p anodrel-linux-client -p anodrel-linux-pipe -p anodrel-linux-paths -p anodrel-linux-storage -p anodrel-linux-crash -p anodrel-linux-bootstrap -p anodrel-native-linux-client-sample --all-targets -- -D warnings
       - name: Run Linux host foundation tests
-        run: cargo test --manifest-path native/Cargo.toml -p anodrel-linux-client -p anodrel-linux-pipe -p anodrel-linux-paths -p anodrel-linux-storage -p anodrel-linux-crash -p anodrel-native-linux-client-sample
+        run: cargo test --manifest-path native/Cargo.toml -p anodrel-linux-client -p anodrel-linux-pipe -p anodrel-linux-paths -p anodrel-linux-storage -p anodrel-linux-crash -p anodrel-linux-bootstrap -p anodrel-native-linux-client-sample
