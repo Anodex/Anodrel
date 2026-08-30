@@ -38,17 +38,17 @@ home directory. The storage tests use a real temporary filesystem to prove
 atomic snapshot recovery, private modes, and link rejection. The crash-store
 tests prove private record creation, retention, bounded enumeration, and link
 rejection. The Wayland tests prove strict wire encoding and decoding, display
-locator validation, required-global selection, fixed buffer availability, and
-headless diagnostic-canvas composition without adding a compositor or GUI
-framework. This keeps the Linux-specific code from being treated as verified
-merely because the Windows workspace compiles its intentionally empty
-non-Linux facade.
+locator validation, required-global selection, fixed buffer availability,
+pointer event validation, fixed click activation, and headless diagnostic-canvas
+composition without adding a compositor or GUI framework. This keeps the
+Linux-specific code from being treated as verified merely because the Windows
+workspace compiles its intentionally empty non-Linux facade.
 
 This job verifies only the documented Linux transport, storage, crash-record,
 development-launch, fixed-child proof, and direct-Wayland diagnostic rules. It
-does not start a compositor or prove a visible window. It does not claim a
-Linux application host, identity, product launcher, SDK, packaging, or macOS
-implementation.
+does not start a compositor or prove a visible window or physical pointer. It
+does not claim a Linux application host, identity, product launcher, SDK,
+packaging, or macOS implementation.
 
 ## Repository policy
 

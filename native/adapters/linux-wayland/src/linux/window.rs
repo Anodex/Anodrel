@@ -7,10 +7,15 @@ use anodrel_canvas::Canvas;
 use super::{
     buffer::{BUFFER_COUNT, Buffer},
     error::LinuxWaylandError,
+    events::{
+        display_event, next_message, protocol_error, registry_event, seat_has_pointer, shm_event,
+        toplevel_closed,
+    },
     globals::{Global, Globals},
     locator::Locator,
+    pointer::{PointerResult, PointerState},
     raw::{Connection, SharedMemory},
-    wire::{Message, ObjectIds, Request, WireError},
+    wire::{Message, ObjectIds, Request},
 };
 
 /// The one fixed diagnostic canvas width.
@@ -22,6 +27,16 @@ const DISPLAY: u32 = 1;
 const REGISTRY: u32 = 2;
 const XRGB8888: u32 = 1;
 const COMPOSITOR_VERSION: u32 = 1;
+const SEAT_VERSION: u32 = 1;
+
+/// Closed diagnostic outcome from the Linux Lab event loop.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LinuxWaylandLabEvent {
+    /// The fixed local pointer activation completed.
+    Activated,
+    /// The compositor requested the fixed diagnostic window close.
+    Closed,
+}
 
 /// One fixed direct-Wayland development diagnostic with no window API surface.
 pub struct LinuxWaylandLab {
@@ -29,6 +44,7 @@ pub struct LinuxWaylandLab {
     input: Vec<u8>,
     objects: Objects,
     buffers: [Buffer; BUFFER_COUNT],
+    pointer: Option<PointerState>,
 }
 
 impl LinuxWaylandLab {
@@ -79,9 +95,26 @@ impl LinuxWaylandLab {
             xdg_wm_base,
         )?;
 
+        let seat = if let Some(global) = globals.seat() {
+            let seat = setup.allocate()?;
+            setup.bind(global, "wl_seat", SEAT_VERSION, seat)?;
+            Some(seat)
+        } else {
+            None
+        };
+
         let format_sync = setup.allocate()?;
         setup.send(new_id_request(DISPLAY, 0, format_sync))?;
-        setup.wait_for_formats(registry, shm, format_sync)?;
+        let pointer_supported =
+            setup.wait_for_formats_and_pointer(registry, shm, seat, format_sync)?;
+        let pointer = if pointer_supported {
+            let seat = seat.ok_or(LinuxWaylandError::ProtocolRejected)?;
+            let pointer = setup.allocate()?;
+            setup.send(new_id_request(seat, 0, pointer))?;
+            Some(pointer)
+        } else {
+            None
+        };
 
         let surface = setup.allocate()?;
         setup.send(new_id_request(compositor, 0, surface))?;
@@ -102,6 +135,8 @@ impl LinuxWaylandLab {
             surface,
             xdg_surface,
             toplevel,
+            seat,
+            pointer,
         };
         setup.wait_for_initial_configure(&objects)?;
         let buffers = setup.create_buffers(shm)?;
@@ -110,6 +145,7 @@ impl LinuxWaylandLab {
             input: setup.input,
             objects,
             buffers,
+            pointer: pointer.map(|_| PointerState::default()),
         })
     }
 
@@ -142,22 +178,37 @@ impl LinuxWaylandLab {
     /// Blocks only in the diagnostic's own event loop until the desktop closes it.
     pub fn wait_for_close(&mut self) -> Result<(), LinuxWaylandError> {
         loop {
-            let message = self.next_message()?;
-            if self.dispatch(message)? {
+            if self.wait_for_lab_event()? == LinuxWaylandLabEvent::Closed {
                 return Ok(());
             }
         }
     }
 
-    fn dispatch(&mut self, message: Message) -> Result<bool, LinuxWaylandError> {
+    /// Waits for one closed local diagnostic outcome from the compositor loop.
+    pub fn wait_for_lab_event(&mut self) -> Result<LinuxWaylandLabEvent, LinuxWaylandError> {
+        loop {
+            let message = self.next_message()?;
+            if let Some(event) = self.dispatch(message)? {
+                return Ok(event);
+            }
+        }
+    }
+
+    fn dispatch(
+        &mut self,
+        message: Message,
+    ) -> Result<Option<LinuxWaylandLabEvent>, LinuxWaylandError> {
         if message.object == DISPLAY {
-            return display_event(&message).map(|_| false);
+            return display_event(&message).map(|_| None);
         }
         if message.object == self.objects.registry {
-            return registry_event(&message, None).map(|_| false);
+            return registry_event(&message, None).map(|_| None);
         }
         if message.object == self.objects.shm {
-            return shm_event(&message, None).map(|_| false);
+            return shm_event(&message, None).map(|_| None);
+        }
+        if self.objects.seat == Some(message.object) {
+            return seat_has_pointer(&message).map(|_| None);
         }
         if message.object == self.objects.xdg_wm_base {
             if message.opcode != 0 {
@@ -169,7 +220,7 @@ impl LinuxWaylandLab {
             let mut pong = Request::new(self.objects.xdg_wm_base, 3);
             pong.uint(serial);
             self.send(pong)?;
-            return Ok(false);
+            return Ok(None);
         }
         if message.object == self.objects.xdg_surface {
             if message.opcode != 0 {
@@ -181,10 +232,23 @@ impl LinuxWaylandLab {
             let mut acknowledge = Request::new(self.objects.xdg_surface, 4);
             acknowledge.uint(serial);
             self.send(acknowledge)?;
-            return Ok(false);
+            return Ok(None);
         }
         if message.object == self.objects.toplevel {
-            return toplevel_event(&message);
+            return toplevel_closed(&message)
+                .map(|closed| closed.then_some(LinuxWaylandLabEvent::Closed));
+        }
+        if self.objects.pointer == Some(message.object) {
+            let pointer = self
+                .pointer
+                .as_mut()
+                .ok_or(LinuxWaylandError::ProtocolRejected)?;
+            return pointer
+                .dispatch(&message, self.objects.surface)
+                .map(|result| match result {
+                    PointerResult::None => None,
+                    PointerResult::Activated => Some(LinuxWaylandLabEvent::Activated),
+                });
         }
         if let Some(buffer) = self
             .buffers
@@ -195,7 +259,7 @@ impl LinuxWaylandLab {
                 return Err(LinuxWaylandError::ProtocolRejected);
             }
             buffer.release();
-            return Ok(false);
+            return Ok(None);
         }
         Err(LinuxWaylandError::ProtocolRejected)
     }
@@ -225,6 +289,8 @@ struct Objects {
     surface: u32,
     xdg_surface: u32,
     toplevel: u32,
+    seat: Option<u32>,
+    pointer: Option<u32>,
 }
 
 struct Setup {
@@ -283,13 +349,15 @@ impl Setup {
         }
     }
 
-    fn wait_for_formats(
+    fn wait_for_formats_and_pointer(
         &mut self,
         registry: u32,
         shm: u32,
+        seat: Option<u32>,
         callback: u32,
-    ) -> Result<(), LinuxWaylandError> {
+    ) -> Result<bool, LinuxWaylandError> {
         let mut xrgb_supported = false;
+        let mut pointer_supported = false;
         loop {
             let message = self.next_message()?;
             if message.object == DISPLAY {
@@ -298,12 +366,14 @@ impl Setup {
                 registry_event(&message, None)?;
             } else if message.object == shm {
                 shm_event(&message, Some(&mut xrgb_supported))?;
+            } else if seat == Some(message.object) {
+                pointer_supported = seat_has_pointer(&message)?;
             } else if message.object == callback && message.opcode == 0 {
                 let mut reader = message.reader();
                 reader.uint().map_err(protocol_error)?;
                 reader.finish().map_err(protocol_error)?;
                 return xrgb_supported
-                    .then_some(())
+                    .then_some(pointer_supported)
                     .ok_or(LinuxWaylandError::RequiredSupportUnavailable);
             } else {
                 return Err(LinuxWaylandError::ProtocolRejected);
@@ -350,7 +420,7 @@ impl Setup {
                 self.send(acknowledge)?;
                 return Ok(());
             } else if message.object == objects.toplevel {
-                if toplevel_event(&message)? {
+                if toplevel_closed(&message)? {
                     return Err(LinuxWaylandError::DesktopUnavailable);
                 }
             } else {
@@ -409,112 +479,6 @@ fn new_id_request(object: u32, opcode: u16, id: u32) -> Request {
     let mut request = Request::new(object, opcode);
     request.uint(id);
     request
-}
-
-fn next_message(
-    connection: &Connection,
-    input: &mut Vec<u8>,
-) -> Result<Message, LinuxWaylandError> {
-    loop {
-        if input.len() >= 8 {
-            let word = u32::from_ne_bytes(
-                input[4..8]
-                    .try_into()
-                    .map_err(|_| LinuxWaylandError::ProtocolRejected)?,
-            );
-            let size = (word >> 16) as usize;
-            if !(8..=65_532).contains(&size) || !size.is_multiple_of(4) {
-                return Err(LinuxWaylandError::ProtocolRejected);
-            }
-            if input.len() >= size {
-                let frame: Vec<_> = input.drain(..size).collect();
-                return Message::from_frame(&frame).map_err(protocol_error);
-            }
-        }
-        if input.len() >= 65_532 {
-            return Err(LinuxWaylandError::ProtocolRejected);
-        }
-        connection
-            .receive(input)
-            .map_err(|_| LinuxWaylandError::DesktopUnavailable)?;
-    }
-}
-
-fn display_event(message: &Message) -> Result<(), LinuxWaylandError> {
-    let mut reader = message.reader();
-    match message.opcode {
-        0 => {
-            reader.uint().map_err(protocol_error)?;
-            reader.uint().map_err(protocol_error)?;
-            reader.string().map_err(protocol_error)?;
-            reader.finish().map_err(protocol_error)?;
-            Err(LinuxWaylandError::ProtocolRejected)
-        }
-        1 => {
-            reader.uint().map_err(protocol_error)?;
-            reader.finish().map_err(protocol_error)
-        }
-        _ => Err(LinuxWaylandError::ProtocolRejected),
-    }
-}
-
-fn registry_event(
-    message: &Message,
-    globals: Option<&mut Globals>,
-) -> Result<(), LinuxWaylandError> {
-    let mut reader = message.reader();
-    match message.opcode {
-        0 => {
-            let name = reader.uint().map_err(protocol_error)?;
-            let interface = reader.string().map_err(protocol_error)?;
-            let version = reader.uint().map_err(protocol_error)?;
-            reader.finish().map_err(protocol_error)?;
-            if let Some(globals) = globals {
-                globals.record(name, interface, version);
-            }
-            Ok(())
-        }
-        1 => {
-            reader.uint().map_err(protocol_error)?;
-            reader.finish().map_err(protocol_error)
-        }
-        _ => Err(LinuxWaylandError::ProtocolRejected),
-    }
-}
-
-fn shm_event(message: &Message, xrgb: Option<&mut bool>) -> Result<(), LinuxWaylandError> {
-    if message.opcode != 0 {
-        return Err(LinuxWaylandError::ProtocolRejected);
-    }
-    let mut reader = message.reader();
-    let format = reader.uint().map_err(protocol_error)?;
-    reader.finish().map_err(protocol_error)?;
-    if let Some(xrgb) = xrgb {
-        *xrgb |= format == XRGB8888;
-    }
-    Ok(())
-}
-
-fn toplevel_event(message: &Message) -> Result<bool, LinuxWaylandError> {
-    let mut reader = message.reader();
-    match message.opcode {
-        0 => {
-            reader.int().map_err(protocol_error)?;
-            reader.int().map_err(protocol_error)?;
-            reader.array().map_err(protocol_error)?;
-            reader.finish().map_err(protocol_error)?;
-            Ok(false)
-        }
-        1 => {
-            reader.finish().map_err(protocol_error)?;
-            Ok(true)
-        }
-        _ => Err(LinuxWaylandError::ProtocolRejected),
-    }
-}
-
-fn protocol_error(_: WireError) -> LinuxWaylandError {
-    LinuxWaylandError::ProtocolRejected
 }
 
 #[cfg(test)]

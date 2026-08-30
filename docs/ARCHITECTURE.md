@@ -74,8 +74,8 @@ The native host owns operating-system integration:
 The first host targets Windows. Linux now has a shared local-transport adapter,
 a separately tested private child transport, a direct development child
 launcher, bounded direct state and crash stores, and one fixed direct-Wayland
-diagnostic surface; its application desktop host and most operating-system
-services remain later work.
+diagnostic surface with a host-owned local pointer probe; its application
+desktop host and most operating-system services remain later work.
 Other operating systems should be added as adapters behind the same service
 contracts.
 
@@ -95,7 +95,8 @@ only to retain one bounded recoverable snapshot through private directory
 descriptors; its direct crash store uses the sibling host logs location for
 closed panic records only. The Linux Wayland lab is a separate direct desktop
 protocol adapter that presents a fixed first-party canvas through two bounded
-shared-memory mappings; it has no application, IPC, or product-launch route.
+shared-memory mappings and consumes one local diagnostic activation; it has no
+application, IPC, or product-launch route.
 None exposes a filesystem capability. macOS and a Linux application host will
 follow the same ownership rule through their respective operating-system APIs.
 

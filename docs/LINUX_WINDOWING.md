@@ -4,8 +4,9 @@
 
 The first Linux desktop surface is implemented as a development-only direct
 Wayland diagnostic: **Anodrel Linux Lab**. It proves that an Anodrel canvas can
-reach a compositor without a browser engine, webview, UI toolkit, graphics
-library, or libwayland runtime dependency.
+reach a compositor and consume one host-owned local pointer activation without
+a browser engine, webview, UI toolkit, graphics library, or libwayland runtime
+dependency.
 
 It is not a Linux application host. It cannot load an application, start an
 invited client, use Anodrel's Linux transport, or provide a product launch.
@@ -31,11 +32,15 @@ direct local Wayland socket
               │
               ▼
       one Anodrel canvas copied and committed
+              │
+              ▼
+  optional wl_seat + wl_pointer activation probe
 ~~~
 
 The application protocol never sees the socket, its path, a Wayland object ID,
-a native window handle, a buffer, a display reading, a compositor event, or an
-environment value. The lab chooses its own fixed title and desktop label.
+a native window handle, a buffer, a display reading, a compositor event,
+pointer value, or an environment value. The lab chooses its own fixed title
+and desktop label.
 
 ## Supported environment
 
@@ -65,6 +70,15 @@ initial commit, acknowledges each later xdg_surface.configure, answers each
 xdg_wm_base.ping, and exits on xdg_toplevel.close. It fixes both minimum and
 maximum size at 960 × 640 pixels. A later configure is therefore acknowledged
 but does not broaden this slice into resize handling.
+
+When the desktop advertises a seat with pointer capability, the lab binds it
+at version 1 and asks for one pointer only after its capability event. The
+pointer can activate one compiled lower-panel target with a left-button press
+and release. Coordinates, serials, button values, timestamps, scrolling, and
+seat identity stay inside the adapter. The only result is one closed
+development-only `Activated` outcome, which the lab uses once to show its
+completed appearance. A pointerless session remains able to present and close
+the lab; it simply has no activation probe.
 
 The wire codec accepts only bounded, 4-byte-aligned messages. It keeps
 client-created object IDs dense, validates every string terminator and array
@@ -104,20 +118,22 @@ Expected result:
 
 1. A fixed-size **Anodrel Linux Lab** window opens with the first-party
    branded diagnostic surface.
-2. Attempting to resize it does not turn it into a resizable application
+2. Clicking its highlighted lower panel once changes that panel to its
+   completed appearance when the desktop provides a pointer.
+3. Attempting to resize it does not turn it into a resizable application
    surface.
-3. Closing it from the desktop chrome makes the process exit normally.
+4. Closing it from the desktop chrome makes the process exit normally.
 
-The automated Linux job tests the pure wire, locator, registry, and
-back-pressure rules only. It does not start a compositor, and a green workflow
-does not prove visual presentation, desktop decoration, compositor
-compatibility, or user interaction.
+The automated Linux job tests the pure wire, locator, registry, pointer,
+activation, and back-pressure rules only. It does not start a compositor, and
+a green workflow does not prove visual presentation, desktop decoration,
+compositor compatibility, or physical user interaction.
 
 ## Deliberate limits
 
-No X11/XWayland route, input, text shaping, accessibility, scale awareness,
-resizing, window state, fullscreen, menus, dialogs, clipboard, notifications,
-application documents, IPC composition, executable identity, product launch,
-packaging, installation, or updates exists in this component.
+No X11/XWayland route, application input, text shaping, accessibility, scale
+awareness, resizing, window state, fullscreen, menus, dialogs, clipboard,
+notifications, application documents, IPC composition, executable identity,
+product launch, packaging, installation, or updates exists in this component.
 
-See Decision 0128, docs/RENDERER.md, and docs/LINUX_TRANSPORT.md.
+See Decisions 0128 and 0129, docs/RENDERER.md, and docs/LINUX_TRANSPORT.md.

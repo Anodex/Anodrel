@@ -10,4 +10,4 @@
 mod linux;
 
 #[cfg(all(target_os = "linux", target_endian = "little"))]
-pub use linux::{LAB_HEIGHT, LAB_WIDTH, LinuxWaylandError, LinuxWaylandLab};
+pub use linux::{LAB_HEIGHT, LAB_WIDTH, LinuxWaylandError, LinuxWaylandLab, LinuxWaylandLabEvent};

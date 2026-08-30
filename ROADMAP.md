@@ -55,6 +55,11 @@ publisher trust, and a capability bridge remain later native-host gates.
 Status: **Direct Windows host in progress**
 
 - Create the first native host, beginning with Windows.
+- Establish direct Linux desktop foundations without a toolkit. **In progress:**
+  Linux has private transport, invited-child, launcher, paths, state, crash,
+  fixed Wayland presentation, and one local pointer-activation diagnostics;
+  an application host, session composition, public input, product identity,
+  packaging, installation, updates, and accessibility remain later work.
 - Implement lifecycle and single-instance behavior. **Completed for the first
   Windows package text surface and Startup Lab:** current-session primary
   instance claim, bounded readiness, and no-data activation request (Decision

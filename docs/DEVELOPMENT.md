@@ -255,9 +255,11 @@ session, run:
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-linux-window-lab
 ~~~
 
-It opens one fixed-size branded surface and exits when the desktop closes it.
-It does not load an application, start a Linux client, expose an SDK, or claim
-a packaged Linux host. See docs/LINUX_WINDOWING.md.
+It opens one fixed-size branded surface. On a desktop with a pointer, clicking
+the highlighted lower panel once shows a completed appearance; closing the
+desktop window then exits normally. It does not load an application, start a
+Linux client, expose an SDK, or claim a packaged Linux host. See
+docs/LINUX_WINDOWING.md.
 
 ## Diagnostics and product fixture
 

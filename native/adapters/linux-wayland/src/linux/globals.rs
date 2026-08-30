@@ -1,4 +1,4 @@
-//! Bounded global discovery for the three interfaces the lab needs.
+//! Bounded global discovery for the fixed Linux Lab interfaces.
 
 #[derive(Clone, Copy)]
 pub(super) struct Global {
@@ -11,6 +11,7 @@ pub(super) struct Globals {
     compositor: Option<Global>,
     shm: Option<Global>,
     xdg_wm_base: Option<Global>,
+    seat: Option<Global>,
 }
 
 impl Globals {
@@ -19,6 +20,7 @@ impl Globals {
             "wl_compositor" => &mut self.compositor,
             "wl_shm" => &mut self.shm,
             "xdg_wm_base" => &mut self.xdg_wm_base,
+            "wl_seat" => &mut self.seat,
             _ => return,
         };
         if slot.is_none() {
@@ -37,6 +39,10 @@ impl Globals {
     pub(super) fn xdg_wm_base(&self) -> Option<Global> {
         self.xdg_wm_base.filter(|global| global.version >= 1)
     }
+
+    pub(super) fn seat(&self) -> Option<Global> {
+        self.seat.filter(|global| global.version >= 1)
+    }
 }
 
 #[cfg(test)]
@@ -50,9 +56,11 @@ mod tests {
         globals.record(9, "wl_compositor", 5);
         globals.record(11, "wl_shm", 1);
         globals.record(13, "xdg_wm_base", 6);
+        globals.record(15, "wl_seat", 8);
 
         assert_eq!(globals.compositor().map(|global| global.name), Some(7));
         assert_eq!(globals.shm().map(|global| global.name), Some(11));
         assert_eq!(globals.xdg_wm_base().map(|global| global.name), Some(13));
+        assert_eq!(globals.seat().map(|global| global.name), Some(15));
     }
 }

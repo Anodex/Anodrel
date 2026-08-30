@@ -4,17 +4,26 @@ use std::error::Error;
 
 use anodrel_brand::{mark, mark::MarkStyle, palette};
 use anodrel_canvas::{Canvas, Color, Paint, Rect, point, stop};
-use anodrel_linux_wayland::{LAB_HEIGHT, LAB_WIDTH, LinuxWaylandLab};
+use anodrel_linux_wayland::{LAB_HEIGHT, LAB_WIDTH, LinuxWaylandLab, LinuxWaylandLabEvent};
 
 pub(super) fn run() -> Result<(), Box<dyn Error>> {
     let mut lab = LinuxWaylandLab::open()?;
-    let canvas = compose_lab();
+    let canvas = compose_lab(false);
     lab.present(&canvas)?;
-    lab.wait_for_close()?;
-    Ok(())
+    let mut activated = false;
+    loop {
+        match lab.wait_for_lab_event()? {
+            LinuxWaylandLabEvent::Activated if !activated => {
+                lab.present(&compose_lab(true))?;
+                activated = true;
+            }
+            LinuxWaylandLabEvent::Activated => {}
+            LinuxWaylandLabEvent::Closed => return Ok(()),
+        }
+    }
 }
 
-fn compose_lab() -> Canvas {
+fn compose_lab(activated: bool) -> Canvas {
     let mut canvas = Canvas::new(LAB_WIDTH, LAB_HEIGHT);
     canvas.clear(palette::BACKDROP);
     let bounds = canvas.bounds();
@@ -38,10 +47,34 @@ fn compose_lab() -> Canvas {
         Rect::new(368.0, 158.0, 592.0, 382.0),
         MarkStyle::hero(),
     );
+    let activation = Rect::new(330.0, 416.0, 630.0, 512.0);
     canvas.fill_rounded_rect(
-        Rect::new(364.0, 432.0, 596.0, 440.0),
+        activation,
+        24.0,
+        &Paint::Solid(if activated {
+            palette::READY
+        } else {
+            palette::PANEL
+        }),
+    );
+    canvas.stroke_rounded_rect(
+        activation,
+        24.0,
+        1.0,
+        &Paint::Solid(if activated {
+            palette::READY
+        } else {
+            palette::ACCENT_CORE
+        }),
+    );
+    canvas.fill_rounded_rect(
+        Rect::new(364.0, 440.0, 596.0, 448.0),
         4.0,
-        &Paint::Solid(palette::ACCENT_CORE),
+        &Paint::Solid(if activated {
+            palette::BACKDROP
+        } else {
+            palette::ACCENT_CORE
+        }),
     );
     canvas.fill_rounded_rect(
         Rect::new(330.0, 464.0, 630.0, 470.0),
@@ -58,7 +91,7 @@ mod tests {
 
     #[test]
     fn diagnostic_surface_is_fixed_and_non_empty() {
-        let canvas = compose_lab();
+        let canvas = compose_lab(false);
         assert_eq!((canvas.width(), canvas.height()), (LAB_WIDTH, LAB_HEIGHT));
         assert!(canvas.pixels().iter().any(|pixel| *pixel != 0));
     }
