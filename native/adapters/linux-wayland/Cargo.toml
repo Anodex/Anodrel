@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 anodrel-canvas = { path = "../../crates/canvas" }
+anodrel-linux-lab-surface = { path = "../../crates/linux-lab-surface" }

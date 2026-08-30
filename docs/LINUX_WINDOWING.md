@@ -8,9 +8,10 @@ reach a compositor and consume one host-owned local pointer activation without
 a browser engine, webview, UI toolkit, graphics library, or libwayland runtime
 dependency.
 
-It is not a Linux application host. It cannot load an application, start an
-invited client, use Anodrel's Linux transport, or provide a product launch.
-Those are later composition decisions.
+It is not a Linux application host. The separate development-window Lab can
+retain this fixed view beside one invited diagnostic child, but this adapter
+cannot load an application, use application transport, or provide a product
+launch. Those remain later composition decisions.
 
 ## Ownership
 
@@ -133,7 +134,9 @@ compositor compatibility, or physical user interaction.
 
 No X11/XWayland route, application input, text shaping, accessibility, scale
 awareness, resizing, window state, fullscreen, menus, dialogs, clipboard,
-notifications, application documents, IPC composition, executable identity,
-product launch, packaging, installation, or updates exists in this component.
+notifications, application documents, application IPC composition, executable
+identity, product launch, packaging, installation, or updates exists in this
+component.
 
-See Decisions 0128 and 0129, docs/RENDERER.md, and docs/LINUX_TRANSPORT.md.
+See Decisions 0128, 0129, and 0131, docs/RENDERER.md,
+docs/LINUX_TRANSPORT.md, and docs/LINUX_WINDOW_SESSIONS.md.

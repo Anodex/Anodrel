@@ -6,6 +6,12 @@ release helpers.
 Scripts must be safe to run from a clean checkout, document their prerequisites,
 and avoid writing secrets or generated output into tracked source directories.
 
+## start-linux-session-window-lab.sh
+
+Builds the fixed first-party held Linux child and opens the development-only
+Linux child/view Session Lab on a little-endian Wayland desktop. It accepts no
+application content or child argument; see `docs/LINUX_WINDOW_SESSIONS.md`.
+
 ## check-source-size.ps1
 
 Checks every tracked maintained source and documentation file against the

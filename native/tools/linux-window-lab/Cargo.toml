@@ -5,6 +5,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anodrel-brand = { path = "../../crates/brand" }
-anodrel-canvas = { path = "../../crates/canvas" }
+anodrel-linux-lab-surface = { path = "../../crates/linux-lab-surface" }
 anodrel-linux-wayland = { path = "../../adapters/linux-wayland" }

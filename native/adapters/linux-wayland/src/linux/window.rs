@@ -1,15 +1,19 @@
 //! Fixed Wayland diagnostic-window lifecycle.
 
-use std::fmt;
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 
 use anodrel_canvas::Canvas;
+use anodrel_linux_lab_surface::{LAB_HEIGHT, LAB_WIDTH};
 
 use super::{
     buffer::{BUFFER_COUNT, Buffer},
     error::LinuxWaylandError,
     events::{
-        display_event, next_message, protocol_error, registry_event, seat_has_pointer, shm_event,
-        toplevel_closed,
+        display_event, next_message, next_message_with_timeout, protocol_error, registry_event,
+        seat_has_pointer, shm_event, toplevel_closed,
     },
     globals::{Global, Globals},
     locator::Locator,
@@ -17,11 +21,6 @@ use super::{
     raw::{Connection, SharedMemory},
     wire::{Message, ObjectIds, Request},
 };
-
-/// The one fixed diagnostic canvas width.
-pub const LAB_WIDTH: u32 = 960;
-/// The one fixed diagnostic canvas height.
-pub const LAB_HEIGHT: u32 = 640;
 
 const DISPLAY: u32 = 1;
 const REGISTRY: u32 = 2;
@@ -194,6 +193,26 @@ impl LinuxWaylandLab {
         }
     }
 
+    /// Waits no longer than `timeout` for one closed local diagnostic outcome.
+    ///
+    /// This stays inside the fixed diagnostic host boundary. It exposes no
+    /// Wayland descriptor, native wait handle, callback, or application event.
+    pub fn wait_for_lab_event_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<Option<LinuxWaylandLabEvent>, LinuxWaylandError> {
+        let started = Instant::now();
+        loop {
+            let remaining = timeout.saturating_sub(started.elapsed());
+            let Some(message) = self.next_message_with_timeout(remaining)? else {
+                return Ok(None);
+            };
+            if let Some(event) = self.dispatch(message)? {
+                return Ok(Some(event));
+            }
+        }
+    }
+
     fn dispatch(
         &mut self,
         message: Message,
@@ -273,6 +292,13 @@ impl LinuxWaylandLab {
 
     fn next_message(&mut self) -> Result<Message, LinuxWaylandError> {
         next_message(&self.connection, &mut self.input)
+    }
+
+    fn next_message_with_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<Option<Message>, LinuxWaylandError> {
+        next_message_with_timeout(&self.connection, &mut self.input, timeout)
     }
 }
 

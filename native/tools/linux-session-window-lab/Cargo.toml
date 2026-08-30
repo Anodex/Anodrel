@@ -1,0 +1,12 @@
+[package]
+name = "anodrel-linux-session-window-lab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-linux-bootstrap = { path = "../../adapters/linux-bootstrap" }
+anodrel-linux-development-window = { path = "../../adapters/linux-development-window" }
+anodrel-linux-lab-surface = { path = "../../crates/linux-lab-surface" }
+anodrel-protocol = { path = "../../crates/protocol" }

@@ -11,4 +11,4 @@ mod window;
 mod wire;
 
 pub use error::LinuxWaylandError;
-pub use window::{LAB_HEIGHT, LAB_WIDTH, LinuxWaylandLab, LinuxWaylandLabEvent};
+pub use window::{LinuxWaylandLab, LinuxWaylandLabEvent};

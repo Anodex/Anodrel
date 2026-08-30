@@ -1,0 +1,12 @@
+[package]
+name = "anodrel-linux-development-window"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-canvas = { path = "../../crates/canvas" }
+anodrel-core = { path = "../../crates/core" }
+anodrel-linux-bootstrap = { path = "../linux-bootstrap" }
+anodrel-linux-development-session = { path = "../linux-development-session" }
+anodrel-linux-wayland = { path = "../linux-wayland" }

@@ -10,4 +10,6 @@
 mod linux;
 
 #[cfg(all(target_os = "linux", target_endian = "little"))]
-pub use linux::{LAB_HEIGHT, LAB_WIDTH, LinuxWaylandError, LinuxWaylandLab, LinuxWaylandLabEvent};
+pub use anodrel_linux_lab_surface::{LAB_HEIGHT, LAB_WIDTH};
+#[cfg(all(target_os = "linux", target_endian = "little"))]
+pub use linux::{LinuxWaylandError, LinuxWaylandLab, LinuxWaylandLabEvent};

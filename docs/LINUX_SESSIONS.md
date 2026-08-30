@@ -44,10 +44,10 @@ argument, command, environment, output, working directory, restart policy, or
 window binding; or expose a PID, handle, signal selector, child output, exit
 code, timing, or callback.
 
-The returned close signal is host-local and coalescing. A future Wayland host
-must retain a running session while it owns its matching view, use that signal
-to request the view close, and then finish the session. That composition does
-not exist yet.
+The returned close signal is host-local and coalescing. The separate
+development-window Lab retains a running session while it owns its matching
+fixed view, consumes that signal through a bounded host wait, and then finishes
+the session. It adds no application window or product-session surface.
 
 ## Verification
 
@@ -63,5 +63,5 @@ The test proves the development lifecycle only. It does not create a Wayland
 window, load an application document, validate an executable identity, or
 prove packaging, installation, updates, accessibility, or a product launcher.
 
-See Decision 0130, docs/LINUX_TRANSPORT.md, docs/LINUX_LAUNCH.md, and
-docs/LINUX_WINDOWING.md.
+See Decisions 0130 and 0131, docs/LINUX_TRANSPORT.md, docs/LINUX_LAUNCH.md,
+docs/LINUX_WINDOWING.md, and docs/LINUX_WINDOW_SESSIONS.md.

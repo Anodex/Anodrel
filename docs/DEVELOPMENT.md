@@ -261,6 +261,22 @@ desktop window then exits normally. It does not load an application, start a
 Linux client, expose an SDK, or claim a packaged Linux host. See
 docs/LINUX_WINDOWING.md.
 
+## Linux child/view Session Lab
+
+The separate Linux Session Lab proves that one held first-party invited child
+and one fixed Wayland Lab view finish together under one host lifetime. On the
+same local little-endian Wayland desktop, run:
+
+~~~text
+scripts/start-linux-session-window-lab.sh
+~~~
+
+It builds only the fixed first-party held child, opens the standard Linux Lab,
+and supplies that exact generated executable. Close the desktop view and the
+child is stopped and joined before the command returns. This still does not
+load application content, expose a Linux host SDK, or claim a product Linux
+host. See docs/LINUX_WINDOW_SESSIONS.md.
+
 ## Diagnostics and product fixture
 
 The compiled diagnostics, native end-to-end samples, screen-reader check, and development product fixture are maintained in [Development diagnostics](DEVELOPMENT_DIAGNOSTICS.md).

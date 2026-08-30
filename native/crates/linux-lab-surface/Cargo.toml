@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-linux-lab-surface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-brand = { path = "../brand" }
+anodrel-canvas = { path = "../canvas" }

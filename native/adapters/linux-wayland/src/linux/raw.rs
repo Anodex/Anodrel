@@ -6,6 +6,7 @@ use std::{
     mem::{MaybeUninit, size_of, size_of_val},
     os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd},
     ptr,
+    time::{Duration, Instant},
 };
 
 const AF_UNIX: c_int = 1;
@@ -19,6 +20,17 @@ const PROT_WRITE: c_int = 2;
 const MAP_SHARED: c_int = 1;
 const MFD_CLOEXEC: u32 = 0x1;
 const EINTR: i32 = 4;
+const POLLIN: i16 = 0x0001;
+const POLLERR: i16 = 0x0008;
+const POLLHUP: i16 = 0x0010;
+const POLLNVAL: i16 = 0x0020;
+
+#[repr(C)]
+struct PollFd {
+    descriptor: c_int,
+    events: i16,
+    returned_events: i16,
+}
 
 #[repr(C)]
 struct SockAddrUn {
@@ -56,6 +68,7 @@ unsafe extern "C" {
     fn write(fd: c_int, buffer: *const c_void, length: usize) -> isize;
     fn recvmsg(fd: c_int, message: *mut MsgHdr, flags: c_int) -> isize;
     fn sendmsg(fd: c_int, message: *const MsgHdr, flags: c_int) -> isize;
+    fn poll(descriptors: *mut PollFd, count: usize, timeout: c_int) -> c_int;
     fn close(fd: c_int) -> c_int;
     fn memfd_create(name: *const c_char, flags: u32) -> c_int;
     fn ftruncate(fd: c_int, length: i64) -> c_int;
@@ -179,6 +192,22 @@ impl Connection {
         destination.extend_from_slice(&bytes[..received]);
         Ok(())
     }
+
+    /// Waits for one inbound message without exposing the socket descriptor.
+    ///
+    /// `false` means the bounded wait elapsed before the compositor produced
+    /// input. An immediately readable stream still receives synchronously.
+    pub(super) fn receive_with_timeout(
+        &self,
+        destination: &mut Vec<u8>,
+        timeout: Duration,
+    ) -> io::Result<bool> {
+        if !wait_for_readable(self.fd.as_raw_fd(), timeout)? {
+            return Ok(false);
+        }
+        self.receive(destination)?;
+        Ok(true)
+    }
 }
 
 /// One mapped shared-memory region and its close-on-exec descriptor.
@@ -294,6 +323,48 @@ fn retry_recvmsg(fd: RawFd, message: &mut MsgHdr) -> io::Result<usize> {
     }
 }
 
+fn wait_for_readable(fd: RawFd, timeout: Duration) -> io::Result<bool> {
+    let started = Instant::now();
+    loop {
+        let remaining = timeout.saturating_sub(started.elapsed());
+        let mut descriptor = PollFd {
+            descriptor: fd,
+            events: POLLIN,
+            returned_events: 0,
+        };
+        // SAFETY: descriptor points to one initialized pollfd for the duration
+        // of the call, and the fixed timeout is converted to poll's C integer.
+        let result = unsafe { poll(&mut descriptor, 1, poll_timeout_millis(remaining)) };
+        if result > 0 {
+            if descriptor.returned_events & POLLIN != 0 {
+                return Ok(true);
+            }
+            let kind = if descriptor.returned_events & POLLNVAL != 0 {
+                io::ErrorKind::InvalidInput
+            } else if descriptor.returned_events & (POLLERR | POLLHUP) != 0 {
+                io::ErrorKind::UnexpectedEof
+            } else {
+                io::ErrorKind::Other
+            };
+            return Err(io::Error::new(kind, "Wayland socket is unavailable"));
+        }
+        if result == 0 {
+            return Ok(false);
+        }
+        let error = io::Error::last_os_error();
+        if error.raw_os_error() != Some(EINTR) {
+            return Err(error);
+        }
+    }
+}
+
+fn poll_timeout_millis(timeout: Duration) -> c_int {
+    let whole_millis = timeout.as_millis();
+    let rounded_up =
+        whole_millis.saturating_add(u128::from(!timeout.is_zero() && whole_millis == 0));
+    rounded_up.min(c_int::MAX as u128) as c_int
+}
+
 fn close_received_descriptors(control: &[usize], length: usize) -> io::Result<bool> {
     let bytes = control.as_ptr().cast::<u8>();
     let capacity = size_of_val(control);
@@ -350,4 +421,23 @@ fn close_received_descriptors(control: &[usize], length: usize) -> io::Result<bo
 
 const fn align(value: usize) -> usize {
     (value + size_of::<usize>() - 1) & !(size_of::<usize>() - 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::poll_timeout_millis;
+
+    #[test]
+    fn poll_timeout_preserves_zero_and_rounds_sub_millisecond_waits_up() {
+        assert_eq!(poll_timeout_millis(Duration::ZERO), 0);
+        assert_eq!(poll_timeout_millis(Duration::from_nanos(1)), 1);
+        assert_eq!(poll_timeout_millis(Duration::from_millis(50)), 50);
+    }
+
+    #[test]
+    fn poll_timeout_never_wraps_a_large_duration_into_an_unbounded_wait() {
+        assert_eq!(poll_timeout_millis(Duration::from_secs(u64::MAX)), i32::MAX);
+    }
 }

@@ -1,0 +1,20 @@
+[package]
+name = "anodrel-native-linux-session-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-native-linux-session-client"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-client = { path = "../../crates/client" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-linux-client = { path = "../../adapters/linux-client" }
+
+[dev-dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-linux-bootstrap = { path = "../../adapters/linux-bootstrap" }
+anodrel-linux-development-session = { path = "../../adapters/linux-development-session" }
+anodrel-protocol = { path = "../../crates/protocol" }

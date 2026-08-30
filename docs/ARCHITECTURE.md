@@ -75,8 +75,9 @@ The first host targets Windows. Linux now has a shared local-transport adapter,
 a separately tested private child transport, a direct development child
 launcher, one host-owned development child/transport lifecycle, bounded direct
 state and crash stores, and one fixed direct-Wayland diagnostic surface with a
-host-owned local pointer probe; its application desktop host and most
-operating-system services remain later work.
+host-owned local pointer probe. A separate development-window Lab retains that
+fixed view with one private child session; its application desktop host and
+most operating-system services remain later work.
 Other operating systems should be added as adapters behind the same service
 contracts.
 
@@ -89,15 +90,17 @@ adapter uses direct abstract Unix sockets and same-UID peer verification. Its
 fixed ANLI child proof opens only a host-issued endpoint, while the direct
 development launcher starts only a host-selected exact executable with private
 standard input. The Linux development-session adapter owns one such child and
-its authenticated worker until either ends, but creates no Linux window,
-application identity, or product service. A direct Linux paths
+its authenticated worker until either ends. Its separate development-window
+Lab closes one fixed Wayland view when that session ends, but creates no Linux
+application identity or product service. A direct Linux paths
 adapter derives an effective-user default data root before applying the
 portable layout. The direct Linux state adapter uses that host-owned layout
 only to retain one bounded recoverable snapshot through private directory
 descriptors; its direct crash store uses the sibling host logs location for
 closed panic records only. The Linux Wayland lab is a separate direct desktop
 protocol adapter that presents a fixed first-party canvas through two bounded
-shared-memory mappings and consumes one local diagnostic activation; it has no
+shared-memory mappings and consumes one local diagnostic activation. The
+development-window Lab owns its child/view lifetime only; neither has an
 application, IPC, or product-launch route.
 None exposes a filesystem capability. macOS and a Linux application host will
 follow the same ownership rule through their respective operating-system APIs.

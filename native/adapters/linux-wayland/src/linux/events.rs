@@ -1,5 +1,7 @@
 //! Closed parsing for compositor events used by the fixed Linux Lab.
 
+use std::time::{Duration, Instant};
+
 use super::{
     error::LinuxWaylandError,
     globals::Globals,
@@ -36,6 +38,44 @@ pub(super) fn next_message(
         connection
             .receive(input)
             .map_err(|_| LinuxWaylandError::DesktopUnavailable)?;
+    }
+}
+
+/// Reads one complete compositor message without extending one fixed wait.
+pub(super) fn next_message_with_timeout(
+    connection: &Connection,
+    input: &mut Vec<u8>,
+    timeout: Duration,
+) -> Result<Option<Message>, LinuxWaylandError> {
+    let started = Instant::now();
+    loop {
+        if input.len() >= 8 {
+            let word = u32::from_ne_bytes(
+                input[4..8]
+                    .try_into()
+                    .map_err(|_| LinuxWaylandError::ProtocolRejected)?,
+            );
+            let size = (word >> 16) as usize;
+            if !(8..=65_532).contains(&size) || !size.is_multiple_of(4) {
+                return Err(LinuxWaylandError::ProtocolRejected);
+            }
+            if input.len() >= size {
+                let frame: Vec<_> = input.drain(..size).collect();
+                return Message::from_frame(&frame)
+                    .map(Some)
+                    .map_err(protocol_error);
+            }
+        }
+        if input.len() >= 65_532 {
+            return Err(LinuxWaylandError::ProtocolRejected);
+        }
+        let remaining = timeout.saturating_sub(started.elapsed());
+        if !connection
+            .receive_with_timeout(input, remaining)
+            .map_err(|_| LinuxWaylandError::DesktopUnavailable)?
+        {
+            return Ok(None);
+        }
     }
 }
 

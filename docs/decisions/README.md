@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0131: Linux development-window Lab owns one session and view.
+
 - 0130: Linux development sessions own child and transport lifetimes.
 
 - 0129: Linux Lab pointer input stays local and semantic.
