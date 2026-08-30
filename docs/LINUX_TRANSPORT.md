@@ -1,8 +1,9 @@
 # Linux local transport
 
 **Status:** First Linux-native transport foundation. Its strict invited child
-transport proof is implemented, but it is not a Linux desktop host, general
-launcher, installer, package format, or application SDK.
+transport proof and its direct development launcher are implemented. A separate
+fixed Wayland diagnostic surface is documented in LINUX_WINDOWING.md; neither
+component is a Linux application host, installer, package format, or SDK.
 
 `anodrel-linux-pipe` lets a future Linux host compose the existing portable
 Anodrel frame codec and authenticated session engine over one direct Unix-domain
@@ -49,17 +50,19 @@ The abstract endpoint disappears when the listener is dropped.
 ## Explicitly absent
 
 - Linux executable identity policy, a product launcher, or product lifecycle;
-- a Linux native window, renderer blit, dialogs, clipboard, logging,
+- an application-controlled Linux window, renderer blit, dialogs, clipboard, logging,
   notification, credential, network, or policy adapter;
 - a filesystem socket, TCP endpoint, multiple-client server, or cross-user
   connection;
 - a public application client or public endpoint discovery;
 - macOS support.
 
-ANLI now supplies one distinct, child-standard-input invitation for the fixed
-Linux health probe. The Windows ANBI record remains Windows-specific because it
-validates a Windows named-pipe name. A reusable Linux launcher still needs its
-own documented process, identity, lifecycle, and desktop policy boundary.
+ANLI supplies one distinct, child-standard-input invitation for the fixed Linux
+health probe. The direct development launcher starts only a host-selected exact
+executable with that invitation and is documented in LINUX_LAUNCH.md. The
+Windows ANBI record remains Windows-specific because it validates a Windows
+named-pipe name. Linux product identity, lifecycle, and desktop policy remain
+separate work.
 
 ## Verification
 
@@ -73,7 +76,9 @@ wsl -- bash -lc 'source "$HOME/.cargo/env" && cd "/mnt/c/Users/Owner/Desktop/Pla
 The tests run a real abstract Unix socket and prove successful authenticated
 health, rejected invalid authentication, same-process stop before accept, and
 stop of a connected worker. The separate compiled-child test is documented in
-LINUX_NATIVE_CLIENT.md. None claim a visible Linux desktop surface.
+LINUX_NATIVE_CLIENT.md. The transport itself does not claim a visible Linux
+desktop surface; that separate fixed diagnostic is documented in
+LINUX_WINDOWING.md.
 
 See [Decision 0122](decisions/0122-linux-transport-uses-an-authenticated-abstract-unix-socket.md),
 [Decision 0123](decisions/0123-linux-child-bootstrap-stays-distinct-from-windows.md),

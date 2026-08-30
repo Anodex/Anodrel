@@ -244,6 +244,21 @@ See `docs/PERFORMANCE.md` for what the figures exclude and what has to be true
 before either is compared with another runtime.
 
 
+## Direct Linux Wayland lab
+
+The Linux Wayland Lab is a development-only presentation check, separate from
+the Windows host and the Linux invited-child foundation. On a little-endian
+Linux Wayland desktop with XDG_RUNTIME_DIR and WAYLAND_DISPLAY set by the
+session, run:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-linux-window-lab
+~~~
+
+It opens one fixed-size branded surface and exits when the desktop closes it.
+It does not load an application, start a Linux client, expose an SDK, or claim
+a packaged Linux host. See docs/LINUX_WINDOWING.md.
+
 ## Diagnostics and product fixture
 
 The compiled diagnostics, native end-to-end samples, screen-reader check, and development product fixture are maintained in [Development diagnostics](DEVELOPMENT_DIAGNOSTICS.md).

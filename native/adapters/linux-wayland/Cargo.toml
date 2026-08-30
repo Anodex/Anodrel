@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-linux-wayland"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-canvas = { path = "../../crates/canvas" }
