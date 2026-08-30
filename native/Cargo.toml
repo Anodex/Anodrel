@@ -32,6 +32,7 @@ members = [
   "adapters/windows-pipe",
   "adapters/linux-pipe",
   "adapters/linux-client",
+  "adapters/linux-paths",
   "adapters/windows-bootstrap",
   "adapters/windows-client",
   "adapters/windows-ui-sdk",

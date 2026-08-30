@@ -33,7 +33,9 @@ Status: **Second-sample foundation implemented; platform expansion planned**
   filesystem socket or TCP listener (Decision 0122), and a fixed compiled child
   proves the separate ANLI invitation route (Decision 0123). It is not yet a
   Linux desktop host, reusable launcher, policy store, or service adapter.
-  macOS and the remaining Linux host layers remain planned.
+  The Linux current-user path foundation is also implemented through the direct
+  effective-account lookup in Decision 0124; storage, logging, and the
+  remaining Linux host layers remain planned.
 - Stabilize the protocol and publish SDK documentation.
 - Define a long-term release and support policy.
 

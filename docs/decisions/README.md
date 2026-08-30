@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0124: Linux application paths use the effective account home.
+
 - 0123: Linux child bootstrap stays distinct from Windows.
 
 - 0122: Linux transport uses an authenticated abstract Unix socket.

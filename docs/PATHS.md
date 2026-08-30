@@ -1,7 +1,8 @@
 # Application directories v1
 
-**Status:** Windows host foundation. This is a host-owned directory-layout
-contract, not a public filesystem capability or protocol operation.
+**Status:** Windows and Linux host foundation. This is a host-owned
+directory-layout contract, not a public filesystem capability or protocol
+operation.
 
 ## Purpose and boundary
 
@@ -15,6 +16,11 @@ known folder through `SHGetKnownFolderPath`. The adapter does not read,
 create, enumerate, delete, watch, or expose any directory to the application
 protocol. A later storage or logging service must own its own permissions,
 creation behavior, and public contract.
+
+`anodrel-linux-paths` obtains only the effective Linux account's home directory
+through direct geteuid and getpwuid_r calls, then derives its fixed default
+local-data root. It does not read HOME, XDG variables, the current working
+directory, or application input.
 
 ## Layout
 
@@ -46,6 +52,28 @@ Because `Host` is a sibling of `Applications`, no application identity can
 resolve to it. A unit test asserts that rather than leaving it to the identity
 grammar.
 
+## Linux root and layout
+
+Linux derives its local-data root from the effective account record rather than
+an inherited environment variable:
+
+~~~text
+<effective account home>/.local/share
+~~~
+
+It then retains the same stable Anodrel namespace:
+
+~~~text
+<effective account home>/.local/share/Anodrel/Applications/org.anodrel.sample/
+|- data/
+|- cache/
+\\-- logs/
+~~~
+
+Host logs remain under the sibling Host namespace. The current adapter
+intentionally does not interpret XDG_DATA_HOME; that convention is a later
+configuration and migration decision, not an ambient application input.
+
 The portable layout builder accepts only the existing validated application-ID
 grammar: 3 to 128 lowercase ASCII letters, digits, `.`, `-`, or `_`, beginning
 and ending with a letter or digit. It rejects a relative operating-system root
@@ -75,12 +103,17 @@ the typed diagnostic log.
 
 The Windows adapter fails closed if Windows cannot provide Local AppData, the
 returned UTF-16 path is malformed, or the portable layout rejects its root or
-identity. Errors do not carry an absolute path, native status code, or user
-profile information.
+identity. The Linux adapter does the same if its effective account home cannot
+be read or cannot form an absolute local-data root. Errors do not carry an
+absolute path, native status code, UID, account name, or user-profile
+information.
 
-One lookup makes one known-folder operating-system call and a few fixed path
-joins. It does not enumerate a directory tree, perform disk I/O, or retain a
-global cache; the host owns caching if it needs a longer-lived policy.
+One Windows lookup makes one known-folder operating-system call; one Linux
+lookup makes one bounded reentrant account-record call. Both add only a few
+fixed path joins. Neither enumerates or opens an Anodrel directory, and neither
+retains a global cache; the host owns caching if it needs a longer-lived policy.
+Linux account-service lookup remains an operating-system concern and may use
+the account sources configured by that machine.
 
 ## Verification
 
@@ -91,6 +124,7 @@ known folder without mutating it. Run:
 ~~~text
 cargo test --manifest-path native/Cargo.toml -p anodrel-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
+wsl -- bash -lc 'source "$HOME/.cargo/env" && cd "/mnt/c/Users/Owner/Desktop/Platform X/native" && CARGO_TARGET_DIR=/tmp/anodrel-linux-target cargo test -p anodrel-linux-paths'
 ~~~
 
-Decision 0021 records the namespace and ownership choice.
+Decisions 0021 and 0124 record the namespace and Linux root choices.

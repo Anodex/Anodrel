@@ -26,11 +26,13 @@ green workflow must never be used to claim those acceptance checks passed.
 ## Linux local transport
 
 The Ubuntu runner installs stable Rust, checks all native formatting, then
-lints and tests the Linux transport, strict invitation adapter, and fixed
-compiled child probe. Its tests create real Linux abstract Unix-domain sockets,
-exercise the same-UID peer check, authenticated health round trip, failed
-authentication closure, and host-only stop paths, then prove a separate child
-process can consume one ANLI record and complete health. This keeps the
+lints and tests the Linux transport, strict invitation adapter, direct
+effective-account paths adapter, and fixed compiled child probe. Its tests
+create real Linux abstract Unix-domain sockets, exercise the same-UID peer
+check, authenticated health round trip, failed authentication closure, and
+host-only stop paths, then prove a separate child process can consume one ANLI
+record and complete health. The paths tests exercise the current effective
+account without exposing its name or home directory. This keeps the
 Linux-specific code from being treated as verified merely because the Windows
 workspace compiles its intentionally empty non-Linux facade.
 

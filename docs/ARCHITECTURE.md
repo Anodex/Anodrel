@@ -84,7 +84,9 @@ digest-verified `anodrel.text.v1` application package surface; it has no
 webview, script runtime, navigation, or application bridge. The Linux transport
 adapter uses direct abstract Unix sockets and same-UID peer verification. Its
 fixed ANLI child proof opens only a host-issued endpoint and does not create a
-Linux window, reusable launcher, or application service. macOS and a Linux
+Linux window, reusable launcher, or application service. A direct Linux paths
+adapter derives only an effective-user default data root before applying the
+portable layout; it exposes no filesystem capability. macOS and a Linux
 desktop host will follow the same ownership rule through their respective
 operating-system APIs.
 

@@ -117,6 +117,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-linux-paths"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-paths",
+]
+
+[[package]]
 name = "anodrel-linux-pipe"
 version = "0.1.0"
 dependencies = [
