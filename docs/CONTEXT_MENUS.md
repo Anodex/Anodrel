@@ -1,7 +1,9 @@
 # Native session context menus
 
-**Status:** Accepted Protocol 1.32 contract; implementation pending. This is
-not yet an available operation or installed-application grant.
+**Status:** Portable model, revision, revalidation state, and bounded
+UI-thread mailbox are implemented. The Protocol 1.32 operation, SDK/mock,
+installed-policy grant, and Windows host remain pending, so this is not yet an
+available operation or installed-application grant.
 
 ## Purpose
 

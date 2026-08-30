@@ -10,6 +10,11 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod context;
+mod context_mailbox;
+mod context_revision;
+mod context_service;
+mod context_session;
 mod error;
 mod mailbox;
 mod model;
@@ -18,6 +23,13 @@ mod service;
 mod session;
 mod shortcut;
 
+pub use context::{ContextMenuModel, MAX_CONTEXT_MENU_ITEMS};
+pub use context_mailbox::{CONTEXT_MENU_RESPONSE_TIMEOUT, ContextMenuMailbox, ContextMenuRequest};
+pub use context_revision::ContextMenuRevision;
+pub use context_service::{
+    ContextMenuService, ContextMenuServiceError, UnavailableContextMenuService,
+};
+pub use context_session::{ContextMenuActionEvent, ContextMenuSession};
 pub use error::MenuError;
 pub use mailbox::{MENU_RESPONSE_TIMEOUT, MenuMailbox, MenuRequest};
 pub use model::{

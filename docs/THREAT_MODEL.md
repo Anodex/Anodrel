@@ -21,8 +21,9 @@ The current operations are `platform.ping`, `platform.capabilities`,
 Protocol 1.18 implements the portable `menu.replace` boundary and its direct
 Windows menu attachment and activation delivery. Manual verification of the
 development-only real-menu diagnostic remains pending.
-Decision 0120 records the accepted, not-yet-implemented Protocol 1.32 contract
-for a separate host-owned semantic context menu. It carries no browser
+Decision 0120 records the Protocol 1.32 contract for a separate host-owned
+semantic context menu. Its portable model and mailbox are implemented, but no
+public operation or Windows surface exists yet. It carries no browser
 selection, link, coordinate, callback, or native-handle boundary.
 Protocol 1.19 implements the portable host-authorized HTTPS text-fetch core,
 SDK, mock-host contract, and direct WinHTTP adapter in `docs/NETWORK.md`. One
