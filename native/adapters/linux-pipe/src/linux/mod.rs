@@ -14,6 +14,7 @@ use std::{
 };
 
 use anodrel_core::HostPolicy;
+use anodrel_linux_client::LinuxBootstrapInvitation;
 use anodrel_transport::{SessionCredentials, TransportSession, authentication_message};
 
 pub use loopback::run_health_self_test;
@@ -29,6 +30,15 @@ pub struct SessionInvitation {
 }
 
 impl SessionInvitation {
+    /// Converts one host-only transport invitation into the separate ANLI
+    /// child-bootstrap record. The returned value still redacts its token and
+    /// can be delivered only through a future host-owned child channel.
+    pub fn bootstrap_invitation(&self) -> Result<LinuxBootstrapInvitation, InvitationError> {
+        let token = std::str::from_utf8(&self.token).map_err(|_| InvitationError::InvalidToken)?;
+        LinuxBootstrapInvitation::new(self.endpoint_name.clone(), self.session_id.clone(), token)
+            .map_err(InvitationError::Bootstrap)
+    }
+
     /// Builds the sensitive first authentication control without exposing a
     /// reusable token getter.
     pub fn authentication_payload(&self) -> Result<String, InvitationError> {
@@ -62,6 +72,7 @@ impl Drop for SessionInvitation {
 #[derive(Debug)]
 pub enum InvitationError {
     InvalidToken,
+    Bootstrap(anodrel_linux_client::LinuxBootstrapError),
     Credentials(anodrel_transport::CredentialsError),
 }
 
@@ -69,6 +80,12 @@ impl fmt::Display for InvitationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidToken => write!(formatter, "session invitation token became invalid"),
+            Self::Bootstrap(error) => {
+                write!(
+                    formatter,
+                    "Linux child bootstrap invitation is invalid: {error}"
+                )
+            }
             Self::Credentials(error) => write!(formatter, "session invitation is invalid: {error}"),
         }
     }

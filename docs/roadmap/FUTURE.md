@@ -27,12 +27,13 @@ Status: **Second-sample foundation implemented; platform expansion planned**
   boundary:** `apps/compass` carries a distinct application identity and its
   own digest-verified text surface, validated in the shipped-package test. It
   adds no executable runtime, capability, native bridge, or Anodex dependency.
-- Add macOS and Linux host adapters as resources allow. **Linux transport
-  foundation implemented:** `anodrel-linux-pipe` gives a future Linux host one
+- Add macOS and Linux host adapters as resources allow. **Linux transport and
+  child proof implemented:** `anodrel-linux-pipe` gives a future Linux host one
   direct, same-UID, authenticated abstract Unix-domain stream without a
-  filesystem socket or TCP listener (Decision 0122). It is not yet a Linux
-  desktop host, launcher, policy store, or service adapter. macOS and the
-  remaining Linux host layers remain planned.
+  filesystem socket or TCP listener (Decision 0122), and a fixed compiled child
+  proves the separate ANLI invitation route (Decision 0123). It is not yet a
+  Linux desktop host, reusable launcher, policy store, or service adapter.
+  macOS and the remaining Linux host layers remain planned.
 - Stabilize the protocol and publish SDK documentation.
 - Define a long-term release and support policy.
 

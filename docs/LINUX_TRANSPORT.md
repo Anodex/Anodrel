@@ -1,8 +1,8 @@
 # Linux local transport
 
-**Status:** First Linux-native foundation. This is an authenticated local IPC
-adapter, not a Linux desktop host, launcher, installer, package format, or
-application SDK.
+**Status:** First Linux-native transport foundation. Its strict invited child
+transport proof is implemented, but it is not a Linux desktop host, general
+launcher, installer, package format, or application SDK.
 
 `anodrel-linux-pipe` lets a future Linux host compose the existing portable
 Anodrel frame codec and authenticated session engine over one direct Unix-domain
@@ -48,7 +48,7 @@ The abstract endpoint disappears when the listener is dropped.
 
 ## Explicitly absent
 
-- Linux child-process launch and bootstrap delivery;
+- a reusable Linux child-process launcher or executable identity policy;
 - a Linux native window, renderer blit, dialogs, clipboard, storage,
   notification, credential, network, or policy adapter;
 - a filesystem socket, TCP endpoint, multiple-client server, or cross-user
@@ -56,9 +56,10 @@ The abstract endpoint disappears when the listener is dropped.
 - a public application client or public endpoint discovery;
 - macOS support.
 
-The Windows bootstrap record remains Windows-specific because it validates a
-Windows named-pipe name. A future Linux launch contract must be documented
-separately rather than weakening that validation.
+ANLI now supplies one distinct, child-standard-input invitation for the fixed
+Linux health probe. The Windows ANBI record remains Windows-specific because it
+validates a Windows named-pipe name. A reusable Linux launcher still needs its
+own documented process, identity, lifecycle, and desktop policy boundary.
 
 ## Verification
 
@@ -71,7 +72,9 @@ wsl -- bash -lc 'source "$HOME/.cargo/env" && cd "/mnt/c/Users/Owner/Desktop/Pla
 
 The tests run a real abstract Unix socket and prove successful authenticated
 health, rejected invalid authentication, same-process stop before accept, and
-stop of a connected worker. They do not claim a visible Linux desktop surface.
+stop of a connected worker. The separate compiled-child test is documented in
+LINUX_NATIVE_CLIENT.md. None claim a visible Linux desktop surface.
 
-See [Decision 0122](decisions/0122-linux-transport-uses-an-authenticated-abstract-unix-socket.md)
+See [Decision 0122](decisions/0122-linux-transport-uses-an-authenticated-abstract-unix-socket.md),
+[Decision 0123](decisions/0123-linux-child-bootstrap-stays-distinct-from-windows.md),
 and [the transport contract](TRANSPORT.md).

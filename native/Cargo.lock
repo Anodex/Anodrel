@@ -107,10 +107,21 @@ name = "anodrel-json"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-linux-client"
+version = "0.1.0"
+dependencies = [
+ "anodrel-client",
+ "anodrel-json",
+ "anodrel-protocol",
+ "anodrel-transport",
+]
+
+[[package]]
 name = "anodrel-linux-pipe"
 version = "0.1.0"
 dependencies = [
  "anodrel-core",
+ "anodrel-linux-client",
  "anodrel-protocol",
  "anodrel-transport",
  "anodrel-wire",
@@ -146,6 +157,18 @@ dependencies = [
  "anodrel-windows-bootstrap",
  "anodrel-windows-client",
  "anodrel-windows-pipe",
+]
+
+[[package]]
+name = "anodrel-native-linux-client-sample"
+version = "0.1.0"
+dependencies = [
+ "anodrel-client",
+ "anodrel-core",
+ "anodrel-json",
+ "anodrel-linux-client",
+ "anodrel-linux-pipe",
+ "anodrel-protocol",
 ]
 
 [[package]]

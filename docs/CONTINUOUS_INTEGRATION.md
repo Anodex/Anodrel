@@ -26,15 +26,17 @@ green workflow must never be used to claim those acceptance checks passed.
 ## Linux local transport
 
 The Ubuntu runner installs stable Rust, checks all native formatting, then
-lints and tests `anodrel-linux-pipe`. Its tests create real Linux abstract
-Unix-domain sockets and exercise the same-UID peer check, authenticated health
-round trip, failed authentication closure, and host-only stop paths. This keeps
-the Linux-specific code from being treated as verified merely because the
-Windows workspace compiles its intentionally empty non-Linux facade.
+lints and tests the Linux transport, strict invitation adapter, and fixed
+compiled child probe. Its tests create real Linux abstract Unix-domain sockets,
+exercise the same-UID peer check, authenticated health round trip, failed
+authentication closure, and host-only stop paths, then prove a separate child
+process can consume one ANLI record and complete health. This keeps the
+Linux-specific code from being treated as verified merely because the Windows
+workspace compiles its intentionally empty non-Linux facade.
 
-This job verifies only the documented Linux transport foundation. It does not
-claim a Linux native window, launcher, application client, packaging, or any
-macOS implementation.
+This job verifies only the documented Linux transport and fixed-child proof. It
+does not claim a Linux native window, reusable launcher, application SDK,
+packaging, or any macOS implementation.
 
 ## Repository policy
 

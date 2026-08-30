@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0123: Linux child bootstrap stays distinct from Windows.
+
 - 0122: Linux transport uses an authenticated abstract Unix socket.
 
 - 0121: Development native context-menu templates stay explicit.

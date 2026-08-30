@@ -56,7 +56,7 @@ jobs:
         run: ./scripts/check-documentation-links.ps1
 
   linux-transport:
-    name: Linux transport adapter
+    name: Linux transport and invited child
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -70,7 +70,7 @@ jobs:
           rustup component add clippy
       - name: Check native formatting
         run: cargo fmt --manifest-path native/Cargo.toml --all --check
-      - name: Lint the Linux transport adapter
-        run: cargo clippy --manifest-path native/Cargo.toml -p anodrel-linux-pipe --all-targets -- -D warnings
-      - name: Run real Linux transport tests
-        run: cargo test --manifest-path native/Cargo.toml -p anodrel-linux-pipe
+      - name: Lint Linux transport and child modules
+        run: cargo clippy --manifest-path native/Cargo.toml -p anodrel-linux-client -p anodrel-linux-pipe -p anodrel-native-linux-client-sample --all-targets -- -D warnings
+      - name: Run real Linux transport and child tests
+        run: cargo test --manifest-path native/Cargo.toml -p anodrel-linux-client -p anodrel-linux-pipe -p anodrel-native-linux-client-sample

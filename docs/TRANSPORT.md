@@ -2,7 +2,7 @@
 
 **Status:** Foundation contract. The frame codec, authenticated host session,
 one-client Windows named-pipe adapter, first Linux abstract Unix-socket adapter,
-and private Windows child-bootstrap adapter are implemented. A separate
+and private Windows and Linux child-bootstrap adapters are implemented. A separate
 no-script application package surface is implemented in `docs/APPLICATIONS.md`;
 it does not use this transport.
 
@@ -22,9 +22,8 @@ local byte stream -> anodrel-wire -> anodrel-transport -> anodrel-core
 The first operating-system adapter is a direct Windows named pipe. Linux now
 has a separate direct abstract Unix-domain socket adapter. Both accept one
 client on a worker thread and require host-created authentication material; an
-endpoint name alone is never authentication. The private bootstrap adapter is
-currently Windows-specific and can hand its invitation to one launched child
-process.
+endpoint name alone is never authentication. Each platform has its own strict
+private child-bootstrap record; neither format is reinterpreted by the other.
 
 ## Frame format
 
@@ -206,11 +205,13 @@ session receives a frame. The abstract endpoint has no filesystem entry and no
 TCP address. It accepts one client, runs only on a worker thread, and has a
 host-only stop signal with no protocol representation.
 
-It does not provide a Linux window, application client, child launcher,
-bootstrap delivery, policy store, service adapter, or macOS implementation.
-`docs/LINUX_TRANSPORT.md` and Decision 0122 define the full boundary.
+The separate ANLI record can deliver one invitation to the fixed compiled Linux
+health probe through private child standard input. It does not provide a Linux
+window, reusable child launcher, application SDK, policy store, service adapter,
+or macOS implementation. `docs/LINUX_TRANSPORT.md`, `docs/LINUX_NATIVE_CLIENT.md`,
+and Decisions 0122 and 0123 define the full boundary.
 
-## Private child bootstrap
+## Windows private child bootstrap
 
 `anodrel-windows-bootstrap` delivers one pipe invitation to a child process
 over an inherited anonymous standard-input handle. It does not expose that
@@ -259,6 +260,22 @@ The host now has a separate no-script text package surface under Decision 0010,
 but that surface is not connected to this launcher or pipe. Publisher trust,
 verified executable launch, and a capability bridge remain required before a
 product application is launched by the Windows host.
+
+## Linux private child bootstrap
+
+The Linux ANLI v1 record is a distinct 12-byte-header bootstrap format. It
+contains one exact Linux abstract endpoint name, session ID, and token and is
+delivered through child standard input to the fixed development health probe.
+The Linux child adapter validates the record, opens only that endpoint, sends
+the first authentication frame, requests platform.health, and exits. It does
+not create a listener, choose an endpoint, support a pathname socket or TCP,
+launch another process, or expose a general application interface.
+
+The real Linux integration test proves this private cross-process path and also
+proves that the probe exits safely without an invitation. This is not a product
+launch route: Linux executable identity, process policy, a desktop host,
+packaging, installation, and updates remain separate work. See
+`docs/LINUX_NATIVE_CLIENT.md` and Decision 0123.
 
 ## Development sample path
 

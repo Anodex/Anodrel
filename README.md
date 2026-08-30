@@ -15,8 +15,9 @@ shipping a browser runtime.
 
 It is not an application itself, an Anodex source mirror, or a finished
 Electron replacement. Production packaging, signing, installation, updates,
-and macOS/Linux desktop hosts remain planned work. Linux now has its first
-direct authenticated local-transport foundation, not a desktop host.
+and macOS/Linux desktop hosts remain planned work. Linux now has a direct
+authenticated local transport and a separately tested private child transport,
+not a desktop host or product launcher.
 
 Anodex will be the first application built on Anodrel. Anodex is not being
 moved into this repository yet; it remains an independent project until the
@@ -312,8 +313,9 @@ Anodrel/
 - docs/decisions/ — durable decisions and their reasoning.
 
 `docs/TRANSPORT.md` defines the native frame and session contract.
-`docs/LINUX_TRANSPORT.md` defines the first direct Linux abstract Unix-socket
+`docs/LINUX_TRANSPORT.md` defines the direct Linux abstract Unix-socket
 transport adapter and its intentionally narrow boundary.
+`docs/LINUX_NATIVE_CLIENT.md` defines its strict child invitation and compiled development transport probe.
 `docs/APPLICATIONS.md` defines the validated application-package contract.
 `docs/APPLICATION_TEMPLATE.md` shows how to create and run the first strict,
 digest-verified native text package without reaching into host source code.

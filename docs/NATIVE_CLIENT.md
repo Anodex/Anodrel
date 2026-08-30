@@ -1,10 +1,10 @@
 # Anodrel native child client
 
 **Status:** Implemented and tested: the portable `anodrel-client` core, direct
-`anodrel-windows-client` adapter, stable `anodrel-windows-ui-sdk` facade,
-migrated product fixture, and compiled native health and UI-session development
-probes. The existing Node.js diagnostic remains separately useful for
-development paths that exercise the broader service set.
+`anodrel-windows-client` adapter, direct `anodrel-linux-client` adapter, stable
+`anodrel-windows-ui-sdk` facade, migrated product fixture, and compiled native
+development probes. The existing Node.js diagnostic remains separately useful
+for development paths that exercise the broader service set.
 
 ## Purpose
 
@@ -22,8 +22,9 @@ is to move a bounded conversation across an already-authorized local stream.
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| `anodrel-client` | `ANBI` invitation consumption, authentication-first framing, one ordered request/response exchange, bounded queued response frames | Windows handles, pipe creation, policy, capabilities, process lifecycle, UI, retries after a session fails |
+| `anodrel-client` | invitation-derived authentication-first framing, one ordered request/response exchange, bounded queued response frames | operating-system handles, endpoint selection, policy, capabilities, process lifecycle, UI, retries after a session fails |
 | `anodrel-windows-client` | Opening and closing the invitation's exact named pipe with direct Kernel32 data I/O | Pipe names, pipe security, server creation, bootstrap delivery, User32, or application policy |
+| `anodrel-linux-client` | ANLI validation and opening its exact abstract Unix socket | a listener, filesystem/TCP endpoint, endpoint discovery, child launch, policy, UI, or retries |
 | Native child | Its fixed application behaviour and safe exit status | Host identity verification, capability grants, native window ownership, or access to another session |
 | Host | Invitation creation, authenticated session policy, window and process lifetimes | Application behaviour after the child receives a valid response |
 
@@ -76,6 +77,20 @@ The adapter performs blocking reads only on the child application thread. It
 never runs on Anodrel's Windows UI thread; host UI responsiveness remains a host
 requirement, not an application permission.
 
+## Linux adapter limits
+
+The Linux adapter accepts only an ANLI invitation. It validates the exact
+abstract endpoint grammar before opening one direct Unix stream to that endpoint.
+It has no endpoint-name getter, listener, filesystem path, TCP route, discovery,
+or reconnect method. The host independently checks the accepted peer's effective
+UID and validates the separate token before accepting a protocol request.
+
+The compiled Linux health probe is a development transport check. It receives
+the record on standard input and proves one real child process can authenticate,
+request platform.health, and exit. It is not a generic Linux launcher, a
+stable Linux application SDK, an executable-trust boundary, or a desktop host.
+See `docs/LINUX_NATIVE_CLIENT.md`.
+
 ## Verification
 
 Portable unit tests cover authentication ordering, fragmented and coalesced
@@ -121,8 +136,9 @@ test, not a trusted launch, application template, or public native UI API.
 
 ## Compatibility
 
-This contract adds no protocol version and no wire format. `ANBI` bootstrap v1
-and `ANDR` wire v1 remain the existing host contracts in `docs/TRANSPORT.md`.
+This contract adds no protocol version and no wire format. Windows ANBI
+bootstrap v1, Linux ANLI bootstrap v1, and ANDR wire v1 remain distinct host
+contracts in `docs/TRANSPORT.md`.
 The lower-level native-client modules remain implementation crates rather than
 the application SDK. Decision 0104 establishes `anodrel-windows-ui-sdk` as the
 stable in-repository Windows application facade. It owns standard-input

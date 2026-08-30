@@ -1,12 +1,11 @@
 [package]
-name = "anodrel-linux-pipe"
+name = "anodrel-linux-client"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anodrel-core = { path = "../../crates/core" }
-anodrel-linux-client = { path = "../linux-client" }
+anodrel-client = { path = "../../crates/client" }
+anodrel-json = { path = "../../crates/json" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-transport = { path = "../../crates/transport" }
-anodrel-wire = { path = "../../crates/wire" }

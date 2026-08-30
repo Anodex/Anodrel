@@ -75,6 +75,17 @@ pub enum ClientError {
     RequestRejected,
 }
 
+/// Host-created secret material that can build exactly one authentication
+/// message for an already-open invited stream.
+///
+/// Platform invitation codecs keep endpoint validation and secret storage on
+/// their own side of this boundary. This portable client never selects or opens
+/// an operating-system endpoint.
+pub trait AuthenticationInvitation {
+    /// Produces the first private session control without exposing its token.
+    fn authentication_message(&self) -> Result<String, ClientError>;
+}
+
 impl fmt::Display for ClientError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
@@ -121,13 +132,14 @@ where
     ///
     /// The platform adapter must have opened only `invitation.pipe_name()` and
     /// must not use the value to construct or discover another endpoint.
-    pub fn authenticate(
+    pub fn authenticate<Invitation>(
         stream: Stream,
-        invitation: BootstrapInvitation,
-    ) -> Result<Self, ClientError> {
-        let authentication = invitation
-            .authentication_message()
-            .map_err(|_| ClientError::BootstrapUnreadable)?;
+        invitation: Invitation,
+    ) -> Result<Self, ClientError>
+    where
+        Invitation: AuthenticationInvitation,
+    {
+        let authentication = invitation.authentication_message()?;
         let mut client = Self {
             stream,
             decoder: FrameDecoder::new(),
@@ -231,6 +243,13 @@ where
     }
 }
 
+impl AuthenticationInvitation for BootstrapInvitation {
+    fn authentication_message(&self) -> Result<String, ClientError> {
+        BootstrapInvitation::authentication_message(self)
+            .map_err(|_| ClientError::BootstrapUnreadable)
+    }
+}
+
 impl<Stream> fmt::Debug for Client<Stream> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // The stream can encapsulate a host-private handle, so never delegate
@@ -257,7 +276,7 @@ mod tests {
     use anodrel_json::JsonValue;
     use anodrel_wire::{FrameDecoder, encode_json};
 
-    use super::{Client, ClientError, ProtocolVersion, object_string};
+    use super::{AuthenticationInvitation, Client, ClientError, ProtocolVersion, object_string};
 
     const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.client-test";
     const SESSION_ID: &str = "client-test-session";
@@ -267,6 +286,16 @@ mod tests {
     struct TestStream {
         reads: VecDeque<Vec<u8>>,
         written: Vec<u8>,
+    }
+
+    struct AlternateInvitation;
+
+    impl AuthenticationInvitation for AlternateInvitation {
+        fn authentication_message(&self) -> Result<String, ClientError> {
+            Ok(format!(
+                r#"{{"kind":"session.authenticate","sessionId":"{SESSION_ID}","token":"{TOKEN}"}}"#
+            ))
+        }
     }
 
     impl TestStream {
@@ -349,6 +378,14 @@ mod tests {
             object_string(&request, "operation"),
             Some("platform.health")
         );
+    }
+
+    #[test]
+    fn authenticates_through_a_platform_invitation_implementation() {
+        let stream = TestStream::with_reads([frame(r#"{"kind":"session.authenticated"}"#)]);
+        let client = Client::authenticate(stream, AlternateInvitation)
+            .expect("a platform invitation supplies authentication");
+        assert_eq!(client.stream.messages().len(), 1);
     }
 
     #[test]
