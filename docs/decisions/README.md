@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0126: Linux crash records use a private bounded directory.
+
 - 0125: Linux state storage uses private directory descriptors.
 
 - 0124: Linux application paths use the effective account home.

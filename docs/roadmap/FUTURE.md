@@ -36,8 +36,10 @@ Status: **Second-sample foundation implemented; platform expansion planned**
   The Linux current-user path foundation is also implemented through the direct
   effective-account lookup in Decision 0124. A direct Linux state adapter now
   retains one bounded, recoverable snapshot in that layout through private
-  directory descriptors; neither adapter exposes a filesystem capability.
-  Logging and the remaining Linux host layers remain planned.
+  directory descriptors; a separate direct host-only crash store retains up to
+  eight closed panic records beside application state. Neither exposes a
+  filesystem capability. General logging and the remaining Linux host layers
+  remain planned.
 - Stabilize the protocol and publish SDK documentation.
 - Define a long-term release and support policy.
 

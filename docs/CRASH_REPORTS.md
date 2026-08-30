@@ -1,7 +1,8 @@
 # Anodrel Crash Records
 
-**Status:** Host-only bounded record of a contained panic. Not an application
-capability, not a telemetry pipeline, and not a general crash handler.
+**Status:** Host-only bounded record of a contained panic, with direct Windows
+and Linux stores. Not an application capability, telemetry pipeline, or
+general crash handler.
 
 ## Purpose and boundary
 
@@ -104,10 +105,12 @@ the person rather than the defect, so v1 does without and says so.
 
 ## Location, format, and retention
 
-Records go to the host's own diagnostics location, not to an application's:
+Records go to the host's own diagnostics location, not to an application's.
+Windows and Linux use their documented current-account roots:
 
 ~~~text
 %LOCALAPPDATA%\Anodrel\Host\logs\
+<effective-account-home>/.local/share/Anodrel/Host/logs/
 ~~~
 
 A crash in the host is the host's, and filing it under whichever application
@@ -142,22 +145,27 @@ could not forge a second field with a newline.
 
 The reporter performs no retry, no fallback location, and no user-visible
 message. Nothing about a failed report reaches an application, the ledger, or a
-rendered surface.
+rendered surface. The Linux writer opens the account and private Anodrel
+directory steps through descriptors without following links, accepts only
+private single-link regular record files, scans at most 128 immediate entries
+and 64 recognised candidates, and writes a new 0600 record before best-effort
+retention cleanup.
 
 ## Verification
 
 Portable unit tests cover the closed catalogues, the exact serialization,
 sequence assignment, the size bound, and that failure categories carry no
-detail. Adapter tests write into a temporary directory and cover creation,
-retention, and eviction order. A host test proves that a contained panic
-produces exactly one record and that the message loop still ends.
+detail. Windows and Linux adapter tests write into private temporary
+directories and cover creation, retention, eviction order, bounded enumeration,
+and rejected links. A Windows host test proves that a contained panic produces
+exactly one record and that the message loop still ends.
 
 A separate test asserts that no protocol operation names a crash record, which
 is the invariant most likely to be broken by someone adding a convenience later.
 
 Two manual checks on Windows, because they prove different things.
 
-**Can the store write?**
+**Can the Windows store write?**
 
 ~~~text
 cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --crash-report-selftest
@@ -190,6 +198,13 @@ the real location — the adapter's tests use a private temporary root. Inspect
 the directory above after either run; the file is plain text. Delete the
 directory to reset.
 
+The Linux store has no host containment route yet, so its verification remains
+adapter-level. Run its direct filesystem tests from a Linux environment:
+
+~~~powershell
+wsl -- bash -lc 'source "$HOME/.cargo/env" && cd "/mnt/c/Users/Owner/Desktop/Platform X/native" && CARGO_TARGET_DIR=/tmp/anodrel-linux-target cargo test -p anodrel-linux-crash'
+~~~
+
 ## Compatibility
 
 `anodrel.crash.v1` is a closed format. Adding a site or surface is additive.
@@ -197,4 +212,5 @@ Adding a field, a clock, any caller-supplied text, a protocol reader, a
 transmitted report, or a handler for the failures listed under
 [What it does not catch](#what-it-does-not-catch) requires a documented service
 contract, a capability decision, a threat-model update, and a new format
-version. Decision 0065 records the reasoning.
+version. Decisions 0065 and 0126 record the Windows and Linux writer
+boundaries.

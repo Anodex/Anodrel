@@ -72,8 +72,9 @@ The native host owns operating-system integration:
 - native security and isolation controls.
 
 The first host targets Windows. Linux now has a shared local-transport adapter,
-a separately tested private child transport, and a bounded direct state-store
-adapter; its desktop host and most operating-system services remain later work.
+a separately tested private child transport, a bounded direct state-store
+adapter, and a host-only crash store; its desktop host and most
+operating-system services remain later work.
 Other operating systems should be added as adapters behind the same service
 contracts.
 
@@ -88,9 +89,10 @@ Linux window, reusable launcher, or application service. A direct Linux paths
 adapter derives an effective-user default data root before applying the
 portable layout. The direct Linux state adapter uses that host-owned layout
 only to retain one bounded recoverable snapshot through private directory
-descriptors; it exposes no filesystem capability. macOS and a Linux desktop
-host will follow the same ownership rule through their respective
-operating-system APIs.
+descriptors; its direct crash store uses the sibling host logs location for
+closed panic records only. Neither exposes a filesystem capability. macOS and
+a Linux desktop host will follow the same ownership rule through their
+respective operating-system APIs.
 
 Drawing is not a host responsibility. Every first-party surface is composed by
 two portable crates — `anodrel-canvas`, a software rasterizer, and
