@@ -39,11 +39,12 @@ pub enum LinuxWaylandLabEvent {
 
 /// One fixed direct-Wayland development diagnostic with no window API surface.
 pub struct LinuxWaylandLab {
-    connection: Connection,
+    pub(super) connection: Connection,
     input: Vec<u8>,
-    objects: Objects,
-    buffers: [Buffer; BUFFER_COUNT],
+    pub(super) objects: Objects,
+    pub(super) buffers: [Buffer; BUFFER_COUNT],
     pointer: Option<PointerState>,
+    pub(super) closing: bool,
 }
 
 impl LinuxWaylandLab {
@@ -129,6 +130,7 @@ impl LinuxWaylandLab {
 
         let objects = Objects {
             registry,
+            compositor,
             shm,
             xdg_wm_base,
             surface,
@@ -145,11 +147,13 @@ impl LinuxWaylandLab {
             objects,
             buffers,
             pointer: pointer.map(|_| PointerState::default()),
+            closing: false,
         })
     }
 
     /// Copies one complete fixed-size canvas into an available compositor buffer.
     pub fn present(&mut self, canvas: &Canvas) -> Result<(), LinuxWaylandError> {
+        self.require_open()?;
         if canvas.width() != LAB_WIDTH || canvas.height() != LAB_HEIGHT {
             return Err(LinuxWaylandError::CanvasSizeMismatch);
         }
@@ -174,17 +178,9 @@ impl LinuxWaylandLab {
         self.send(Request::new(self.objects.surface, 6))
     }
 
-    /// Blocks only in the diagnostic's own event loop until the desktop closes it.
-    pub fn wait_for_close(&mut self) -> Result<(), LinuxWaylandError> {
-        loop {
-            if self.wait_for_lab_event()? == LinuxWaylandLabEvent::Closed {
-                return Ok(());
-            }
-        }
-    }
-
     /// Waits for one closed local diagnostic outcome from the compositor loop.
     pub fn wait_for_lab_event(&mut self) -> Result<LinuxWaylandLabEvent, LinuxWaylandError> {
+        self.require_open()?;
         loop {
             let message = self.next_message()?;
             if let Some(event) = self.dispatch(message)? {
@@ -201,6 +197,7 @@ impl LinuxWaylandLab {
         &mut self,
         timeout: Duration,
     ) -> Result<Option<LinuxWaylandLabEvent>, LinuxWaylandError> {
+        self.require_open()?;
         let started = Instant::now();
         loop {
             let remaining = timeout.saturating_sub(started.elapsed());
@@ -308,15 +305,16 @@ impl fmt::Debug for LinuxWaylandLab {
     }
 }
 
-struct Objects {
-    registry: u32,
-    shm: u32,
-    xdg_wm_base: u32,
-    surface: u32,
-    xdg_surface: u32,
-    toplevel: u32,
-    seat: Option<u32>,
-    pointer: Option<u32>,
+pub(super) struct Objects {
+    pub(super) registry: u32,
+    pub(super) compositor: u32,
+    pub(super) shm: u32,
+    pub(super) xdg_wm_base: u32,
+    pub(super) surface: u32,
+    pub(super) xdg_surface: u32,
+    pub(super) toplevel: u32,
+    pub(super) seat: Option<u32>,
+    pub(super) pointer: Option<u32>,
 }
 
 struct Setup {

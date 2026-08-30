@@ -87,6 +87,20 @@ length, and treats a wl_display.error, malformed message, unexpected object,
 or any inbound file descriptor as a failed local desktop connection. The
 server's error text is discarded.
 
+## Teardown
+
+The Lab owns its fixed Wayland objects and closes them in child-before-parent
+order: the xdg role and surface, both buffers, then xdg shell, shared-memory,
+compositor, and registry globals. This is best effort and never waits for a
+frame release, callback, acknowledgement, or compositor response. If the
+stream has already ended, the owned socket close remains the fixed cleanup
+fallback.
+
+The Lab binds seat and pointer only at protocol version 1. Their later-version
+release requests are deliberately not guessed; those optional local diagnostic
+objects leave with the socket instead. Closing never exposes a Wayland object,
+close result, or native failure to an application.
+
 ## Presentation and performance
 
 The portable canvas stores pixels as 0xAARRGGBB. On little-endian Linux, their
@@ -138,5 +152,5 @@ notifications, application documents, application IPC composition, executable
 identity, product launch, packaging, installation, or updates exists in this
 component.
 
-See Decisions 0128, 0129, and 0131, docs/RENDERER.md,
+See Decisions 0128, 0129, 0131, and 0132, docs/RENDERER.md,
 docs/LINUX_TRANSPORT.md, and docs/LINUX_WINDOW_SESSIONS.md.

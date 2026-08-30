@@ -80,10 +80,11 @@ impl LinuxDevelopmentWindowSession {
     /// Drops the fixed view before stopping and joining its private session.
     pub fn finish(self) -> Result<(), LinuxDevelopmentWindowError> {
         let Self {
-            lab,
+            mut lab,
             session,
             close_signal,
         } = self;
+        lab.close();
         drop(lab);
         drop(close_signal);
         session

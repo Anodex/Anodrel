@@ -36,11 +36,12 @@ it immediately; an idle timeout checks only that private signal. This keeps
 idle CPU work at zero while bounding an external child/worker end to the next
 host close check.
 
-If the child or authenticated worker ends, the host drops the view connection
-and then finishes the session. If the desktop asks the fixed view to close,
-the host follows the same session-finish path. Neither path exposes the side
-that ended first, a PID, exit code, signal, endpoint, token, native error,
-event, or callback to an application.
+If the child or authenticated worker ends, the host first sends the fixed
+best-effort Wayland teardown sequence, drops the view connection, and then
+finishes the session. If the desktop asks the fixed view to close, the host
+follows the same session-finish path. Neither path exposes the side that ended
+first, a PID, exit code, signal, endpoint, token, native error, event, or
+callback to an application.
 
 ## Run and verify manually
 
@@ -70,5 +71,5 @@ application document, route authenticated application UI, expose input,
 provide a product identity, validate an executable, install a package, update
 software, or make a Linux product claim.
 
-See Decisions 0128 through 0131, docs/LINUX_SESSIONS.md, and
+See Decisions 0128 through 0132, docs/LINUX_SESSIONS.md, and
 docs/LINUX_WINDOWING.md.

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0132: Linux Wayland Lab teardown is ordered and bounded.
+
 - 0131: Linux development-window Lab owns one session and view.
 
 - 0130: Linux development sessions own child and transport lifetimes.

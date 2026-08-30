@@ -4,9 +4,11 @@ mod buffer;
 mod error;
 mod events;
 mod globals;
+mod lifecycle;
 mod locator;
 mod pointer;
 mod raw;
+mod teardown;
 mod window;
 mod wire;
 
