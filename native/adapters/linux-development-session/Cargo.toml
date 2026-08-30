@@ -1,0 +1,10 @@
+[package]
+name = "anodrel-linux-development-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-linux-bootstrap = { path = "../linux-bootstrap" }
+anodrel-linux-pipe = { path = "../linux-pipe" }

@@ -29,7 +29,8 @@ The Ubuntu runner installs stable Rust, checks all native formatting, then
 lints and tests the Linux transport, strict invitation adapter, direct
 effective-account paths adapter, direct bounded state adapter, direct
 host-only crash store, direct development launcher, fixed compiled child probe,
-and direct Wayland lab. Its tests create real Linux abstract Unix-domain sockets, exercise the
+host-owned development session, and direct Wayland lab. Its tests create real
+Linux abstract Unix-domain sockets, exercise the
 same-UID peer check, authenticated health round trip, failed authentication
 closure, and host-only stop paths, then prove a separate child process can
 consume one ANLI record and complete health through the owned launcher. The
@@ -37,7 +38,9 @@ paths tests exercise the current effective account without exposing its name or
 home directory. The storage tests use a real temporary filesystem to prove
 atomic snapshot recovery, private modes, and link rejection. The crash-store
 tests prove private record creation, retention, bounded enumeration, and link
-rejection. The Wayland tests prove strict wire encoding and decoding, display
+rejection. The development-session test proves the compiled fixed child and
+its authenticated worker close under one host owner. The Wayland tests prove
+strict wire encoding and decoding, display
 locator validation, required-global selection, fixed buffer availability,
 pointer event validation, fixed click activation, and headless diagnostic-canvas
 composition without adding a compositor or GUI framework. This keeps the
@@ -45,10 +48,10 @@ Linux-specific code from being treated as verified merely because the Windows
 workspace compiles its intentionally empty non-Linux facade.
 
 This job verifies only the documented Linux transport, storage, crash-record,
-development-launch, fixed-child proof, and direct-Wayland diagnostic rules. It
-does not start a compositor or prove a visible window or physical pointer. It
-does not claim a Linux application host, identity, product launcher, SDK,
-packaging, or macOS implementation.
+development-launch, fixed-child proof, host-owned child/transport lifecycle,
+and direct-Wayland diagnostic rules. It does not start a compositor or prove a
+visible window or physical pointer. It does not claim a Linux application host,
+identity, product launcher, SDK, packaging, or macOS implementation.
 
 ## Repository policy
 

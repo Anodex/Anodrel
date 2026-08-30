@@ -123,6 +123,17 @@ pub(super) fn terminate(process: c_int) -> Result<(), ()> {
     }
 }
 
+/// Sends the fixed final termination signal to one host-tracked child.
+pub(super) fn force_terminate(process: c_int) -> Result<(), ()> {
+    // SAFETY: process is a child PID supplied only by launch and SIGKILL is the
+    // fixed final host cleanup route after the ordinary shutdown grace period.
+    if unsafe { kill(process, SIGKILL) } == 0 {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
 /// Closed wait categories for an opaque child.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum WaitError {

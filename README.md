@@ -16,7 +16,7 @@ shipping a browser runtime.
 It is not an application itself, an Anodex source mirror, or a finished
 Electron replacement. Production packaging, signing, installation, updates,
 and macOS/Linux desktop hosts remain planned work. Linux has authenticated local
-transport, a private child transport, bounded state, and a fixed Wayland diagnostic surface with one local activation probe—not an application desktop host or product launcher.
+transport, a private child transport with one host-owned lifecycle, bounded state, and a fixed Wayland diagnostic surface with one local activation probe—not an application desktop host or product launcher.
 
 Anodex will be the first application built on Anodrel. Anodex is not being
 moved into this repository yet; it remains an independent project until the
@@ -313,8 +313,7 @@ Anodrel/
 - docs/decisions/ — durable decisions and their reasoning.
 
 `docs/TRANSPORT.md` defines the native frame and session contract.
-`docs/LINUX_TRANSPORT.md` and `docs/LINUX_WINDOWING.md` define the direct
-Linux transport and fixed Wayland diagnostic/pointer boundaries.
+`docs/LINUX_TRANSPORT.md`, `docs/LINUX_SESSIONS.md`, and `docs/LINUX_WINDOWING.md` define Linux transport, development session, and fixed Wayland diagnostic/pointer boundaries.
 `docs/LINUX_NATIVE_CLIENT.md` defines its strict child invitation and compiled development transport probe.
 `docs/APPLICATIONS.md` defines the validated application-package contract.
 `docs/APPLICATION_TEMPLATE.md` shows how to create and run the first strict,

@@ -85,3 +85,4 @@ process launch.
 
 See [Decision 0123](decisions/0123-linux-child-bootstrap-stays-distinct-from-windows.md),
 [Linux transport](LINUX_TRANSPORT.md), and [the native transport contract](TRANSPORT.md).
+The development-session owner is separately defined by Decision 0130.

@@ -57,6 +57,15 @@ impl LaunchedProcess {
     pub fn terminate(&self) -> Result<(), LinuxProcessError> {
         raw::terminate(self.process).map_err(|_| LinuxProcessError::Unavailable)
     }
+
+    /// Sends the fixed final host termination signal to a tracked child.
+    ///
+    /// Only a host lifecycle owner may need this after its earlier fixed
+    /// termination request did not end the child inside the documented grace
+    /// period. The child receives no signal-selection surface.
+    pub fn force_terminate(&self) -> Result<(), LinuxProcessError> {
+        raw::force_terminate(self.process).map_err(|_| LinuxProcessError::Unavailable)
+    }
 }
 
 impl fmt::Debug for LaunchedProcess {

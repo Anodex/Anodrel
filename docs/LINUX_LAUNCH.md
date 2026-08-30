@@ -26,9 +26,11 @@ calling it.
 
 The returned process value is opaque. A host may wait for a bounded time or
 send the fixed termination signal; dropping the value does not kill the child.
-This preserves the separation between launch mechanics and host session
-lifetime. A failed bootstrap write kills and reaps the child immediately, so an
-uninvited child cannot remain alive.
+`anodrel-linux-development-session` is the separate owner that attaches one
+such child to one private transport worker and escalates its own fixed shutdown
+if required. This preserves the separation between launch mechanics and host
+session lifetime. A failed bootstrap write kills and reaps the child
+immediately, so an uninvited child cannot remain alive.
 
 The child has no inherited Anodrel file descriptor beyond standard input. The
 launcher gives it an empty environment and redirects standard output/error to

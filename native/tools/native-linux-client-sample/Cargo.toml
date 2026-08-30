@@ -16,5 +16,6 @@ anodrel-linux-client = { path = "../../adapters/linux-client" }
 [dev-dependencies]
 anodrel-core = { path = "../../crates/core" }
 anodrel-linux-bootstrap = { path = "../../adapters/linux-bootstrap" }
+anodrel-linux-development-session = { path = "../../adapters/linux-development-session" }
 anodrel-linux-pipe = { path = "../../adapters/linux-pipe" }
 anodrel-protocol = { path = "../../crates/protocol" }

@@ -36,6 +36,7 @@ members = [
   "adapters/linux-storage",
   "adapters/linux-crash",
   "adapters/linux-bootstrap",
+  "adapters/linux-development-session",
   "adapters/linux-wayland",
   "adapters/windows-bootstrap",
   "adapters/windows-client",

@@ -133,6 +133,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-linux-development-session"
+version = "0.1.0"
+dependencies = [
+ "anodrel-core",
+ "anodrel-linux-bootstrap",
+ "anodrel-linux-pipe",
+]
+
+[[package]]
 name = "anodrel-linux-paths"
 version = "0.1.0"
 dependencies = [
@@ -218,6 +227,7 @@ dependencies = [
  "anodrel-json",
  "anodrel-linux-bootstrap",
  "anodrel-linux-client",
+ "anodrel-linux-development-session",
  "anodrel-linux-pipe",
  "anodrel-protocol",
 ]
