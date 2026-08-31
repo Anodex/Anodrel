@@ -257,9 +257,11 @@ It must never be echoed to stdout/stderr, a log, telemetry, crash reporting,
 or a durable file. The current launcher has no application trust policy,
 restart manager, or privilege boundary beyond the selected child executable.
 The host now has a separate no-script text package surface under Decision 0010,
-but that surface is not connected to this launcher or pipe. Publisher trust,
-verified executable launch, and a capability bridge remain required before a
-product application is launched by the Windows host.
+but that surface is not connected to this launcher or pipe. The separate
+registered interactive session now supplies the verified-launch product path
+and its identity-bound capability bridge; production publisher trust,
+installation, packaging, and updates remain required before a shipped product.
+See `docs/CAPABILITY_BRIDGE.md` and `docs/PRODUCT_SESSIONS.md`.
 
 ## Linux private child bootstrap
 

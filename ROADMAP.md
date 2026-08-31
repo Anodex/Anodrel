@@ -49,8 +49,9 @@ using only documented interfaces.
 
 The initial protocol, SDK, mock host, sample application, contract suite, and
 bounded native session engine are established. The minimum Phase 0 content
-boundary and associated threat-model controls are complete. Product launch,
-publisher trust, and a capability bridge remain later native-host gates.
+boundary and associated threat-model controls are complete. The Windows
+identity-bound capability bridge is implemented; production signing,
+installation, and publisher trust remain later native-host gates.
 
 ## Phase 2 — Native host
 
@@ -434,8 +435,7 @@ This is a development-machine fixture, not an installed product: it depends on
 a locally generated certificate placed in machine trust, and it says nothing
 about packaging, installation, updates, multi-window policy, restart, or
 background execution. Remaining acceptance work includes a production signing
-and packaging story, a capability bridge, and broader operation-specific native
-tests.
+and packaging story, plus broader operation-specific native tests.
 
 The Startup Lab's linked and planned actions are maintained in
 [`docs/roadmap/STARTUP_LAB_TILES.md`](docs/roadmap/STARTUP_LAB_TILES.md).

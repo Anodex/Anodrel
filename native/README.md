@@ -139,10 +139,10 @@ deliver a private invitation to a child process. The Windows host's
 development-only diagnostics launch both the compiled native health probe and
 the Node client: the former proves private bootstrap and authentication without
 a runtime dependency, and the latter exercises the bounded service seams.
-Publisher trust, executable launch, and a product capability bridge still
-require separate threat-model work. The
-host-only registered launch service is separate from the visual surface until
-a signed application record is provisioned.
+The registered interactive session implements the product capability bridge;
+production publisher trust, packaging, installation, and updates remain
+separate release work. The host-only registered launch service is separate from
+the visual surface until a signed application record is provisioned.
 
 `--showcase <manifest>` opens the Anodrel Startup Lab. Before any window is
 created, it loads the supplied package, performs the internal protocol health

@@ -398,6 +398,7 @@ exposing monitor selection, display control, geometry, or fullscreen state.
 client-area request for that same session-owned window, without exposing
 position, outer geometry, monitor, DPI, or readback.
 `docs/PERFORMANCE.md` defines how Electron comparisons will be measured; `docs/WINDOWS_RELEASE.md` defines the Windows-first release gates and remaining production decisions.
+`docs/CAPABILITY_BRIDGE.md` defines how a Windows installed record becomes a fixed authenticated service boundary.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
 `docs/APPEARANCE.md` defines the direct Windows high-contrast appearance adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the Windows accessibility boundary. **UI
