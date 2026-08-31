@@ -192,6 +192,10 @@ match both that record and the release publisher. It accepts no identity, root,
 registry, or executable argument and deletes nothing. Later record removal and
 tree cleanup consume only this opaque verified result.
 
+The next owned step removes only the fixed `record` value from that application's
+64-bit machine key. It neither deletes the key nor any package file. The later
+tree cleanup receives only its opaque policy-removed result.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under

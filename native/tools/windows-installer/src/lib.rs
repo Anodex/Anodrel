@@ -49,7 +49,8 @@ pub use signing::{SignedReleaseError, VerifiedEmbeddedRelease, verify_current_si
 pub use staging::StagedReleaseError;
 #[cfg(windows)]
 pub use uninstall::{
-    UninstallPreflightError, VerifiedUninstallTarget, verify_current_uninstall_target,
+    PolicyRemovedUninstallTarget, UninstallPolicyRemovalError, UninstallPreflightError,
+    VerifiedUninstallTarget, remove_verified_uninstall_policy, verify_current_uninstall_target,
 };
 
 /// Maximum UTF-8 release-manifest size before JSON parsing.

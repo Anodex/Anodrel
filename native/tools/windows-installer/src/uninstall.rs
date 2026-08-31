@@ -9,7 +9,29 @@ use crate::{SignedReleaseError, verify_current_signed_release};
 
 /// A signed, policy-selected application eligible for later uninstall work.
 pub struct VerifiedUninstallTarget {
+    application_id: String,
     package_root: PathBuf,
+}
+
+impl VerifiedUninstallTarget {
+    #[must_use]
+    pub(crate) fn application_id(&self) -> &str {
+        &self.application_id
+    }
+}
+
+/// A verified uninstall target whose fixed machine record was removed.
+pub struct PolicyRemovedUninstallTarget {
+    target: VerifiedUninstallTarget,
+}
+
+impl fmt::Debug for PolicyRemovedUninstallTarget {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("PolicyRemovedUninstallTarget")
+            .field(&self.target)
+            .finish()
+    }
 }
 
 impl fmt::Debug for VerifiedUninstallTarget {
@@ -43,6 +65,25 @@ pub enum UninstallPreflightError {
     /// The installed signer differed from the signed uninstaller publisher.
     InstallerPublisherMismatch,
 }
+
+/// A fixed policy record could not be removed after verified preflight.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UninstallPolicyRemovalError {
+    /// Windows denied the elevated fixed policy change.
+    AccessDenied,
+    /// The fixed policy record was unavailable or could not be removed safely.
+    PolicyUnavailable,
+}
+
+impl fmt::Display for UninstallPolicyRemovalError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::AccessDenied => "machine policy cannot be changed; run from an elevated shell",
+            Self::PolicyUnavailable => "the installed application policy could not be removed",
+        })
+    }
+}
+impl std::error::Error for UninstallPolicyRemovalError {}
 
 impl fmt::Display for UninstallPreflightError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -94,8 +135,79 @@ pub fn verify_current_uninstall_target() -> Result<VerifiedUninstallTarget, Unin
         return Err(UninstallPreflightError::InstallerPublisherMismatch);
     }
     Ok(VerifiedUninstallTarget {
+        application_id: manifest.application_id().to_owned(),
         package_root: installed.package_root().to_path_buf(),
     })
+}
+
+/// Removes only the fixed machine `record` value for a verified target.
+pub fn remove_verified_uninstall_policy(
+    target: VerifiedUninstallTarget,
+) -> Result<PolicyRemovedUninstallTarget, UninstallPolicyRemovalError> {
+    raw::remove_record(target.application_id())?;
+    Ok(PolicyRemovedUninstallTarget { target })
+}
+
+mod raw {
+    use super::UninstallPolicyRemovalError;
+    type HKey = isize;
+    const HKEY_LOCAL_MACHINE: HKey = 0x8000_0002_usize as HKey;
+    const KEY_SET_VALUE: u32 = 0x0002;
+    const KEY_WOW64_64KEY: u32 = 0x0100;
+    const ERROR_SUCCESS: i32 = 0;
+    const ERROR_ACCESS_DENIED: i32 = 5;
+    const POLICY_PREFIX: &str = "Software\\Anodrel\\Applications\\";
+    #[link(name = "Advapi32")]
+    unsafe extern "system" {
+        fn RegOpenKeyExW(
+            key: HKey,
+            sub_key: *const u16,
+            options: u32,
+            access: u32,
+            result: *mut HKey,
+        ) -> i32;
+        fn RegDeleteValueW(key: HKey, value_name: *const u16) -> i32;
+        fn RegCloseKey(key: HKey) -> i32;
+    }
+    pub(super) fn remove_record(application_id: &str) -> Result<(), UninstallPolicyRemovalError> {
+        let path = wide(&format!("{POLICY_PREFIX}{application_id}"));
+        let mut key = 0_isize;
+        // SAFETY: The fixed path is NUL terminated and `key` is one HKEY output slot.
+        let opened = unsafe {
+            RegOpenKeyExW(
+                HKEY_LOCAL_MACHINE,
+                path.as_ptr(),
+                0,
+                KEY_SET_VALUE | KEY_WOW64_64KEY,
+                &mut key,
+            )
+        };
+        if opened != ERROR_SUCCESS {
+            return Err(error(opened));
+        }
+        let guard = Key(key);
+        let value = wide("record");
+        // SAFETY: The guard owns the fixed machine key and value is NUL terminated.
+        let status = unsafe { RegDeleteValueW(guard.0, value.as_ptr()) };
+        (status == ERROR_SUCCESS).then_some(()).ok_or(error(status))
+    }
+    fn wide(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(Some(0)).collect()
+    }
+    fn error(status: i32) -> UninstallPolicyRemovalError {
+        if status == ERROR_ACCESS_DENIED {
+            UninstallPolicyRemovalError::AccessDenied
+        } else {
+            UninstallPolicyRemovalError::PolicyUnavailable
+        }
+    }
+    struct Key(HKey);
+    impl Drop for Key {
+        fn drop(&mut self) {
+            /* SAFETY: owns a successful registry handle. */
+            let _ = unsafe { RegCloseKey(self.0) };
+        }
+    }
 }
 
 #[cfg(test)]
