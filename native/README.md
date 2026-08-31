@@ -101,9 +101,10 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   current read-only `validate` command parses the strict embedded release
   manifest, checks its complete bounded payload before the owned bundle decoder,
   and renders a record that the existing application validator accepts. Its
-  direct Kernel32 resource reader accepts only two fixed current-image resources;
-  it cannot install, uninstall, write machine policy, unpack a payload, or add a
-  signing dependency.
+  direct Kernel32 resource reader accepts only two fixed current-image resources,
+  and its activation gate requires the current Authenticode signer to match the
+  embedded manifest publisher; it cannot install, uninstall, write machine
+  policy, unpack a payload, or add a signing dependency.
 - `crates/release-bundle` encodes and parses bounded, uncompressed release files
   with a per-file SHA-256 check. Its decoder borrows checked file contents from
   the signed payload and performs no filesystem or Windows API operation.

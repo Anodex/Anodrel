@@ -14,3 +14,4 @@ anodrel-json = { path = "../../crates/json" }
 anodrel-network = { path = "../../crates/network" }
 anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-release-bundle = { path = "../../crates/release-bundle" }
+anodrel-windows-signature = { path = "../../adapters/windows-signature" }

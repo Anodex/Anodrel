@@ -617,6 +617,7 @@ dependencies = [
  "anodrel-network",
  "anodrel-protocol",
  "anodrel-release-bundle",
+ "anodrel-windows-signature",
 ]
 
 [[package]]

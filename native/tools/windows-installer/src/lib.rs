@@ -13,6 +13,8 @@ mod payload;
 mod record;
 #[cfg(windows)]
 mod resources;
+#[cfg(windows)]
+mod signing;
 
 pub use error::ReleaseManifestError;
 pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
@@ -22,6 +24,8 @@ pub use resources::{
     EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,
     RELEASE_PAYLOAD_RESOURCE_ID, read_current_release,
 };
+#[cfg(windows)]
+pub use signing::{SignedReleaseError, VerifiedEmbeddedRelease, verify_current_signed_release};
 
 /// Maximum UTF-8 release-manifest size before JSON parsing.
 pub const MAX_RELEASE_MANIFEST_BYTES: usize = 16 * 1024;

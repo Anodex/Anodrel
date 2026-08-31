@@ -35,6 +35,11 @@ It never accepts a sidecar path or resource selector. Resource loading alone is
 not signature verification; the later signed-installer activation requires both
 the self-signature check and the manifest/payload verification chain.
 
+That activation checks the current installer executable with Windows
+Authenticode, loads its fixed resources, and requires its accepted leaf
+fingerprint to equal the manifest publisher fingerprint. A valid bundle under
+an unsigned or differently signed executable is not an installable release.
+
 ## `anodrel.release.v1` manifest
 
 The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only
@@ -87,7 +92,9 @@ and renders the existing version-1.19 installed-record shape for later host-side
 validation. The direct Windows resource reader selects only the two fixed
 current-image resources and fails closed when they are absent. Its contract tests
 prove that the rendered record passes the same `anodrel-application` validator
-the Windows host reads.
+the Windows host reads. The activation gate now asks Windows to verify the
+current installer image before it reads those resources, and rejects an unsigned
+test image through the real Authenticode path.
 
 The tool has no `install` or `uninstall` command yet. It cannot write a package
 directory or the registry, inspect a certificate, extract a payload, create
