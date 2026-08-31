@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-glyph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-canvas = { path = "../canvas" }
+anodrel-font = { path = "../font" }

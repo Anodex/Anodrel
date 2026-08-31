@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0136: Glyph flattening is bounded and device-explicit.
+
 - 0135: TrueType contours convert to exact quadratic paths.
 
 - 0134: First-party simple glyph outlines stay bounded.

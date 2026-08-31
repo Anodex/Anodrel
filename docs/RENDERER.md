@@ -5,6 +5,8 @@
 This is the public contract for how Anodrel draws. It covers two portable
 crates — `anodrel-canvas` (how to draw) and `anodrel-brand` (what Anodrel looks
 like) — and the seam a native host implements to put their output on screen.
+`anodrel-glyph` is a separate, narrow adapter that supplies flattened glyph
+contours to the canvas; see `docs/GLYPH_RENDERING.md`.
 
 Neither crate depends on an operating system or on a third-party library, and
 both are `#![forbid(unsafe_code)]`. The reasoning behind that is Decision 0013.
@@ -106,6 +108,7 @@ constructors and operations: `from_size`, `centered`, `inflate`, `translate`,
 | `Path::circle(center, radius)` | Circle. |
 | `Path::ellipse(rect)` | Ellipse inscribed in a rectangle. |
 | `Path::ring(center, outer, thickness)` | Annulus; the inner contour is reversed. |
+| `push_owned_contour(points)` | Transfers one completed contour without copying it. |
 
 Transforms return new paths: `translate`, `scale_about`, and `fit_unit_square`,
 which maps geometry authored in a normalised `0.0..=1.0` square into a target

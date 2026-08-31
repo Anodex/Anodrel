@@ -125,7 +125,14 @@ impl Path {
 
     /// Appends a closed contour. Contours with fewer than three points are ignored.
     pub fn push_contour(&mut self, points: impl IntoIterator<Item = Point>) {
-        let points: Vec<Point> = points.into_iter().collect();
+        self.push_owned_contour(points.into_iter().collect());
+    }
+
+    /// Appends an already-owned closed contour without copying its points.
+    ///
+    /// Contours with fewer than three points are ignored. The closing edge is
+    /// implied, so callers must not repeat the first point at the end.
+    pub fn push_owned_contour(&mut self, points: Vec<Point>) {
         if points.len() >= 3 {
             self.contours.push(points);
         }
@@ -376,6 +383,16 @@ mod tests {
         path.push_contour([point(0.0, 0.0), point(1.0, 1.0)]);
         assert!(path.is_empty());
         assert_eq!(path.bounds(), Rect::default());
+    }
+
+    #[test]
+    fn owned_contours_follow_the_same_closure_rule() {
+        let mut path = Path::new();
+        path.push_owned_contour(vec![point(0.0, 0.0), point(4.0, 0.0), point(0.0, 4.0)]);
+        assert_eq!(
+            path.contours(),
+            &[vec![point(0.0, 0.0), point(4.0, 0.0), point(0.0, 4.0)]]
+        );
     }
 
     #[test]

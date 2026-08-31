@@ -7,7 +7,8 @@ looks up a Unicode scalar value in its character map. It can also extract one
 validated simple TrueType outline as contours of on- and off-curve points. It
 can deterministically convert those contours to exact quadratic paths. It is
 the first step toward first-party glyph coverage for Linux and future native
-hosts; it does not yet draw text.
+hosts; it does not yet draw text. `docs/GLYPH_RENDERING.md` describes the
+separate renderer adapter that can flatten those paths.
 
 ## Boundary
 
@@ -128,13 +129,13 @@ application data are read during conversion.
 - OpenType layout: shaping, ligatures, kerning, variation selection, bidirectional
   text, script handling, line breaking, and text measurement;
 - composite glyphs, hinting, rasterization, colour glyphs, bitmap strikes, or
-  a canvas integration;
+  a canvas dependency;
 - application-controlled font bytes or a protocol field carrying fonts.
 
 A later composite decoder and rasterizer may consume the simple `GlyphOutline`
 or `GlyphPath` only after dedicated contracts establish transformation,
-recursion, curve flattening, memory limits, and rasterization quality. None may
-turn this parsing crate into a hidden font loader or a general text engine.
+recursion, memory limits, and rasterization quality. None may turn this parsing
+crate into a hidden font loader or a general text engine.
 
 ## Verification
 
