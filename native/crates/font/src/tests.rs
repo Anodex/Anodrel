@@ -2,8 +2,13 @@
 
 mod fixtures;
 
-use crate::{FontError, FontFace};
-use fixtures::{cmap, format4, format4_with_glyph_array, format12, sfnt};
+use crate::{FontError, FontFace, GlyphOutlineError};
+use fixtures::{
+    cmap, composite_glyph, format4, format4_with_glyph_array, format12, glyph_over_contour_limit,
+    glyph_with_instruction, glyph_with_reserved_flag, glyph_with_trailing_byte, long_vector_points,
+    outline_face, outline_face_for_glyph, outline_face_with_nonzero_first_location,
+    repeated_zero_points, sfnt, simple_triangle, truncated_composite_marker,
+};
 
 #[test]
 fn format_four_maps_bmp_character_without_copying_face_bytes() {
@@ -148,5 +153,157 @@ fn unsupported_face_and_map_are_closed_errors() {
     assert_eq!(
         FontFace::parse(&bytes).unwrap_err(),
         FontError::UnsupportedCharacterMap
+    );
+}
+
+#[test]
+fn simple_outline_preserves_points_contours_bounds_and_curve_state() {
+    let bytes = outline_face(simple_triangle(), false);
+    let face = FontFace::parse(&bytes).expect("complete outline face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let outline = face
+        .glyph_outline(glyph)
+        .expect("simple outline should parse");
+    assert_eq!(outline.bounds().x_max(), 20);
+    assert_eq!(outline.bounds().y_max(), 20);
+    assert_eq!(outline.contour_count(), 1);
+    assert_eq!(outline.point_count(), 3);
+    let contour = outline.point_slice(0).expect("first contour exists");
+    assert_eq!((contour[0].x(), contour[0].y()), (0, 0));
+    assert_eq!((contour[1].x(), contour[1].y()), (20, 0));
+    assert_eq!((contour[2].x(), contour[2].y()), (0, 20));
+    assert!(contour[0].is_on_curve());
+    assert!(!contour[1].is_on_curve());
+    assert!(contour[2].is_on_curve());
+    assert_eq!(outline.point_slice(1), None);
+}
+
+#[test]
+fn long_locations_extract_the_same_simple_outline() {
+    let bytes = outline_face(simple_triangle(), true);
+    let face = FontFace::parse(&bytes).expect("long-location face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let outline = face
+        .glyph_outline(glyph)
+        .expect("long location resolves glyph");
+    assert_eq!(outline.point_count(), 3);
+}
+
+#[test]
+fn packed_repeated_flags_expand_without_coordinate_bytes() {
+    let bytes = outline_face(repeated_zero_points(), false);
+    let face = FontFace::parse(&bytes).expect("repeated flag face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let outline = face
+        .glyph_outline(glyph)
+        .expect("repeated flags should expand");
+    assert_eq!(outline.point_count(), 2);
+    assert!(
+        outline
+            .point_slice(0)
+            .expect("first contour exists")
+            .iter()
+            .all(|point| point.x() == 0 && point.y() == 0 && point.is_on_curve())
+    );
+}
+
+#[test]
+fn signed_long_coordinate_vectors_accumulate_in_design_units() {
+    let bytes = outline_face(long_vector_points(), false);
+    let face = FontFace::parse(&bytes).expect("long-vector face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let outline = face
+        .glyph_outline(glyph)
+        .expect("long vectors should parse");
+    let contour = outline.point_slice(0).expect("first contour exists");
+    assert_eq!((contour[0].x(), contour[0].y()), (300, -300));
+    assert_eq!((contour[1].x(), contour[1].y()), (200, -200));
+}
+
+#[test]
+fn instruction_bytes_are_skipped_without_execution() {
+    let bytes = outline_face(glyph_with_instruction(), false);
+    let face = FontFace::parse(&bytes).expect("instruction face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    assert_eq!(
+        face.glyph_outline(glyph)
+            .expect("instruction bytes are skipped")
+            .point_count(),
+        3
+    );
+}
+
+#[test]
+fn empty_located_glyph_is_distinct_from_missing_outline_source() {
+    let bytes = outline_face(Vec::new(), false);
+    let face = FontFace::parse(&bytes).expect("empty outline face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let outline = face.glyph_outline(glyph).expect("empty glyph is valid");
+    assert_eq!(outline.contour_count(), 0);
+    assert_eq!(outline.point_count(), 0);
+
+    let map_only_bytes = sfnt(cmap(&[(3, 1, format4(1))]));
+    let map_only = FontFace::parse(&map_only_bytes).expect("map-only face should parse");
+    let glyph = map_only.glyph_id('A').expect("fixture maps A");
+    assert_eq!(
+        map_only.glyph_outline(glyph).unwrap_err(),
+        GlyphOutlineError::OutlineUnavailable
+    );
+}
+
+#[test]
+fn composite_and_reserved_simple_glyphs_are_refused() {
+    for (glyph, expected) in [
+        (
+            composite_glyph(),
+            GlyphOutlineError::CompositeGlyphUnsupported,
+        ),
+        (
+            glyph_with_reserved_flag(),
+            GlyphOutlineError::MalformedOutline,
+        ),
+        (
+            glyph_with_trailing_byte(),
+            GlyphOutlineError::MalformedOutline,
+        ),
+        (
+            glyph_over_contour_limit(),
+            GlyphOutlineError::ComplexityLimitExceeded,
+        ),
+        (
+            truncated_composite_marker(),
+            GlyphOutlineError::MalformedOutline,
+        ),
+    ] {
+        let bytes = outline_face(glyph, false);
+        let face = FontFace::parse(&bytes).expect("outline-table source should parse");
+        let glyph = face.glyph_id('A').expect("fixture maps A");
+        assert_eq!(face.glyph_outline(glyph).unwrap_err(), expected);
+    }
+}
+
+#[test]
+fn partial_outline_tables_are_rejected_during_face_parsing() {
+    let bytes = fixtures::sfnt_with_tables(&[
+        (*b"cmap", cmap(&[(3, 1, format4(1))])),
+        (*b"head", vec![0; 54]),
+    ]);
+    assert_eq!(FontFace::parse(&bytes).unwrap_err(), FontError::InvalidFace);
+}
+
+#[test]
+fn location_index_must_begin_at_the_glyph_data_start() {
+    let bytes = outline_face_with_nonzero_first_location();
+    assert_eq!(FontFace::parse(&bytes).unwrap_err(), FontError::InvalidFace);
+}
+
+#[test]
+fn mapped_glyph_outside_maximum_profile_is_refused() {
+    let bytes = outline_face_for_glyph(simple_triangle(), false, 2);
+    let face = FontFace::parse(&bytes).expect("face tables are valid");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    assert_eq!(
+        face.glyph_outline(glyph).unwrap_err(),
+        GlyphOutlineError::InvalidGlyphId
     );
 }

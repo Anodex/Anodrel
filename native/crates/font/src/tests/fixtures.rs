@@ -117,6 +117,162 @@ pub(super) fn format12(groups: &[(u32, u32, u32)]) -> Vec<u8> {
     bytes
 }
 
+/// Builds a complete face that maps `A` to glyph 1 in one outline table set.
+pub(super) fn outline_face(glyph: Vec<u8>, uses_long_locations: bool) -> Vec<u8> {
+    outline_face_for_glyph(glyph, uses_long_locations, 1)
+}
+
+/// Builds a complete face that maps `A` to one caller-chosen glyph identifier.
+pub(super) fn outline_face_for_glyph(
+    glyph: Vec<u8>,
+    uses_long_locations: bool,
+    character_glyph: u16,
+) -> Vec<u8> {
+    let glyph = pad_to_word(glyph);
+    let location_format = if uses_long_locations { 1 } else { 0 };
+    sfnt_with_tables(&[
+        (*b"cmap", cmap(&[(3, 1, format4(character_glyph))])),
+        (*b"head", head(location_format)),
+        (*b"maxp", maximum_profile(2)),
+        (*b"loca", locations(glyph.len(), uses_long_locations)),
+        (*b"glyf", glyph),
+    ])
+}
+
+/// Builds a complete face whose otherwise-valid location index skips glyph-data bytes.
+pub(super) fn outline_face_with_nonzero_first_location() -> Vec<u8> {
+    let glyph = pad_to_word(simple_triangle());
+    let mut location_table = locations(glyph.len(), false);
+    location_table[0..2].copy_from_slice(&1_u16.to_be_bytes());
+    location_table[2..4].copy_from_slice(&1_u16.to_be_bytes());
+    sfnt_with_tables(&[
+        (*b"cmap", cmap(&[(3, 1, format4(1))])),
+        (*b"head", head(0)),
+        (*b"maxp", maximum_profile(2)),
+        (*b"loca", location_table),
+        (*b"glyf", glyph),
+    ])
+}
+
+/// Builds one simple triangle whose middle point is off the curve.
+pub(super) fn simple_triangle() -> Vec<u8> {
+    let mut bytes = glyph_header(1, 0, 0, 20, 20);
+    push_u16(&mut bytes, 2);
+    push_u16(&mut bytes, 0);
+    bytes.extend_from_slice(&[0x31, 0x32, 0x27]);
+    bytes.extend_from_slice(&[20, 20]);
+    bytes.push(20);
+    bytes
+}
+
+/// Builds two repeated on-curve points at the origin.
+pub(super) fn repeated_zero_points() -> Vec<u8> {
+    let mut bytes = glyph_header(1, 0, 0, 0, 0);
+    push_u16(&mut bytes, 1);
+    push_u16(&mut bytes, 0);
+    bytes.extend_from_slice(&[0x39, 1]);
+    bytes
+}
+
+/// Builds a simple glyph whose coordinates use signed 16-bit deltas.
+pub(super) fn long_vector_points() -> Vec<u8> {
+    let mut bytes = glyph_header(1, 200, -300, 300, -200);
+    push_u16(&mut bytes, 1);
+    push_u16(&mut bytes, 0);
+    bytes.extend_from_slice(&[0x01, 0x01]);
+    bytes.extend_from_slice(&300_i16.to_be_bytes());
+    bytes.extend_from_slice(&(-100_i16).to_be_bytes());
+    bytes.extend_from_slice(&(-300_i16).to_be_bytes());
+    bytes.extend_from_slice(&100_i16.to_be_bytes());
+    bytes
+}
+
+/// Adds ignored instruction bytes ahead of an otherwise valid simple glyph.
+pub(super) fn glyph_with_instruction() -> Vec<u8> {
+    let mut glyph = simple_triangle();
+    glyph[12..14].copy_from_slice(&1_u16.to_be_bytes());
+    glyph.insert(14, 0xB0);
+    glyph
+}
+
+/// Builds only a composite glyph header, which is enough for the closed outcome test.
+pub(super) fn composite_glyph() -> Vec<u8> {
+    glyph_header(-1, 0, 0, 0, 0)
+}
+
+/// Builds an incomplete composite marker with no required glyph header bounds.
+pub(super) fn truncated_composite_marker() -> Vec<u8> {
+    (-1_i16).to_be_bytes().to_vec()
+}
+
+/// Sets the first simple-glyph flag to the reserved bit for malformed-input tests.
+pub(super) fn glyph_with_reserved_flag() -> Vec<u8> {
+    let mut glyph = simple_triangle();
+    glyph[14] |= 0x80;
+    glyph
+}
+
+/// Appends a non-padding byte after a complete simple glyph description.
+pub(super) fn glyph_with_trailing_byte() -> Vec<u8> {
+    let mut glyph = simple_triangle();
+    glyph.push(0x7F);
+    glyph
+}
+
+/// Declares more contours than the fixed extraction limit without adding data.
+pub(super) fn glyph_over_contour_limit() -> Vec<u8> {
+    glyph_header(4_097, 0, 0, 0, 0)
+}
+
+fn head(location_format: i16) -> Vec<u8> {
+    let mut bytes = vec![0; 54];
+    bytes[12..16].copy_from_slice(&0x5F0F_3CF5_u32.to_be_bytes());
+    bytes[50..52].copy_from_slice(&location_format.to_be_bytes());
+    bytes
+}
+
+fn maximum_profile(glyph_count: u16) -> Vec<u8> {
+    let mut bytes = vec![0; 32];
+    bytes[0..4].copy_from_slice(&0x0001_0000_u32.to_be_bytes());
+    bytes[4..6].copy_from_slice(&glyph_count.to_be_bytes());
+    bytes
+}
+
+fn locations(glyph_length: usize, uses_long_locations: bool) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    if uses_long_locations {
+        for offset in [0, 0, glyph_length] {
+            push_u32(
+                &mut bytes,
+                u32::try_from(offset).expect("fixture location fits"),
+            );
+        }
+    } else {
+        for offset in [0, 0, glyph_length] {
+            push_u16(
+                &mut bytes,
+                u16::try_from(offset / 2).expect("fixture location fits"),
+            );
+        }
+    }
+    bytes
+}
+
+fn glyph_header(contours: i16, x_min: i16, y_min: i16, x_max: i16, y_max: i16) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for value in [contours, x_min, y_min, x_max, y_max] {
+        bytes.extend_from_slice(&value.to_be_bytes());
+    }
+    bytes
+}
+
+fn pad_to_word(mut bytes: Vec<u8>) -> Vec<u8> {
+    if !bytes.len().is_multiple_of(2) {
+        bytes.push(0);
+    }
+    bytes
+}
+
 fn push_u16(bytes: &mut Vec<u8>, value: u16) {
     bytes.extend_from_slice(&value.to_be_bytes());
 }

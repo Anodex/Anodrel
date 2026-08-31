@@ -18,6 +18,11 @@ impl<'font> Bytes<'font> {
         Some(u16::from_be_bytes([bytes.source[0], bytes.source[1]]))
     }
 
+    /// Reads one unsigned byte.
+    pub(crate) fn u8(self, offset: usize) -> Option<u8> {
+        self.source.get(offset).copied()
+    }
+
     /// Reads one big-endian signed 16-bit value.
     pub(crate) fn i16(self, offset: usize) -> Option<i16> {
         self.u16(offset).map(|value| value as i16)
@@ -38,5 +43,17 @@ impl<'font> Bytes<'font> {
     pub(crate) fn range(self, offset: usize, length: usize) -> Option<Self> {
         let end = offset.checked_add(length)?;
         Some(Self::new(self.source.get(offset..end)?))
+    }
+
+    /// Returns the length without exposing the borrowed byte contents.
+    pub(crate) const fn len(self) -> usize {
+        self.source.len()
+    }
+
+    /// Returns whether a final unused range contains only zero padding.
+    pub(crate) fn zero_padding_from(self, offset: usize) -> bool {
+        self.source
+            .get(offset..)
+            .is_some_and(|bytes| bytes.iter().all(|byte| *byte == 0))
     }
 }

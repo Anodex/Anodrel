@@ -163,11 +163,11 @@ Status: **Direct Windows host in progress**
   it never reopens the display path. Recursion, child paths, writes, watches,
   initial-folder control, filters, and non-Windows adapters remain separate
   gates. The final selected and cancelled desktop outcomes remain manual checks.
-- Draw first-party surfaces with a software renderer. **Windows complete; font map started:** a portable
+- Draw first-party surfaces with a software renderer. **Windows complete; owned text foundation started:** a portable
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
-  per-monitor DPI awareness (Decision 0013). `anodrel-font` now provides the first
-  bounded, owned Unicode-to-glyph parsing step for a later Linux glyph source (Decision 0133). See `docs/RENDERER.md` and `docs/FONTS.md`.
+  per-monitor DPI awareness (Decision 0013). `anodrel-font` now provides bounded,
+  owned Unicode mapping and simple-outline extraction for a later Linux glyph source (Decisions 0133 and 0134). See `docs/RENDERER.md` and `docs/FONTS.md`.
 - Define an owned native application UI foundation. **In progress:** a portable
   declarative layout tree with semantic actions establishes the first reusable
   UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a

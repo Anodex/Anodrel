@@ -11,9 +11,11 @@ mod bytes;
 mod cmap;
 mod error;
 mod face;
+mod outline;
 
 pub use error::FontError;
 pub use face::{FontFace, GlyphId};
+pub use outline::{GlyphBounds, GlyphOutline, GlyphOutlineError, GlyphPoint};
 
 #[cfg(test)]
 mod tests;
