@@ -40,6 +40,11 @@ Authenticode, loads its fixed resources, and requires its accepted leaf
 fingerprint to equal the manifest publisher fingerprint. A valid bundle under
 an unsigned or differently signed executable is not an installable release.
 
+`anodrel-release-image` builds those resources into a new unsigned installer
+image with direct Windows APIs, then reloads the output to verify the exact
+bytes. The production signing step follows assembly because resource changes
+invalidate existing executable signatures.
+
 ## `anodrel.release.v1` manifest
 
 The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only

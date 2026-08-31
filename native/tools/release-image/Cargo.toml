@@ -1,0 +1,16 @@
+[package]
+name = "anodrel-release-image"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-release-image"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-windows-installer = { path = "../windows-installer" }
+
+[dev-dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-release-bundle = { path = "../../crates/release-bundle" }

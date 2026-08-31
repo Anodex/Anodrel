@@ -108,6 +108,10 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
 - `crates/release-bundle` encodes and parses bounded, uncompressed release files
   with a per-file SHA-256 check. Its decoder borrows checked file contents from
   the signed payload and performs no filesystem or Windows API operation.
+- `tools/release-image` copies an unsigned installer template only to a new
+  output, embeds the checked manifest and bundle through direct Kernel32 resource
+  updates, then reloads the result as data-only PE content to compare both
+  resources. It performs no signing, installation, or machine-policy mutation.
 - `crates/paths` derives fixed per-application `data`, `cache`, and `logs`
   locations without filesystem I/O from a validated identity and an absolute
   operating-system root.
@@ -196,6 +200,7 @@ cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-installer
 cargo test --manifest-path native/Cargo.toml -p anodrel-release-bundle
+cargo test --manifest-path native/Cargo.toml -p anodrel-release-image
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui

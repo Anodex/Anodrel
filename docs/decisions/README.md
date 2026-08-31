@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0144: The owned release-image builder embeds resources before signing.
+
 - 0143: The current installer signature must match its embedded publisher.
 
 - 0142: The installer reads fixed release resources from its current image.
