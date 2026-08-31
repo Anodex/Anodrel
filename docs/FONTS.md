@@ -1,11 +1,12 @@
 # Anodrel Font Faces
 
-**Status:** Portable character-map and simple-outline foundation.
+**Status:** Portable character-map, simple-outline, and quadratic-path foundation.
 
 `anodrel-font` validates one already-owned TrueType face held in memory and
 looks up a Unicode scalar value in its character map. It can also extract one
 validated simple TrueType outline as contours of on- and off-curve points. It
-is the first step toward first-party glyph coverage for Linux and future native
+can deterministically convert those contours to exact quadratic paths. It is
+the first step toward first-party glyph coverage for Linux and future native
 hosts; it does not yet draw text.
 
 ## Boundary
@@ -21,7 +22,8 @@ The public surface is deliberately small:
 ```rust
 let face = anodrel_font::FontFace::parse(bytes)?;
 let glyph = face.glyph_id('A');
-let outline = glyph.map(|glyph| face.glyph_outline(glyph));
+let outline = glyph.map(|glyph| face.glyph_outline(glyph)).transpose()?;
+let path = outline.as_ref().map(anodrel_font::GlyphOutline::quadratic_path);
 ```
 
 `glyph` is `Some(GlyphId)` only when the selected character map resolves to a
@@ -70,8 +72,8 @@ An outline call reads one location pair in constant time, then validates and
 decodes a **simple** glyph. It returns its header bounds plus a flat point list
 and one contour-end index for each contour. `point_slice` exposes one contour
 without copying it. Points use signed font design units and preserve the
-TrueType on-curve flag; a later rasterizer owns quadratic-curve construction,
-scaling, hinting policy, and canvas coverage.
+TrueType on-curve flag. `quadratic_path` converts those points into a later
+rasterizer's line and quadratic segments without changing the source outline.
 
 The parser expands packed flag runs and relative x/y vectors only after every
 read is range-checked. It ignores instruction bytes without executing them,
@@ -91,6 +93,35 @@ The table and packed-point rules follow Microsoft's OpenType documentation for
 [`loca`](https://learn.microsoft.com/en-us/typography/opentype/spec/loca) and
 [`glyf`](https://learn.microsoft.com/en-us/typography/opentype/spec/glyf).
 
+## Quadratic paths
+
+`GlyphOutline::quadratic_path` is a pure conversion of one validated simple
+outline. It emits one closed sequence per source contour: each sequence has a
+start point and a flat slice of `LineTo` or `QuadraticTo` segments whose final
+endpoint is that start point. An empty outline has no contours or segments.
+
+`GlyphPathPoint` stores each coordinate in **doubled design units** as a signed
+32-bit integer. A point stored by the font becomes `2 × coordinate`; an implied
+point between two adjacent off-curve controls is the average of their doubled
+values (equivalently, the exact integer sum of their source coordinates). That
+preserves half-unit midpoints without floating-point rounding and leaves later
+scaling policy explicit.
+
+The converter follows the TrueType contour rules: consecutive off-curve
+controls gain an implied on-curve midpoint; one off-curve control followed by
+an explicit on-curve point becomes one quadratic segment; adjacent explicit
+on-curve points become a line. When a contour starts off-curve, it starts at
+the last explicit on-curve point if there is one, otherwise at the exact
+midpoint between the last and first controls. This rule and the packed source
+point format are defined by Microsoft's OpenType
+[`glyf`](https://learn.microsoft.com/en-us/typography/opentype/spec/glyf)
+table documentation.
+
+Conversion costs one bounded linear pass over the existing points. It makes
+one flat segment buffer and two small contour-index buffers, rather than one
+allocation per contour. No font bytes, OS service, callback, global cache, or
+application data are read during conversion.
+
 ## Deliberately absent
 
 - font discovery, paths, package policy, fallback, or a default family;
@@ -100,9 +131,9 @@ The table and packed-point rules follow Microsoft's OpenType documentation for
   a canvas integration;
 - application-controlled font bytes or a protocol field carrying fonts.
 
-A later composite decoder, curve builder, and rasterizer may consume the
-simple `GlyphOutline` only after dedicated contracts establish transformation,
-recursion, curve geometry, memory limits, and rasterization quality. None may
+A later composite decoder and rasterizer may consume the simple `GlyphOutline`
+or `GlyphPath` only after dedicated contracts establish transformation,
+recursion, curve flattening, memory limits, and rasterization quality. None may
 turn this parsing crate into a hidden font loader or a general text engine.
 
 ## Verification
@@ -112,5 +143,7 @@ non-BMP lookup, missing glyphs, selection priority, malformed table ranges,
 truncated maps, invalid group/segment ordering, and glyph-ID overflow. Simple
 outline tests cover short and long location formats, packed repeats and signed
 coordinate vectors, contour slices, empty glyphs, and malformed outline
-boundaries. Those tests contain no machine font and no operating-system
+boundaries. Quadratic-path tests cover explicit lines, off-curve controls,
+implied half-unit midpoints, off-curve contour starts, closure, and empty
+outlines. Those tests contain no machine font and no operating-system
 dependency, so they run identically on every supported development host.

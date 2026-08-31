@@ -1,6 +1,7 @@
 //! Deterministic synthetic face tests.
 
 mod fixtures;
+mod path;
 
 use crate::{FontError, FontFace, GlyphOutlineError};
 use fixtures::{

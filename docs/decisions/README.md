@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0135: TrueType contours convert to exact quadratic paths.
+
 - 0134: First-party simple glyph outlines stay bounded.
 
 - 0133: First-party font faces parse owned memory.

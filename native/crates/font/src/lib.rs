@@ -15,7 +15,10 @@ mod outline;
 
 pub use error::FontError;
 pub use face::{FontFace, GlyphId};
-pub use outline::{GlyphBounds, GlyphOutline, GlyphOutlineError, GlyphPoint};
+pub use outline::{
+    GlyphBounds, GlyphOutline, GlyphOutlineError, GlyphPath, GlyphPathPoint, GlyphPoint,
+    GlyphSegment,
+};
 
 #[cfg(test)]
 mod tests;
