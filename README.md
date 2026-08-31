@@ -397,10 +397,9 @@ exposing monitor selection, display control, geometry, or fullscreen state.
 `docs/WINDOW_SIZE.md` defines the separately granted bounded logical
 client-area request for that same session-owned window, without exposing
 position, outer geometry, monitor, DPI, or readback.
-`docs/PERFORMANCE.md` defines how Electron comparisons will be measured.
+`docs/PERFORMANCE.md` defines how Electron comparisons will be measured; `docs/WINDOWS_RELEASE.md` defines the Windows-first release gates and remaining production decisions.
 `docs/UI.md` defines the first owned native UI layout and input foundation.
-`docs/APPEARANCE.md` defines the direct Windows high-contrast appearance
-adapter used by the native interactive UI labs.
+`docs/APPEARANCE.md` defines the direct Windows high-contrast appearance adapter used by the native interactive UI labs.
 `docs/ACCESSIBILITY.md` defines the Windows accessibility boundary. **UI
 Automation reading is implemented and verified:** Narrator reads an Anodrel
 surface aloud on Windows 11, an Inspect cross-check of every earlier flat

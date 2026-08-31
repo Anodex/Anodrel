@@ -2,7 +2,7 @@
 
 This roadmap is intentionally staged. The platform must become useful and stable before Anodex depends on it.
 
-Delivery order: Windows is the reference platform and must meet its release gates before new Linux-specific or macOS-specific feature work begins.
+Delivery order: Windows is the reference platform and must meet its [release gates](docs/WINDOWS_RELEASE.md) before new Linux-specific or macOS-specific feature work begins.
 Portable components may continue only when they directly close a Windows gate.
 
 ## Phase 0 — Foundation
