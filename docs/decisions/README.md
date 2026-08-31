@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0150: Recovery removes only normal private stage trees.
+
 - 0149: Recovery discovers only exact private stage directories.
 
 - 0148: Only a promoted validated record can publish machine policy.

@@ -179,8 +179,10 @@ The owned recovery scanner accepts only an installer-selected absolute
 application root. It discovers, but does not delete, normal child directories
 with Anodrel's exact private staging name format. Version directories, files,
 links, and unknown names are never candidates. A later direct deletion boundary
-will consume only those discovered private directories and refuse reparse points
-while walking them.
+consumes only those discovered private directories and refuses reparse points
+while walking them. It removes normal files then normal directories, never a
+version directory or a caller-named path. A partial failed cleanup remains
+unselected and may be retried.
 
 ## Planned machine installation
 
