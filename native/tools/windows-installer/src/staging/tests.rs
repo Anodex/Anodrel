@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use anodrel_application::sha256;
 use anodrel_release_bundle::{BundleEntryInput, encode};
 
-use crate::{ReleaseManifest, StagedReleaseError, stage_checked_release, verify_bundle};
+use crate::staging::stage_checked_release;
+use crate::{ReleaseManifest, StagedReleaseError, verify_bundle};
 
 const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
 
@@ -20,14 +21,14 @@ fn an_exact_checked_bundle_becomes_a_valid_private_staged_package() {
         .expect("the checked bundle creates a staged package");
     let canonical_parent =
         std::fs::canonicalize(parent.path()).expect("the temporary staging parent canonicalizes");
-    assert!(staged.package_root().starts_with(canonical_parent));
+    assert!(staged.package_root.starts_with(canonical_parent));
     assert_eq!(
-        std::fs::read(staged.package_root().join("content/main.txt"))
+        std::fs::read(staged.package_root.join("content/main.txt"))
             .expect("the staged content is readable"),
         b"staged release content"
     );
-    assert!(staged.install_record().contains("\"recordVersion\""));
-    let staged_root = staged.package_root().to_path_buf();
+    assert!(staged.install_record.contains("\"recordVersion\""));
+    let staged_root = staged.package_root.clone();
     drop(staged);
     assert!(
         !staged_root.exists(),

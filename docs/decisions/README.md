@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0146: The staged executable must match the release publisher before promotion.
+
 - 0145: Staged release extraction is private and rechecked before publication.
 
 - 0144: The owned release-image builder embeds resources before signing.

@@ -101,6 +101,13 @@ the Windows host reads. The activation gate now asks Windows to verify the
 current installer image before it reads those resources, and rejects an unsigned
 test image through the real Authenticode path.
 
+The library can then stage only a checked release under an installer-owned
+parent, revalidate its package and rendered record, and call Windows
+Authenticode for the staged executable before it is promotion-ready. An unsigned
+staged executable fails closed in the direct test; the matching-signer positive
+path remains an operator fixture until a signed resource-bearing installer and
+application are available.
+
 The command-line tool has no `install` or `uninstall` command yet. It cannot
 write a production package directory or the registry, create machine trust, or
 launch an application. Its library now has the private staged-extraction
@@ -125,8 +132,10 @@ After every bundle file is present, the installer renders the version-1.19
 record for the staging root and runs the existing installed-record validator.
 That independently checks the application manifest, content digest, executable
 containment, executable digest, application identity, capabilities, and network
-policy. The later signer check, atomic promotion, registry publication,
-recovery, and uninstall boundaries remain separate.
+policy. The signer gate then verifies the staged executable through Windows
+Authenticode and compares its opaque accepted leaf fingerprint to the same
+embedded publisher value before it becomes promotion-ready. Atomic promotion,
+registry publication, recovery, and uninstall remain separate.
 
 ## Planned machine installation
 

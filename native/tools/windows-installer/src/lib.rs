@@ -3,13 +3,16 @@
 
 //! First-party Windows installer foundations.
 //!
-//! This crate parses the private release manifest that a later signed Windows
-//! installer will embed. It does not extract a payload, change the registry,
-//! create a directory, install a certificate, or launch an application.
+//! This crate validates the private release carried by a signed Windows
+//! installer and can prepare it in a private staging directory. It does not
+//! promote a version directory, change the registry, install a certificate, or
+//! launch an application.
 
 mod error;
 mod manifest;
 mod payload;
+#[cfg(windows)]
+mod prepared;
 mod record;
 #[cfg(windows)]
 mod resources;
@@ -21,13 +24,15 @@ pub use error::ReleaseManifestError;
 pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
 pub use payload::{ReleasePayloadError, verify_bundle};
 #[cfg(windows)]
+pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed_release};
+#[cfg(windows)]
 pub use resources::{
     EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,
     RELEASE_PAYLOAD_RESOURCE_ID, read_current_release,
 };
 #[cfg(windows)]
 pub use signing::{SignedReleaseError, VerifiedEmbeddedRelease, verify_current_signed_release};
-pub use staging::{StagedRelease, StagedReleaseError, stage_checked_release};
+pub use staging::StagedReleaseError;
 
 /// Maximum UTF-8 release-manifest size before JSON parsing.
 pub const MAX_RELEASE_MANIFEST_BYTES: usize = 16 * 1024;

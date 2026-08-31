@@ -23,23 +23,26 @@ static NEXT_STAGING_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 /// The directory is removed when this value is dropped. A later promotion
 /// transaction must move it to a final version directory before publishing any
 /// registry policy.
-#[derive(Debug)]
-pub struct StagedRelease {
+pub(crate) struct StagedRelease {
     package_root: PathBuf,
+    executable_path: PathBuf,
     install_record: String,
 }
 
 impl StagedRelease {
-    /// Returns the private package root for later installer-only verification.
+    /// Returns the already validated contained executable for signer verification.
     #[must_use]
-    pub fn package_root(&self) -> &Path {
-        &self.package_root
+    pub(crate) fn executable_path(&self) -> &Path {
+        &self.executable_path
     }
+}
 
-    /// Returns the already validated machine record for later atomic publication.
-    #[must_use]
-    pub fn install_record(&self) -> &str {
-        &self.install_record
+impl fmt::Debug for StagedRelease {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("StagedRelease")
+            .field("install_record_bytes", &self.install_record.len())
+            .finish_non_exhaustive()
     }
 }
 
@@ -102,7 +105,7 @@ impl std::error::Error for StagedReleaseError {
 /// directory, registry value, process, trust, or network connection. Callers
 /// must first establish the installer signature boundary for the checked
 /// manifest and bundle they supply.
-pub fn stage_checked_release(
+pub(crate) fn stage_checked_release(
     staging_parent: &Path,
     manifest: &ReleaseManifest,
     bundle: &ReleaseBundle<'_>,
@@ -116,10 +119,11 @@ pub fn stage_checked_release(
     let guard = StagingGuard::new(staging);
     write_bundle(guard.path(), bundle)?;
     let record = manifest.render_install_record(guard.path());
-    InstalledApplication::load_from_trusted_record(&record, manifest.application_id())
-        .map_err(StagedReleaseError::PackageInvalid)?;
+    let installed =
+        InstalledApplication::load_from_trusted_record(&record, manifest.application_id())
+            .map_err(StagedReleaseError::PackageInvalid)?;
 
-    Ok(guard.finish(record))
+    Ok(guard.finish(record, installed.executable_path().to_path_buf()))
 }
 
 fn canonical_staging_parent(path: &Path) -> Result<PathBuf, StagedReleaseError> {
@@ -224,10 +228,11 @@ impl StagingGuard {
         &self.path
     }
 
-    fn finish(mut self, install_record: String) -> StagedRelease {
+    fn finish(mut self, install_record: String, executable_path: PathBuf) -> StagedRelease {
         self.retain = true;
         StagedRelease {
             package_root: self.path.clone(),
+            executable_path,
             install_record,
         }
     }
