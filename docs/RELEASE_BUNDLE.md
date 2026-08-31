@@ -63,9 +63,11 @@ file-level parsing merely because its manifest has a valid shape.
 The installer reads a release payload only from its own fixed `RT_RCDATA`
 resource (`0xA142`); the companion signed manifest is resource `0xA141`.
 
-A later Windows extraction module must recheck each path while creating only
-new files below its private staging root, then validate the staged package and
-record before registry publication.
+The Windows staged-extraction contract rechecks each entry while creating only
+new files below a private staging root, then validates the staged package and
+record before registry publication. It additionally rejects Windows device
+names, normalization-sensitive components, and overlong output paths. See
+Decision 0145.
 
 ## Compatibility
 

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0145: Staged release extraction is private and rechecked before publication.
+
 - 0144: The owned release-image builder embeds resources before signing.
 
 - 0143: The current installer signature must match its embedded publisher.

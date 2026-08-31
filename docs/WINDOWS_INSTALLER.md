@@ -101,11 +101,32 @@ the Windows host reads. The activation gate now asks Windows to verify the
 current installer image before it reads those resources, and rejects an unsigned
 test image through the real Authenticode path.
 
-The tool has no `install` or `uninstall` command yet. It cannot write a package
-directory or the registry, inspect a certificate, extract a payload, create
-machine trust, or launch an application. Those Windows API operations follow
-only after the installer self-signature and staged extraction boundaries are
-implemented.
+The command-line tool has no `install` or `uninstall` command yet. It cannot
+write a production package directory or the registry, create machine trust, or
+launch an application. Its library now has the private staged-extraction
+boundary below, but no command can select a staging parent or invoke it. The
+later signer check, promotion, policy publication, recovery, and uninstall
+operations remain separate boundaries.
+
+## Staged extraction contract
+
+The owned staged-extraction module accepts only an internal absolute staging
+parent selected by the elevated installer. It creates one new private,
+unpublished staging directory below that parent and never writes into a version
+directory or a path supplied by a release, command line, or application.
+
+For each already checked bundle entry it derives the relative Windows path from
+the canonical `/` components, rejects device names, trailing dots or spaces,
+reserved path characters, and overlong output paths, then creates a new regular
+file. It syncs and rehashes that file before continuing. Existing files,
+directories, links, and registry values are never reused as staging input.
+
+After every bundle file is present, the installer renders the version-1.19
+record for the staging root and runs the existing installed-record validator.
+That independently checks the application manifest, content digest, executable
+containment, executable digest, application identity, capabilities, and network
+policy. The later signer check, atomic promotion, registry publication,
+recovery, and uninstall boundaries remain separate.
 
 ## Planned machine installation
 

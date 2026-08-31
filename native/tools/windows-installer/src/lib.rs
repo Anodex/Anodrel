@@ -15,6 +15,7 @@ mod record;
 mod resources;
 #[cfg(windows)]
 mod signing;
+mod staging;
 
 pub use error::ReleaseManifestError;
 pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
@@ -26,6 +27,7 @@ pub use resources::{
 };
 #[cfg(windows)]
 pub use signing::{SignedReleaseError, VerifiedEmbeddedRelease, verify_current_signed_release};
+pub use staging::{StagedRelease, StagedReleaseError, stage_checked_release};
 
 /// Maximum UTF-8 release-manifest size before JSON parsing.
 pub const MAX_RELEASE_MANIFEST_BYTES: usize = 16 * 1024;
