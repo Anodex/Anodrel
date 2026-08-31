@@ -27,7 +27,7 @@ breadth rather than in a missing window or transport base.
 | Accessibility | In progress | The UI Automation provider supports reading, navigation, hit testing, focus, Invoke, Value, structure, live-status, and scroll boundaries. | Complete every documented manual Narrator and Inspect check for the current provider, then add further patterns only when a real UI requires them. |
 | Performance | Guarded | The release-only frame guard currently measures 6.68 ms average and 8.08 ms worst sustained frame against a 16 ms interval. | Keep the release guard, startup report, and equivalent real-application measurements in each release candidate. |
 | Product fixture | Built, operator verification pending | A first-party signed fixture exercises machine record, signature verification, child bootstrap, session UI, and shutdown. | Run its elevated provision, launch, action, and removal paths on the release machine. |
-| Signed distribution and installation | Not started | The host deliberately does not create certificates, install trust, or write production policy. | Choose certificate custody, installer/package format, install location, uninstall behaviour, and the source of the installed record. |
+| Signed distribution and installation | Foundation defined | The owned signed-installer contract fixes the machine record, embedded release envelope, and staged update boundary without adding an installer framework. | Choose certificate custody, implement the owned bundle, installation, recovery, uninstall, and release verification paths. |
 | Updates | Not started | No updater is shipped, which avoids an unreviewed code-distribution path. | Define signed update metadata, rollback, key rotation, delivery, and user-visible update policy after distribution identity is chosen. |
 | Release documentation and templates | Development-complete | Native SDK, templates, package tool, Startup Lab, diagnostics, and contract documents are maintained in the repository. | Publish installation, upgrade, recovery, and support documentation with the production package design. |
 
@@ -38,10 +38,10 @@ The next two gates cannot be completed honestly by code alone:
 1. **Production signing identity.** Choose the certificate issuer, who holds the
    private key, and how renewal or loss is handled. A development certificate is
    intentionally not a production identity.
-2. **Packaging and installation.** Choose the Windows package or installer route,
-   where application files and the installed record live, how removal works, and
-   whether a stable package identity is required for features such as toast
-   notifications.
+2. **Production signing and release operation.** The owned installer contract
+   defines a machine-scoped route, but the certificate, custody, renewal,
+   release procedure, and any stable package identity still need product
+   authority.
 
 Those choices determine the update trust model, so updating must follow them.
 The platform will not create machine trust or select a certificate authority on

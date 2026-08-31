@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0140: The Windows installer is owned and carries a signed release envelope.
+
 - 0139: Finish the Windows reference release before other hosts.
 
 - 0138: Horizontal font metrics stay bounded.
