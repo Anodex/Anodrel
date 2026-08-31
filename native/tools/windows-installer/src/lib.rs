@@ -18,6 +18,7 @@ mod promotion;
 #[cfg(windows)]
 mod publication;
 mod record;
+mod recovery;
 #[cfg(windows)]
 mod resources;
 #[cfg(windows)]
@@ -33,6 +34,7 @@ pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed
 pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};
 #[cfg(windows)]
 pub use publication::{PublicationError, PublishedRelease, publish_promoted_release};
+pub use recovery::{RecoveryDiscoveryError, discover_private_stages};
 #[cfg(windows)]
 pub use resources::{
     EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,

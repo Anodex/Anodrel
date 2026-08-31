@@ -173,6 +173,15 @@ the new complete version is unselected. The later recovery boundary decides
 whether that stale version can be safely removed; this publication step never
 tries to roll back by deleting content.
 
+## Recovery discovery contract
+
+The owned recovery scanner accepts only an installer-selected absolute
+application root. It discovers, but does not delete, normal child directories
+with Anodrel's exact private staging name format. Version directories, files,
+links, and unknown names are never candidates. A later direct deletion boundary
+will consume only those discovered private directories and refuse reparse points
+while walking them.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under

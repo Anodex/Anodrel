@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0149: Recovery discovers only exact private stage directories.
+
 - 0148: Only a promoted validated record can publish machine policy.
 
 - 0147: Verified stages promote through one same-volume rename.
