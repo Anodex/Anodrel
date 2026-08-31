@@ -19,6 +19,7 @@ members = [
   "crates/client",
   "crates/ui-client",
   "crates/application",
+  "crates/release-bundle",
   "crates/session-policy",
   "crates/paths",
   "crates/storage",

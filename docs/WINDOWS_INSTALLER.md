@@ -26,8 +26,8 @@ signed anodrel-windows-installer.exe
 
 The manifest is not distributed beside the executable. Windows trust evaluation
 must accept the installer before its embedded bytes become installation input.
-The payload descriptor is checked before extraction; a later owned bundle codec
-will define its individual file records and decompression rules.
+The payload descriptor is checked before extraction; the owned bundle codec
+defines its individual file records without compression.
 
 ## `anodrel.release.v1` manifest
 
@@ -75,15 +75,16 @@ download URL, certificate subject, token, user data, or child argument.
 
 `native/tools/windows-installer` now implements the read-only `validate`
 foundation. It bounds and parses one release manifest, validates its executable
-and payload descriptors, canonicalizes permitted network origins, and renders
-the existing version-1.19 installed-record shape for later host-side validation.
-Its contract tests prove that the rendered record passes the same
+and payload descriptors, then requires the complete payload to match before its
+owned per-file bundle decoder runs. It canonicalizes permitted network origins
+and renders the existing version-1.19 installed-record shape for later host-side
+validation. Its contract tests prove that the rendered record passes the same
 `anodrel-application` validator the Windows host reads.
 
 The tool has no `install` or `uninstall` command yet. It cannot write a package
 directory or the registry, inspect a certificate, extract a payload, create
 machine trust, or launch an application. Those Windows API operations follow
-only after the owned bundle codec and signed-resource boundary are implemented.
+only after the signed-resource boundary and staged extraction are implemented.
 
 ## Planned machine installation
 

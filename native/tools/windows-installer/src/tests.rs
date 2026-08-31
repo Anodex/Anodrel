@@ -3,8 +3,11 @@
 use std::path::{Path, PathBuf};
 
 use anodrel_application::{InstalledApplication, sha256};
+use anodrel_release_bundle::{BundleEntryInput, ReleaseBundleError, encode};
 
-use crate::{MAX_PAYLOAD_BYTES, ReleaseManifest, ReleaseManifestError};
+use crate::{
+    MAX_PAYLOAD_BYTES, ReleaseManifest, ReleaseManifestError, ReleasePayloadError, verify_bundle,
+};
 
 const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
 const PAYLOAD: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
@@ -21,6 +24,17 @@ fn release_manifest(executable_digest: &str, capabilities: &str, origins: &str) 
   "networkOrigins": {origins},
   "payload": {{ "byteLength": 32, "sha256": "{PAYLOAD}" }}
 }}"#
+    )
+}
+
+fn release_manifest_with_payload(payload: &[u8]) -> String {
+    let digest = sha256::to_lower_hex(&sha256::digest(payload));
+    release_manifest(PAYLOAD, "[]", "[]").replace(
+        &format!("\"byteLength\": 32, \"sha256\": \"{PAYLOAD}\""),
+        &format!(
+            "\"byteLength\": {}, \"sha256\": \"{digest}\"",
+            payload.len()
+        ),
     )
 }
 
@@ -113,6 +127,39 @@ fn malformed_paths_unknown_fields_and_out_of_bounds_payloads_fail_closed() {
     assert!(matches!(
         ReleaseManifest::parse(&excessive_payload),
         Err(ReleaseManifestError::PayloadInvalid)
+    ));
+}
+
+#[test]
+fn the_signed_payload_must_match_its_manifest_before_the_bundle_is_usable() {
+    let payload = encode(&[BundleEntryInput {
+        path: "content/main.txt",
+        contents: b"verified release content",
+    }])
+    .expect("the owned bundle encodes");
+    let manifest = ReleaseManifest::parse(&release_manifest_with_payload(&payload))
+        .expect("the manifest authenticates the exact payload");
+    let bundle = verify_bundle(&manifest, &payload).expect("both release checks pass");
+    assert_eq!(
+        bundle.file("content/main.txt"),
+        Some(&b"verified release content"[..])
+    );
+
+    let mut substituted = payload.clone();
+    *substituted.last_mut().expect("the payload has bytes") ^= 1;
+    assert!(matches!(
+        verify_bundle(&manifest, &substituted),
+        Err(ReleasePayloadError::DigestMismatch)
+    ));
+
+    let malformed = b"not a release bundle";
+    let malformed_manifest = ReleaseManifest::parse(&release_manifest_with_payload(malformed))
+        .expect("the manifest can authenticate invalid bundle bytes");
+    assert!(matches!(
+        verify_bundle(&malformed_manifest, malformed),
+        Err(ReleasePayloadError::BundleInvalid(
+            ReleaseBundleError::HeaderInvalid
+        ))
     ));
 }
 

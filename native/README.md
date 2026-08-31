@@ -99,9 +99,13 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   invitation, and terminates its tracked child during host shutdown.
 - `tools/windows-installer` is the first owned distribution foundation. Its
   current read-only `validate` command parses the strict embedded release
-  manifest and renders a record that the existing application validator accepts;
-  it cannot install, uninstall, write machine policy, unpack a payload, or add
-  a signing dependency.
+  manifest, checks its complete bounded payload before the owned bundle decoder,
+  and renders a record that the existing application validator accepts; it cannot
+  install, uninstall, write machine policy, unpack a payload, or add a signing
+  dependency.
+- `crates/release-bundle` encodes and parses bounded, uncompressed release files
+  with a per-file SHA-256 check. Its decoder borrows checked file contents from
+  the signed payload and performs no filesystem or Windows API operation.
 - `crates/paths` derives fixed per-application `data`, `cache`, and `logs`
   locations without filesystem I/O from a validated identity and an absolute
   operating-system root.
@@ -189,6 +193,7 @@ cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-installer
+cargo test --manifest-path native/Cargo.toml -p anodrel-release-bundle
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui

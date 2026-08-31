@@ -402,6 +402,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-release-bundle"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+]
+
+[[package]]
 name = "anodrel-session-policy"
 version = "0.1.0"
 dependencies = [
@@ -609,6 +616,7 @@ dependencies = [
  "anodrel-json",
  "anodrel-network",
  "anodrel-protocol",
+ "anodrel-release-bundle",
 ]
 
 [[package]]

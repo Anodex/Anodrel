@@ -13,3 +13,4 @@ anodrel-application = { path = "../../crates/application" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-network = { path = "../../crates/network" }
 anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-release-bundle = { path = "../../crates/release-bundle" }
