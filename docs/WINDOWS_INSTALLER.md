@@ -108,6 +108,11 @@ staged executable fails closed in the direct test; the matching-signer positive
 path remains an operator fixture until a signed resource-bearing installer and
 application are available.
 
+The owned promotion path moves only a prepared stage to its absent signed
+version-directory sibling through direct `MoveFileExW`, with no copy or
+replacement flags. Its direct tests prove both the successful move and that an
+existing version stays untouched. It still does not publish the staged record.
+
 The command-line tool has no `install` or `uninstall` command yet. It cannot
 write a production package directory or the registry, create machine trust, or
 launch an application. Its library now has the private staged-extraction
@@ -136,6 +141,21 @@ policy. The signer gate then verifies the staged executable through Windows
 Authenticode and compares its opaque accepted leaf fingerprint to the same
 embedded publisher value before it becomes promotion-ready. Atomic promotion,
 registry publication, recovery, and uninstall remain separate.
+
+## Promotion contract
+
+A promotion-ready stage can become only its signed three-part version directory
+under the same installer-owned application root. The destination must be
+absent. The owned boundary uses `MoveFileExW` with neither copy nor replacement
+flags, so it cannot overwrite an existing version or fall back to a
+cross-volume copy-and-delete operation.
+
+Promotion itself publishes no machine policy. If it fails, the stage stays
+unpublished and its owner removes it. If it succeeds but a later registry
+publication fails or the machine stops, the resulting complete version remains
+unselected; the prior registry record is still the host's only launch policy.
+Recovery may clean only such Anodrel-owned stale directories after a separate
+decision.
 
 ## Planned machine installation
 

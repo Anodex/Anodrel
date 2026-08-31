@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0147: Verified stages promote through one same-volume rename.
+
 - 0146: The staged executable must match the release publisher before promotion.
 
 - 0145: Staged release extraction is private and rechecked before publication.

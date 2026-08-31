@@ -27,13 +27,26 @@ pub(crate) struct StagedRelease {
     package_root: PathBuf,
     executable_path: PathBuf,
     install_record: String,
+    cleanup_on_drop: bool,
 }
 
 impl StagedRelease {
+    /// Returns the private stage root for an owned later promotion transaction.
+    #[must_use]
+    pub(crate) fn package_root(&self) -> &Path {
+        &self.package_root
+    }
+
     /// Returns the already validated contained executable for signer verification.
     #[must_use]
     pub(crate) fn executable_path(&self) -> &Path {
         &self.executable_path
+    }
+
+    /// Transfers the retained record after a successful directory promotion.
+    pub(crate) fn into_promoted_parts(mut self, package_root: PathBuf) -> (PathBuf, String) {
+        self.cleanup_on_drop = false;
+        (package_root, std::mem::take(&mut self.install_record))
     }
 }
 
@@ -48,7 +61,9 @@ impl fmt::Debug for StagedRelease {
 
 impl Drop for StagedRelease {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.package_root);
+        if self.cleanup_on_drop {
+            let _ = fs::remove_dir_all(&self.package_root);
+        }
     }
 }
 
@@ -234,6 +249,7 @@ impl StagingGuard {
             package_root: self.path.clone(),
             executable_path,
             install_record,
+            cleanup_on_drop: true,
         }
     }
 }

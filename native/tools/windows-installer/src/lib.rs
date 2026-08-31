@@ -13,6 +13,8 @@ mod manifest;
 mod payload;
 #[cfg(windows)]
 mod prepared;
+#[cfg(windows)]
+mod promotion;
 mod record;
 #[cfg(windows)]
 mod resources;
@@ -25,6 +27,8 @@ pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
 pub use payload::{ReleasePayloadError, verify_bundle};
 #[cfg(windows)]
 pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed_release};
+#[cfg(windows)]
+pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};
 #[cfg(windows)]
 pub use resources::{
     EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,

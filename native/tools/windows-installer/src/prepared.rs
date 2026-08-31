@@ -6,12 +6,14 @@ use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 
 use crate::staging::{StagedRelease, stage_checked_release};
 use crate::{
-    ReleaseManifest, SignedReleaseError, StagedReleaseError, verify_current_signed_release,
+    PackageVersion, ReleaseManifest, SignedReleaseError, StagedReleaseError,
+    verify_current_signed_release,
 };
 
 /// A private release stage that passed installer and executable publisher checks.
 pub struct PreparedRelease {
     staged: StagedRelease,
+    version: PackageVersion,
 }
 
 impl fmt::Debug for PreparedRelease {
@@ -19,6 +21,7 @@ impl fmt::Debug for PreparedRelease {
         formatter
             .debug_tuple("PreparedRelease")
             .field(&self.staged)
+            .field(&self.version)
             .finish()
     }
 }
@@ -76,10 +79,16 @@ pub fn prepare_current_signed_release(
     let release =
         verify_current_signed_release().map_err(PreparedReleaseError::InstallerInvalid)?;
     let manifest = release.release().manifest();
+    let version = manifest.package_version();
     let staged = stage_checked_release(staging_parent, manifest, release.release().bundle())
         .map_err(PreparedReleaseError::StagingInvalid)?;
     verify_staged_executable(&staged, manifest)?;
-    Ok(PreparedRelease { staged })
+    Ok(PreparedRelease { staged, version })
+}
+
+/// Transfers a fully checked stage to the owned promotion boundary.
+pub(crate) fn into_promotion_parts(prepared: PreparedRelease) -> (StagedRelease, PackageVersion) {
+    (prepared.staged, prepared.version)
 }
 
 fn verify_staged_executable(
