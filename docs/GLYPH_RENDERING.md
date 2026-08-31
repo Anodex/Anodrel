@@ -61,21 +61,34 @@ path. The repeated closing vertex is removed because `anodrel-canvas::Path`
 closes contours implicitly. Degenerate contours remain the canvas layer's
 existing no-op rather than becoming special text behavior.
 
+## Coverage mask
+
+`coverage_mask` rasterizes that bounded canvas path into one normal
+`anodrel_canvas::Mask`. Before allocation, it rejects non-finite geometry,
+unrepresentable canvas bounds, and a mask area above **262,144 pixels**. The
+returned coverage buffer therefore occupies at most one mebibyte and can later
+be safely retained by a dedicated cache. The existing generic canvas mask is
+not globally limited because authored artwork has separate resource needs.
+
+The coverage result is a one-glyph value, not a cache or a paint operation. It
+does not select an origin later, infer a baseline, retain a font, blend pixels,
+or report whether anything became visible.
+
 ## Deliberately absent
 
 - font discovery, file formats, character maps, composite glyphs, metrics,
   hinting, kerning, shaping, fallback, line breaking, and text layout;
 - per-application font configuration, a protocol operation, cached glyph runs,
-  GPU work, raster-mask allocation, drawing, or host presentation;
+  GPU work, drawing, or host presentation;
 - a Linux application surface, desktop input route, or accessibility tree.
 
-The next rendering step may rasterize this returned `Path` into a retained
-coverage mask only after it defines cache keys, bounds, clipping, and
-invalidation. It must not move source-font or layout authority into this
-adapter.
+The next rendering step may retain a returned coverage mask only after it
+defines cache keys, clipping, and invalidation. It must not move source-font or
+layout authority into this adapter.
 
 ## Verification
 
 The adapter has deterministic unit tests for placement direction and limits,
-flat lines, curved subdivision, exact closure removal, and complexity refusal.
-It is compiled and linted on Windows and Linux alongside the native workspace.
+flat lines, curved subdivision, exact closure removal, mask coverage, and
+complexity refusal. It is compiled and linted on Windows and Linux alongside
+the native workspace.

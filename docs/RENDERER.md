@@ -126,6 +126,12 @@ Two methods support bevelling:
   from. Bands meet exactly at the mitred corners, so translucent overlays never
   double up.
 
+`Mask::for_path_bounded` is the checked counterpart to `Mask::for_path` for a
+caller that owns an explicit pixel budget. It returns `None` before allocation
+when the path or padding is non-finite, its bounds cannot be represented, or
+the requested area is above that budget. Glyphs use it through `anodrel-glyph`;
+authored renderer surfaces continue to use the unconstrained constructor.
+
 ### Paint
 
 A paint is a pure function of position, so the rasterizer samples it at pixel

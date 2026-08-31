@@ -93,6 +93,19 @@ impl Mask {
         mask
     }
 
+    /// Builds a path mask only when its checked pixel area fits `max_pixels`.
+    ///
+    /// Returns `None` before allocating when the path or padding is non-finite,
+    /// its bounds cannot become signed canvas coordinates, or its area exceeds
+    /// the caller's explicit limit.
+    #[must_use]
+    pub fn for_path_bounded(path: &Path, padding: f32, max_pixels: usize) -> Option<Self> {
+        let (origin_x, origin_y, width, height) = bounded_dimensions(path, padding, max_pixels)?;
+        let mut mask = Self::new(origin_x, origin_y, width, height);
+        mask.fill_path(path);
+        Some(mask)
+    }
+
     /// Returns the mask width in pixels.
     #[must_use]
     pub const fn width(&self) -> u32 {
@@ -165,6 +178,62 @@ impl Mask {
     }
 }
 
+fn bounded_dimensions(
+    path: &Path,
+    padding: f32,
+    max_pixels: usize,
+) -> Option<(i32, i32, u32, u32)> {
+    if !padding.is_finite() || padding < 0.0 {
+        return None;
+    }
+    let mut bounds: Option<(f32, f32, f32, f32)> = None;
+    for contour in path.contours() {
+        for point in contour {
+            if !point.x.is_finite() || !point.y.is_finite() {
+                return None;
+            }
+            bounds = Some(match bounds {
+                Some((left, top, right, bottom)) => (
+                    left.min(point.x),
+                    top.min(point.y),
+                    right.max(point.x),
+                    bottom.max(point.y),
+                ),
+                None => (point.x, point.y, point.x, point.y),
+            });
+        }
+    }
+    let Some((left, top, right, bottom)) = bounds else {
+        return Some((0, 0, 0, 0));
+    };
+    let (left, top, right, bottom) = (
+        (left - padding).floor(),
+        (top - padding).floor(),
+        (right + padding).ceil(),
+        (bottom + padding).ceil(),
+    );
+    if !left.is_finite()
+        || !top.is_finite()
+        || !right.is_finite()
+        || !bottom.is_finite()
+        || left < -2_147_483_648.0
+        || top < -2_147_483_648.0
+        || right >= 2_147_483_648.0
+        || bottom >= 2_147_483_648.0
+    {
+        return None;
+    }
+    let (origin_x, origin_y, right, bottom) =
+        (left as i32, top as i32, right as i32, bottom as i32);
+    let width = u32::try_from((i64::from(right) - i64::from(origin_x)).max(0)).ok()?;
+    let height = u32::try_from((i64::from(bottom) - i64::from(origin_y)).max(0)).ok()?;
+    let pixels = u64::from(width) * u64::from(height);
+    if pixels > max_pixels as u64 {
+        return None;
+    }
+    Some((origin_x, origin_y, width, height))
+}
+
 fn blur_horizontal(source: &[f32], target: &mut [f32], width: u32, height: u32, radius: usize) {
     let width = width as usize;
     let window = (radius * 2 + 1) as f32;
@@ -201,5 +270,21 @@ fn blur_vertical(source: &[f32], target: &mut [f32], width: u32, height: u32, ra
             sum += source[(y + radius + 1).min(height - 1) * width + x];
             sum -= source[y.saturating_sub(radius) * width + x];
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Mask;
+    use crate::{Path, Rect, point};
+
+    #[test]
+    fn bounded_masks_refuse_invalid_or_oversized_geometry_before_allocation() {
+        let square = Path::rect(Rect::new(0.0, 0.0, 4.0, 4.0));
+        let mask = Mask::for_path_bounded(&square, 0.0, 16).expect("exact area fits");
+        assert_eq!((mask.width(), mask.height()), (4, 4));
+        assert!(Mask::for_path_bounded(&square, 0.0, 15).is_none());
+        let invalid = Path::polygon([point(f32::NAN, 0.0), point(1.0, 0.0), point(0.0, 1.0)]);
+        assert!(Mask::for_path_bounded(&invalid, 0.0, 16).is_none());
     }
 }

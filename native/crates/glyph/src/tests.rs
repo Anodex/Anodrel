@@ -6,7 +6,7 @@ use anodrel_canvas::point;
 use anodrel_font::FontFace;
 
 use crate::flatten::{Quadratic, append_quadratic};
-use crate::{GlyphPlacement, GlyphRenderError, canvas_path};
+use crate::{GlyphPlacement, GlyphRenderError, canvas_path, coverage_mask};
 
 #[test]
 fn placement_flips_the_font_vertical_axis_at_its_baseline() {
@@ -92,4 +92,32 @@ fn parsed_quadratic_paths_flatten_into_one_open_canvas_contour() {
         flattened.contours()[0].first(),
         flattened.contours()[0].last()
     );
+}
+
+#[test]
+fn parsed_glyphs_rasterize_to_a_bounded_coverage_mask() {
+    let bytes = fixture::simple_outline_face();
+    let face = FontFace::parse(&bytes).expect("synthetic face should parse");
+    let outline = face
+        .glyph_outline(face.glyph_id('A').expect("fixture maps A"))
+        .expect("fixture has a simple glyph");
+    let glyph_path = outline.quadratic_path();
+    let placement = GlyphPlacement::new(point(10.0, 30.0), 1.0).expect("placement fits");
+    let mask = coverage_mask(&glyph_path, placement).expect("small glyph fits the mask limit");
+    assert!(mask.width() > 0 && mask.height() > 0);
+    assert!((0..mask.height()).any(|y| (0..mask.width()).any(|x| mask.coverage_at(x, y) > 0.0)));
+}
+
+#[test]
+fn glyph_coverage_refuses_an_oversized_transformed_path() {
+    let bytes = fixture::simple_outline_face();
+    let face = FontFace::parse(&bytes).expect("synthetic face should parse");
+    let outline = face
+        .glyph_outline(face.glyph_id('A').expect("fixture maps A"))
+        .expect("fixture has a simple glyph");
+    let placement = GlyphPlacement::new(point(0.0, 0.0), 64.0).expect("maximum scale fits");
+    assert!(matches!(
+        coverage_mask(&outline.quadratic_path(), placement),
+        Err(GlyphRenderError::TooComplex)
+    ));
 }

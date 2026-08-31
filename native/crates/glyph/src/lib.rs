@@ -7,10 +7,12 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod coverage;
 mod error;
 mod flatten;
 mod placement;
 
+pub use coverage::coverage_mask;
 pub use error::GlyphRenderError;
 pub use flatten::canvas_path;
 pub use placement::GlyphPlacement;
