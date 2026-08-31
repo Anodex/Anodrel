@@ -118,10 +118,10 @@ its elevated signed-fixture path remains an operator check.
 
 The command-line tool has no `install` or `uninstall` command yet. It cannot
 write a production package directory or the registry, create machine trust, or
-launch an application. Its library now has the private staged-extraction
-boundary below, but no command can select a staging parent or invoke it. The
-later signer check, promotion, policy publication, recovery, and uninstall
-operations remain separate boundaries.
+launch an application. Its library contains the separately reviewable
+staging, signer, promotion, publication, recovery, uninstall, and update
+preflight boundaries below, but no command can select their paths or invoke a
+machine-changing transaction.
 
 ## Staged extraction contract
 
@@ -201,6 +201,21 @@ direct normal-tree remover as private-stage recovery and refuses reparse points.
 It does not remove application data or credentials; an incomplete cleanup stays
 unselected for a later recovery route.
 
+## Update-candidate preflight contract
+
+Before later update delivery or installation work can use a candidate, the
+current signed installer release is compared to the fixed selected installed
+record for the same embedded application identity. Windows must accept the
+installed executable's Authenticode signature; that signer must match both the
+installed record and the candidate release publisher. The selected package root
+must end in the exact canonical owned version-directory form `major.minor.patch`.
+The candidate version must be strictly newer.
+
+This is a read-only anti-rollback and publisher-continuity gate. It has no
+network, URL, file, registry, process, background-service, or user-interface
+input. It does not prove the candidate application's embedded executable until
+the separate staging signer gate runs, and it does not perform an update.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under
@@ -241,7 +256,8 @@ package root, registry path, policy, capability, certificate, or network URL.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
-notifications. Each adds a separate user-visible or trust boundary.
+notifications. The read-only update-candidate preflight is the first update
+foundation; delivery and installation remain separate trust boundaries.
 
 ## Production decision still required
 

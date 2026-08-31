@@ -10,7 +10,7 @@ use anodrel_protocol::Capability;
 use crate::{MAX_PAYLOAD_BYTES, MAX_RELEASE_MANIFEST_BYTES, ReleaseManifestError};
 
 /// One release directory version, distinct from protocol compatibility.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct PackageVersion {
     major: u16,
     minor: u16,
@@ -35,6 +35,30 @@ impl PackageVersion {
     pub const fn patch(self) -> u16 {
         self.patch
     }
+
+    /// Parses the exact canonical name of an owned release directory.
+    ///
+    /// Release promotion creates only `major.minor.patch` names with ordinary
+    /// decimal components. Rejecting alternate spellings keeps a version
+    /// directory from having more than one textual identity.
+    pub(crate) fn from_directory_name(name: &str) -> Option<Self> {
+        let mut components = name.split('.');
+        let major = parse_directory_component(components.next()?)?;
+        let minor = parse_directory_component(components.next()?)?;
+        let patch = parse_directory_component(components.next()?)?;
+        components.next().is_none().then_some(Self {
+            major,
+            minor,
+            patch,
+        })
+    }
+}
+
+fn parse_directory_component(component: &str) -> Option<u16> {
+    (!component.is_empty()
+        && component.bytes().all(|byte| byte.is_ascii_digit())
+        && (component.len() == 1 || !component.starts_with('0')))
+    .then(|| component.parse().ok())?
 }
 
 /// The bounded embedded-payload facts a signed manifest declares.
