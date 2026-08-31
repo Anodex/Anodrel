@@ -13,6 +13,7 @@ mod raw;
 
 /// A complete version directory retained before later registry publication.
 pub struct PromotedRelease {
+    application_id: String,
     package_root: PathBuf,
     install_record: String,
 }
@@ -32,6 +33,20 @@ impl fmt::Debug for PromotedRelease {
             )
             .field("install_record_bytes", &self.install_record.len())
             .finish_non_exhaustive()
+    }
+}
+
+impl PromotedRelease {
+    /// Returns the installer-validated identity for fixed policy publication.
+    #[must_use]
+    pub(crate) fn application_id(&self) -> &str {
+        &self.application_id
+    }
+
+    /// Returns the already validated record for fixed policy publication.
+    #[must_use]
+    pub(crate) fn install_record(&self) -> &str {
+        &self.install_record
     }
 }
 
@@ -69,13 +84,14 @@ impl std::error::Error for PromotionError {}
 pub fn promote_prepared_release(
     prepared: PreparedRelease,
 ) -> Result<PromotedRelease, PromotionError> {
-    let (staged, version) = into_promotion_parts(prepared);
-    promote_staged_release(staged, version)
+    let (staged, version, application_id) = into_promotion_parts(prepared);
+    promote_staged_release(staged, version, application_id)
 }
 
 fn promote_staged_release(
     staged: StagedRelease,
     version: PackageVersion,
+    application_id: String,
 ) -> Result<PromotedRelease, PromotionError> {
     let destination = version_destination(staged.package_root(), version)?;
     if destination
@@ -87,6 +103,7 @@ fn promote_staged_release(
     raw::move_directory(staged.package_root(), &destination)?;
     let (package_root, install_record) = staged.into_promoted_parts(destination);
     Ok(PromotedRelease {
+        application_id,
         package_root,
         install_record,
     })
@@ -127,8 +144,12 @@ mod tests {
         let (manifest, staged) = staged_fixture(parent.path());
         let stage_root = staged.package_root().to_path_buf();
 
-        let promoted = promote_staged_release(staged, manifest.package_version())
-            .expect("a unique sibling version receives the checked stage");
+        let promoted = promote_staged_release(
+            staged,
+            manifest.package_version(),
+            manifest.application_id().to_owned(),
+        )
+        .expect("a unique sibling version receives the checked stage");
         let destination = parent.path().join("1.2.3");
         assert!(!stage_root.exists());
         assert!(destination.is_dir());
@@ -153,7 +174,11 @@ mod tests {
         let (manifest, staged) = staged_fixture(parent.path());
 
         assert!(matches!(
-            promote_staged_release(staged, manifest.package_version()),
+            promote_staged_release(
+                staged,
+                manifest.package_version(),
+                manifest.application_id().to_owned(),
+            ),
             Err(PromotionError::VersionAlreadyExists)
         ));
         assert_eq!(

@@ -111,7 +111,10 @@ application are available.
 The owned promotion path moves only a prepared stage to its absent signed
 version-directory sibling through direct `MoveFileExW`, with no copy or
 replacement flags. Its direct tests prove both the successful move and that an
-existing version stays untouched. It still does not publish the staged record.
+existing version stays untouched. The following direct Advapi32 boundary then
+writes only its already validated record to the fixed 64-bit machine-policy
+location; it is unit-tested for exact key/value and UTF-16 representation, but
+its elevated signed-fixture path remains an operator check.
 
 The command-line tool has no `install` or `uninstall` command yet. It cannot
 write a production package directory or the registry, create machine trust, or
@@ -156,6 +159,19 @@ publication fails or the machine stops, the resulting complete version remains
 unselected; the prior registry record is still the host's only launch policy.
 Recovery may clean only such Anodrel-owned stale directories after a separate
 decision.
+
+## Machine-policy publication contract
+
+Only an opaque promotion result can write the fixed 64-bit `record` `REG_SZ`
+value below `HKEY_LOCAL_MACHINE\Software\Anodrel\Applications\<applicationId>`.
+The record was constructed from the signed release and validated against the
+complete promoted package before publication. The writer exposes no hive, key,
+value, record-text, or delete option to a command line or application.
+
+If the Windows registry write fails, the existing record remains selected while
+the new complete version is unselected. The later recovery boundary decides
+whether that stale version can be safely removed; this publication step never
+tries to roll back by deleting content.
 
 ## Planned machine installation
 

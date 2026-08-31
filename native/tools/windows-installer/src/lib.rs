@@ -15,6 +15,8 @@ mod payload;
 mod prepared;
 #[cfg(windows)]
 mod promotion;
+#[cfg(windows)]
+mod publication;
 mod record;
 #[cfg(windows)]
 mod resources;
@@ -29,6 +31,8 @@ pub use payload::{ReleasePayloadError, verify_bundle};
 pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed_release};
 #[cfg(windows)]
 pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};
+#[cfg(windows)]
+pub use publication::{PublicationError, PublishedRelease, publish_promoted_release};
 #[cfg(windows)]
 pub use resources::{
     EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,

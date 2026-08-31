@@ -14,6 +14,7 @@ use crate::{
 pub struct PreparedRelease {
     staged: StagedRelease,
     version: PackageVersion,
+    application_id: String,
 }
 
 impl fmt::Debug for PreparedRelease {
@@ -80,15 +81,22 @@ pub fn prepare_current_signed_release(
         verify_current_signed_release().map_err(PreparedReleaseError::InstallerInvalid)?;
     let manifest = release.release().manifest();
     let version = manifest.package_version();
+    let application_id = manifest.application_id().to_owned();
     let staged = stage_checked_release(staging_parent, manifest, release.release().bundle())
         .map_err(PreparedReleaseError::StagingInvalid)?;
     verify_staged_executable(&staged, manifest)?;
-    Ok(PreparedRelease { staged, version })
+    Ok(PreparedRelease {
+        staged,
+        version,
+        application_id,
+    })
 }
 
 /// Transfers a fully checked stage to the owned promotion boundary.
-pub(crate) fn into_promotion_parts(prepared: PreparedRelease) -> (StagedRelease, PackageVersion) {
-    (prepared.staged, prepared.version)
+pub(crate) fn into_promotion_parts(
+    prepared: PreparedRelease,
+) -> (StagedRelease, PackageVersion, String) {
+    (prepared.staged, prepared.version, prepared.application_id)
 }
 
 fn verify_staged_executable(
