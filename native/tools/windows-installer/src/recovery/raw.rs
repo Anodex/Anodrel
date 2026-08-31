@@ -44,7 +44,7 @@ unsafe extern "system" {
 }
 
 /// Removes one checked private staging tree while refusing every reparse point.
-pub(super) fn remove_normal_tree(root: &Path) -> Result<(), RecoveryCleanupError> {
+pub(crate) fn remove_normal_tree(root: &Path) -> Result<(), RecoveryCleanupError> {
     let attributes = attributes(root)?;
     if attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
         return Err(RecoveryCleanupError::ReparsePointRefused);

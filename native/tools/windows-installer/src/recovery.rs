@@ -6,7 +6,7 @@ use std::{
 };
 
 #[cfg(windows)]
-mod raw;
+pub(crate) mod raw;
 
 /// A recovery scan could not inspect one installer-owned application root.
 #[derive(Debug)]

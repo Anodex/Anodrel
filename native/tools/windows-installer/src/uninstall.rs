@@ -34,6 +34,13 @@ impl fmt::Debug for PolicyRemovedUninstallTarget {
     }
 }
 
+impl PolicyRemovedUninstallTarget {
+    #[must_use]
+    pub(crate) fn package_root(&self) -> &std::path::Path {
+        &self.target.package_root
+    }
+}
+
 impl fmt::Debug for VerifiedUninstallTarget {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -84,6 +91,25 @@ impl fmt::Display for UninstallPolicyRemovalError {
     }
 }
 impl std::error::Error for UninstallPolicyRemovalError {}
+
+/// A policy-removed package tree could not be deleted safely.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UninstallPackageRemovalError {
+    /// A link or junction was encountered and cleanup refused to traverse it.
+    ReparsePointRefused,
+    /// Windows could not remove the verified package tree.
+    PackageRemovalFailed,
+}
+
+impl fmt::Display for UninstallPackageRemovalError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::ReparsePointRefused => "package cleanup refused a reparse point",
+            Self::PackageRemovalFailed => "the installed package could not be removed",
+        })
+    }
+}
+impl std::error::Error for UninstallPackageRemovalError {}
 
 impl fmt::Display for UninstallPreflightError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -146,6 +172,21 @@ pub fn remove_verified_uninstall_policy(
 ) -> Result<PolicyRemovedUninstallTarget, UninstallPolicyRemovalError> {
     raw::remove_record(target.application_id())?;
     Ok(PolicyRemovedUninstallTarget { target })
+}
+
+/// Removes only the verified package tree after fixed policy removal.
+pub fn remove_policy_removed_package(
+    target: PolicyRemovedUninstallTarget,
+) -> Result<(), UninstallPackageRemovalError> {
+    crate::recovery::raw::remove_normal_tree(target.package_root()).map_err(|error| match error {
+        crate::RecoveryCleanupError::ReparsePointRefused => {
+            UninstallPackageRemovalError::ReparsePointRefused
+        }
+        crate::RecoveryCleanupError::DiscoveryFailed(_)
+        | crate::RecoveryCleanupError::RemovalFailed => {
+            UninstallPackageRemovalError::PackageRemovalFailed
+        }
+    })
 }
 
 mod raw {

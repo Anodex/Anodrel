@@ -196,6 +196,11 @@ The next owned step removes only the fixed `record` value from that application'
 64-bit machine key. It neither deletes the key nor any package file. The later
 tree cleanup receives only its opaque policy-removed result.
 
+Package cleanup consumes only that policy-removed result. It uses the same
+direct normal-tree remover as private-stage recovery and refuses reparse points.
+It does not remove application data or credentials; an incomplete cleanup stays
+unselected for a later recovery route.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under
