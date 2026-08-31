@@ -43,13 +43,13 @@ impl<'font> OutlineSource<'font> {
         maximum_profile: Option<Bytes<'font>>,
         locations: Option<Bytes<'font>>,
         glyph_data: Option<Bytes<'font>>,
+        metric_source_present: bool,
     ) -> Result<Option<Self>, FontError> {
-        if head.is_none()
-            && maximum_profile.is_none()
-            && locations.is_none()
-            && glyph_data.is_none()
-        {
-            return Ok(None);
+        if locations.is_none() && glyph_data.is_none() {
+            if (head.is_none() && maximum_profile.is_none()) || metric_source_present {
+                return Ok(None);
+            }
+            return Err(FontError::InvalidFace);
         }
         let source = Self::parse(
             head.ok_or(FontError::InvalidFace)?,

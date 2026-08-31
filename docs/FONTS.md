@@ -1,6 +1,6 @@
 # Anodrel Font Faces
 
-**Status:** Portable character-map, simple-outline, and quadratic-path foundation.
+**Status:** Portable character-map, horizontal-metric, simple-outline, and quadratic-path foundation.
 
 `anodrel-font` validates one already-owned TrueType face held in memory and
 looks up a Unicode scalar value in its character map. It can also extract one
@@ -23,6 +23,8 @@ The public surface is deliberately small:
 ```rust
 let face = anodrel_font::FontFace::parse(bytes)?;
 let glyph = face.glyph_id('A');
+let metrics = face.font_metrics()?;
+let advance = glyph.map(|glyph| face.horizontal_metric(glyph)).transpose()?;
 let outline = glyph.map(|glyph| face.glyph_outline(glyph)).transpose()?;
 let path = outline.as_ref().map(anodrel_font::GlyphOutline::quadratic_path);
 ```
@@ -59,6 +61,28 @@ The parser stores byte-slice views into the caller's face. Parsing costs one
 bounded directory and map validation pass. A lookup uses binary search over
 format-4 segments or format-12 groups, so it is logarithmic in the selected
 map and makes no allocation.
+
+## Horizontal metrics
+
+Metrics become available only when the face contains a complete `head`,
+version-1.0 `maxp`, version-1.0 `hhea`, and `hmtx` table set. Map-only faces
+remain valid, but a partial metric set is malformed. `FontMetrics` returns the
+validated `unitsPerEm`, ascender, descender, and line gap in signed font design
+units. `HorizontalMetric` returns one glyph's advance width and left side
+bearing in those same units.
+
+`unitsPerEm` must be in the OpenType range 16 through 16,384. The parser also
+requires the four reserved `hhea` values and its metric-data format to be zero,
+and validates an exact `hmtx` length from `numGlyphs` and
+`numberOfHMetrics`. A glyph after the long metric records reuses the final
+advance width but reads its own side bearing, as the table format defines.
+
+Metric lookup reads at most two validated table values and allocates nothing.
+It does not infer a missing metric from an outline. See Microsoft's OpenType
+[`head`](https://learn.microsoft.com/en-us/typography/opentype/otspec183/head),
+[`hhea`](https://learn.microsoft.com/en-us/typography/opentype/spec/hhea), and
+[`hmtx`](https://learn.microsoft.com/en-us/typography/opentype/spec/hmtx)
+specifications.
 
 ## Simple outlines
 
@@ -127,7 +151,7 @@ application data are read during conversion.
 
 - font discovery, paths, package policy, fallback, or a default family;
 - OpenType layout: shaping, ligatures, kerning, variation selection, bidirectional
-  text, script handling, line breaking, and text measurement;
+  text, script handling, line breaking, text measurement, and text sizing;
 - composite glyphs, hinting, rasterization, colour glyphs, bitmap strikes, or
   a canvas dependency;
 - application-controlled font bytes or a protocol field carrying fonts.
@@ -144,7 +168,9 @@ non-BMP lookup, missing glyphs, selection priority, malformed table ranges,
 truncated maps, invalid group/segment ordering, and glyph-ID overflow. Simple
 outline tests cover short and long location formats, packed repeats and signed
 coordinate vectors, contour slices, empty glyphs, and malformed outline
-boundaries. Quadratic-path tests cover explicit lines, off-curve controls,
+boundaries. Metric tests cover table completeness, units-per-em bounds, shared
+advances, individual side bearings, and malformed table lengths. Quadratic-path
+tests cover explicit lines, off-curve controls,
 implied half-unit midpoints, off-curve contour starts, closure, and empty
 outlines. Those tests contain no machine font and no operating-system
 dependency, so they run identically on every supported development host.

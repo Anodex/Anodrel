@@ -3,11 +3,11 @@
 mod fixtures;
 mod path;
 
-use crate::{FontError, FontFace, GlyphOutlineError};
+use crate::{FontError, FontFace, FontMetricError, GlyphOutlineError};
 use fixtures::{
     cmap, composite_glyph, format4, format4_with_glyph_array, format12, glyph_over_contour_limit,
     glyph_with_instruction, glyph_with_reserved_flag, glyph_with_trailing_byte, long_vector_points,
-    outline_face, outline_face_for_glyph, outline_face_with_nonzero_first_location,
+    metrics_face, outline_face, outline_face_for_glyph, outline_face_with_nonzero_first_location,
     repeated_zero_points, sfnt, simple_triangle, truncated_composite_marker,
 };
 
@@ -26,6 +26,75 @@ fn format_twelve_maps_non_bmp_character() {
     let face = FontFace::parse(&bytes).expect("format twelve face should parse");
     assert_eq!(face.glyph_id('😀').map(|glyph| glyph.value()), Some(77));
     assert_eq!(face.glyph_id('A'), None);
+}
+
+#[test]
+fn horizontal_metrics_return_line_values_and_shared_advances() {
+    let bytes = metrics_face(&[(400, -10), (600, 12)], &[-20, -30], 2);
+    let face = FontFace::parse(&bytes).expect("metric-only face should parse");
+    let metrics = face.font_metrics().expect("metric source is available");
+    assert_eq!(
+        (
+            metrics.units_per_em(),
+            metrics.ascender(),
+            metrics.descender(),
+            metrics.line_gap(),
+        ),
+        (1_024, 800, -200, 40)
+    );
+    let glyph = face.glyph_id('A').expect("fixture maps A to glyph two");
+    let metric = face
+        .horizontal_metric(glyph)
+        .expect("trailing metric resolves");
+    assert_eq!(
+        (metric.advance_width(), metric.left_side_bearing()),
+        (600, -20)
+    );
+    assert_eq!(
+        face.glyph_outline(glyph).unwrap_err(),
+        GlyphOutlineError::OutlineUnavailable
+    );
+}
+
+#[test]
+fn metric_tables_are_complete_and_exact_or_the_face_is_refused() {
+    let base = metrics_face(&[(500, 0), (600, 4)], &[], 1);
+    let hmtx_record = fixtures::table_record_offset(&base, *b"hmtx");
+    let hhea_record = fixtures::table_record_offset(&base, *b"hhea");
+    let head_record = fixtures::table_record_offset(&base, *b"head");
+    for mutation in [
+        (hmtx_record, *b"none"),
+        (hhea_record + 12, [0, 0, 0, 6]),
+        (hmtx_record + 12, [0, 0, 0, 6]),
+        (head_record + 8, [0, 0, 0, 0]),
+    ] {
+        let mut bytes = base.clone();
+        bytes[mutation.0..mutation.0 + 4].copy_from_slice(&mutation.1);
+        assert_eq!(FontFace::parse(&bytes).unwrap_err(), FontError::InvalidFace);
+    }
+    let mut bad_units = base;
+    let head_offset = usize::try_from(u32::from_be_bytes(
+        bad_units[head_record + 8..head_record + 12]
+            .try_into()
+            .expect("table offset is four bytes"),
+    ))
+    .expect("fixture offset fits");
+    bad_units[head_offset + 18..head_offset + 20].copy_from_slice(&15_u16.to_be_bytes());
+    assert_eq!(
+        FontFace::parse(&bad_units).unwrap_err(),
+        FontError::InvalidFace
+    );
+}
+
+#[test]
+fn metric_lookup_rejects_a_mapped_glyph_beyond_the_metric_range() {
+    let bytes = metrics_face(&[(500, 0), (600, 4)], &[], 2);
+    let face = FontFace::parse(&bytes).expect("metric face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A beyond maxp");
+    assert_eq!(
+        face.horizontal_metric(glyph).unwrap_err(),
+        FontMetricError::InvalidGlyphId
+    );
 }
 
 #[test]
@@ -249,6 +318,10 @@ fn empty_located_glyph_is_distinct_from_missing_outline_source() {
     assert_eq!(
         map_only.glyph_outline(glyph).unwrap_err(),
         GlyphOutlineError::OutlineUnavailable
+    );
+    assert_eq!(
+        map_only.font_metrics().unwrap_err(),
+        FontMetricError::MetricsUnavailable
     );
 }
 

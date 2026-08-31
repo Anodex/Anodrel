@@ -4,6 +4,7 @@ use crate::{
     FontError,
     bytes::Bytes,
     cmap::{CharacterMap, parse_character_map},
+    metrics::{FontMetricError, FontMetrics, HorizontalMetric, MetricSource},
     outline::{GlyphOutline, GlyphOutlineError, OutlineSource},
 };
 
@@ -14,6 +15,8 @@ const MAX_TABLES: usize = 64;
 const CMAP_TAG: u32 = u32::from_be_bytes(*b"cmap");
 const HEAD_TAG: u32 = u32::from_be_bytes(*b"head");
 const MAXP_TAG: u32 = u32::from_be_bytes(*b"maxp");
+const HHEA_TAG: u32 = u32::from_be_bytes(*b"hhea");
+const HMTX_TAG: u32 = u32::from_be_bytes(*b"hmtx");
 const LOCA_TAG: u32 = u32::from_be_bytes(*b"loca");
 const GLYF_TAG: u32 = u32::from_be_bytes(*b"glyf");
 
@@ -35,6 +38,7 @@ impl GlyphId {
 /// A validated borrowed TrueType face with one selected Unicode character map.
 pub struct FontFace<'font> {
     character_map: CharacterMap<'font>,
+    metric_source: Option<MetricSource<'font>>,
     outline_source: Option<OutlineSource<'font>>,
 }
 
@@ -61,6 +65,8 @@ impl<'font> FontFace<'font> {
         let mut character_map = None;
         let mut head = None;
         let mut maximum_profile = None;
+        let mut horizontal_header = None;
+        let mut horizontal_metrics = None;
         let mut locations = None;
         let mut glyph_data = None;
         for index in 0..table_count {
@@ -79,6 +85,12 @@ impl<'font> FontFace<'font> {
                 MAXP_TAG if maximum_profile.replace(table).is_some() => {
                     return Err(FontError::InvalidFace);
                 }
+                HHEA_TAG if horizontal_header.replace(table).is_some() => {
+                    return Err(FontError::InvalidFace);
+                }
+                HMTX_TAG if horizontal_metrics.replace(table).is_some() => {
+                    return Err(FontError::InvalidFace);
+                }
                 LOCA_TAG if locations.replace(table).is_some() => {
                     return Err(FontError::InvalidFace);
                 }
@@ -91,9 +103,23 @@ impl<'font> FontFace<'font> {
 
         let character_map =
             parse_character_map(character_map.ok_or(FontError::MissingCharacterMap)?)?;
-        let outline_source = OutlineSource::optional(head, maximum_profile, locations, glyph_data)?;
+        let metric_source = MetricSource::optional(
+            head,
+            maximum_profile,
+            horizontal_header,
+            horizontal_metrics,
+            locations.is_some() || glyph_data.is_some(),
+        )?;
+        let outline_source = OutlineSource::optional(
+            head,
+            maximum_profile,
+            locations,
+            glyph_data,
+            metric_source.is_some(),
+        )?;
         Ok(Self {
             character_map,
+            metric_source,
             outline_source,
         })
     }
@@ -109,6 +135,22 @@ impl<'font> FontFace<'font> {
             .as_ref()
             .ok_or(GlyphOutlineError::OutlineUnavailable)?
             .glyph_outline(glyph)
+    }
+
+    /// Returns the face-wide validated horizontal metrics.
+    pub fn font_metrics(&self) -> Result<FontMetrics, FontMetricError> {
+        self.metric_source
+            .as_ref()
+            .map(MetricSource::metrics)
+            .ok_or(FontMetricError::MetricsUnavailable)
+    }
+
+    /// Returns one validated glyph's horizontal advance and left side bearing.
+    pub fn horizontal_metric(&self, glyph: GlyphId) -> Result<HorizontalMetric, FontMetricError> {
+        self.metric_source
+            .as_ref()
+            .ok_or(FontMetricError::MetricsUnavailable)?
+            .horizontal_metric(glyph)
     }
 }
 

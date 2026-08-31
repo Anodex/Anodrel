@@ -139,6 +139,41 @@ pub(super) fn outline_face_for_glyph(
     ])
 }
 
+/// Builds a metric-only face that maps `A` to one caller-chosen glyph identifier.
+pub(super) fn metrics_face(
+    long_metrics: &[(u16, i16)],
+    trailing_side_bearings: &[i16],
+    character_glyph: u16,
+) -> Vec<u8> {
+    let glyph_count = long_metrics.len() + trailing_side_bearings.len();
+    assert!(!long_metrics.is_empty(), "fixture needs one long metric");
+    sfnt_with_tables(&[
+        (*b"cmap", cmap(&[(3, 1, format4(character_glyph))])),
+        (*b"head", head(0)),
+        (
+            *b"maxp",
+            maximum_profile(u16::try_from(glyph_count).expect("glyph count fits")),
+        ),
+        (*b"hhea", horizontal_header(long_metrics.len())),
+        (
+            *b"hmtx",
+            horizontal_metrics(long_metrics, trailing_side_bearings),
+        ),
+    ])
+}
+
+/// Returns one table record's offset in a synthetic face.
+pub(super) fn table_record_offset(face: &[u8], tag: [u8; 4]) -> usize {
+    let count = usize::from(u16::from_be_bytes([face[4], face[5]]));
+    for index in 0..count {
+        let record = 12 + index * 16;
+        if face[record..record + 4] == tag {
+            return record;
+        }
+    }
+    panic!("fixture table must exist");
+}
+
 /// Builds a complete face whose otherwise-valid location index skips glyph-data bytes.
 pub(super) fn outline_face_with_nonzero_first_location() -> Vec<u8> {
     let glyph = pad_to_word(simple_triangle());
@@ -227,6 +262,7 @@ pub(super) fn glyph_over_contour_limit() -> Vec<u8> {
 fn head(location_format: i16) -> Vec<u8> {
     let mut bytes = vec![0; 54];
     bytes[12..16].copy_from_slice(&0x5F0F_3CF5_u32.to_be_bytes());
+    bytes[18..20].copy_from_slice(&1_024_u16.to_be_bytes());
     bytes[50..52].copy_from_slice(&location_format.to_be_bytes());
     bytes
 }
@@ -235,6 +271,32 @@ fn maximum_profile(glyph_count: u16) -> Vec<u8> {
     let mut bytes = vec![0; 32];
     bytes[0..4].copy_from_slice(&0x0001_0000_u32.to_be_bytes());
     bytes[4..6].copy_from_slice(&glyph_count.to_be_bytes());
+    bytes
+}
+
+fn horizontal_header(long_metric_count: usize) -> Vec<u8> {
+    let mut bytes = vec![0; 36];
+    bytes[0..4].copy_from_slice(&0x0001_0000_u32.to_be_bytes());
+    bytes[4..6].copy_from_slice(&800_i16.to_be_bytes());
+    bytes[6..8].copy_from_slice(&(-200_i16).to_be_bytes());
+    bytes[8..10].copy_from_slice(&40_i16.to_be_bytes());
+    bytes[34..36].copy_from_slice(
+        &u16::try_from(long_metric_count)
+            .expect("long metric count fits")
+            .to_be_bytes(),
+    );
+    bytes
+}
+
+fn horizontal_metrics(long_metrics: &[(u16, i16)], trailing_side_bearings: &[i16]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(long_metrics.len() * 4 + trailing_side_bearings.len() * 2);
+    for (advance, bearing) in long_metrics {
+        push_u16(&mut bytes, *advance);
+        bytes.extend_from_slice(&bearing.to_be_bytes());
+    }
+    for bearing in trailing_side_bearings {
+        bytes.extend_from_slice(&bearing.to_be_bytes());
+    }
     bytes
 }
 

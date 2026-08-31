@@ -1,7 +1,9 @@
 # Anodrel Roadmap
 
-This roadmap is intentionally staged. The platform must become useful and
-stable before Anodex depends on it.
+This roadmap is intentionally staged. The platform must become useful and stable before Anodex depends on it.
+
+Delivery order: Windows is the reference platform and must meet its release gates before new Linux-specific or macOS-specific feature work begins.
+Portable components may continue only when they directly close a Windows gate.
 
 ## Phase 0 — Foundation
 
@@ -55,12 +57,12 @@ publisher trust, and a capability bridge remain later native-host gates.
 Status: **Direct Windows host in progress**
 
 - Create the first native host, beginning with Windows.
-- Establish direct Linux desktop foundations without a toolkit. **In progress:**
-  Linux has private transport, invited-child, launcher, one host-owned child /
-  transport lifecycle, paths, state, crash, fixed Wayland presentation, local
-  pointer activation, and a development-only child/view lifetime composition;
-  an application host, public input, product identity, packaging, installation,
-  updates, and accessibility remain later work.
+- Establish direct Linux desktop foundations without a toolkit. **Paused after
+  the foundation slice:** Linux has private transport, invited-child, launcher,
+  one host-owned child / transport lifecycle, paths, state, crash, fixed
+  Wayland presentation, local pointer activation, and a development-only child/view
+  lifetime composition. Its application host, public input, product identity,
+  packaging, installation, updates, and accessibility begin only after Windows meets its release gates.
 - Implement lifecycle and single-instance behavior. **Completed for the first
   Windows package text surface and Startup Lab:** current-session primary
   instance claim, bounded readiness, and no-data activation request (Decision
@@ -167,7 +169,7 @@ Status: **Direct Windows host in progress**
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
   per-monitor DPI awareness (Decision 0013). `anodrel-font` now provides bounded,
-  owned Unicode mapping, simple-outline extraction, exact quadratic paths, bounded device-explicit flattening, and one bounded coverage mask for a later Linux glyph source (Decisions 0133 through 0137). See `docs/RENDERER.md`, `docs/FONTS.md`, and `docs/GLYPH_RENDERING.md`.
+  owned Unicode mapping, bounded horizontal metrics, simple-outline extraction, exact quadratic paths, bounded device-explicit flattening, and one bounded coverage mask for a later Linux glyph source (Decisions 0133 through 0138). See `docs/RENDERER.md`, `docs/FONTS.md`, and `docs/GLYPH_RENDERING.md`.
 - Define an owned native application UI foundation. **In progress:** a portable
   declarative layout tree with semantic actions establishes the first reusable
   UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a
@@ -545,5 +547,4 @@ route, isolated release build, and real child-session test are implemented.
 Manual window-action verification, production executable identity, registry
 publication, packaging, and non-Windows hosts remain separate work.
 
-Phase 4, Phase 5, and deliberate product deferrals are maintained in
-[`docs/roadmap/FUTURE.md`](docs/roadmap/FUTURE.md).
+Phase 4, Phase 5, and deliberate product deferrals are maintained in [`docs/roadmap/FUTURE.md`](docs/roadmap/FUTURE.md).

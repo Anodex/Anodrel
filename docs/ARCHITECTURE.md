@@ -113,13 +113,13 @@ bitmap blit. Both crates are free of operating-system and
 third-party dependencies and forbid unsafe code. `anodrel-font` is the
 separate first-party parsing foundation for a future host-owned glyph source:
 it maps Unicode to a glyph ID, reads bounded simple contours from already-owned
-memory, and converts them to exact quadratic paths, but does not load or draw a
-font. `anodrel-glyph` is the equally portable, separate adapter that converts
+memory, validates bounded horizontal metrics, and converts contours to exact
+quadratic paths, but does not load or draw a font. `anodrel-glyph` is the equally portable, separate adapter that converts
 one such path through an explicit device transform into a bounded canvas
 polygon and then one bounded coverage mask; it does not parse or draw a font.
 A future host therefore still supplies a blit and a display-density signal. See
 `docs/RENDERER.md`, `docs/FONTS.md`, `docs/GLYPH_RENDERING.md`, Decisions 0013,
-0133 through 0137.
+0133 through 0138.
 
 The Windows host also has an Anodrel Startup Lab. It validates a supplied
 application package and performs its internal protocol health check before
