@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0151: Uninstall starts from the signed policy-selected application.
+
 - 0150: Recovery removes only normal private stage trees.
 
 - 0149: Recovery discovers only exact private stage directories.

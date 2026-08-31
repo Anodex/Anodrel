@@ -184,6 +184,14 @@ while walking them. It removes normal files then normal directories, never a
 version directory or a caller-named path. A partial failed cleanup remains
 unselected and may be retried.
 
+## Uninstall preflight contract
+
+Uninstall starts with the current signed installer release, then loads only its
+fixed machine record and requires the installed executable's accepted signer to
+match both that record and the release publisher. It accepts no identity, root,
+registry, or executable argument and deletes nothing. Later record removal and
+tree cleanup consume only this opaque verified result.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under

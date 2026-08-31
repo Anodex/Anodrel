@@ -112,6 +112,15 @@ impl InstalledApplication {
         &self.executable_path
     }
 
+    /// Returns the canonical package root for a private native host operation.
+    ///
+    /// This path must never be serialized to an application, renderer, or
+    /// protocol response.
+    #[must_use]
+    pub fn package_root(&self) -> &Path {
+        &self.package_root
+    }
+
     /// Compares a newly calculated executable digest with the record's expected
     /// digest without exposing the expected value.
     #[must_use]
