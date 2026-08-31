@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
 #![deny(missing_docs)]
 
 //! First-party Windows installer foundations.
@@ -11,10 +11,17 @@ mod error;
 mod manifest;
 mod payload;
 mod record;
+#[cfg(windows)]
+mod resources;
 
 pub use error::ReleaseManifestError;
 pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
 pub use payload::{ReleasePayloadError, verify_bundle};
+#[cfg(windows)]
+pub use resources::{
+    EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,
+    RELEASE_PAYLOAD_RESOURCE_ID, read_current_release,
+};
 
 /// Maximum UTF-8 release-manifest size before JSON parsing.
 pub const MAX_RELEASE_MANIFEST_BYTES: usize = 16 * 1024;

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0142: The installer reads fixed release resources from its current image.
+
 - 0141: Release bundles are owned, bounded, and uncompressed.
 
 - 0140: The Windows installer is owned and carries a signed release envelope.

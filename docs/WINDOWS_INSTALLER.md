@@ -29,6 +29,12 @@ must accept the installer before its embedded bytes become installation input.
 The payload descriptor is checked before extraction; the owned bundle codec
 defines its individual file records without compression.
 
+The installer reads those two bytes from fixed `RT_RCDATA` resources in its own
+loaded executable: manifest identifier `0xA141` and payload identifier `0xA142`.
+It never accepts a sidecar path or resource selector. Resource loading alone is
+not signature verification; the later signed-installer activation requires both
+the self-signature check and the manifest/payload verification chain.
+
 ## `anodrel.release.v1` manifest
 
 The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only
@@ -78,13 +84,16 @@ foundation. It bounds and parses one release manifest, validates its executable
 and payload descriptors, then requires the complete payload to match before its
 owned per-file bundle decoder runs. It canonicalizes permitted network origins
 and renders the existing version-1.19 installed-record shape for later host-side
-validation. Its contract tests prove that the rendered record passes the same
-`anodrel-application` validator the Windows host reads.
+validation. The direct Windows resource reader selects only the two fixed
+current-image resources and fails closed when they are absent. Its contract tests
+prove that the rendered record passes the same `anodrel-application` validator
+the Windows host reads.
 
 The tool has no `install` or `uninstall` command yet. It cannot write a package
 directory or the registry, inspect a certificate, extract a payload, create
 machine trust, or launch an application. Those Windows API operations follow
-only after the signed-resource boundary and staged extraction are implemented.
+only after the installer self-signature and staged extraction boundaries are
+implemented.
 
 ## Planned machine installation
 

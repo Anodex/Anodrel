@@ -60,6 +60,9 @@ installer foundation first checks the manifest's total payload length and digest
 then calls the decoder. A corrupt or substituted payload therefore cannot reach
 file-level parsing merely because its manifest has a valid shape.
 
+The installer reads a release payload only from its own fixed `RT_RCDATA`
+resource (`0xA142`); the companion signed manifest is resource `0xA141`.
+
 A later Windows extraction module must recheck each path while creating only
 new files below its private staging root, then validate the staged package and
 record before registry publication.
