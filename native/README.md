@@ -97,6 +97,11 @@ anodrel-ui-session -> anodrel-ui-document / anodrel-ui
   locks the policy-approved executable, revalidates its digest and signer,
   launches no shell or application arguments, delivers one private bootstrap
   invitation, and terminates its tracked child during host shutdown.
+- `tools/windows-installer` is the first owned distribution foundation. Its
+  current read-only `validate` command parses the strict embedded release
+  manifest and renders a record that the existing application validator accepts;
+  it cannot install, uninstall, write machine policy, unpack a payload, or add
+  a signing dependency.
 - `crates/paths` derives fixed per-application `data`, `cache`, and `logs`
   locations without filesystem I/O from a validated identity and an absolute
   operating-system root.
@@ -183,6 +188,7 @@ cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-launch
+cargo test --manifest-path native/Cargo.toml -p anodrel-windows-installer
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-paths
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-credentials
 cargo test --manifest-path native/Cargo.toml -p anodrel-ui

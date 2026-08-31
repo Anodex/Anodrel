@@ -72,6 +72,7 @@ members = [
   "tools/native-app-tool",
   "tools/product-fixture",
   "tools/product-provisioning",
+  "tools/windows-installer",
   "tools/native-client-sample",
   "tools/native-linux-client-sample",
   "tools/native-linux-session-client",

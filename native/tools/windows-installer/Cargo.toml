@@ -1,0 +1,15 @@
+[package]
+name = "anodrel-windows-installer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-windows-installer"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-network = { path = "../../crates/network" }
+anodrel-protocol = { path = "../../crates/protocol" }

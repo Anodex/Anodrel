@@ -1,0 +1,172 @@
+//! Contract tests for the owned installer release-manifest foundation.
+
+use std::path::{Path, PathBuf};
+
+use anodrel_application::{InstalledApplication, sha256};
+
+use crate::{MAX_PAYLOAD_BYTES, ReleaseManifest, ReleaseManifestError};
+
+const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
+const PAYLOAD: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+fn release_manifest(executable_digest: &str, capabilities: &str, origins: &str) -> String {
+    format!(
+        r#"{{
+  "formatVersion": {{ "major": 1, "minor": 0 }},
+  "applicationId": "org.anodrel.installer-test",
+  "packageVersion": {{ "major": 1, "minor": 2, "patch": 3 }},
+  "executable": {{ "path": "bin/Product.EXE", "sha256": "{executable_digest}" }},
+  "publisher": {{ "leafCertificateSha256": "{PUBLISHER}" }},
+  "capabilities": {capabilities},
+  "networkOrigins": {origins},
+  "payload": {{ "byteLength": 32, "sha256": "{PAYLOAD}" }}
+}}"#
+    )
+}
+
+#[test]
+fn a_valid_manifest_preserves_the_signed_release_facts() {
+    let release = ReleaseManifest::parse(&release_manifest(PAYLOAD, "[\"session.close\"]", "[]"))
+        .expect("the release manifest is valid");
+
+    assert_eq!(release.application_id(), "org.anodrel.installer-test");
+    assert_eq!(release.package_version().major(), 1);
+    assert_eq!(release.package_version().minor(), 2);
+    assert_eq!(release.package_version().patch(), 3);
+    assert_eq!(release.executable_path(), "bin/Product.EXE");
+    assert!(release.matches_executable_digest(
+        sha256::parse_lower_hex(PAYLOAD).expect("digest fixture is valid")
+    ));
+    assert!(release.matches_publisher_fingerprint(
+        sha256::parse_lower_hex(PUBLISHER).expect("publisher fixture is valid")
+    ));
+    assert_eq!(release.payload().byte_length(), 32);
+    assert!(
+        release
+            .payload()
+            .matches_digest(sha256::parse_lower_hex(PAYLOAD).expect("payload fixture is valid"))
+    );
+}
+
+#[test]
+fn the_rendered_machine_record_passes_the_existing_host_validator() {
+    let package = StagedPackage::new();
+    let executable_digest = package.executable_digest();
+    let release = ReleaseManifest::parse(&release_manifest(
+        &executable_digest,
+        "[\"ui.document.write\", \"session.close\"]",
+        "[]",
+    ))
+    .expect("the release manifest is valid");
+    let record = release.render_install_record(package.root());
+
+    let installed =
+        InstalledApplication::load_from_trusted_record(&record, "org.anodrel.installer-test")
+            .expect("the host accepts the installer-rendered record");
+    assert_eq!(
+        installed.identity().application_id(),
+        release.application_id()
+    );
+    assert_eq!(installed.capabilities().len(), 2);
+}
+
+#[test]
+fn network_permission_requires_one_exact_origin_and_canonicalizes_it() {
+    let release = ReleaseManifest::parse(&release_manifest(
+        PAYLOAD,
+        "[\"network.fetch\"]",
+        "[{\"host\": \"Api.Example.test\", \"port\": 443}]",
+    ))
+    .expect("the exact network policy is valid");
+
+    assert_eq!(release.network_origins()[0].hostname(), "api.example.test");
+    assert_eq!(release.network_origins()[0].port(), 443);
+
+    let missing_origins =
+        ReleaseManifest::parse(&release_manifest(PAYLOAD, "[\"network.fetch\"]", "[]"));
+    assert!(matches!(
+        missing_origins,
+        Err(ReleaseManifestError::PolicyInvalid)
+    ));
+}
+
+#[test]
+fn malformed_paths_unknown_fields_and_out_of_bounds_payloads_fail_closed() {
+    let parent_path =
+        release_manifest(PAYLOAD, "[]", "[]").replace("bin/Product.EXE", "bin/../Product.EXE");
+    assert!(matches!(
+        ReleaseManifest::parse(&parent_path),
+        Err(ReleaseManifestError::ExecutablePathInvalid)
+    ));
+
+    let unknown_field = release_manifest(PAYLOAD, "[]", "[]")
+        .replace("  \"payload\":", "  \"unexpected\": true,\n  \"payload\":");
+    assert!(matches!(
+        ReleaseManifest::parse(&unknown_field),
+        Err(ReleaseManifestError::Invalid)
+    ));
+
+    let excessive_payload = release_manifest(PAYLOAD, "[]", "[]").replace(
+        "\"byteLength\": 32",
+        &format!("\"byteLength\": {}", MAX_PAYLOAD_BYTES + 1),
+    );
+    assert!(matches!(
+        ReleaseManifest::parse(&excessive_payload),
+        Err(ReleaseManifestError::PayloadInvalid)
+    ));
+}
+
+/// A temporary package whose identity and content meet the normal host checks.
+struct StagedPackage(PathBuf);
+
+impl StagedPackage {
+    fn new() -> Self {
+        let root = std::env::temp_dir().join(format!(
+            "anodrel-windows-installer-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("content")).expect("the content directory is created");
+        std::fs::create_dir_all(root.join("bin")).expect("the binary directory is created");
+        let content = b"installer record validation";
+        std::fs::write(root.join("content").join("main.txt"), content)
+            .expect("the package content is written");
+        std::fs::write(root.join("bin").join("Product.EXE"), b"placeholder image")
+            .expect("the package executable is written");
+        let content_digest = sha256::to_lower_hex(&sha256::digest(content));
+        std::fs::write(
+            root.join("anodrel.application.json"),
+            format!(
+                r#"{{
+  "manifestVersion": {{ "major": 1, "minor": 0 }},
+  "applicationId": "org.anodrel.installer-test",
+  "displayName": "Installer Test",
+  "content": {{
+    "format": "anodrel.text.v1",
+    "path": "content/main.txt",
+    "sha256": "{content_digest}"
+  }}
+}}
+"#
+            ),
+        )
+        .expect("the package manifest is written");
+        Self(root)
+    }
+
+    fn root(&self) -> &Path {
+        &self.0
+    }
+
+    fn executable_digest(&self) -> String {
+        let bytes = std::fs::read(self.0.join("bin").join("Product.EXE"))
+            .expect("the package executable is read");
+        sha256::to_lower_hex(&sha256::digest(&bytes))
+    }
+}
+
+impl Drop for StagedPackage {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}

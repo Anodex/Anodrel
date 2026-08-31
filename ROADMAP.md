@@ -434,8 +434,8 @@ pipe, host-owned native window, one semantic action, and coordinated shutdown.
 This is a development-machine fixture, not an installed product: it depends on
 a locally generated certificate placed in machine trust, and it says nothing
 about packaging, installation, updates, multi-window policy, restart, or
-background execution. Remaining acceptance work includes a production signing
-and packaging story, plus broader operation-specific native tests.
+background execution. Release work still needs production signing and packaging; the owned
+release-manifest foundation awaits bundle extraction, installation, updates, and native tests.
 
 The Startup Lab's linked and planned actions are maintained in
 [`docs/roadmap/STARTUP_LAB_TILES.md`](docs/roadmap/STARTUP_LAB_TILES.md).

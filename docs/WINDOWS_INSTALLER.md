@@ -71,6 +71,20 @@ are rejected.
 The manifest contains no filesystem root, command line, registry location,
 download URL, certificate subject, token, user data, or child argument.
 
+## Current implementation
+
+`native/tools/windows-installer` now implements the read-only `validate`
+foundation. It bounds and parses one release manifest, validates its executable
+and payload descriptors, canonicalizes permitted network origins, and renders
+the existing version-1.19 installed-record shape for later host-side validation.
+Its contract tests prove that the rendered record passes the same
+`anodrel-application` validator the Windows host reads.
+
+The tool has no `install` or `uninstall` command yet. It cannot write a package
+directory or the registry, inspect a certificate, extract a payload, create
+machine trust, or launch an application. Those Windows API operations follow
+only after the owned bundle codec and signed-resource boundary are implemented.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under

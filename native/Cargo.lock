@@ -602,6 +602,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-installer"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-json",
+ "anodrel-network",
+ "anodrel-protocol",
+]
+
+[[package]]
 name = "anodrel-windows-instance"
 version = "0.1.0"
 
