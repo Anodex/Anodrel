@@ -77,6 +77,7 @@ members = [
   "tools/release-bundle-tool",
   "tools/release-image",
   "tools/release-sign",
+  "tools/release-manifest",
   "tools/native-client-sample",
   "tools/native-linux-client-sample",
   "tools/native-linux-session-client",

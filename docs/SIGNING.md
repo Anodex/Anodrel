@@ -1,8 +1,8 @@
 # Windows executable-signature foundation
 
-**Status:** Windows verification is implemented. The owned release signing
-boundary is documented and selects no production identity by itself. This
-document does not authorize application process launch.
+**Status:** Windows verification and owned release signing are implemented.
+The signing boundary selects no production identity by itself. This document
+does not authorize application process launch.
 
 ## Purpose
 

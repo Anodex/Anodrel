@@ -425,6 +425,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-release-manifest"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-json",
+ "anodrel-release-bundle",
+ "anodrel-windows-installer",
+]
+
+[[package]]
 name = "anodrel-release-sign"
 version = "0.1.0"
 dependencies = [

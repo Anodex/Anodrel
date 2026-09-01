@@ -81,6 +81,12 @@ impl ApplicationManifest {
         &self.content_path
     }
 
+    /// Compares a calculated content digest without exposing the declared value.
+    #[must_use]
+    pub fn matches_content_digest(&self, actual: [u8; 32]) -> bool {
+        self.content_digest == actual
+    }
+
     pub(crate) fn content_digest(&self) -> &[u8; 32] {
         &self.content_digest
     }
@@ -170,7 +176,7 @@ fn is_valid_content_path(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::ApplicationManifest;
-    use crate::ApplicationError;
+    use crate::{ApplicationError, sha256};
 
     const DIGEST: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 
@@ -196,6 +202,15 @@ mod tests {
                 .expect("manifest is valid");
         assert_eq!(manifest.identity().application_id(), "org.anodrel.sample");
         assert_eq!(manifest.identity().display_name(), "Anodrel Sample");
+    }
+
+    #[test]
+    fn compares_a_calculated_content_digest_without_exposing_the_declaration() {
+        let manifest =
+            ApplicationManifest::parse(&manifest("org.anodrel.sample", "content/main.txt"))
+                .expect("manifest is valid");
+        assert!(manifest.matches_content_digest(sha256::digest(b"abc")));
+        assert!(!manifest.matches_content_digest(sha256::digest(b"other content")));
     }
 
     #[test]

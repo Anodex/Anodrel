@@ -1,0 +1,15 @@
+[package]
+name = "anodrel-release-manifest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-release-manifest"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-release-bundle = { path = "../../crates/release-bundle" }
+anodrel-windows-installer = { path = "../windows-installer" }

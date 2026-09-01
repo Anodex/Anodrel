@@ -75,4 +75,5 @@ download data, or run the result. Resource modification invalidates an existing
 signature, so signed input templates are not a release shortcut.
 
 See [Windows installer contract](WINDOWS_INSTALLER.md), [release bundle](RELEASE_BUNDLE.md),
-and Decisions 0140–0144 and 0162.
+[release manifest](RELEASE_MANIFEST.md), and Decisions 0140–0144, 0162, and
+0163.
