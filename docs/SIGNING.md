@@ -1,7 +1,8 @@
 # Windows executable-signature foundation
 
-**Status:** Windows foundation. This document does not authorize application
-process launch.
+**Status:** Windows verification is implemented. The owned release signing
+boundary is documented and selects no production identity by itself. This
+document does not authorize application process launch.
 
 ## Purpose
 
@@ -26,6 +27,30 @@ verify_embedded_signature(canonical_executable_path)
     -> trusted leaf certificate SHA-256 fingerprint
     | safe verification failure
 ~~~
+
+## Owned release-signing contract
+
+`anodrel-release-sign sign <unsigned-release-image> <certificate-sha256>
+<new-signed-image>` is a release-operator boundary, not a platform service or
+application capability. It first verifies that its absolute input carries an
+exact Anodrel release manifest and bundle whose publisher value equals the
+supplied fingerprint. It copies that input to one absent absolute output, opens
+only the current user's Windows `MY` certificate store, and selects only that
+exact lowercase SHA-256 fingerprint. It asks Windows `SignerSignEx` for a SHA-256 Authenticode
+signature with no timestamp or network endpoint, then requires Windows trust
+to accept the new image and report the same leaf fingerprint.
+
+The signer accepts an image no larger than **576 MiB**: Anodrel's fixed 512 MiB
+release payload limit plus a bounded 64 MiB PE envelope. It streams the copy
+into a create-new output file, synchronizes that file before signing, and
+removes only that fresh output on any later failure.
+
+It does not modify the input, choose by certificate subject, offer a picker,
+fall back to another store or certificate, create a certificate, import a key,
+install machine trust, timestamp, download, install, or launch. An error
+removes only the fresh output created by that invocation. A private key,
+certificate authority, trust distribution, timestamp service, and renewal plan
+remain operator-owned production decisions.
 
 The Windows adapter:
 

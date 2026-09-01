@@ -1,0 +1,17 @@
+[package]
+name = "anodrel-release-sign"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-release-sign"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-release-image = { path = "../release-image" }
+anodrel-windows-signature = { path = "../../adapters/windows-signature" }
+
+[dev-dependencies]
+anodrel-release-bundle = { path = "../../crates/release-bundle" }

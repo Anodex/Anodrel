@@ -408,9 +408,9 @@ Status: **Direct Windows host in progress**
   verification-only entry point that runs the same sequence without creating a
   process. A development-only signed fixture, a controlled provisioning helper,
   the host `--product-session` route, and a preflight-resolved Startup Lab tile
-  exercise the whole path on a development machine (Decision 0061). A production
-  signing identity, packaging, installation, and updates remain required before
-  a shipped application uses it.
+  exercise the whole path on a development machine (Decision 0061). Owned release
+  foundations are implemented; production identity, signed proof, delivery, and
+  update operations remain required before a shipped application uses it.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
@@ -434,7 +434,8 @@ pipe, host-owned native window, one semantic action, and coordinated shutdown.
 This is a development-machine fixture, not an installed product: it depends on
 a locally generated certificate placed in machine trust, and it says nothing
 about packaging, installation, updates, multi-window policy, restart, or
-background execution. The owned release foundation now has bounded payload bundles, private extraction, publisher verification, fixed machine-root selection, promotion, publication, recovery, uninstall, update transactions, policy-backed rollback, and direct-elevation operator commands. Release work still needs production signing, signed positive acceptance, delivery policy, and update recovery proof.
+background execution. The owned release foundation now has bundle, image, direct-signing, installation, rollback, and recovery boundaries. Release work still needs production certificate
+custody, signed acceptance, delivery policy, timestamping, and update recovery proof.
 
 The Startup Lab's linked and planned actions are maintained in
 [`docs/roadmap/STARTUP_LAB_TILES.md`](docs/roadmap/STARTUP_LAB_TILES.md).

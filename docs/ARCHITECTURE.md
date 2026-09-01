@@ -173,13 +173,16 @@ a development machine. The separate owned installer foundation now carries a
 strict resource-bearing release envelope through private staging, extracted
 publisher verification, no-overwrite promotion, fixed policy publication,
 recovery, uninstall, a refreshed publisher-and-forward-version update
-transaction, and a one-record policy-backed rollback. Its no-argument machine
-routes select only their current signed release and fixed 64-bit Program Files
-root. Production certificate custody, a signed positive acceptance run, update
-delivery, recovery proof, and a real production identity remain separate work. See
-`docs/SIGNING.md`, `docs/LAUNCH.md`, `docs/PRODUCT_FIXTURE.md`,
+transaction, and a one-record policy-backed rollback. The release authoring
+boundary also creates bounded owned bundles, embeds them into fresh images, and
+signs only fresh checked image copies with one explicit current-user certificate
+through Windows Authenticode. Its no-argument machine routes select only their
+current signed release and fixed 64-bit Program Files root. Production
+certificate custody, timestamping, a signed positive acceptance run, update
+delivery, recovery proof, and a real production identity remain separate work.
+See `docs/SIGNING.md`, `docs/LAUNCH.md`, `docs/PRODUCT_FIXTURE.md`,
 `docs/WINDOWS_INSTALLER.md`, and Decisions 0017 through 0020, 0061, and 0140
-through 0160.
+through 0162.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. The Linux paths adapter obtains the

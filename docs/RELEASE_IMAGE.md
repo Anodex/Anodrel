@@ -1,7 +1,8 @@
 # Windows release image assembly
 
-**Status:** Contract for the owned pre-signing image builder. It creates no
-installed application and no machine policy.
+**Status:** Owned pre-signing image builder. The separate owned signing boundary
+selects one explicit current-user certificate and creates no installed
+application or machine policy.
 
 ## Purpose
 
@@ -21,7 +22,7 @@ checked anodrel.bundle.v1 payload
 new unsigned resource-bearing installer.exe
              |
              v
-separate production signing step
+owned Windows signing step
 ~~~
 
 The build operator supplies the inputs. The output path must be absolute and
@@ -37,8 +38,12 @@ result as data-only, and compares both stored resource byte sequences. A second
 test proves an existing output is left untouched.
 
 The resulting image is still unsigned. It cannot activate the installer until
-the separate signing step produces a Windows-accepted image with the same
+the separate owned signing step produces a Windows-accepted image with the same
 embedded publisher identity.
+
+The signing boundary reopens the image and requires its manifest publisher to
+equal the explicitly selected signing-certificate fingerprint before it copies
+or signs anything.
 
 ## Assembly sequence
 
@@ -55,8 +60,9 @@ embedded publisher identity.
 5. Commit both updates together with `EndUpdateResourceW`.
 6. Reload the output as data-only PE content and require each resource to equal
    its original input bytes.
-7. Report that the verified output is **unsigned**. The separate signing step
-   must happen before distribution or installation.
+7. Report that the verified output is **unsigned**. `anodrel-release-sign` must
+   create and verify the separate signed copy before distribution or
+   installation.
 
 If an update fails before commit, the resource update is discarded. The copied
 output remains an ordinary unsigned template copy, never a claimed release.
@@ -69,4 +75,4 @@ download data, or run the result. Resource modification invalidates an existing
 signature, so signed input templates are not a release shortcut.
 
 See [Windows installer contract](WINDOWS_INSTALLER.md), [release bundle](RELEASE_BUNDLE.md),
-and Decisions 0140–0144.
+and Decisions 0140–0144 and 0162.

@@ -2,7 +2,10 @@
 
 use std::{ffi::c_void, os::windows::ffi::OsStrExt, path::Path};
 
-use anodrel_windows_installer::{RELEASE_MANIFEST_RESOURCE_ID, RELEASE_PAYLOAD_RESOURCE_ID};
+use anodrel_windows_installer::{
+    MAX_PAYLOAD_BYTES, MAX_RELEASE_MANIFEST_BYTES, RELEASE_MANIFEST_RESOURCE_ID,
+    RELEASE_PAYLOAD_RESOURCE_ID,
+};
 
 use crate::ReleaseImageError;
 
@@ -83,6 +86,29 @@ pub(super) fn resources_match(
         .ok_or(ReleaseImageError::ResourceVerificationFailed)
 }
 
+/// Copies both fixed release resources from one data-only PE image.
+pub(super) fn read_resources(output: &Path) -> Result<(Vec<u8>, Vec<u8>), ReleaseImageError> {
+    let output = wide_path(output);
+    // SAFETY: The caller validated an existing absolute image path. The
+    // data-file flag avoids running code or resolving imports while resources
+    // are copied from the image.
+    let module = unsafe {
+        LoadLibraryExW(
+            output.as_ptr(),
+            std::ptr::null_mut(),
+            LOAD_LIBRARY_AS_DATAFILE,
+        )
+    };
+    if module.is_null() {
+        return Err(ReleaseImageError::ResourceVerificationFailed);
+    }
+    let image = LoadedDataImage { module };
+    Ok((
+        image.resource_bytes(RELEASE_MANIFEST_RESOURCE_ID, MAX_RELEASE_MANIFEST_BYTES)?,
+        image.resource_bytes(RELEASE_PAYLOAD_RESOURCE_ID, MAX_PAYLOAD_BYTES as usize)?,
+    ))
+}
+
 struct ResourceTransaction {
     handle: Handle,
 }
@@ -136,6 +162,15 @@ struct LoadedDataImage {
 
 impl LoadedDataImage {
     fn resource_matches(&self, identifier: u16, expected: &[u8]) -> bool {
+        self.resource_bytes(identifier, expected.len())
+            .is_ok_and(|actual| actual == expected)
+    }
+
+    fn resource_bytes(
+        &self,
+        identifier: u16,
+        maximum: usize,
+    ) -> Result<Vec<u8>, ReleaseImageError> {
         // SAFETY: This data-only module remains loaded by this guard. Both
         // resource identifiers are fixed private RCDATA values.
         let resource = unsafe {
@@ -146,26 +181,26 @@ impl LoadedDataImage {
             )
         };
         if resource.is_null() {
-            return false;
+            return Err(ReleaseImageError::ResourceVerificationFailed);
         }
         // SAFETY: The resource handle belongs to the guarded loaded module.
         let length = unsafe { SizeofResource(self.module, resource) };
-        if length as usize != expected.len() {
-            return false;
+        if length as usize > maximum {
+            return Err(ReleaseImageError::ResourceVerificationFailed);
         }
         // SAFETY: The resource handle belongs to the guarded loaded module.
         let data = unsafe { LoadResource(self.module, resource) };
         if data.is_null() {
-            return false;
+            return Err(ReleaseImageError::ResourceVerificationFailed);
         }
         // SAFETY: LockResource exposes exactly SizeofResource bytes while the
         // data-only module stays loaded by this guard.
         let bytes = unsafe { LockResource(data).cast::<u8>() };
         if bytes.is_null() {
-            return false;
+            return Err(ReleaseImageError::ResourceVerificationFailed);
         }
         // SAFETY: Pointer and byte count came from the same locked resource.
-        unsafe { std::slice::from_raw_parts(bytes, expected.len()) == expected }
+        Ok(unsafe { std::slice::from_raw_parts(bytes, length as usize).to_vec() })
     }
 }
 

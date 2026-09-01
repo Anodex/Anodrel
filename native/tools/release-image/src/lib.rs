@@ -12,7 +12,7 @@ mod build;
 mod error;
 mod raw;
 
-pub use build::embed_release_image;
+pub use build::{embed_release_image, verify_release_image, verify_release_image_for_publisher};
 pub use error::ReleaseImageError;
 
 #[cfg(test)]

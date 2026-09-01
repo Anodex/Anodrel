@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0162: Owned release signing selects one current-user certificate.
+
 - 0161: Owned release-bundle authoring is bounded and fresh-output-only.
 
 - 0160: Owned rollback selects only the retained validated prior record.

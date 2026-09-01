@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use anodrel_release_bundle::{BundleEntryInput, encode};
 use anodrel_windows_installer::ReleaseManifest;
 
-use crate::embed_release_image;
+use crate::{embed_release_image, verify_release_image, verify_release_image_for_publisher};
 
 fn manifest_for(payload: &[u8]) -> Vec<u8> {
     let digest =
@@ -49,6 +49,20 @@ fn a_new_pe_copy_carries_exact_checked_release_resources() {
     embed_release_image(&template, &output, &manifest, &payload)
         .expect("the new PE copy receives verified resources");
     assert!(output.is_file());
+    verify_release_image(&output).expect("the assembled image reparses as one release");
+    assert!(matches!(
+        verify_release_image_for_publisher(&output, [0; 32]),
+        Err(crate::ReleaseImageError::PublisherMismatch)
+    ));
+}
+
+#[test]
+fn inspection_rejects_an_image_without_the_fixed_release_resources() {
+    let image = std::env::current_exe().expect("the test executable path is available");
+    assert!(matches!(
+        verify_release_image(&image),
+        Err(crate::ReleaseImageError::ResourceVerificationFailed)
+    ));
 }
 
 #[test]

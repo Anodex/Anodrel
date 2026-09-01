@@ -32,9 +32,54 @@ pub fn embed_release_image(
     Ok(())
 }
 
+/// Checks fixed release resources in one existing release-image file.
+///
+/// This is a read-only authoring check. It loads only PE resources as data,
+/// parses the manifest, and verifies the bundle against that manifest. It does
+/// not verify Authenticode, modify the image, create an output, or access a
+/// certificate store.
+pub fn verify_release_image(path: &Path) -> Result<(), ReleaseImageError> {
+    read_release_manifest(path).map(|_| ())
+}
+
+/// Checks that one release image names exactly one expected opaque publisher.
+///
+/// This is a read-only authoring check that additionally compares the supplied
+/// leaf certificate fingerprint to the publisher value in the checked embedded
+/// release manifest. It does not expose that manifest value, verify an image
+/// signature, create an output, or access a certificate store.
+pub fn verify_release_image_for_publisher(
+    path: &Path,
+    expected_publisher: [u8; 32],
+) -> Result<(), ReleaseImageError> {
+    let manifest = read_release_manifest(path)?;
+    manifest
+        .matches_publisher_fingerprint(expected_publisher)
+        .then_some(())
+        .ok_or(ReleaseImageError::PublisherMismatch)
+}
+
+fn read_release_manifest(path: &Path) -> Result<ReleaseManifest, ReleaseImageError> {
+    validate_image(path)?;
+    let (manifest_bytes, payload) = raw::read_resources(path)?;
+    let manifest_text = std::str::from_utf8(&manifest_bytes)
+        .map_err(|_| ReleaseImageError::ManifestInvalid(ReleaseManifestError::Invalid))?;
+    let manifest =
+        ReleaseManifest::parse(manifest_text).map_err(ReleaseImageError::ManifestInvalid)?;
+    verify_bundle(&manifest, &payload).map_err(ReleaseImageError::PayloadInvalid)?;
+    Ok(manifest)
+}
+
 fn validate_template(path: &Path) -> Result<(), ReleaseImageError> {
     if !path.is_absolute() || !fs::metadata(path).is_ok_and(|metadata| metadata.is_file()) {
         return Err(ReleaseImageError::TemplateInvalid);
+    }
+    Ok(())
+}
+
+fn validate_image(path: &Path) -> Result<(), ReleaseImageError> {
+    if !path.is_absolute() || !fs::metadata(path).is_ok_and(|metadata| metadata.is_file()) {
+        return Err(ReleaseImageError::ImageInvalid);
     }
     Ok(())
 }
