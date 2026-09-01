@@ -116,12 +116,13 @@ writes only its already validated record to the fixed 64-bit machine-policy
 location; it is unit-tested for exact key/value and UTF-16 representation, but
 its elevated signed-fixture path remains an operator check.
 
-The command-line tool has no `install` or `uninstall` command yet. It cannot
-write a production package directory or the registry, create machine trust, or
-launch an application. Its library contains the separately reviewable
-staging, signer, promotion, publication, recovery, uninstall, and update
-preflight boundaries below, but no command can select their paths or invoke a
-machine-changing transaction.
+The command-line tool exposes only fixed `verify`, `install`, `update`, and
+`uninstall` operations. Each machine-changing operation first asks Windows
+whether its current process token is elevated and fails closed without trying
+to self-elevate. It accepts no target, root, record, publisher, certificate,
+or network argument. The separately reviewable staging, signer, promotion,
+publication, recovery, uninstall, and update boundaries remain behind those
+fixed commands.
 
 ## Staged extraction contract
 
@@ -291,15 +292,18 @@ installer command will recover only Anodrel-owned stale staging directories.
 
 ## Commands and exclusions
 
-The future installer has only `install`, `uninstall`, and `verify` commands.
-`install` and `uninstall` need elevation; `verify` is read-only. All commands
-select the embedded identity only. They do not accept an arbitrary executable,
-package root, registry path, policy, capability, certificate, or network URL.
+The installer has only `install`, `update`, `uninstall`, and `verify` commands.
+`install`, `update`, and `uninstall` need elevation; `verify` is read-only. All
+commands select the embedded identity only. They do not accept an arbitrary
+executable, package root, registry path, policy, capability, certificate, or
+network URL.
 
-The command-line tool has not exposed the installation transaction yet. Its
-first invocation path must include elevation detection, clear consent and
-failure reporting, and the signed-fixture acceptance procedure rather than
-turning a library function into an unreviewed command.
+`install`, `update`, and `uninstall` need elevation; the installer does not
+trigger a UAC prompt or relaunch itself. An operator explicitly starts the
+signed executable from an elevated shell. `verify` is read-only and can show
+that the current signed embedded release was accepted without writing machine
+state. The development-only `validate-manifest <path>` command still validates
+one sidecar manifest and cannot write machine state.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
