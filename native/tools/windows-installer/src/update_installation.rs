@@ -5,13 +5,14 @@ use std::fmt;
 use crate::machine_root::current_machine_application_root;
 use crate::prepared::prepare_verified_signed_release;
 use crate::{
-    MachineRootError, PreparedReleaseError, PromotionError, PublicationError, SignedReleaseError,
-    UpdatePreflightError, verify_current_signed_release, verify_current_update_candidate,
+    MachineRootError, PreparedReleaseError, PromotionError, SignedReleaseError,
+    UpdatePreflightError, UpdatePublicationError, verify_current_signed_release,
+    verify_current_update_candidate,
 };
 
 /// A new release selected by the fixed machine policy through an update transaction.
 pub struct UpdatedRelease {
-    published: crate::PublishedRelease,
+    published: crate::PublishedUpdate,
 }
 
 impl fmt::Debug for UpdatedRelease {
@@ -39,7 +40,7 @@ pub enum UpdateCurrentError {
     /// The checked stage could not become a new version directory.
     PromotionFailed(PromotionError),
     /// The promoted record could not become the fixed selected machine policy.
-    PublicationFailed(PublicationError),
+    PublicationFailed(UpdatePublicationError),
 }
 
 impl fmt::Display for UpdateCurrentError {
@@ -96,7 +97,7 @@ pub fn update_current_signed_release() -> Result<UpdatedRelease, UpdateCurrentEr
     let promoted =
         crate::promote_prepared_release(prepared).map_err(UpdateCurrentError::PromotionFailed)?;
     let published =
-        crate::publish_promoted_release(promoted).map_err(UpdateCurrentError::PublicationFailed)?;
+        crate::publish_promoted_update(promoted).map_err(UpdateCurrentError::PublicationFailed)?;
     Ok(UpdatedRelease { published })
 }
 

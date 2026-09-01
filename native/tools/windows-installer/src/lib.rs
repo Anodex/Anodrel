@@ -47,7 +47,10 @@ pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed
 #[cfg(windows)]
 pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};
 #[cfg(windows)]
-pub use publication::{PublicationError, PublishedRelease, publish_promoted_release};
+pub use publication::{
+    PublicationError, PublishedRelease, PublishedUpdate, UpdatePublicationError,
+    publish_promoted_release, publish_promoted_update,
+};
 #[cfg(windows)]
 pub use recovery::{RecoveryCleanupError, cleanup_private_stages};
 pub use recovery::{RecoveryDiscoveryError, discover_private_stages};

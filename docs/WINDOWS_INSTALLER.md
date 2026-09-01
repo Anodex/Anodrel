@@ -229,8 +229,10 @@ and fixed policy-publication boundaries as initial installation.
 An update transaction accepts no parameter and creates no download, background
 service, user-data directory, process, trust, shortcut, file association, or
 network connection. The already-selected version directory is retained after
-the fixed record points at the new complete version. Publisher-key rotation and
-a policy-backed rollback route remain separate decisions.
+the fixed record points at the new complete version. Before it selects that new
+record, it copies the current fixed record into one private `previous` policy
+value. Publisher-key rotation and the later rollback command remain separate
+decisions.
 
 ## Machine installation transaction contract
 
