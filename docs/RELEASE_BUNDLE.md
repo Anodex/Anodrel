@@ -1,7 +1,7 @@
 # Release bundle format
 
-**Status:** Owned encoder and borrowed decoder implemented. No installer
-extraction path is implemented yet.
+**Status:** Owned encoder, borrowed decoder, and bounded authoring tool
+implemented. The Windows installer has a separate private extraction boundary.
 
 ## Purpose
 
@@ -59,6 +59,15 @@ a directory, change machine policy, evaluate a signature, or launch a process.
 installer foundation first checks the manifest's total payload length and digest,
 then calls the decoder. A corrupt or substituted payload therefore cannot reach
 file-level parsing merely because its manifest has a valid shape.
+
+`anodrel-release-bundle-tool create <source-directory> <new-bundle>` is the
+first-party authoring boundary. It reads only one existing absolute normal
+directory tree, refuses links, non-regular files, non-UTF-8 relative paths,
+more than 128 files, and any input above the format's total size bound. It sorts
+the derived forward-slash paths by raw UTF-8 bytes, encodes the owned bundle,
+re-parses those bytes, then writes and synchronizes only one previously absent
+absolute output file. It neither changes its source tree nor embeds, signs,
+installs, launches, downloads, or compresses anything.
 
 The installer reads a release payload only from its own fixed `RT_RCDATA`
 resource (`0xA142`); the companion signed manifest is resource `0xA141`.

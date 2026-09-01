@@ -1,0 +1,12 @@
+[package]
+name = "anodrel-release-bundle-tool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-release-bundle-tool"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-release-bundle = { path = "../../crates/release-bundle" }

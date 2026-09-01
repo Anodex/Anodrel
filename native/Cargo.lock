@@ -409,6 +409,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-release-bundle-tool"
+version = "0.1.0"
+dependencies = [
+ "anodrel-release-bundle",
+]
+
+[[package]]
 name = "anodrel-release-image"
 version = "0.1.0"
 dependencies = [

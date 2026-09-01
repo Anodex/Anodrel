@@ -74,6 +74,7 @@ members = [
   "tools/product-fixture",
   "tools/product-provisioning",
   "tools/windows-installer",
+  "tools/release-bundle-tool",
   "tools/release-image",
   "tools/native-client-sample",
   "tools/native-linux-client-sample",
