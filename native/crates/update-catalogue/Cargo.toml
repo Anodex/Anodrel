@@ -1,0 +1,11 @@
+[package]
+name = "anodrel-update-catalogue"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-application = { path = "../application" }
+anodrel-json = { path = "../json" }
+anodrel-network = { path = "../network" }
+anodrel-windows-installer = { path = "../../tools/windows-installer" }

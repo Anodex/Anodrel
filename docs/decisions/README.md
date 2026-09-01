@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0164: Owned update catalogues bind one candidate before retrieval.
+
 - 0163: Owned release manifests derive facts from checked bundles.
 
 - 0162: Owned release signing selects one current-user certificate.

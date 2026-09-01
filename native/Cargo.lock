@@ -513,6 +513,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-update-catalogue"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-json",
+ "anodrel-network",
+ "anodrel-windows-installer",
+]
+
+[[package]]
 name = "anodrel-window"
 version = "0.1.0"
 

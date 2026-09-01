@@ -18,6 +18,16 @@ pub struct PackageVersion {
 }
 
 impl PackageVersion {
+    /// Creates one exact three-component release version.
+    #[must_use]
+    pub const fn new(major: u16, minor: u16, patch: u16) -> Self {
+        Self {
+            major,
+            minor,
+            patch,
+        }
+    }
+
     /// Returns the release version's major component.
     #[must_use]
     pub const fn major(self) -> u16 {
