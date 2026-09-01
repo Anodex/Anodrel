@@ -32,6 +32,8 @@ mod staging;
 mod uninstall;
 #[cfg(windows)]
 mod update;
+#[cfg(windows)]
+mod update_installation;
 
 pub use error::ReleaseManifestError;
 #[cfg(windows)]
@@ -65,6 +67,8 @@ pub use uninstall::{
 };
 #[cfg(windows)]
 pub use update::{UpdatePreflightError, VerifiedUpdateCandidate, verify_current_update_candidate};
+#[cfg(windows)]
+pub use update_installation::{UpdateCurrentError, UpdatedRelease, update_current_signed_release};
 
 /// Maximum UTF-8 release-manifest size before JSON parsing.
 pub const MAX_RELEASE_MANIFEST_BYTES: usize = 16 * 1024;

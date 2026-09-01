@@ -11,6 +11,23 @@ use crate::{PackageVersion, SignedReleaseError, verify_current_signed_release};
 pub struct VerifiedUpdateCandidate {
     application_id: String,
     package_version: PackageVersion,
+    publisher_fingerprint: [u8; 32],
+}
+
+impl VerifiedUpdateCandidate {
+    /// Returns the verified identity for internal update composition.
+    #[must_use]
+    pub(crate) fn application_id(&self) -> &str {
+        &self.application_id
+    }
+
+    /// Checks a freshly activated release against this candidate decision.
+    #[must_use]
+    pub(crate) fn matches_manifest(&self, manifest: &crate::ReleaseManifest) -> bool {
+        manifest.application_id() == self.application_id
+            && manifest.package_version() == self.package_version
+            && manifest.matches_publisher_fingerprint(self.publisher_fingerprint)
+    }
 }
 
 impl fmt::Debug for VerifiedUpdateCandidate {
@@ -19,6 +36,7 @@ impl fmt::Debug for VerifiedUpdateCandidate {
             .debug_struct("VerifiedUpdateCandidate")
             .field("application_id", &self.application_id)
             .field("package_version", &self.package_version)
+            .field("publisher_fingerprint", &"[redacted]")
             .finish_non_exhaustive()
     }
 }
@@ -111,6 +129,7 @@ pub fn verify_current_update_candidate() -> Result<VerifiedUpdateCandidate, Upda
     Ok(VerifiedUpdateCandidate {
         application_id: manifest.application_id().to_owned(),
         package_version,
+        publisher_fingerprint: signer.as_bytes(),
     })
 }
 
@@ -124,8 +143,11 @@ fn package_version_from_root(root: &std::path::Path) -> Option<PackageVersion> {
 mod tests {
     use anodrel_windows_signature::SignatureError;
 
-    use super::{UpdatePreflightError, package_version_from_root, verify_current_update_candidate};
-    use crate::SignedReleaseError;
+    use super::{
+        UpdatePreflightError, VerifiedUpdateCandidate, package_version_from_root,
+        verify_current_update_candidate,
+    };
+    use crate::{ReleaseManifest, SignedReleaseError};
 
     #[test]
     fn parses_only_canonical_owned_version_directory_names() {
@@ -152,5 +174,54 @@ mod tests {
                 SignedReleaseError::SignatureInvalid(SignatureError::TrustRejected)
             ))
         ));
+    }
+
+    #[test]
+    fn a_refreshed_candidate_must_keep_its_identity_version_and_publisher() {
+        let current_manifest = ReleaseManifest::parse(&release_manifest("1.2.3", PUBLISHER))
+            .expect("the candidate manifest is valid");
+        let candidate = VerifiedUpdateCandidate {
+            application_id: current_manifest.application_id().to_owned(),
+            package_version: current_manifest.package_version(),
+            publisher_fingerprint: manifest_fingerprint(PUBLISHER),
+        };
+        assert!(candidate.matches_manifest(&current_manifest));
+        for changed in [
+            release_manifest("1.2.4", PUBLISHER),
+            release_manifest("1.2.3", OTHER_PUBLISHER),
+            release_manifest("1.2.3", PUBLISHER)
+                .replace("org.anodrel.update-test", "org.anodrel.other"),
+        ] {
+            let changed =
+                ReleaseManifest::parse(&changed).expect("the comparison manifest is valid");
+            assert!(!candidate.matches_manifest(&changed));
+        }
+    }
+
+    const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
+    const OTHER_PUBLISHER: &str =
+        "9089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
+
+    fn release_manifest(version: &str, publisher: &str) -> String {
+        let mut components = version.split('.');
+        let major = components.next().expect("major version is present");
+        let minor = components.next().expect("minor version is present");
+        let patch = components.next().expect("patch version is present");
+        format!(
+            r#"{{
+  "formatVersion": {{ "major": 1, "minor": 0 }},
+  "applicationId": "org.anodrel.update-test",
+  "packageVersion": {{ "major": {major}, "minor": {minor}, "patch": {patch} }},
+  "executable": {{ "path": "bin/Product.exe", "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" }},
+  "publisher": {{ "leafCertificateSha256": "{publisher}" }},
+  "capabilities": [],
+  "networkOrigins": [],
+  "payload": {{ "byteLength": 1, "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" }}
+}}"#
+        )
+    }
+
+    fn manifest_fingerprint(value: &str) -> [u8; 32] {
+        anodrel_application::sha256::parse_lower_hex(value).expect("fixture fingerprint is valid")
     }
 }

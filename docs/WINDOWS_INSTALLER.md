@@ -216,6 +216,21 @@ network, URL, file, registry, process, background-service, or user-interface
 input. It does not prove the candidate application's embedded executable until
 the separate staging signer gate runs, and it does not perform an update.
 
+## Machine update transaction contract
+
+The installer library composes an update only from a current candidate that
+passed the preflight above. Before selecting a machine root or writing any
+file, it activates its current signed release again and requires its identity,
+package version, and publisher to match the candidate decision. It then uses
+the same private preparation, staged-executable signer, no-overwrite promotion,
+and fixed policy-publication boundaries as initial installation.
+
+An update transaction accepts no parameter and creates no download, background
+service, user-data directory, process, trust, shortcut, file association, or
+network connection. The already-selected version directory is retained after
+the fixed record points at the new complete version. Publisher-key rotation and
+a policy-backed rollback route remain separate decisions.
+
 ## Machine installation transaction contract
 
 The installer library composes one machine installation only from its current

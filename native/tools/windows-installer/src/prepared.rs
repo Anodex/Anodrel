@@ -7,7 +7,7 @@ use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 use crate::staging::{StagedRelease, stage_checked_release};
 use crate::{
     PackageVersion, ReleaseManifest, SignedReleaseError, StagedReleaseError,
-    verify_current_signed_release,
+    VerifiedEmbeddedRelease, verify_current_signed_release,
 };
 
 /// A private release stage that passed installer and executable publisher checks.
@@ -79,6 +79,19 @@ pub fn prepare_current_signed_release(
 ) -> Result<PreparedRelease, PreparedReleaseError> {
     let release =
         verify_current_signed_release().map_err(PreparedReleaseError::InstallerInvalid)?;
+    prepare_verified_signed_release(staging_parent, release)
+}
+
+/// Prepares one release that has just passed the current-installer signature gate.
+///
+/// This internal composition accepts the verified release token rather than a
+/// manifest, bundle, executable, or publisher supplied by a caller. It still
+/// privately stages the release, validates its installed record, and verifies
+/// the staged executable before returning a promotion-ready result.
+pub(crate) fn prepare_verified_signed_release(
+    staging_parent: &Path,
+    release: VerifiedEmbeddedRelease<'_>,
+) -> Result<PreparedRelease, PreparedReleaseError> {
     let manifest = release.release().manifest();
     let version = manifest.package_version();
     let application_id = manifest.application_id().to_owned();
