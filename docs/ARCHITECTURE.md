@@ -169,9 +169,16 @@ pre-launch sequence without creating a process, so a surface can decide whether
 a launch is currently possible. A development-only signed fixture and a
 controlled provisioning helper — both outside the host, which never writes
 machine policy, installs trust, or signs anything — exercise the joined path on
-a development machine. Production packaging, installation, updates, and a real
-signing identity remain separate work. See `docs/SIGNING.md`, `docs/LAUNCH.md`,
-`docs/PRODUCT_FIXTURE.md`, and Decisions 0017 through 0020 and 0061.
+a development machine. The separate owned installer foundation now carries a
+strict resource-bearing release envelope through private staging, extracted
+publisher verification, no-overwrite promotion, fixed policy publication,
+recovery, uninstall, and a read-only update-candidate gate. Its no-argument
+machine transaction selects only its current signed release and fixed 64-bit
+Program Files root. Production certificate custody, a signed positive
+acceptance run, elevated command UX, update delivery, and a real production
+identity remain separate work. See `docs/SIGNING.md`, `docs/LAUNCH.md`,
+`docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`, and Decisions 0017
+through 0020, 0061, and 0140 through 0156.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. The Linux paths adapter obtains the

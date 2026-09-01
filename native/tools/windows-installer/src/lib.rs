@@ -9,6 +9,10 @@
 //! launch an application.
 
 mod error;
+#[cfg(windows)]
+mod installation;
+#[cfg(windows)]
+mod machine_root;
 mod manifest;
 mod payload;
 #[cfg(windows)]
@@ -30,6 +34,10 @@ mod uninstall;
 mod update;
 
 pub use error::ReleaseManifestError;
+#[cfg(windows)]
+pub use installation::{InstallCurrentError, InstalledRelease, install_current_signed_release};
+#[cfg(windows)]
+pub use machine_root::MachineRootError;
 pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
 pub use payload::{ReleasePayloadError, verify_bundle};
 #[cfg(windows)]

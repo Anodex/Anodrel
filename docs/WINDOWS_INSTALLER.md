@@ -216,6 +216,25 @@ network, URL, file, registry, process, background-service, or user-interface
 input. It does not prove the candidate application's embedded executable until
 the separate staging signer gate runs, and it does not perform an update.
 
+## Machine installation transaction contract
+
+The installer library composes one machine installation only from its current
+signed embedded release. It first activates that signed release to obtain the
+validated application identity and rejects any existing selected machine policy.
+An existing installation must use the separately gated update path, preventing
+this first-install route from rolling a selected release back. It then derives
+the fixed machine root and activates the current release again as preparation
+starts. Preparation privately stages and checks the package and executable,
+promotion uses its existing no-overwrite same-volume rename, and publication
+writes the existing fixed policy record.
+
+The transaction accepts no parameter. It creates no trust, shortcut, file
+association, service, process, network connection, updater, or user-data
+directory. An unsigned current executable fails before Program Files selection.
+If promotion succeeds but policy publication fails, the complete version stays
+unselected while the prior policy remains authoritative; the transaction never
+replaces a version or deletes existing content to hide that failure.
+
 ## Planned machine installation
 
 Version 1 is a machine installation. The installer owns the destination under
@@ -226,6 +245,14 @@ existing registry value:
 HKEY_LOCAL_MACHINE\Software\Anodrel\Applications\<applicationId>
     record    REG_SZ
 ~~~
+
+The 64-bit installer derives `Program Files` from Windows'
+`FOLDERID_ProgramFilesX64` known folder rather than an environment variable or
+hard-coded drive. It creates and verifies only normal, non-reparse
+`Anodrel\Applications\<applicationId>` directories below it, where the final
+component is the signed manifest identity. A 32-bit installer is not a Version
+1 distribution target because it cannot reliably select that 64-bit known
+folder. Administrators remain inside the machine-trust boundary.
 
 It accepts neither as a command-line argument. The registry remains the product
 host's only policy source.
@@ -253,6 +280,11 @@ The future installer has only `install`, `uninstall`, and `verify` commands.
 `install` and `uninstall` need elevation; `verify` is read-only. All commands
 select the embedded identity only. They do not accept an arbitrary executable,
 package root, registry path, policy, capability, certificate, or network URL.
+
+The command-line tool has not exposed the installation transaction yet. Its
+first invocation path must include elevation detection, clear consent and
+failure reporting, and the signed-fixture acceptance procedure rather than
+turning a library function into an unreviewed command.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
