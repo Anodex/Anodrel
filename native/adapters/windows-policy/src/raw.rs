@@ -1,4 +1,4 @@
-//! Narrow direct Advapi32 bindings for the machine policy registry value.
+//! Narrow direct Advapi32 bindings for fixed machine policy registry values.
 
 use std::ptr;
 
@@ -17,6 +17,8 @@ const ERROR_ACCESS_DENIED: i32 = 5;
 const ERROR_MORE_DATA: i32 = 234;
 const MAX_RECORD_UTF16_BYTES: u32 = 32 * 1024;
 const POLICY_KEY_PREFIX: &str = "Software\\Anodrel\\Applications\\";
+const CURRENT_RECORD_VALUE: &str = "record";
+const PREVIOUS_RECORD_VALUE: &str = "previous";
 
 #[link(name = "Advapi32")]
 unsafe extern "system" {
@@ -40,9 +42,18 @@ unsafe extern "system" {
 
 /// Reads the one allowed registry value for a prevalidated application ID.
 pub(super) fn read_record(application_id: &str) -> Result<String, PolicyStoreError> {
+    read_value(application_id, PolicyValue::Current)
+}
+
+/// Reads the one fixed retained registry value for a prevalidated application ID.
+pub(super) fn read_previous_record(application_id: &str) -> Result<String, PolicyStoreError> {
+    read_value(application_id, PolicyValue::Previous)
+}
+
+fn read_value(application_id: &str, value: PolicyValue) -> Result<String, PolicyStoreError> {
     let key_path = wide_null(&format!("{POLICY_KEY_PREFIX}{application_id}"));
     let key = open_policy_key(&key_path)?;
-    let value_name = wide_null("record");
+    let value_name = wide_null(value.name());
 
     let mut value_type = 0_u32;
     let mut byte_length = 0_u32;
@@ -95,6 +106,21 @@ pub(super) fn read_record(application_id: &str) -> Result<String, PolicyStoreErr
         return Err(PolicyStoreError::RecordChangedDuringRead);
     }
     decode_record(&data)
+}
+
+#[derive(Clone, Copy)]
+enum PolicyValue {
+    Current,
+    Previous,
+}
+
+impl PolicyValue {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Current => CURRENT_RECORD_VALUE,
+            Self::Previous => PREVIOUS_RECORD_VALUE,
+        }
+    }
 }
 
 fn open_policy_key(path: &[u16]) -> Result<RegistryKey, PolicyStoreError> {
@@ -154,7 +180,7 @@ impl Drop for RegistryKey {
 
 #[cfg(test)]
 mod tests {
-    use super::{POLICY_KEY_PREFIX, decode_record, status_error, wide_null};
+    use super::{POLICY_KEY_PREFIX, PolicyValue, decode_record, status_error, wide_null};
     use crate::PolicyStoreError;
 
     #[test]
@@ -165,6 +191,12 @@ mod tests {
             String::from_utf16(&path[..path.len() - 1]).expect("path is valid UTF-16"),
             "Software\\Anodrel\\Applications\\org.anodrel.sample"
         );
+    }
+
+    #[test]
+    fn policy_value_selection_is_fixed_and_not_caller_supplied() {
+        assert_eq!(PolicyValue::Current.name(), "record");
+        assert_eq!(PolicyValue::Previous.name(), "previous");
     }
 
     #[test]

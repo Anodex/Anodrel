@@ -4,8 +4,9 @@ use std::fs;
 
 use anodrel_windows_installer::{
     MAX_RELEASE_MANIFEST_BYTES, ReleaseManifest, install_current_signed_release,
-    remove_policy_removed_package, remove_verified_uninstall_policy, update_current_signed_release,
-    verify_current_signed_release, verify_current_uninstall_target,
+    remove_policy_removed_package, remove_verified_uninstall_policy,
+    rollback_current_signed_release, update_current_signed_release, verify_current_signed_release,
+    verify_current_uninstall_target,
 };
 
 use crate::elevation::require_elevation;
@@ -15,6 +16,7 @@ const USAGE: &str = concat!(
     "  anodrel-windows-installer verify\n",
     "  anodrel-windows-installer install\n",
     "  anodrel-windows-installer update\n",
+    "  anodrel-windows-installer rollback\n",
     "  anodrel-windows-installer uninstall\n",
     "  anodrel-windows-installer validate-manifest <release-manifest.json>\n",
     "\n",
@@ -29,6 +31,7 @@ pub(super) enum Command {
     Verify,
     Install,
     Update,
+    Rollback,
     Uninstall,
     ValidateManifest(String),
 }
@@ -39,6 +42,7 @@ pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
         [command] if command == "verify" => Ok(Command::Verify),
         [command] if command == "install" => Ok(Command::Install),
         [command] if command == "update" => Ok(Command::Update),
+        [command] if command == "rollback" => Ok(Command::Rollback),
         [command] if command == "uninstall" => Ok(Command::Uninstall),
         [command, path] if command == "validate-manifest" => {
             Ok(Command::ValidateManifest(path.clone()))
@@ -53,6 +57,7 @@ pub(super) fn execute(command: Command) -> Result<String, String> {
         Command::Verify => verify(),
         Command::Install => elevated(install),
         Command::Update => elevated(update),
+        Command::Rollback => elevated(rollback),
         Command::Uninstall => elevated(uninstall),
         Command::ValidateManifest(path) => validate_manifest(&path),
     }
@@ -79,6 +84,11 @@ fn install() -> Result<String, String> {
 fn update() -> Result<String, String> {
     update_current_signed_release().map_err(display_error)?;
     Ok("Current signed Anodrel release updated.".to_owned())
+}
+
+fn rollback() -> Result<String, String> {
+    rollback_current_signed_release().map_err(display_error)?;
+    Ok("Current signed Anodrel release rolled back to its retained prior policy.".to_owned())
 }
 
 fn uninstall() -> Result<String, String> {
@@ -124,6 +134,7 @@ mod tests {
         assert_eq!(parse(&arguments(&["verify"])), Ok(Command::Verify));
         assert_eq!(parse(&arguments(&["install"])), Ok(Command::Install));
         assert_eq!(parse(&arguments(&["update"])), Ok(Command::Update));
+        assert_eq!(parse(&arguments(&["rollback"])), Ok(Command::Rollback));
         assert_eq!(parse(&arguments(&["uninstall"])), Ok(Command::Uninstall));
         assert_eq!(
             parse(&arguments(&["validate-manifest", "release.json"])),
@@ -132,6 +143,7 @@ mod tests {
         for invalid in [
             &["install", "C:\\target"][..],
             &["update", "--url", "https://example.test"][..],
+            &["rollback", "1.2.3"][..],
             &["uninstall", "org.example.product"][..],
             &["verify", "--registry"][..],
         ] {

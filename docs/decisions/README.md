@@ -13,6 +13,20 @@ Each record should include:
 
 Current records (newest first):
 
+- 0160: Owned rollback selects only the retained validated prior record.
+
+- 0159: Owned updates retain one prior fixed policy record.
+
+- 0158: Owned installer commands require an already elevated token.
+
+- 0157: Owned update transactions refresh the candidate before publication.
+
+- 0156: Machine installation composes only the current signed release.
+
+- 0155: Owned machine roots come from the 64-bit Program Files known folder.
+
+- 0154: Owned update candidates require publisher continuity and forward versions.
+
 - 0153: Uninstall cleans only the policy-removed package tree.
 
 - 0152: Uninstall removes only the fixed policy value first.

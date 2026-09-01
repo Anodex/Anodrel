@@ -2,9 +2,10 @@
 
 //! Read-only machine policy for installed Windows applications.
 //!
-//! This adapter reads exactly one `REG_SZ` record from the fixed 64-bit
-//! `HKEY_LOCAL_MACHINE` Anodrel policy location, then delegates every package
-//! and executable check to `anodrel-application`. It does not create, modify,
+//! This adapter reads the fixed current `record` and, for installer recovery
+//! only, the fixed retained `previous` `REG_SZ` record from the 64-bit
+//! `HKEY_LOCAL_MACHINE` Anodrel policy location. It delegates every package and
+//! executable check to `anodrel-application`. It does not create, modify,
 //! delete, enumerate, or otherwise provision registry policy. It does not
 //! verify Authenticode, launch a process, create a pipe, or expose policy data
 //! to an application or renderer.
@@ -30,6 +31,22 @@ pub fn load_installed_application(
         return Err(PolicyStoreError::InvalidApplicationId);
     }
     let record = raw::read_record(application_id)?;
+    InstalledApplication::load_from_trusted_record(&record, application_id)
+        .map_err(PolicyStoreError::Record)
+}
+
+/// Loads the fixed retained prior record for an installer-only rollback preflight.
+///
+/// This is not host session policy. `application_id` must be selected by a
+/// signed installer release rather than an application, package, protocol
+/// message, environment value, command line, or UI control.
+pub fn load_previous_installed_application(
+    application_id: &str,
+) -> Result<InstalledApplication, PolicyStoreError> {
+    if !is_valid_application_id(application_id) {
+        return Err(PolicyStoreError::InvalidApplicationId);
+    }
+    let record = raw::read_previous_record(application_id)?;
     InstalledApplication::load_from_trusted_record(&record, application_id)
         .map_err(PolicyStoreError::Record)
 }
@@ -97,7 +114,10 @@ impl std::error::Error for PolicyStoreError {
 
 #[cfg(test)]
 mod tests {
-    use super::{PolicyStoreError, load_host_policy, load_installed_application};
+    use super::{
+        PolicyStoreError, load_host_policy, load_installed_application,
+        load_previous_installed_application,
+    };
 
     #[test]
     fn rejects_an_invalid_identity_before_opening_a_registry_key() {
@@ -111,6 +131,14 @@ mod tests {
     fn rejects_an_invalid_session_identity_before_opening_a_registry_key() {
         assert!(matches!(
             load_host_policy("org.anodrel/escape", "windows-host"),
+            Err(PolicyStoreError::InvalidApplicationId)
+        ));
+    }
+
+    #[test]
+    fn prior_policy_lookup_rejects_an_invalid_identity_before_opening_a_registry_key() {
+        assert!(matches!(
+            load_previous_installed_application("org.anodrel/escape"),
             Err(PolicyStoreError::InvalidApplicationId)
         ));
     }

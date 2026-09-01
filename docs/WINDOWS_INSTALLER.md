@@ -234,6 +234,21 @@ record, it copies the current fixed record into one private `previous` policy
 value. Publisher-key rotation and the later rollback command remain separate
 decisions.
 
+## Machine rollback transaction contract
+
+The installer may roll back only to that one retained `previous` record. Its
+preflight activates the current signed installer release, then validates both
+the selected and retained records as complete application packages. Windows
+must accept both executable signatures; each signer must match its own record
+and the current installer publisher. Both package roots must be direct
+canonical version children of the fixed machine application root, and the
+retained version must be strictly lower than the selected version.
+
+Only that opaque result can copy the fixed retained record back to `record`.
+It accepts no version, path, identity, registry value, publisher, package, or
+network input. It neither deletes a version directory nor starts a process;
+the retained `previous` value stays in place until a later update replaces it.
+
 ## Machine installation transaction contract
 
 The installer library composes one machine installation only from its current
@@ -294,18 +309,18 @@ installer command will recover only Anodrel-owned stale staging directories.
 
 ## Commands and exclusions
 
-The installer has only `install`, `update`, `uninstall`, and `verify` commands.
-`install`, `update`, and `uninstall` need elevation; `verify` is read-only. All
-commands select the embedded identity only. They do not accept an arbitrary
-executable, package root, registry path, policy, capability, certificate, or
-network URL.
+The installer has only `install`, `update`, `rollback`, `uninstall`, and
+`verify` commands. `install`, `update`, `rollback`, and `uninstall` need
+elevation; `verify` is read-only. All commands select the embedded identity
+only. They do not accept an arbitrary executable, package root, registry path,
+policy, capability, certificate, or network URL.
 
-`install`, `update`, and `uninstall` need elevation; the installer does not
-trigger a UAC prompt or relaunch itself. An operator explicitly starts the
-signed executable from an elevated shell. `verify` is read-only and can show
-that the current signed embedded release was accepted without writing machine
-state. The development-only `validate-manifest <path>` command still validates
-one sidecar manifest and cannot write machine state.
+`install`, `update`, `rollback`, and `uninstall` need elevation; the installer
+does not trigger a UAC prompt or relaunch itself. An operator explicitly starts
+the signed executable from an elevated shell. `verify` is read-only and can
+show that the current signed embedded release was accepted without writing
+machine state. The development-only `validate-manifest <path>` command still
+validates one sidecar manifest and cannot write machine state.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and

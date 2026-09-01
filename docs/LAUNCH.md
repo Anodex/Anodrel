@@ -101,6 +101,12 @@ embedded NUL, fit within 32 KiB of UTF-16 registry data, convert to valid Rust
 text, and then meet the 16 KiB JSON record limit above. The adapter reads only;
 it has no create, write, delete, registry enumeration, or installer API.
 
+The host reads only `record`. An owned installer update may retain one private
+`previous` value in that same fixed key, and the read adapter exposes it only to
+installer rollback preflight; it is never converted into host session policy or
+visible to an application. A rollback revalidates both records and their
+executable publishers before it can select the retained value.
+
 Windows normally limits writes below this `HKEY_LOCAL_MACHINE` location to
 administrative installation or system management. A later installation service
 must document how it provisions records and validates the key's access-control

@@ -94,6 +94,35 @@ impl fmt::Display for UpdatePublicationError {
 
 impl std::error::Error for UpdatePublicationError {}
 
+/// A retained prior policy record could not become the fixed selected record.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RollbackPublicationError {
+    /// The retained prior record was unavailable.
+    PreviousRecordUnavailable,
+    /// The retained prior record was not one bounded valid `REG_SZ` value.
+    PreviousRecordMalformed,
+    /// The retained prior record changed while Windows was reading it.
+    PreviousRecordChanged,
+    /// Windows denied the elevated fixed policy write or read.
+    AccessDenied,
+    /// Windows machine policy was unavailable for the fixed operation.
+    RegistryUnavailable,
+}
+
+impl fmt::Display for RollbackPublicationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::PreviousRecordUnavailable => "the retained prior policy record is unavailable",
+            Self::PreviousRecordMalformed => "the retained prior policy record is malformed",
+            Self::PreviousRecordChanged => "the retained prior policy record changed during read",
+            Self::AccessDenied => "machine policy cannot be changed; run from an elevated shell",
+            Self::RegistryUnavailable => "Windows machine policy is unavailable",
+        })
+    }
+}
+
+impl std::error::Error for RollbackPublicationError {}
+
 /// Publishes the one validated record selected by a promoted release.
 ///
 /// This accepts neither a registry path nor record text. It writes only the
@@ -120,9 +149,21 @@ pub fn publish_promoted_update(
     Ok(PublishedUpdate { release })
 }
 
+/// Restores only the fixed retained prior record to the selected policy value.
+///
+/// This internal rollback write accepts only a verified rollback identity. It
+/// reads the fixed private `previous` value and writes its exact text to the
+/// fixed current `record` value. It does not delete either value, modify a
+/// package directory, or accept policy text, a value name, or a key path.
+pub(crate) fn restore_previous_record(
+    application_id: &str,
+) -> Result<(), RollbackPublicationError> {
+    raw::restore_previous_as_current(application_id)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{PublicationError, UpdatePublicationError, raw};
+    use super::{PublicationError, RollbackPublicationError, UpdatePublicationError, raw};
 
     #[test]
     fn publication_uses_the_exact_fixed_machine_policy_location() {
@@ -155,6 +196,18 @@ mod tests {
         assert_eq!(
             UpdatePublicationError::NewRecordEncodingInvalid.to_string(),
             "the promoted update record cannot be published"
+        );
+    }
+
+    #[test]
+    fn rollback_publication_keeps_distinct_safe_failure_categories() {
+        assert_eq!(
+            RollbackPublicationError::PreviousRecordUnavailable.to_string(),
+            "the retained prior policy record is unavailable"
+        );
+        assert_eq!(
+            RollbackPublicationError::PreviousRecordMalformed.to_string(),
+            "the retained prior policy record is malformed"
         );
     }
 }

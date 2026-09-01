@@ -2,7 +2,7 @@
 
 use std::ptr;
 
-use crate::{PublicationError, UpdatePublicationError};
+use crate::{PublicationError, RollbackPublicationError, UpdatePublicationError};
 
 type HKey = isize;
 
@@ -79,6 +79,16 @@ pub(super) fn retain_current_then_write_update(
     let current = read_existing_record(&key)?;
     write_value(&key, PREVIOUS_VALUE_NAME, &current).map_err(update_status_error)?;
     write_value(&key, RECORD_VALUE_NAME, &data).map_err(update_status_error)
+}
+
+/// Copies the one retained prior value to the fixed selected value.
+pub(super) fn restore_previous_as_current(
+    application_id: &str,
+) -> Result<(), RollbackPublicationError> {
+    let path = wide_null(&policy_path(application_id));
+    let key = open_existing_rollback_key(&path)?;
+    let previous = read_retained_record(&key)?;
+    write_value(&key, RECORD_VALUE_NAME, &previous).map_err(rollback_status_error)
 }
 
 /// Renders the sole host-read machine policy key for a validated identity.
@@ -159,6 +169,24 @@ fn open_existing_update_key(path: &[u16]) -> Result<RegistryKey, UpdatePublicati
         .ok_or(update_status_error(status))
 }
 
+fn open_existing_rollback_key(path: &[u16]) -> Result<RegistryKey, RollbackPublicationError> {
+    let mut key = 0_isize;
+    // SAFETY: path is NUL terminated and `key` is one output slot. This rollback
+    // path reads the fixed retained value and writes only the fixed current value.
+    let status = unsafe {
+        RegOpenKeyExW(
+            HKEY_LOCAL_MACHINE,
+            path.as_ptr(),
+            0,
+            KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_64KEY,
+            &mut key,
+        )
+    };
+    (status == ERROR_SUCCESS)
+        .then_some(RegistryKey(key))
+        .ok_or(rollback_status_error(status))
+}
+
 fn read_existing_record(key: &RegistryKey) -> Result<Vec<u16>, UpdatePublicationError> {
     let value = wide_null(RECORD_VALUE_NAME);
     let mut value_type = 0_u32;
@@ -208,6 +236,55 @@ fn read_existing_record(key: &RegistryKey) -> Result<Vec<u16>, UpdatePublication
         .ok_or(UpdatePublicationError::ExistingRecordMalformed)
 }
 
+fn read_retained_record(key: &RegistryKey) -> Result<Vec<u16>, RollbackPublicationError> {
+    let value = wide_null(PREVIOUS_VALUE_NAME);
+    let mut value_type = 0_u32;
+    let mut byte_length = 0_u32;
+    // SAFETY: `key` is live, value is NUL terminated, and Windows writes only
+    // the two declared u32 output values during this size query.
+    let status = unsafe {
+        RegQueryValueExW(
+            key.0,
+            value.as_ptr(),
+            ptr::null_mut(),
+            &mut value_type,
+            ptr::null_mut(),
+            &mut byte_length,
+        )
+    };
+    if status != ERROR_SUCCESS {
+        return Err(rollback_status_error(status));
+    }
+    if value_type != REG_SZ || byte_length == 0 || !byte_length.is_multiple_of(2) {
+        return Err(RollbackPublicationError::PreviousRecordMalformed);
+    }
+    if byte_length as usize > MAX_RECORD_UTF16_BYTES {
+        return Err(RollbackPublicationError::PreviousRecordMalformed);
+    }
+    let initial_length = byte_length;
+    let mut data = vec![0_u16; (byte_length / 2) as usize];
+    // SAFETY: data has exactly the UTF-16 capacity returned by the first query.
+    let status = unsafe {
+        RegQueryValueExW(
+            key.0,
+            value.as_ptr(),
+            ptr::null_mut(),
+            &mut value_type,
+            data.as_mut_ptr().cast(),
+            &mut byte_length,
+        )
+    };
+    if status == ERROR_MORE_DATA || byte_length != initial_length || value_type != REG_SZ {
+        return Err(RollbackPublicationError::PreviousRecordChanged);
+    }
+    if status != ERROR_SUCCESS {
+        return Err(rollback_status_error(status));
+    }
+    valid_record_utf16(&data)
+        .then_some(data)
+        .ok_or(RollbackPublicationError::PreviousRecordMalformed)
+}
+
 fn valid_record_utf16(data: &[u16]) -> bool {
     let Some((&0, body)) = data.split_last() else {
         return false;
@@ -252,6 +329,17 @@ fn update_status_error(status: i32) -> UpdatePublicationError {
         ERROR_ACCESS_DENIED => UpdatePublicationError::AccessDenied,
         ERROR_MORE_DATA => UpdatePublicationError::ExistingRecordChanged,
         _ => UpdatePublicationError::RegistryUnavailable,
+    }
+}
+
+fn rollback_status_error(status: i32) -> RollbackPublicationError {
+    match status {
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => {
+            RollbackPublicationError::PreviousRecordUnavailable
+        }
+        ERROR_ACCESS_DENIED => RollbackPublicationError::AccessDenied,
+        ERROR_MORE_DATA => RollbackPublicationError::PreviousRecordChanged,
+        _ => RollbackPublicationError::RegistryUnavailable,
     }
 }
 

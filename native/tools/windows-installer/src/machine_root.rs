@@ -1,7 +1,7 @@
 //! Fixed machine-owned application-root selection for the Windows installer.
 
 use std::{
-    fmt,
+    fmt, fs,
     path::{Path, PathBuf},
 };
 
@@ -81,6 +81,14 @@ pub(crate) fn current_machine_application_root(
     application_root_below(&program_files, application_id)
 }
 
+/// Selects an existing fixed 64-bit Program Files application root without creating it.
+pub(crate) fn existing_machine_application_root(
+    application_id: &str,
+) -> Result<MachineApplicationRoot, MachineRootError> {
+    let program_files = raw::program_files_x64()?;
+    existing_application_root_below(&program_files, application_id)
+}
+
 fn application_root_below(
     program_files: &Path,
     application_id: &str,
@@ -95,6 +103,23 @@ fn application_root_below(
         raw::create_or_verify_normal_directory(&root)?;
     }
     Ok(MachineApplicationRoot { path: root })
+}
+
+fn existing_application_root_below(
+    program_files: &Path,
+    application_id: &str,
+) -> Result<MachineApplicationRoot, MachineRootError> {
+    if !is_valid_application_id(application_id) {
+        return Err(MachineRootError::ApplicationIdInvalid);
+    }
+    raw::verify_normal_directory(program_files)?;
+    let mut root = program_files.to_path_buf();
+    for component in ["Anodrel", "Applications", application_id] {
+        root.push(component);
+        raw::verify_normal_directory(&root)?;
+    }
+    let path = fs::canonicalize(root).map_err(|_| MachineRootError::RootInvalid)?;
+    Ok(MachineApplicationRoot { path })
 }
 
 mod raw {
@@ -260,7 +285,7 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
 
-    use super::{MachineRootError, application_root_below};
+    use super::{MachineRootError, application_root_below, existing_application_root_below};
 
     static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
@@ -293,6 +318,23 @@ mod tests {
             Err(MachineRootError::ApplicationIdInvalid)
         ));
         assert!(!parent.path().join("Anodrel").exists());
+    }
+
+    #[test]
+    fn existing_root_selection_never_creates_missing_components() {
+        let parent = TemporaryDirectory::new();
+        assert!(matches!(
+            existing_application_root_below(parent.path(), "org.anodrel.root-test"),
+            Err(MachineRootError::RootInvalid)
+        ));
+        let created = application_root_below(parent.path(), "org.anodrel.root-test")
+            .expect("the fixed root is created for the fixture");
+        assert_eq!(
+            existing_application_root_below(parent.path(), "org.anodrel.root-test")
+                .expect("the existing fixed root is selected")
+                .path(),
+            std::fs::canonicalize(created.path()).expect("the created fixed root canonicalizes")
+        );
     }
 
     struct TemporaryDirectory(PathBuf);

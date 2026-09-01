@@ -26,6 +26,8 @@ mod recovery;
 #[cfg(windows)]
 mod resources;
 #[cfg(windows)]
+mod rollback;
+#[cfg(windows)]
 mod signing;
 mod staging;
 #[cfg(windows)]
@@ -48,8 +50,8 @@ pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed
 pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};
 #[cfg(windows)]
 pub use publication::{
-    PublicationError, PublishedRelease, PublishedUpdate, UpdatePublicationError,
-    publish_promoted_release, publish_promoted_update,
+    PublicationError, PublishedRelease, PublishedUpdate, RollbackPublicationError,
+    UpdatePublicationError, publish_promoted_release, publish_promoted_update,
 };
 #[cfg(windows)]
 pub use recovery::{RecoveryCleanupError, cleanup_private_stages};
@@ -58,6 +60,11 @@ pub use recovery::{RecoveryDiscoveryError, discover_private_stages};
 pub use resources::{
     EmbeddedRelease, EmbeddedReleaseError, RELEASE_MANIFEST_RESOURCE_ID,
     RELEASE_PAYLOAD_RESOURCE_ID, read_current_release,
+};
+#[cfg(windows)]
+pub use rollback::{
+    RollbackCurrentError, RollbackPreflightError, RolledBackRelease, VerifiedRollbackTarget,
+    rollback_current_signed_release, verify_current_rollback_target,
 };
 #[cfg(windows)]
 pub use signing::{SignedReleaseError, VerifiedEmbeddedRelease, verify_current_signed_release};
