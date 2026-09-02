@@ -1,0 +1,13 @@
+[package]
+name = "anodrel-windows-updater"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-windows-update-cache = { path = "../windows-update-cache" }
+anodrel-windows-update-download = { path = "../windows-update-download" }
+anodrel-windows-update-handoff = { path = "../windows-update-handoff" }
+
+[dev-dependencies]
+anodrel-windows-policy = { path = "../windows-policy" }

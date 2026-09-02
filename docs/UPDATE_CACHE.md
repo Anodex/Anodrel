@@ -1,8 +1,8 @@
 # Windows update cache
 
 **Status:** The fixed cache-root and private-image recovery contracts are
-implemented. A later coordinator will connect them to discovery, user choice,
-download, UAC handoff, and completion waiting.
+implemented and compose with discovery, download, and UAC handoff. A later
+user-facing host surface will collect consent and completion information.
 
 ## Purpose
 

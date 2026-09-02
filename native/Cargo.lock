@@ -875,5 +875,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-updater"
+version = "0.1.0"
+dependencies = [
+ "anodrel-windows-policy",
+ "anodrel-windows-update-cache",
+ "anodrel-windows-update-download",
+ "anodrel-windows-update-handoff",
+]
+
+[[package]]
 name = "anodrel-wire"
 version = "0.1.0"
