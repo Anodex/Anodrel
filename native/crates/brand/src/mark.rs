@@ -107,7 +107,7 @@ pub fn draw(canvas: &mut Canvas, bounds: Rect, style: MarkStyle) {
         .flatten();
 
     if style.glow_ratio > 0.0 && style.glow_passes > 0 {
-        let glow = glow_paint(bounds).scale_alpha(style.opacity);
+        let glow = glow_paint(bounds, style.opacity);
         let radius = width * style.glow_ratio;
         match scaled.as_deref() {
             // Take the glow's shape from the artwork's own alpha, so the light
@@ -128,7 +128,7 @@ pub fn draw_glow_layer(canvas: &mut Canvas, bounds: Rect, style: MarkStyle) {
     if bounds.is_empty() || style.glow_ratio <= 0.0 || style.glow_passes == 0 {
         return;
     }
-    let glow = glow_paint(bounds).scale_alpha(style.opacity);
+    let glow = glow_paint(bounds, style.opacity);
     let radius = bounds.width() * style.glow_ratio;
     let edge = bounds.width().max(bounds.height());
     match (edge >= RASTER_MIN_EDGE)
@@ -187,14 +187,14 @@ pub fn coverage_mask(bounds: Rect) -> Option<Mask> {
     Mask::from_coverage(origin_x, origin_y, width, height, coverage)
 }
 
-fn glow_paint(bounds: Rect) -> Paint {
-    Paint::linear(
+fn glow_paint(bounds: Rect, opacity: f32) -> Paint {
+    Paint::linear_quantized(
         point(bounds.left, 0.0),
         point(bounds.right, 0.0),
         vec![
-            Stop::new(0.0, palette::VIOLET.with_alpha(140)),
-            Stop::new(0.5, palette::INDIGO.with_alpha(120)),
-            Stop::new(1.0, palette::BLUE.with_alpha(140)),
+            Stop::new(0.0, palette::VIOLET.with_alpha(140).scale_alpha(opacity)),
+            Stop::new(0.5, palette::INDIGO.with_alpha(120).scale_alpha(opacity)),
+            Stop::new(1.0, palette::BLUE.with_alpha(140).scale_alpha(opacity)),
         ],
     )
 }

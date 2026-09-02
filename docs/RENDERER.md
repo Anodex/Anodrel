@@ -450,10 +450,14 @@ changed. LLVM already hoists that arithmetic, because the paint is borrowed
 immutably for the whole fill. The change was reverted rather than kept, since
 unpaid complexity is still complexity.
 
-That leaves the per-pixel stop lookup and the four-channel `lerp` as the
-remaining candidates, and a **quantised colour ramp** as the way to remove them.
-That one would change pixels, so it needs the treatment Decision 0064 describes:
-a bounded error, measured and asserted, not assumed.
+The remaining cost was the per-pixel stop lookup and four-channel `lerp` under
+the diffuse mark glow. Decision 0176 now replaces only that effect with an
+explicit 512-sample colour ramp. Its brand test compares every sampled glow
+colour with the exact gradient and permits at most one level in any RGBA
+channel; exact paints remain the default elsewhere. The renderer workload
+reports both mask-fill paths: its optimized same-process 11-sample run measured
+1.779 ms for exact fill and 1.113 ms for the ramp. The Windows release guard
+remains authoritative for a whole sustained frame.
 
 ### Measuring a renderer change honestly
 

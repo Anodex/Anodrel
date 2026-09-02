@@ -4,6 +4,7 @@ use super::{
     GLOW_CACHE_LIMIT, GLOWS, MarkStyle, Piece, draw, draw_glow_layer, face_paint, glow_paint,
     pieces, scaled_raster, silhouette,
 };
+use crate::palette;
 use anodrel_canvas::{Canvas, Color, Mask, Rect, point};
 
 const UNIT: Rect = Rect::new(0.0, 0.0, 1.0, 1.0);
@@ -15,7 +16,7 @@ const UNIT: Rect = Rect::new(0.0, 0.0, 1.0, 1.0);
 /// spelled out here rather than sharing code with the path under test.
 fn glow_built_in_place(canvas: &mut Canvas, bounds: Rect, style: MarkStyle) {
     let image = scaled_raster(bounds.width().max(bounds.height())).expect("the mark decodes");
-    let paint = glow_paint(bounds).scale_alpha(style.opacity);
+    let paint = glow_paint(bounds, style.opacity);
     let radius = bounds.width() * style.glow_ratio;
     let padding = (radius * 1.5).ceil().max(1.0);
     let origin_x = (bounds.left - padding).floor() as i32;
@@ -74,6 +75,49 @@ fn largest_channel_difference(left: &Canvas, right: &Canvas) -> i16 {
 /// exactly on the grid and differ by at most 7 at the half-pixel worst
 /// case, so this is that with a step to spare.
 const GLOW_TOLERANCE: i16 = 8;
+
+/// The unquantized glow paint kept only as the approximation reference.
+fn exact_glow_paint(bounds: Rect, opacity: f32) -> anodrel_canvas::Paint {
+    anodrel_canvas::Paint::linear(
+        point(bounds.left, 0.0),
+        point(bounds.right, 0.0),
+        vec![
+            anodrel_canvas::Stop::new(0.0, palette::VIOLET.with_alpha(140).scale_alpha(opacity)),
+            anodrel_canvas::Stop::new(0.5, palette::INDIGO.with_alpha(120).scale_alpha(opacity)),
+            anodrel_canvas::Stop::new(1.0, palette::BLUE.with_alpha(140).scale_alpha(opacity)),
+        ],
+    )
+}
+
+#[test]
+fn the_quantized_glow_paint_stays_within_one_channel_level() {
+    for bounds in [
+        Rect::new(41.25, 0.0, 261.25, 220.0),
+        Rect::new(47.75, 0.0, 412.75, 365.0),
+    ] {
+        for opacity in [0.17, 0.63, 1.0] {
+            let (exact, quantized) = (
+                exact_glow_paint(bounds, opacity),
+                glow_paint(bounds, opacity),
+            );
+            for sample in 0..=4_096 {
+                let x = bounds.left - 8.0 + sample as f32 * (bounds.width() + 16.0) / 4_096.0;
+                let (a, b) = (exact.sample(point(x, 0.5)), quantized.sample(point(x, 0.5)));
+                for (exact, approximate) in [
+                    (a.red, b.red),
+                    (a.green, b.green),
+                    (a.blue, b.blue),
+                    (a.alpha, b.alpha),
+                ] {
+                    assert!(
+                        (i16::from(exact) - i16::from(approximate)).abs() <= 1,
+                        "glow paint exceeds one channel level at {x}"
+                    );
+                }
+            }
+        }
+    }
+}
 
 #[test]
 fn a_retained_glow_matches_one_built_in_place() {

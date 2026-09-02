@@ -3,6 +3,9 @@
 use crate::color::Color;
 use crate::geometry::Point;
 
+/// Precomputed colours held by one explicit quantized linear gradient.
+const QUANTIZED_LINEAR_SAMPLES: usize = 512;
+
 /// One colour anchored at a position along a gradient axis.
 #[derive(Clone, Copy, Debug)]
 pub struct Stop {
@@ -46,6 +49,19 @@ pub enum Paint {
         /// Stops in ascending position order.
         stops: Vec<Stop>,
     },
+    /// A bounded approximate linear gradient for a diffuse visual effect.
+    ///
+    /// The colour ramp contains [`QUANTIZED_LINEAR_SAMPLES`] samples and is
+    /// selected by nearest position. Exact linear gradients remain the default
+    /// for callers that carry semantic content.
+    LinearQuantized {
+        /// Axis origin, mapping to ramp position `0.0`.
+        start: Point,
+        /// Axis end, mapping to ramp position `1.0`.
+        end: Point,
+        /// Precomputed colours from the caller's exact stop table.
+        ramp: Vec<Color>,
+    },
     /// A gradient interpolated by distance from `center`.
     Radial {
         /// Centre, mapping to position `0.0`.
@@ -72,6 +88,22 @@ impl Paint {
             end,
             stops: stops.into(),
         }
+    }
+
+    /// Builds a bounded quantized linear gradient from exact colour stops.
+    ///
+    /// This replaces per-pixel stop lookup and interpolation with a nearest
+    /// lookup in 512 colours. Use it only where a caller has independently
+    /// bounded and tested the resulting visual error; see Decision 0176.
+    #[must_use]
+    pub fn linear_quantized(start: Point, end: Point, stops: impl Into<Vec<Stop>>) -> Self {
+        let stops = stops.into();
+        let last = (QUANTIZED_LINEAR_SAMPLES - 1) as f32;
+        let mut ramp = Vec::with_capacity(QUANTIZED_LINEAR_SAMPLES);
+        for index in 0..QUANTIZED_LINEAR_SAMPLES {
+            ramp.push(sample_stops(&stops, index as f32 / last));
+        }
+        Self::LinearQuantized { start, end, ramp }
     }
 
     /// Builds a vertical linear gradient between two colours.
@@ -110,14 +142,10 @@ impl Paint {
         match self {
             Self::Solid(color) => *color,
             Self::Linear { start, end, stops } => {
-                let axis = start.to(*end);
-                let length_squared = axis.dot(axis);
-                let position = if length_squared <= f32::EPSILON {
-                    0.0
-                } else {
-                    start.to(at).dot(axis) / length_squared
-                };
-                sample_stops(stops, position)
+                sample_stops(stops, linear_position(*start, *end, at))
+            }
+            Self::LinearQuantized { start, end, ramp } => {
+                sample_ramp(ramp, linear_position(*start, *end, at))
             }
             Self::Radial {
                 center,
@@ -147,6 +175,11 @@ impl Paint {
                 end: *end,
                 stops: scaled_stops(stops, factor),
             },
+            Self::LinearQuantized { start, end, ramp } => Self::LinearQuantized {
+                start: *start,
+                end: *end,
+                ramp: ramp.iter().map(|color| color.scale_alpha(factor)).collect(),
+            },
             Self::Radial {
                 center,
                 radius,
@@ -158,6 +191,24 @@ impl Paint {
             },
         }
     }
+}
+
+fn linear_position(start: Point, end: Point, at: Point) -> f32 {
+    let axis = start.to(end);
+    let length_squared = axis.dot(axis);
+    if length_squared <= f32::EPSILON {
+        0.0
+    } else {
+        start.to(at).dot(axis) / length_squared
+    }
+}
+
+fn sample_ramp(ramp: &[Color], position: f32) -> Color {
+    let Some(last_index) = ramp.len().checked_sub(1) else {
+        return Color::TRANSPARENT;
+    };
+    let index = (position.clamp(0.0, 1.0) * last_index as f32).round() as usize;
+    ramp[index]
 }
 
 fn scaled_stops(stops: &[Stop], factor: f32) -> Vec<Stop> {
@@ -255,5 +306,35 @@ mod tests {
         let paint = Paint::horizontal(0.0, 10.0, Color::WHITE, Color::BLACK).scale_alpha(0.5);
         assert_eq!(paint.sample(point(0.0, 0.0)).alpha, 128);
         assert_eq!(paint.sample(point(10.0, 0.0)).alpha, 128);
+    }
+
+    #[test]
+    fn a_quantized_linear_gradient_stays_within_one_channel_level() {
+        let stops = vec![
+            stop(0.0, Color::rgba(255, 3, 79, 211)),
+            stop(0.43, Color::rgba(17, 249, 131, 19)),
+            stop(1.0, Color::rgba(5, 47, 255, 233)),
+        ];
+        let exact = Paint::linear(point(13.4, 0.0), point(507.8, 0.0), stops.clone());
+        let quantized = Paint::linear_quantized(point(13.4, 0.0), point(507.8, 0.0), stops);
+
+        for index in 0..=16_384 {
+            let x = -20.0 + index as f32 * 560.0 / 16_384.0;
+            let (a, b) = (
+                exact.sample(point(x, 12.0)),
+                quantized.sample(point(x, 12.0)),
+            );
+            for (exact, approximate) in [
+                (a.red, b.red),
+                (a.green, b.green),
+                (a.blue, b.blue),
+                (a.alpha, b.alpha),
+            ] {
+                assert!(
+                    (i16::from(exact) - i16::from(approximate)).abs() <= 1,
+                    "sample at {x} differs by more than one channel level"
+                );
+            }
+        }
     }
 }

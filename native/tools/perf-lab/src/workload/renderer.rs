@@ -84,6 +84,11 @@ pub(super) fn measurements(iterations: usize) -> Result<Vec<LatencyMeasurement>,
             draw: mask_fill_stage,
         },
         Stage {
+            name: "mask-fill-quantized-gradient",
+            pixels: mask_pixels(),
+            draw: mask_fill_quantized_stage,
+        },
+        Stage {
             name: "image-scale",
             pixels: image_target_pixels(),
             draw: image_stage,
@@ -157,6 +162,11 @@ fn mask_fill_stage(canvas: &mut Canvas, _image: &Image, mask: &Mask) {
     canvas.fill_mask(mask, &panel_paint());
 }
 
+/// Compositing the same mask through the bounded quantized lookup path.
+fn mask_fill_quantized_stage(canvas: &mut Canvas, _image: &Image, mask: &Mask) {
+    canvas.fill_mask(mask, &quantized_panel_paint());
+}
+
 /// Compositing a scaled image, as the mark's artwork is drawn.
 fn image_stage(canvas: &mut Canvas, image: &Image, _mask: &Mask) {
     canvas.draw_image(image, image_bounds(), 1.0);
@@ -168,6 +178,18 @@ fn panel_bounds() -> Rect {
 
 fn panel_paint() -> Paint {
     Paint::linear(
+        point(40.0, 0.0),
+        point(320.0, 0.0),
+        vec![
+            Stop::new(0.0, Color::hex(0xA855F7).with_alpha(190)),
+            Stop::new(0.5, Color::hex(0x7C3AED).with_alpha(160)),
+            Stop::new(1.0, Color::hex(0x3B82F6).with_alpha(190)),
+        ],
+    )
+}
+
+fn quantized_panel_paint() -> Paint {
+    Paint::linear_quantized(
         point(40.0, 0.0),
         point(320.0, 0.0),
         vec![
@@ -247,7 +269,7 @@ mod tests {
     #[test]
     fn every_stage_reports_a_distinct_name_and_a_nonzero_pixel_count() {
         let measured = measurements(3).expect("the renderer workload runs");
-        assert_eq!(measured.len(), 5);
+        assert_eq!(measured.len(), 6);
 
         let mut names = Vec::new();
         for measurement in &measured {

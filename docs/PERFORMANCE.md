@@ -109,6 +109,15 @@ mask removed the first two; see
 [Decision 0064](decisions/0064-retained-raster-effects-trade-bounded-fidelity.md).
 The 2.3 ms composite is now the largest single cost in a frame.
 
+Decision 0176 replaces only that diffuse glow's exact three-stop paint with a
+512-sample bounded ramp. In one optimized `anodrel-perf-lab --renderer` run on
+the reference machine (11 samples per stage), exact gradient mask fill averaged
+**1.779 ms** and the equivalent quantized path averaged **1.113 ms** — 37% less
+for that isolated operation. This is a same-process stage comparison, not a
+claim that every frame became 37% faster: blending, rasterization, text, and
+presentation still cost time. The exact and quantized stages remain together in
+the workload so a later run can detect either regression.
+
 ## Host startup and memory report
 
 ~~~text
