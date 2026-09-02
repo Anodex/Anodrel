@@ -1,0 +1,9 @@
+[package]
+name = "anodrel-windows-install-handoff"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-windows-install-consent = { path = "../windows-install-consent" }
+anodrel-windows-installer = { path = "../../tools/windows-installer" }

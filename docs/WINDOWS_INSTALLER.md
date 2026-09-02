@@ -330,9 +330,11 @@ The installer now also exposes an opaque initial-install preflight and matching
 postcondition proof for a later native consent/UAC surface; see
 [initial-install acceptance](INSTALL_ACCEPTANCE.md). A direct native, no-by-default
 confirmation may turn that prepared result into an opaque approval; see
-[initial-install consent](INSTALL_CONSENT.md). The current command-line tool
-still requires an explicitly elevated shell and has no self-elevation or
-interactive installer path.
+[initial-install consent](INSTALL_CONSENT.md). Only that approval can enter a
+fixed direct UAC handoff, whose zero exit still requires the postcondition
+proof; see [initial-install handoff](INSTALL_HANDOFF.md). The current
+command-line tool still requires an explicitly elevated shell and has no
+default interactive installer path.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
@@ -349,5 +351,5 @@ compatible with the desired Windows distribution channel.
 
 See [Windows release readiness](WINDOWS_RELEASE.md), [signing foundation](SIGNING.md),
 [installed application records](LAUNCH.md), [initial-install acceptance](INSTALL_ACCEPTANCE.md),
-[initial-install consent](INSTALL_CONSENT.md), and Decisions 0017–0020, 0140,
-0177, and 0178.
+[initial-install consent](INSTALL_CONSENT.md), [initial-install handoff](INSTALL_HANDOFF.md),
+and Decisions 0017–0020, 0140, 0177–0179.

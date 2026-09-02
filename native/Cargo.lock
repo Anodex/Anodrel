@@ -703,6 +703,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-install-handoff"
+version = "0.1.0"
+dependencies = [
+ "anodrel-windows-install-consent",
+ "anodrel-windows-installer",
+]
+
+[[package]]
 name = "anodrel-windows-installer"
 version = "0.1.0"
 dependencies = [

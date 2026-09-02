@@ -66,6 +66,8 @@ impl std::error::Error for InitialInstallPreflightError {
 /// A safe failure while proving the selected initial installation afterwards.
 #[derive(Debug)]
 pub enum InitialInstallCompletionError {
+    /// The elevated installer process returned a nonzero exit code.
+    InstallerReportedFailure,
     /// Fixed machine policy could not select one valid current application.
     InstalledPolicyInvalid(PolicyStoreError),
     /// Windows did not accept the selected executable's Authenticode signer.
@@ -83,6 +85,7 @@ pub enum InitialInstallCompletionError {
 impl fmt::Display for InitialInstallCompletionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
+            Self::InstallerReportedFailure => "the installer reported that installation failed",
             Self::InstalledPolicyInvalid(_) => "the selected application policy is invalid",
             Self::InstalledSignatureInvalid(_) => {
                 "Windows did not accept the selected executable signature"
@@ -106,6 +109,7 @@ impl fmt::Display for InitialInstallCompletionError {
 impl std::error::Error for InitialInstallCompletionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::InstallerReportedFailure => None,
             Self::InstalledPolicyInvalid(error) => Some(error),
             Self::InstalledSignatureInvalid(error) => Some(error),
             Self::InstalledPublisherMismatch
@@ -215,6 +219,10 @@ mod tests {
         assert_eq!(
             InitialInstallCompletionError::InstallerVersionMismatch.to_string(),
             "the selected application version does not match the signed installer"
+        );
+        assert_eq!(
+            InitialInstallCompletionError::InstallerReportedFailure.to_string(),
+            "the installer reported that installation failed"
         );
     }
 }

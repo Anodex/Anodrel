@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0179: Initial-install elevation is fixed and one-shot.
+
 - 0178: Initial-install consent is native and one-shot.
 
 - 0177: Initial-install success requires policy proof.

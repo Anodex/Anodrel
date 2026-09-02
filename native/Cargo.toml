@@ -55,6 +55,7 @@ members = [
   "adapters/windows-update-cache",
   "adapters/windows-update-consent",
   "adapters/windows-install-consent",
+  "adapters/windows-install-handoff",
   "adapters/windows-update-handoff",
   "adapters/windows-updater",
   "adapters/windows-policy",
