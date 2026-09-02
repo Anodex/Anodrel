@@ -12,6 +12,8 @@ mod error;
 #[cfg(windows)]
 mod image;
 #[cfg(windows)]
+mod install_acceptance;
+#[cfg(windows)]
 mod installation;
 #[cfg(windows)]
 mod machine_root;
@@ -42,6 +44,12 @@ mod update_installation;
 pub use error::ReleaseManifestError;
 #[cfg(windows)]
 pub use image::{InstallerImageError, VerifiedInstallerImage, verify_locked_installer_image};
+#[cfg(windows)]
+pub use install_acceptance::{
+    InitialInstallCompletionError, InitialInstallPreflightError, PreparedInitialInstall,
+    VerifiedInitialInstallation, prepare_current_initial_install,
+    verify_current_initial_installation,
+};
 #[cfg(windows)]
 pub use installation::{InstallCurrentError, InstalledRelease, install_current_signed_release};
 #[cfg(windows)]

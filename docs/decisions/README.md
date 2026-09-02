@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0177: Initial-install success requires policy proof.
+
 - 0176: A quantized glow colour ramp buys bounded frame headroom.
 
 - 0175: Update catalogues derive release facts from locked images.

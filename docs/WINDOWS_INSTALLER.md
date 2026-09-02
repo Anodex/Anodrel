@@ -326,6 +326,12 @@ show that the current signed embedded release was accepted without writing
 machine state. The development-only `validate-manifest <path>` command still
 validates one sidecar manifest and cannot write machine state.
 
+The installer now also exposes an opaque initial-install preflight and matching
+postcondition proof for a later native consent/UAC surface; see
+[initial-install acceptance](INSTALL_ACCEPTANCE.md). The current command-line
+tool still requires an explicitly elevated shell and has no self-elevation or
+interactive installer path.
+
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
 notifications. The signed catalogue source, CMS verification, and private image
@@ -340,4 +346,5 @@ certificate, its custody and renewal process, and whether that identity is
 compatible with the desired Windows distribution channel.
 
 See [Windows release readiness](WINDOWS_RELEASE.md), [signing foundation](SIGNING.md),
-[installed application records](LAUNCH.md), and Decisions 0017–0020 and 0140.
+[installed application records](LAUNCH.md), [initial-install acceptance](INSTALL_ACCEPTANCE.md),
+and Decisions 0017–0020, 0140, and 0177.
