@@ -213,7 +213,7 @@ pub fn rollback_current_signed_release() -> Result<RolledBackRelease, RollbackCu
 fn package_version_under_root(root: &Path, package_root: &Path) -> Option<PackageVersion> {
     (package_root.parent()? == root)
         .then(|| package_root.file_name()?.to_str())?
-        .and_then(PackageVersion::from_directory_name)
+        .and_then(PackageVersion::from_canonical_directory_name)
 }
 
 #[cfg(test)]

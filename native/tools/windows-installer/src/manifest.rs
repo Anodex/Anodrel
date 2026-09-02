@@ -51,7 +51,7 @@ impl PackageVersion {
     /// Release promotion creates only `major.minor.patch` names with ordinary
     /// decimal components. Rejecting alternate spellings keeps a version
     /// directory from having more than one textual identity.
-    pub(crate) fn from_directory_name(name: &str) -> Option<Self> {
+    pub fn from_canonical_directory_name(name: &str) -> Option<Self> {
         let mut components = name.split('.');
         let major = parse_directory_component(components.next()?)?;
         let minor = parse_directory_component(components.next()?)?;

@@ -66,15 +66,19 @@ existing Authenticode and installer update gates
 The parser itself is **not** a trust decision. The direct Windows signature
 adapter uses attached CMS with exactly one valid signer certificate, requires
 that signer's SHA-256 fingerprint to equal the installed publisher, and only
-then returns the bounded decoded bytes for this parser. It proves a signature
-from that pinned publisher but does not independently establish certificate
-chain trust, timestamp validity, or installer trust.
+then returns an opaque verified catalogue value. It proves a signature from
+that pinned publisher but does not independently establish certificate-chain
+trust, timestamp validity, installed identity, version freshness, or installer
+trust.
 
-A future direct HTTPS adapter must refuse redirects, cookies, proxy discovery,
+The direct update-download adapter refuses redirects, cookies, proxy discovery,
 automatic credentials, arbitrary URLs, and content outside the declared size
-and digest. The existing installer then independently checks the downloaded
-image's Authenticode signature, embedded publisher, payload, staged executable,
-forward version, and machine policy before update.
+and digest. It admits only CMS-verified catalogues that also pass fixed
+installed identity, publisher, and newer-version preflight, and stages one
+fresh private file. The existing installer must still independently check the
+downloaded image's Authenticode signature, embedded publisher, payload, staged
+executable, forward version, and machine policy before update. See
+[update delivery](UPDATE_DELIVERY.md) and Decision 0167.
 
 ## Owned signing command
 

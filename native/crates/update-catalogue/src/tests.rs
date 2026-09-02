@@ -31,6 +31,10 @@ fn valid_catalogue_binds_an_exact_newer_installer_image() {
     );
     assert_eq!(catalogue.installer().byte_length(), image.len() as u64);
     assert!(catalogue.installer().matches_bytes(image));
+    assert!(catalogue.installer().matches_descriptor(
+        image.len() as u64,
+        anodrel_application::sha256::digest(image)
+    ));
     assert!(!catalogue.installer().matches_bytes(b"substituted image"));
 }
 

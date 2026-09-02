@@ -136,7 +136,7 @@ pub fn verify_current_update_candidate() -> Result<VerifiedUpdateCandidate, Upda
 fn package_version_from_root(root: &std::path::Path) -> Option<PackageVersion> {
     root.file_name()?
         .to_str()
-        .and_then(PackageVersion::from_directory_name)
+        .and_then(PackageVersion::from_canonical_directory_name)
 }
 
 #[cfg(test)]

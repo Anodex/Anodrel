@@ -86,7 +86,7 @@ const ROUND_CONSTANTS: [u32; 64] = [
 ];
 
 pub fn digest(input: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
+    let mut hasher = Sha256Digest::new();
     hasher.update(input);
     hasher.finish()
 }
@@ -122,7 +122,7 @@ pub fn digest_reader_limited<R: Read>(
     reader: &mut R,
     maximum: usize,
 ) -> io::Result<Option<([u8; 32], usize)>> {
-    let mut hasher = Sha256::new();
+    let mut hasher = Sha256Digest::new();
     let mut total = 0_usize;
     let mut buffer = [0_u8; 16 * 1024];
 
@@ -160,15 +160,28 @@ fn hex_digit(value: u8) -> Option<u8> {
     }
 }
 
-struct Sha256 {
+/// Incrementally calculates one SHA-256 digest without retaining its input.
+///
+/// Call [`Sha256Digest::update`] for each available byte slice, then consume
+/// the value with [`Sha256Digest::finish`]. The digest remains deterministic
+/// across any chunking of the same byte stream.
+pub struct Sha256Digest {
     state: [u32; 8],
     total_bytes: u64,
     buffer: [u8; 64],
     buffered: usize,
 }
 
-impl Sha256 {
-    fn new() -> Self {
+impl Default for Sha256Digest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Sha256Digest {
+    /// Starts an empty SHA-256 byte stream.
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             state: INITIAL_STATE,
             total_bytes: 0,
@@ -177,7 +190,8 @@ impl Sha256 {
         }
     }
 
-    fn update(&mut self, mut input: &[u8]) {
+    /// Adds one byte slice to this digest without retaining the slice.
+    pub fn update(&mut self, mut input: &[u8]) {
         self.total_bytes = self.total_bytes.wrapping_add(input.len() as u64);
 
         if self.buffered != 0 {
@@ -204,7 +218,9 @@ impl Sha256 {
         }
     }
 
-    fn finish(mut self) -> [u8; 32] {
+    /// Completes the digest and returns its 32-byte SHA-256 value.
+    #[must_use]
+    pub fn finish(mut self) -> [u8; 32] {
         let bit_length = self.total_bytes.wrapping_mul(8);
         let padding = if self.buffered < 56 {
             56 - self.buffered
@@ -279,7 +295,7 @@ fn transform(state: &mut [u32; 8], block: &[u8; 64]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{digest, lower_hex, parse_lower_hex};
+    use super::{Sha256Digest, digest, lower_hex, parse_lower_hex};
 
     #[test]
     fn matches_standard_sha256_vectors() {
@@ -308,5 +324,15 @@ mod tests {
             parse_lower_hex("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
             Some(digest(b"abc"))
         );
+    }
+
+    #[test]
+    fn incremental_digest_matches_one_shot_digest_across_chunk_boundaries() {
+        let input = b"Anodrel streams release images without retaining them.";
+        let mut streamed = Sha256Digest::new();
+        for chunk in input.chunks(7) {
+            streamed.update(chunk);
+        }
+        assert_eq!(streamed.finish(), digest(input));
     }
 }

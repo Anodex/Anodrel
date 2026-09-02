@@ -133,7 +133,14 @@ impl UpdateInstaller {
     /// Checks one downloaded image's bytes without exposing its expected digest.
     #[must_use]
     pub fn matches_bytes(&self, actual: &[u8]) -> bool {
-        actual.len() as u64 == self.byte_length && sha256::digest(actual) == self.digest
+        self.matches_descriptor(actual.len() as u64, sha256::digest(actual))
+    }
+
+    /// Checks a caller-calculated downloaded-image descriptor without exposing
+    /// the catalogue's expected digest.
+    #[must_use]
+    pub fn matches_descriptor(&self, byte_length: u64, digest: [u8; 32]) -> bool {
+        byte_length == self.byte_length && digest == self.digest
     }
 }
 

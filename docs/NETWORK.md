@@ -86,10 +86,11 @@ one successful protocol result.
 
 ## Windows mapping
 
-The direct adapter uses WinHTTP: `WinHttpOpen`, `WinHttpConnect`,
-`WinHttpOpenRequest`, `WinHttpSendRequest`, `WinHttpReceiveResponse`, status
-query, bounded reads, and `WinHttpCloseHandle`. It uses no browser, webview,
-Node.js, WinINet, COM browser component, or third-party network library.
+The direct adapter uses Anodrel's shared WinHTTP transport: `WinHttpOpen`,
+`WinHttpConnect`, `WinHttpOpenRequest`, `WinHttpSendRequest`,
+`WinHttpReceiveResponse`, status query, bounded reads, and
+`WinHttpCloseHandle`. It uses no browser, webview, Node.js, WinINet, COM
+browser component, or third-party network library.
 
 Every session, connection, and request handle has one RAII owner. Parent and
 child handles are closed on every success, rejection, timeout, and failure path.
@@ -97,8 +98,11 @@ Each request creates a fresh direct no-proxy session, sets every phase timeout
 to ten seconds, then disables cookies, redirects, automatic authentication, and
 keep-alive on its request handle before sending. It enables Windows
 certificate-revocation checking on that same handle and sets no
-certificate-error-ignore flag. The adapter maps all native failure detail to
-the two stable safe errors above. It does not start a callback, background
+certificate-error-ignore flag. The shared transport streams checked chunks
+rather than retaining a response body; this text adapter alone collects and
+validates at most 32 KiB. See [direct HTTPS transport](HTTPS_TRANSPORT.md) and
+Decision 0166. The adapter maps all native failure detail to the two stable
+safe errors above. It does not start a callback, background
 worker, or UI operation; the existing authenticated session worker holds the
 bounded synchronous work.
 

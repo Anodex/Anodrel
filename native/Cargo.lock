@@ -666,6 +666,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-http"
+version = "0.1.0"
+dependencies = [
+ "anodrel-network",
+]
+
+[[package]]
 name = "anodrel-windows-installer"
 version = "0.1.0"
 dependencies = [
@@ -698,6 +705,7 @@ name = "anodrel-windows-network"
 version = "0.1.0"
 dependencies = [
  "anodrel-network",
+ "anodrel-windows-http",
 ]
 
 [[package]]
@@ -831,7 +839,21 @@ name = "anodrel-windows-update-catalogue-signature"
 version = "0.1.0"
 dependencies = [
  "anodrel-update-catalogue",
+ "anodrel-windows-installer",
  "anodrel-windows-signing",
+]
+
+[[package]]
+name = "anodrel-windows-update-download"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-update-catalogue",
+ "anodrel-windows-http",
+ "anodrel-windows-installer",
+ "anodrel-windows-policy",
+ "anodrel-windows-signature",
+ "anodrel-windows-update-catalogue-signature",
 ]
 
 [[package]]

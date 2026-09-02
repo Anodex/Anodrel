@@ -12,7 +12,7 @@ mod error;
 mod signature;
 
 pub use error::UpdateCatalogueSignatureError;
-pub use signature::{sign_update_catalogue, verify_update_catalogue};
+pub use signature::{VerifiedUpdateCatalogue, sign_update_catalogue, verify_update_catalogue};
 
 /// Maximum attached CMS envelope size for one version-1 update catalogue.
 pub const MAX_SIGNED_UPDATE_CATALOGUE_BYTES: usize = 128 * 1024;

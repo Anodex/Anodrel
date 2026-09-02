@@ -1,0 +1,19 @@
+#![deny(unsafe_op_in_unsafe_fn)]
+#![deny(missing_docs)]
+
+//! Direct Windows staging for one already verified update installer image.
+//!
+//! This internal adapter reloads installed identity facts, streams one signed
+//! catalogue image into a fresh private file, and verifies its byte descriptor.
+//! It has no application protocol, discovery, launch, elevation, or install
+//! surface. See `docs/UPDATE_DELIVERY.md` and Decision 0167.
+
+mod candidate;
+mod download;
+mod error;
+mod file;
+
+pub use candidate::{PreparedUpdateDownload, prepare_current_update_download};
+pub use download::download_prepared_update;
+pub use error::UpdateDownloadError;
+pub use file::DownloadedInstaller;

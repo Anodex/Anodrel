@@ -13,6 +13,10 @@ Each record should include:
 
 Current records (newest first):
 
+- 0167: Verified update images stream to fresh private files.
+
+- 0166: Direct Windows HTTPS transfer is shared and streaming.
+
 - 0165: Owned update catalogues use attached CMS signatures.
 
 - 0164: Owned update catalogues bind one candidate before retrieval.

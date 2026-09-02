@@ -7,3 +7,4 @@ license.workspace = true
 [dependencies]
 anodrel-update-catalogue = { path = "../../crates/update-catalogue" }
 anodrel-windows-signing = { path = "../windows-signing" }
+anodrel-windows-installer = { path = "../../tools/windows-installer" }
