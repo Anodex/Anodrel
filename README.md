@@ -14,7 +14,7 @@ shipping a browser runtime.
   browser engine, webview, or Node.js runtime.
 
 It is not an application itself, an Anodex source mirror, or a finished
-Electron replacement. Owned Windows release foundations include signed catalogue discovery and private image staging; production certificate custody, signed acceptance, elevation handoff, update recovery, and macOS/Linux desktop hosts remain planned work. Linux has authenticated local transport, a private child transport with one host-owned lifecycle, bounded state, and a fixed Wayland child/view diagnostic—not an application desktop host or product launcher.
+Electron replacement. Owned Windows release foundations include signed catalogue discovery, private image staging, native consent, elevation handoff, and post-update policy proof; production certificate custody, signed end-to-end acceptance, and macOS/Linux desktop hosts remain planned work. Linux has authenticated local transport, a private child transport with one host-owned lifecycle, bounded state, and a fixed Wayland child/view diagnostic—not an application desktop host or product launcher.
 
 Anodex will be the first application built on Anodrel. Anodex is not being
 moved into this repository yet; it remains an independent project until the

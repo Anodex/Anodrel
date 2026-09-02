@@ -184,14 +184,15 @@ Authenticode. Its no-argument machine routes select only their
   command. One opaque native updater now composes cache recovery, signed
   discovery, private download, image locking, and that handoff. Its fixed
   current-user cache remains separate from every application filesystem surface.
-  Production certificate custody, timestamping, a signed positive acceptance
-  run, user-visible consent/progress, and a real production identity remain
-  separate work.
+  Its direct native consent defaults to no and remains separate from application
+  UI. Production certificate custody, timestamping, a signed positive
+  acceptance run, progress/restart presentation, and a real production identity
+  remain separate work.
 See `docs/SIGNING.md`, `docs/RELEASE_MANIFEST.md`, `docs/LAUNCH.md`,
   `docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`,
   `docs/UPDATE_HANDOFF.md`, `docs/UPDATE_CACHE.md`, `docs/UPDATE_FLOW.md`, and
-  `docs/UPDATE_ACCEPTANCE.md`, and Decisions 0017 through 0020, 0061, and 0140
-  through 0172.
+  `docs/UPDATE_ACCEPTANCE.md`, `docs/UPDATE_CONSENT.md`, and Decisions 0017
+  through 0020, 0061, and 0140 through 0173.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. The Linux paths adapter obtains the

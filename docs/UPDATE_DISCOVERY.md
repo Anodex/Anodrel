@@ -1,8 +1,8 @@
 # Windows update catalogue discovery
 
-**Status:** The signed installed-policy contract is implemented. A later
-native updater will connect it to user consent, cache-root selection, and the
-installer handoff.
+**Status:** The signed installed-policy contract now composes with the native
+cache, consent, handoff, and postcondition boundaries. A user-visible host
+action and a signed end-to-end acceptance run remain separate work.
 
 ## Purpose
 

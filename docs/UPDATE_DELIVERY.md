@@ -2,9 +2,9 @@
 
 **Status:** Direct signed-catalogue discovery, private staging, fixed-cache
 recovery, locked image acceptance, direct UAC handoff, and opaque native
-coordination are implemented. The post-handoff policy proof is also
-implemented. User-visible consent/progress, a signed end-to-end acceptance run,
-and automatic scheduling remain separate work.
+coordination, native consent, and the post-handoff policy proof are implemented.
+Progress/restart presentation, a signed end-to-end acceptance run, and automatic
+scheduling remain separate work.
 
 ## Purpose
 

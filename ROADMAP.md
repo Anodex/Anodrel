@@ -409,7 +409,9 @@ Status: **Direct Windows host in progress**
   process. A development-only signed fixture, a controlled provisioning helper,
   the host `--product-session` route, and a preflight-resolved Startup Lab tile
   exercise the whole path on a development machine (Decision 0061). Owned release
-  foundations now include signed catalogue discovery and private image staging; production identity, signed proof, elevation handoff, and update recovery remain required before a shipped application uses it.
+  foundations now include signed catalogue discovery, private image staging,
+  native consent, elevation handoff, and post-update policy proof. Production identity
+  and a signed end-to-end acceptance run remain required before a shipped application uses it.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.
@@ -433,7 +435,7 @@ pipe, host-owned native window, one semantic action, and coordinated shutdown.
 This is a development-machine fixture, not an installed product: it depends on
 a locally generated certificate placed in machine trust, and it says nothing
 about packaging, installation, updates, multi-window policy, restart, or
-background execution. The owned release foundation now has bundle, image, direct-signing, installation, rollback, recovery, signed catalogue discovery, and private image staging boundaries. Release work still needs production certificate custody, signed acceptance, endpoint operation, timestamping, elevation handoff, and update recovery proof.
+background execution. The owned release foundation now has bundle, image, direct-signing, installation, rollback, recovery, signed catalogue discovery, private image staging, native consent, elevation handoff, and post-update policy proof. Release work still needs production certificate custody, endpoint operation, timestamping, and a signed end-to-end acceptance run.
 
 The Startup Lab's linked and planned actions are maintained in
 [`docs/roadmap/STARTUP_LAB_TILES.md`](docs/roadmap/STARTUP_LAB_TILES.md).

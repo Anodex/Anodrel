@@ -8,6 +8,7 @@ license.workspace = true
 anodrel-windows-update-cache = { path = "../windows-update-cache" }
 anodrel-windows-update-download = { path = "../windows-update-download" }
 anodrel-windows-update-handoff = { path = "../windows-update-handoff" }
+anodrel-windows-installer = { path = "../../tools/windows-installer" }
 
 [dev-dependencies]
 anodrel-windows-policy = { path = "../windows-policy" }

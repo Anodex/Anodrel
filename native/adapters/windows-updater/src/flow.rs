@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use anodrel_windows_installer::PackageVersion;
 use anodrel_windows_update_cache::{UpdateCache, open_current_update_cache, recover_update_cache};
 use anodrel_windows_update_download::{
     PreparedUpdateDownload, VerifiedDownloadedInstaller, download_prepared_update,
@@ -35,6 +36,12 @@ impl fmt::Debug for ReadyUpdate {
 }
 
 impl AvailableUpdate {
+    /// Returns the signed candidate version for an Anodrel-owned host prompt.
+    #[must_use]
+    pub const fn candidate_version(&self) -> PackageVersion {
+        self.candidate.candidate_version()
+    }
+
     /// Downloads and locks this exact discovered candidate into its fixed cache.
     ///
     /// A host must place this mutating transfer behind its own explicit user

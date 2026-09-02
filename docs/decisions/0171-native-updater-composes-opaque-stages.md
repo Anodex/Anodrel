@@ -22,8 +22,12 @@ Windows UAC `runas update` handoff.
 
 The composition exposes no application protocol, endpoint, path, installer,
 argument, version, publisher, registry, certificate, progress, scheduler, or
-restart choice. It intentionally stops before user-visible consent and final
-installed-policy confirmation.
+restart choice. Its initial implementation intentionally stopped before
+user-visible consent and final installed-policy confirmation.
+
+Decision 0172 subsequently adds the native postcondition proof, and Decision
+0173 adds a separate host-owned consent prompt. The updater crate remains free
+of either UI implementation so its ordering and authority stay narrow.
 
 ## Consequences
 

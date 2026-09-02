@@ -20,6 +20,12 @@ impl PreparedUpdateDownload {
         self.catalogue.installer()
     }
 
+    /// Returns the CMS-verified candidate version for native host presentation.
+    #[must_use]
+    pub const fn candidate_version(&self) -> PackageVersion {
+        self.catalogue.package_version()
+    }
+
     pub(crate) fn matches_image(&self, image: &VerifiedInstallerImage) -> bool {
         self.catalogue.matches_release(image.manifest())
     }

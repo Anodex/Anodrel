@@ -53,6 +53,7 @@ members = [
   "adapters/windows-update-catalogue-signature",
   "adapters/windows-update-download",
   "adapters/windows-update-cache",
+  "adapters/windows-update-consent",
   "adapters/windows-update-handoff",
   "adapters/windows-updater",
   "adapters/windows-policy",
