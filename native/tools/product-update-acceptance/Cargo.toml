@@ -1,0 +1,18 @@
+[package]
+name = "anodrel-product-update-acceptance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-product-update-acceptance"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-windows-update-consent = { path = "../../adapters/windows-update-consent" }
+anodrel-windows-update-handoff = { path = "../../adapters/windows-update-handoff" }
+anodrel-windows-updater = { path = "../../adapters/windows-updater" }
+
+[dev-dependencies]
+anodrel-windows-update-cache = { path = "../../adapters/windows-update-cache" }

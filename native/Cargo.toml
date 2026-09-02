@@ -82,6 +82,7 @@ members = [
   "tools/native-app-tool",
   "tools/product-fixture",
   "tools/product-provisioning",
+  "tools/product-update-acceptance",
   "tools/windows-installer",
   "tools/release-bundle-tool",
   "tools/release-image",

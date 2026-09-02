@@ -395,6 +395,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-product-update-acceptance"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-windows-update-cache",
+ "anodrel-windows-update-consent",
+ "anodrel-windows-update-handoff",
+ "anodrel-windows-updater",
+]
+
+[[package]]
 name = "anodrel-protocol"
 version = "0.1.0"
 dependencies = [

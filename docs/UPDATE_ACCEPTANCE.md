@@ -1,7 +1,8 @@
 # Windows update acceptance
 
-**Status:** The post-handoff machine-policy proof is implemented. A real signed
-fixture run remains required before this can be claimed as production acceptance.
+**Status:** The post-handoff machine-policy proof and fixed-identity development
+acceptance runner are implemented. A real signed fixture run remains required
+before this can be claimed as production acceptance.
 
 ## Purpose
 
@@ -29,11 +30,14 @@ relaunch, notification, or error detail is produced by this boundary.
 
 ## Verification still required
 
-The eventual signed fixture acceptance must exercise an actual newer installer,
-the UAC prompt, the elevated update transaction, process completion, and this
-postcondition on a development machine with its temporary signing certificate
-trusted. Production acceptance additionally needs the real certificate custody,
-timestamping, and release endpoint decisions.
+`anodrel-product-update-acceptance` is the no-argument operator diagnostic for
+the fixed development fixture identity. The eventual signed fixture acceptance
+must exercise an actual newer installer, the Anodrel prompt, UAC prompt, the
+elevated update transaction, process completion, and this postcondition on a
+development machine with its temporary signing certificate trusted. Production
+acceptance additionally needs the real certificate custody, timestamping, and
+release endpoint decisions.
 
 See [update flow](UPDATE_FLOW.md), [update handoff](UPDATE_HANDOFF.md), and
-[Windows installer](WINDOWS_INSTALLER.md).
+[Windows installer](WINDOWS_INSTALLER.md), and the
+[development product-update fixture](PRODUCT_UPDATE_FIXTURE.md).
