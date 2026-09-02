@@ -140,7 +140,8 @@ fn version_one_one_binds_one_catalogue_source_into_the_machine_record() {
 
 #[test]
 fn version_one_two_binds_safe_product_metadata_to_the_signed_release() {
-    let manifest = release_manifest(PAYLOAD, "[]", "[]")
+    let package = StagedPackage::new();
+    let manifest = release_manifest(&package.executable_digest(), "[]", "[]")
         .replace("\"minor\": 0", "\"minor\": 2")
         .replace(
             "  \"payload\":",
@@ -152,6 +153,16 @@ fn version_one_two_binds_safe_product_metadata_to_the_signed_release() {
         .expect("version 1.2 has signed display metadata");
     assert_eq!(product.display_name(), "Anodrel Installer Test");
     assert_eq!(product.publisher_name(), "Anodrel");
+
+    let record = release.render_install_record(package.root());
+    let installed =
+        InstalledApplication::load_from_trusted_record(&record, "org.anodrel.installer-test")
+            .expect("the version 1.21 record is valid");
+    let selected_product = installed
+        .product_metadata()
+        .expect("selected record retains signed display metadata");
+    assert_eq!(selected_product.display_name(), "Anodrel Installer Test");
+    assert_eq!(selected_product.publisher_name(), "Anodrel");
 
     let unsafe_text = manifest.replace("Anodrel Installer Test", "Anodrel\u{202E}Test");
     assert!(matches!(

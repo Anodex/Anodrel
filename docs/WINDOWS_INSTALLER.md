@@ -81,7 +81,7 @@ field. Unknown, missing, duplicate, or wrongly typed fields are rejected.
 | `executable.path` | Relative, forward-slash-separated contained `.exe` path; no roots, drives, `.` or `..`. |
 | `executable.sha256` | Lowercase SHA-256 of the extracted executable. |
 | `publisher.leafCertificateSha256` | Lowercase SHA-256 leaf fingerprint the installer and extracted executable must both match. |
-| `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19 machine record, then asks the existing validator to accept it. |
+| `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19, 1.20, or 1.21 machine record, then asks the existing validator to accept it. |
 | `networkOrigins` | Exact host/port policy. It is empty unless `capabilities` includes `network.fetch`; the existing installed-record validator is authoritative. |
 | `updateCatalogue` | Versions 1.1 and 1.2: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
 | `product` | Version 1.2 only: one signed `displayName` and `publisherName` for later host-owned Windows product surfaces. Neither value is a path, policy key, identity, or certificate selector. See [signed product display metadata](PRODUCT_METADATA.md). |
@@ -98,9 +98,11 @@ location and it enters the fixed machine record only through installer gates.
 foundation. It bounds and parses one release manifest, validates its executable
 and payload descriptors, then requires the complete payload to match before its
 owned per-file bundle decoder runs. It canonicalizes permitted network origins
-and renders version 1.19 or 1.20 installed-record policy for later host-side
-validation. Version 1.20 retains the signed release's optional strict catalogue
-source, not an application-provided or arbitrary download route. The direct Windows resource reader selects only the two fixed
+and renders version 1.19, 1.20, or 1.21 installed-record policy for later
+host-side validation. Version 1.20 retains the signed release's optional strict
+catalogue source, not an application-provided or arbitrary download route;
+version 1.21 additionally retains signed product display metadata for a later
+host-owned Windows surface. The direct Windows resource reader selects only the two fixed
 current-image resources and fails closed when they are absent. Its contract tests
 prove that the rendered record passes the same `anodrel-application` validator
 the Windows host reads. The activation gate now asks Windows to verify the
@@ -144,8 +146,9 @@ reserved path characters, and overlong output paths, then creates a new regular
 file. It syncs and rehashes that file before continuing. Existing files,
 directories, links, and registry values are never reused as staging input.
 
-After every bundle file is present, the installer renders the version-1.19
-record for the staging root and runs the existing installed-record validator.
+After every bundle file is present, the installer renders the version-1.19,
+1.20, or 1.21 record for the staging root and runs the existing
+installed-record validator.
 That independently checks the application manifest, content digest, executable
 containment, executable digest, application identity, capabilities, and network
 policy. The signer gate then verifies the staged executable through Windows
@@ -303,7 +306,7 @@ host's only policy source.
    and reject any file outside the destination tree.
 3. Check the extracted application package, executable path, executable digest,
    and executable Authenticode fingerprint. It must match the installer.
-4. Compose the proposed version-1.19 or 1.20 installed record and validate it through
+4. Compose the proposed version-1.19, 1.20, or 1.21 installed record and validate it through
    `anodrel-application` before any registry write.
 5. Rename the verified staging directory to its version directory, atomically
    publish the one registry `record` value, and retain the prior complete

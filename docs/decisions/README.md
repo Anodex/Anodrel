@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0182: Product registration follows selected machine policy.
+
 - 0181: Product display metadata is signed and never authority.
 
 - 0180: Default installer entry composes fixed initial-install stages.

@@ -9,9 +9,7 @@ use anodrel_protocol::Capability;
 
 use crate::{MAX_PAYLOAD_BYTES, MAX_RELEASE_MANIFEST_BYTES, ReleaseManifestError};
 
-mod metadata;
-
-pub use metadata::ProductMetadata;
+pub use anodrel_application::ProductDisplayMetadata as ProductMetadata;
 
 /// One release directory version, distinct from protocol compatibility.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -334,6 +332,7 @@ fn parse_product_metadata(
         required_string(fields, "displayName")?,
         required_string(fields, "publisherName")?,
     )
+    .map_err(|_| ReleaseManifestError::ProductMetadataInvalid)
 }
 
 fn parse_update_catalogue(

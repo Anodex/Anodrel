@@ -24,9 +24,11 @@ use crate::{
 
 const PACKAGE_MANIFEST_NAME: &str = "anodrel.application.json";
 
+mod product;
 mod record;
 mod update_catalogue;
 
+pub use product::{ProductDisplayMetadata, ProductDisplayMetadataError};
 pub use update_catalogue::{
     MAX_UPDATE_CATALOGUE_PATH_BYTES, UpdateCatalogueLocation, UpdateCatalogueLocationError,
 };
@@ -60,6 +62,7 @@ pub struct InstalledApplication {
     capabilities: Vec<Capability>,
     network_policy: Option<NetworkOriginPolicy>,
     update_catalogue: Option<UpdateCatalogueLocation>,
+    product_metadata: Option<ProductDisplayMetadata>,
 }
 
 impl InstalledApplication {
@@ -167,6 +170,15 @@ impl InstalledApplication {
         self.update_catalogue.as_ref()
     }
 
+    /// Returns selected signed display metadata for a host-owned product surface.
+    ///
+    /// This is private native-host composition data and is never serialized into
+    /// an application protocol response.
+    #[must_use]
+    pub fn product_metadata(&self) -> Option<&ProductDisplayMetadata> {
+        self.product_metadata.as_ref()
+    }
+
     /// Rechecks an executable path and hashes bytes read from a caller-held
     /// file handle against this record's expected digest.
     ///
@@ -243,6 +255,7 @@ fn validate_record(
         capabilities: record.capabilities,
         network_policy: record.network_policy,
         update_catalogue: record.update_catalogue,
+        product_metadata: record.product_metadata,
     })
 }
 
@@ -427,6 +440,7 @@ fn validate_version(
         (1, 18) => Ok(record::RecordVersion::V1_18),
         (1, 19) => Ok(record::RecordVersion::V1_19),
         (1, 20) => Ok(record::RecordVersion::V1_20),
+        (1, 21) => Ok(record::RecordVersion::V1_21),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }

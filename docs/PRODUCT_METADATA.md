@@ -1,7 +1,8 @@
 # Signed product display metadata
 
-**Status:** Version 1.2 parsing and first-party manifest authoring are
-implemented. Windows registration surfaces remain separate work.
+**Status:** Version 1.2 parsing, first-party manifest authoring, and matching
+installed-record v1.21 rendering are implemented. Windows registration
+surfaces remain separate work.
 
 ## Purpose
 
@@ -47,9 +48,10 @@ application identity and release version, then may show these names only after
 the signed manifest gate succeeds.
 
 Changing product metadata in a later signed release does not grant a new
-application identity or publisher. It only updates a product surface after the
-same identity, signature, and release-policy checks that govern installation or
-update.
+application identity or publisher. The matching installed-record v1.21 carries
+it with the selected policy, so a later product surface can change only after
+the same identity, signature, and release-policy checks that govern
+installation, update, or rollback.
 
 ## Exclusions
 
@@ -57,5 +59,5 @@ This contract does not create shortcuts, Apps & features records, icons,
 uninstall commands, file associations, a custom installer window, translated
 strings, an application protocol field, or a code-signing identity.
 
-See [release-manifest authoring](RELEASE_MANIFEST.md), [Windows installer](WINDOWS_INSTALLER.md),
-and Decision 0181.
+See [release-manifest authoring](RELEASE_MANIFEST.md), [product registration](PRODUCT_REGISTRATION.md),
+[Windows installer](WINDOWS_INSTALLER.md), and Decisions 0181 and 0182.

@@ -7,7 +7,7 @@ use anodrel_json::JsonValue;
 use crate::ReleaseManifest;
 
 impl ReleaseManifest {
-    /// Renders the version-1.19 or 1.20 machine record for one host-selected package root.
+    /// Renders the version-1.19, 1.20, or 1.21 machine record for one host-selected package root.
     ///
     /// The caller must validate this record against the extracted package before
     /// writing it. The root comes from installer code, never the embedded
@@ -34,17 +34,7 @@ impl ReleaseManifest {
                 "recordVersion".to_owned(),
                 object([
                     ("major", JsonValue::Number("1".to_owned())),
-                    (
-                        "minor",
-                        JsonValue::Number(
-                            if self.update_catalogue_location().is_some() {
-                                "20"
-                            } else {
-                                "19"
-                            }
-                            .to_owned(),
-                        ),
-                    ),
+                    ("minor", JsonValue::Number(record_minor(self).to_string())),
                 ]),
             ),
             (
@@ -106,7 +96,32 @@ impl ReleaseManifest {
                 ]),
             ));
         }
+        if let Some(product) = self.product_metadata() {
+            fields.push((
+                "product".to_owned(),
+                object([
+                    (
+                        "displayName",
+                        JsonValue::String(product.display_name().to_owned()),
+                    ),
+                    (
+                        "publisherName",
+                        JsonValue::String(product.publisher_name().to_owned()),
+                    ),
+                ]),
+            ));
+        }
         JsonValue::Object(fields.into_iter().collect()).to_json()
+    }
+}
+
+fn record_minor(release: &ReleaseManifest) -> u8 {
+    if release.product_metadata().is_some() {
+        21
+    } else if release.update_catalogue_location().is_some() {
+        20
+    } else {
+        19
     }
 }
 

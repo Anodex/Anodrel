@@ -7,8 +7,8 @@ use anodrel_protocol::Capability;
 use crate::{MAX_INSTALL_RECORD_BYTES, manifest, network_policy, sha256};
 
 use super::{
-    InstalledApplicationError, UpdateCatalogueLocation, exact_fields, is_valid_executable_path,
-    required_object, required_string, validate_version,
+    InstalledApplicationError, ProductDisplayMetadata, UpdateCatalogueLocation, exact_fields,
+    is_valid_executable_path, required_object, required_string, validate_version,
 };
 
 pub(super) struct ParsedRecord {
@@ -20,6 +20,7 @@ pub(super) struct ParsedRecord {
     pub(super) capabilities: Vec<Capability>,
     pub(super) network_policy: Option<NetworkOriginPolicy>,
     pub(super) update_catalogue: Option<UpdateCatalogueLocation>,
+    pub(super) product_metadata: Option<ProductDisplayMetadata>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -45,6 +46,7 @@ pub(super) enum RecordVersion {
     V1_18,
     V1_19,
     V1_20,
+    V1_21,
 }
 
 impl RecordVersion {
@@ -96,6 +98,18 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
             "packageRoot",
             "executable",
             "publisher",
+        ][..]
+    } else if version.accepts(RecordVersion::V1_21) {
+        &[
+            "recordVersion",
+            "applicationId",
+            "packageRoot",
+            "executable",
+            "publisher",
+            "capabilities",
+            "networkOrigins",
+            "updateCatalogue",
+            "product",
         ][..]
     } else if version.accepts(RecordVersion::V1_20) {
         &[
@@ -187,6 +201,11 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
     } else {
         None
     };
+    let product_metadata = if version.accepts(RecordVersion::V1_21) {
+        Some(parse_product_metadata(required_object(fields, "product")?)?)
+    } else {
+        None
+    };
 
     Ok(ParsedRecord {
         application_id: application_id.to_owned(),
@@ -197,7 +216,19 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
         capabilities,
         network_policy,
         update_catalogue,
+        product_metadata,
     })
+}
+
+fn parse_product_metadata(
+    fields: &std::collections::BTreeMap<String, JsonValue>,
+) -> Result<ProductDisplayMetadata, InstalledApplicationError> {
+    exact_fields(fields, &["displayName", "publisherName"])?;
+    ProductDisplayMetadata::new(
+        required_string(fields, "displayName")?,
+        required_string(fields, "publisherName")?,
+    )
+    .map_err(|_| InstalledApplicationError::InvalidRecord)
 }
 
 fn parse_update_catalogue(
