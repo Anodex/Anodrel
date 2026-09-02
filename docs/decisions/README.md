@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0183: Start-menu registration begins with selected-policy proof.
+
 - 0182: Product registration follows selected machine policy.
 
 - 0181: Product display metadata is signed and never authority.

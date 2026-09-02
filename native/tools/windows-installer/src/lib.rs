@@ -22,6 +22,8 @@ mod payload;
 #[cfg(windows)]
 mod prepared;
 #[cfg(windows)]
+mod product_shortcut;
+#[cfg(windows)]
 mod promotion;
 #[cfg(windows)]
 mod publication;
@@ -58,6 +60,11 @@ pub use manifest::{PackageVersion, PayloadDescriptor, ProductMetadata, ReleaseMa
 pub use payload::{ReleasePayloadError, verify_bundle};
 #[cfg(windows)]
 pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed_release};
+#[cfg(windows)]
+pub use product_shortcut::{
+    ProductShortcutPreflightError, VerifiedProductShortcutTarget,
+    verify_current_product_shortcut_target,
+};
 #[cfg(windows)]
 pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};
 #[cfg(windows)]
