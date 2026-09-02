@@ -1,8 +1,9 @@
 # Windows elevated update handoff
 
 **Status:** The locked image-acceptance gate and direct UAC launcher are
-implemented. A later updater coordinator will choose the cache root, collect
-an explicit user decision, wait off the UI thread, and recover retained files.
+implemented. The fixed cache root and constrained recovery are also available;
+a later updater coordinator will collect an explicit user decision and wait off
+the UI thread.
 
 ## Purpose
 

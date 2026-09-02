@@ -836,6 +836,16 @@ name = "anodrel-windows-uia-client"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-windows-update-cache"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-paths",
+ "anodrel-windows-paths",
+ "anodrel-windows-policy",
+]
+
+[[package]]
 name = "anodrel-windows-update-catalogue-signature"
 version = "0.1.0"
 dependencies = [

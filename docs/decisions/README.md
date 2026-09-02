@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0170: Update cache is fixed per installed application.
+
 - 0169: Verified images are locked before elevation.
 
 - 0168: Signed installed policy selects update catalogue source.

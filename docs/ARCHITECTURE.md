@@ -181,13 +181,15 @@ Authenticode. Its no-argument machine routes select only their
   current signed release and fixed 64-bit Program Files root. The owned update
   route now discovers its catalogue from signed installed policy, streams and
   locks a matching image, then asks Windows to elevate only its fixed update
-  command. Production certificate custody, timestamping, a signed positive
-  acceptance run, cache/recovery composition, and a real production identity
-  remain separate work.
+  command. Its fixed current-user cache and exact private-image recovery are
+  separate from every application filesystem surface. Production certificate
+  custody, timestamping, a signed positive acceptance run, host-flow
+  composition, recovery proof, and a real production identity remain separate
+  work.
 See `docs/SIGNING.md`, `docs/RELEASE_MANIFEST.md`, `docs/LAUNCH.md`,
   `docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`,
-  `docs/UPDATE_HANDOFF.md`, and Decisions 0017 through 0020, 0061, and 0140
-  through 0169.
+  `docs/UPDATE_HANDOFF.md`, `docs/UPDATE_CACHE.md`, and Decisions 0017 through
+  0020, 0061, and 0140 through 0170.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. The Linux paths adapter obtains the

@@ -1,8 +1,9 @@
 # Windows update delivery
 
-**Status:** Direct staging and locked image acceptance are implemented.
-Catalogue discovery, user-visible update choice, elevation handoff composition,
-installation, recovery proof, and automatic scheduling remain separate work.
+**Status:** Direct signed-catalogue discovery, private staging, fixed-cache
+recovery, locked image acceptance, and direct UAC handoff are implemented. A
+user-visible updater coordinator, installation proof, and automatic scheduling
+remain separate work.
 
 ## Purpose
 
