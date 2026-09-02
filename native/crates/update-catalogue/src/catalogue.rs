@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use anodrel_application::{is_valid_application_id, sha256};
 use anodrel_json::JsonValue;
 use anodrel_network::NetworkOrigin;
-use anodrel_windows_installer::PackageVersion;
+use anodrel_windows_installer::{PackageVersion, ReleaseManifest};
 
 use crate::{MAX_UPDATE_CATALOGUE_BYTES, MAX_UPDATE_IMAGE_BYTES, UpdateCatalogueError};
 
@@ -67,6 +67,18 @@ impl UpdateCatalogue {
     #[must_use]
     pub fn matches_installed(&self, application_id: &str, publisher: [u8; 32]) -> bool {
         self.application_id == application_id && self.publisher_fingerprint == publisher
+    }
+
+    /// Checks one locked installer release against this signed candidate.
+    ///
+    /// The caller must first establish that the release came from an accepted
+    /// Authenticode image. This comparison has no signature, file, process, or
+    /// network operation of its own.
+    #[must_use]
+    pub fn matches_release(&self, release: &ReleaseManifest) -> bool {
+        self.application_id == release.application_id()
+            && self.package_version == release.package_version()
+            && release.matches_publisher_fingerprint(self.publisher_fingerprint)
     }
 
     /// Returns whether this catalogue is strictly newer than an installed version.

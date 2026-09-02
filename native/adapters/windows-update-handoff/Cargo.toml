@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-windows-update-handoff"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-windows-update-download = { path = "../windows-update-download" }

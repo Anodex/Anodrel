@@ -3,7 +3,7 @@
 use std::fmt;
 
 use anodrel_update_catalogue::UpdateInstaller;
-use anodrel_windows_installer::PackageVersion;
+use anodrel_windows_installer::{PackageVersion, VerifiedInstallerImage};
 use anodrel_windows_policy::load_installed_application;
 use anodrel_windows_signature::verify_embedded_signature;
 use anodrel_windows_update_catalogue_signature::VerifiedUpdateCatalogue;
@@ -18,6 +18,10 @@ pub struct PreparedUpdateDownload {
 impl PreparedUpdateDownload {
     pub(crate) fn installer(&self) -> &UpdateInstaller {
         self.catalogue.installer()
+    }
+
+    pub(crate) fn matches_image(&self, image: &VerifiedInstallerImage) -> bool {
+        self.catalogue.matches_release(image.manifest())
     }
 }
 

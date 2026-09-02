@@ -1,7 +1,7 @@
 //! Catalogue-specific bounded composition above direct CMS primitives.
 
 use anodrel_update_catalogue::{MAX_UPDATE_CATALOGUE_BYTES, UpdateCatalogue, UpdateInstaller};
-use anodrel_windows_installer::PackageVersion;
+use anodrel_windows_installer::{PackageVersion, ReleaseManifest};
 use anodrel_windows_signing::{sign_attached_message, verify_attached_message};
 
 use crate::{MAX_SIGNED_UPDATE_CATALOGUE_BYTES, UpdateCatalogueSignatureError};
@@ -32,6 +32,15 @@ impl VerifiedUpdateCatalogue {
     #[must_use]
     pub fn matches_installed(&self, application_id: &str, publisher: [u8; 32]) -> bool {
         self.catalogue.matches_installed(application_id, publisher)
+    }
+
+    /// Compares the verified catalogue with one locked installer release.
+    ///
+    /// The caller must establish the image's Windows Authenticode acceptance
+    /// independently before using this exact data comparison.
+    #[must_use]
+    pub fn matches_release(&self, release: &ReleaseManifest) -> bool {
+        self.catalogue.matches_release(release)
     }
 
     /// Returns whether the verified catalogue is newer than one installed release.

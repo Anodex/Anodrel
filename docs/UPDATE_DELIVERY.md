@@ -1,8 +1,8 @@
 # Windows update delivery
 
-**Status:** The direct staging contract is implemented. Catalogue discovery,
-user-visible update choice, elevation handoff, installation, recovery proof,
-and automatic scheduling remain separate work.
+**Status:** Direct staging and locked image acceptance are implemented.
+Catalogue discovery, user-visible update choice, elevation handoff composition,
+installation, recovery proof, and automatic scheduling remain separate work.
 
 ## Purpose
 
@@ -27,7 +27,10 @@ one direct HTTPS GET to the signed image location
 fresh cache file, streamed SHA-256 and exact byte count
              |
              v
-later Authenticode and installer update transaction
+locked Authenticode and exact-release acceptance
+             |
+             v
+direct UAC handoff, then the installer update transaction
 ~~~
 
 The preflight reloads the catalogue-selected installed application only after
@@ -57,9 +60,11 @@ catalogue descriptor.
 Any preflight, transfer, write, synchronization, size, or digest failure
 removes only that newly created cache file. A successful `DownloadedInstaller`
 also deletes its private file on drop unless a later updater uses it while it
-remains alive. The downloaded file is still *not* accepted for installation:
-the later handoff must re-verify current-image Authenticode, the embedded
-release, publisher continuity, and the existing installer update transaction.
+remains alive. The downloaded file is still *not* accepted for installation.
+The next native gate re-verifies its Authenticode, embedded release, and
+signed-catalogue facts while holding it against writes; see
+[update handoff](UPDATE_HANDOFF.md). The elevated installer then re-verifies
+itself and runs its existing transaction.
 
 No resume, redirect, proxy, cookie, authentication, headers, response
 metadata, arbitrary URL, cache enumeration, background transfer, scheduling,

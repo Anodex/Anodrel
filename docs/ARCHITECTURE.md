@@ -178,12 +178,16 @@ boundary creates bounded owned bundles, derives strict manifests from those
 checked bundle bytes, embeds them into fresh images, and signs only fresh checked
 image copies with one explicit current-user certificate through Windows
 Authenticode. Its no-argument machine routes select only their
-current signed release and fixed 64-bit Program Files root. Production
-certificate custody, timestamping, a signed positive acceptance run, elevation
-handoff, recovery proof, and a real production identity remain separate work.
+  current signed release and fixed 64-bit Program Files root. The owned update
+  route now discovers its catalogue from signed installed policy, streams and
+  locks a matching image, then asks Windows to elevate only its fixed update
+  command. Production certificate custody, timestamping, a signed positive
+  acceptance run, cache/recovery composition, and a real production identity
+  remain separate work.
 See `docs/SIGNING.md`, `docs/RELEASE_MANIFEST.md`, `docs/LAUNCH.md`,
-`docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`, and Decisions 0017
-through 0020, 0061, and 0140 through 0163.
+  `docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`,
+  `docs/UPDATE_HANDOFF.md`, and Decisions 0017 through 0020, 0061, and 0140
+  through 0169.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. The Linux paths adapter obtains the

@@ -123,6 +123,10 @@ impl DownloadedInstaller {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    pub(crate) fn retain_for_recovery(&mut self) {
+        self.cleanup_on_drop = false;
+    }
 }
 
 impl fmt::Debug for DownloadedInstaller {

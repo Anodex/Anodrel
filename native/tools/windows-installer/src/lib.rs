@@ -10,6 +10,8 @@
 
 mod error;
 #[cfg(windows)]
+mod image;
+#[cfg(windows)]
 mod installation;
 #[cfg(windows)]
 mod machine_root;
@@ -38,6 +40,8 @@ mod update;
 mod update_installation;
 
 pub use error::ReleaseManifestError;
+#[cfg(windows)]
+pub use image::{InstallerImageError, VerifiedInstallerImage, verify_locked_installer_image};
 #[cfg(windows)]
 pub use installation::{InstallCurrentError, InstalledRelease, install_current_signed_release};
 #[cfg(windows)]

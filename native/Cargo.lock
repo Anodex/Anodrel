@@ -858,5 +858,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-update-handoff"
+version = "0.1.0"
+dependencies = [
+ "anodrel-windows-update-download",
+]
+
+[[package]]
 name = "anodrel-wire"
 version = "0.1.0"

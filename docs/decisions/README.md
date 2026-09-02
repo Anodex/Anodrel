@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0169: Verified images are locked before elevation.
+
 - 0168: Signed installed policy selects update catalogue source.
 
 - 0167: Verified update images stream to fresh private files.
