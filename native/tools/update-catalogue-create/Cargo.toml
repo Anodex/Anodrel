@@ -1,0 +1,16 @@
+[package]
+name = "anodrel-update-catalogue-create"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-update-catalogue-create"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-update-catalogue = { path = "../../crates/update-catalogue" }
+anodrel-windows-installer = { path = "../windows-installer" }
+anodrel-windows-signature = { path = "../../adapters/windows-signature" }

@@ -536,6 +536,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-update-catalogue-create"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-json",
+ "anodrel-update-catalogue",
+ "anodrel-windows-installer",
+ "anodrel-windows-signature",
+]
+
+[[package]]
 name = "anodrel-update-catalogue-sign"
 version = "0.1.0"
 dependencies = [

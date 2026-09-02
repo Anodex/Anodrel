@@ -82,6 +82,24 @@ executable, forward version, and machine policy before update. See
 
 ## Owned signing command
 
+`anodrel-update-catalogue-create` creates the strict unsigned JSON from one
+locked, Windows-verified signed installer image:
+
+~~~text
+anodrel-update-catalogue-create create <signed-installer.exe> <https-host> <https-port> <installer-path> <new-catalogue.json>
+~~~
+
+It derives the application identity, version, publisher fingerprint, byte
+length, and SHA-256 descriptor from the image only while its embedded release
+and Authenticode signature remain accepted. The host, port, and installer path
+are the operator's explicit publication location. The tool re-parses its fresh
+output with the owned strict catalogue parser before reporting success. It does
+not create or use a sidecar manifest, checksum, identity, version, or
+certificate input.
+
+The resulting JSON is not distributable update authority until the separate
+CMS step signs it:
+
 `anodrel-update-catalogue-sign` turns one absolute strict catalogue file into
 one new synchronized attached-CMS file. Its exact command is:
 
@@ -102,4 +120,4 @@ user notification, background service, or network route is introduced here.
 Those require their own documented product and operating-system boundaries.
 
 See [Windows installer](WINDOWS_INSTALLER.md), [signing](SIGNING.md), and
-Decisions 0164 and 0165.
+Decisions 0164, 0165, and 0175.

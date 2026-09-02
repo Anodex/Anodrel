@@ -88,6 +88,7 @@ members = [
   "tools/release-image",
   "tools/release-sign",
   "tools/release-manifest",
+  "tools/update-catalogue-create",
   "tools/update-catalogue-sign",
   "tools/native-client-sample",
   "tools/native-linux-client-sample",

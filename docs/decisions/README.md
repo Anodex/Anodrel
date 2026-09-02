@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0175: Update catalogues derive release facts from locked images.
+
 - 0174: Product-update acceptance uses one fixed development identity.
 
 - 0173: Update consent is a host-owned native decision.
