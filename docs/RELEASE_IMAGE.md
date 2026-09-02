@@ -37,6 +37,13 @@ checked manifest and bundle through the resource-update transaction, reloads the
 result as data-only, and compares both stored resource byte sequences. A second
 test proves an existing output is left untouched.
 
+The owned template is built from `native/tools/windows-installer-shell` as the
+`anodrel-windows-installer.exe` binary. That thin shell owns only the fixed
+operator commands and no-argument initial-install composition; the separately
+dependent `native/tools/windows-installer` core owns signed release,
+installation, and policy proofs. Building the shell before `embed` preserves
+that one-way dependency direction while producing the product installer name.
+
 The resulting image is still unsigned. It cannot activate the installer until
 the separate owned signing step produces a Windows-accepted image with the same
 embedded publisher identity.

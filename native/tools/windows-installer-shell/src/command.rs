@@ -1,4 +1,4 @@
-//! Fixed command parsing and operator reporting for the Windows installer.
+//! Fixed command parsing and operator reporting for the Windows installer shell.
 
 use std::fs;
 
@@ -9,10 +9,11 @@ use anodrel_windows_installer::{
     verify_current_uninstall_target,
 };
 
-use crate::elevation::require_elevation;
+use crate::{elevation::require_elevation, initial_install};
 
 const USAGE: &str = concat!(
     "usage:\n",
+    "  anodrel-windows-installer\n",
     "  anodrel-windows-installer verify\n",
     "  anodrel-windows-installer install\n",
     "  anodrel-windows-installer update\n",
@@ -20,14 +21,15 @@ const USAGE: &str = concat!(
     "  anodrel-windows-installer uninstall\n",
     "  anodrel-windows-installer validate-manifest <release-manifest.json>\n",
     "\n",
-    "install, update, and uninstall require an elevated shell. They select only\n",
-    "the current signed embedded release and accept no target or policy arguments.\n",
-    "validate-manifest is development-only and does not install anything.",
+    "No command starts the fixed signed initial-install flow. Named install, update,\n",
+    "rollback, and uninstall commands require an elevated shell and accept no target\n",
+    "or policy arguments. validate-manifest is development-only and does not install anything.",
 );
 
 /// One fixed command accepted by the installer executable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Command {
+    InitialInstall,
     Verify,
     Install,
     Update,
@@ -39,6 +41,7 @@ pub(super) enum Command {
 /// Parses only the supported fixed command shapes.
 pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
     match arguments {
+        [] => Ok(Command::InitialInstall),
         [command] if command == "verify" => Ok(Command::Verify),
         [command] if command == "install" => Ok(Command::Install),
         [command] if command == "update" => Ok(Command::Update),
@@ -54,6 +57,7 @@ pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
 /// Performs one parsed command without exposing machine-owned operation inputs.
 pub(super) fn execute(command: Command) -> Result<String, String> {
     match command {
+        Command::InitialInstall => initial_install::run(),
         Command::Verify => verify(),
         Command::Install => elevated(install),
         Command::Update => elevated(update),
@@ -108,8 +112,8 @@ fn validate_manifest(path: &str) -> Result<String, String> {
     if !metadata.is_file() || metadata.len() > MAX_RELEASE_MANIFEST_BYTES as u64 {
         return Err("the release manifest could not be read".to_owned());
     }
-    let manifest =
-        fs::read_to_string(path).map_err(|_| "the release manifest could not be read")?;
+    let manifest = fs::read_to_string(path)
+        .map_err(|_| "the release manifest could not be read".to_owned())?;
     let release = ReleaseManifest::parse(&manifest).map_err(display_error)?;
     let version = release.package_version();
     Ok(format!(
@@ -131,6 +135,7 @@ mod tests {
 
     #[test]
     fn commands_are_fixed_and_do_not_accept_machine_target_arguments() {
+        assert_eq!(parse(&arguments(&[])), Ok(Command::InitialInstall));
         assert_eq!(parse(&arguments(&["verify"])), Ok(Command::Verify));
         assert_eq!(parse(&arguments(&["install"])), Ok(Command::Install));
         assert_eq!(parse(&arguments(&["update"])), Ok(Command::Update));
@@ -146,6 +151,7 @@ mod tests {
             &["rollback", "1.2.3"][..],
             &["uninstall", "org.example.product"][..],
             &["verify", "--registry"][..],
+            &["--package", "release.bin"][..],
         ] {
             assert_eq!(parse(&arguments(invalid)), Err(USAGE.to_owned()));
         }

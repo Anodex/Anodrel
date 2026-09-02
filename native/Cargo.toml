@@ -86,6 +86,7 @@ members = [
   "tools/product-provisioning",
   "tools/product-update-acceptance",
   "tools/windows-installer",
+  "tools/windows-installer-shell",
   "tools/release-bundle-tool",
   "tools/release-image",
   "tools/release-sign",

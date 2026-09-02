@@ -6,23 +6,26 @@ param(
 
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $repositoryRoot = Split-Path -Parent $scriptRoot
-$trackedFiles = & git -C $repositoryRoot ls-files
+$workingFiles = & git -C $repositoryRoot ls-files --cached --others --exclude-standard
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to read the repository file list.'
 }
 
 $managedExtensions = @('.bat', '.css', '.html', '.js', '.json', '.md', '.ps1', '.rs', '.ts')
-$violations = foreach ($trackedFile in $trackedFiles) {
-    $extension = [System.IO.Path]::GetExtension($trackedFile).ToLowerInvariant()
+$violations = foreach ($workingFile in $workingFiles) {
+    $extension = [System.IO.Path]::GetExtension($workingFile).ToLowerInvariant()
     if ($extension -notin $managedExtensions) {
         continue
     }
-    $fullPath = Join-Path $repositoryRoot $trackedFile
+    $fullPath = Join-Path $repositoryRoot $workingFile
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        continue
+    }
     $lineCount = [System.IO.File]::ReadAllLines($fullPath).Length
     if ($lineCount -gt $MaximumLines) {
         [PSCustomObject]@{
             Lines = $lineCount
-            Path = $trackedFile
+            Path = $workingFile
         }
     }
 }
@@ -32,4 +35,4 @@ if ($violations) {
     throw "Maintained files must stay at or below $MaximumLines lines."
 }
 
-Write-Host "All tracked maintained files are at or below $MaximumLines lines."
+Write-Host "All maintained files are at or below $MaximumLines lines."

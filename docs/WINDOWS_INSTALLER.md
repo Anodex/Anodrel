@@ -120,8 +120,9 @@ writes only its already validated record to the fixed 64-bit machine-policy
 location; it is unit-tested for exact key/value and UTF-16 representation, but
 its elevated signed-fixture path remains an operator check.
 
-The command-line tool exposes only fixed `verify`, `install`, `update`, and
-`uninstall` operations. Each machine-changing operation first asks Windows
+The installer core exposes only fixed `verify`, `install`, `update`, and
+`uninstall` operations through its thin first-party `windows-installer-shell`.
+Each machine-changing operation first asks Windows
 whether its current process token is elevated and fails closed without trying
 to self-elevate. It accepts no target, root, record, publisher, certificate,
 or network argument. The separately reviewable staging, signer, promotion,
@@ -333,8 +334,9 @@ confirmation may turn that prepared result into an opaque approval; see
 [initial-install consent](INSTALL_CONSENT.md). Only that approval can enter a
 fixed direct UAC handoff, whose zero exit still requires the postcondition
 proof; see [initial-install handoff](INSTALL_HANDOFF.md). The current
-command-line tool still requires an explicitly elevated shell and has no
-default interactive installer path.
+no-argument command now composes those stages for an initial installation; see
+[interactive initial-install flow](INSTALL_FLOW.md). Named machine-changing
+commands still require an explicitly elevated shell.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
@@ -352,4 +354,5 @@ compatible with the desired Windows distribution channel.
 See [Windows release readiness](WINDOWS_RELEASE.md), [signing foundation](SIGNING.md),
 [installed application records](LAUNCH.md), [initial-install acceptance](INSTALL_ACCEPTANCE.md),
 [initial-install consent](INSTALL_CONSENT.md), [initial-install handoff](INSTALL_HANDOFF.md),
-and Decisions 0017–0020, 0140, 0177–0179.
+[interactive initial-install flow](INSTALL_FLOW.md), and Decisions 0017–0020,
+0140, and 0177–0180.

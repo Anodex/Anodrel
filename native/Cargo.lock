@@ -724,6 +724,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-windows-installer-shell"
+version = "0.1.0"
+dependencies = [
+ "anodrel-windows-install-consent",
+ "anodrel-windows-install-handoff",
+ "anodrel-windows-installer",
+]
+
+[[package]]
 name = "anodrel-windows-instance"
 version = "0.1.0"
 

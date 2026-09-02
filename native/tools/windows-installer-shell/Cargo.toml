@@ -1,0 +1,14 @@
+[package]
+name = "anodrel-windows-installer-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-windows-installer"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-windows-install-consent = { path = "../../adapters/windows-install-consent" }
+anodrel-windows-install-handoff = { path = "../../adapters/windows-install-handoff" }
+anodrel-windows-installer = { path = "../windows-installer" }

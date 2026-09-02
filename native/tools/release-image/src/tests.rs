@@ -1,11 +1,16 @@
 //! Integration-style tests for owned resource-image assembly.
 
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use anodrel_release_bundle::{BundleEntryInput, encode};
 use anodrel_windows_installer::ReleaseManifest;
 
 use crate::{embed_release_image, verify_release_image, verify_release_image_for_publisher};
+
+static NEXT_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
 
 fn manifest_for(payload: &[u8]) -> Vec<u8> {
     let digest =
@@ -94,8 +99,11 @@ struct TemporaryDirectory {
 
 impl TemporaryDirectory {
     fn new() -> Self {
-        let path =
-            std::env::temp_dir().join(format!("anodrel-release-image-test-{}", std::process::id()));
+        let sequence = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "anodrel-release-image-test-{}-{sequence}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).expect("the temporary directory is created");
         Self { path }

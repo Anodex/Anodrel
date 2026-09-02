@@ -1,7 +1,8 @@
-//! Fixed operator commands for the owned Windows installer.
+//! Fixed operator commands and no-argument flow for the owned Windows installer.
 
 mod command;
 mod elevation;
+mod initial_install;
 
 use std::{env, process::ExitCode};
 
