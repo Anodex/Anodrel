@@ -13,4 +13,6 @@ mod process;
 mod raw;
 
 pub use error::UpdateHandoffError;
-pub use process::{ElevatedUpdateExit, ElevatedUpdateProcess, begin_elevated_update};
+pub use process::{
+    CompletedElevatedUpdate, ElevatedUpdateExit, ElevatedUpdateProcess, begin_elevated_update,
+};

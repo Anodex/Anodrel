@@ -3,7 +3,8 @@
 **Status:** The locked image-acceptance gate and direct UAC launcher are
 implemented. The opaque native coordinator now composes the fixed cache,
 recovery, discovery, and image stages; a later user-facing host surface will
-collect explicit consent and wait off the UI thread.
+collect explicit consent and wait off the UI thread before invoking the native
+postcondition proof.
 
 ## Purpose
 

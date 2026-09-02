@@ -10,6 +10,7 @@
 
 mod acceptance;
 mod candidate;
+mod completion;
 mod discovery;
 mod discovery_error;
 mod download;
@@ -20,6 +21,9 @@ pub use acceptance::{
     UpdateImageAcceptanceError, VerifiedDownloadedInstaller, verify_downloaded_update_image,
 };
 pub use candidate::{PreparedUpdateDownload, prepare_current_update_download};
+pub use completion::{
+    UpdateCompletionError, VerifiedUpdateInstallation, verify_current_update_selection,
+};
 pub use discovery::retrieve_current_update_download;
 pub use discovery_error::UpdateCatalogueDiscoveryError;
 pub use download::download_prepared_update;

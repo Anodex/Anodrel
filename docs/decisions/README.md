@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0172: Update success requires postcondition proof.
+
 - 0171: Native updater composes opaque stages.
 
 - 0170: Update cache is fixed per installed application.

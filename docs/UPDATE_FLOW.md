@@ -36,9 +36,9 @@ The values passed between stages are opaque and are consumed in order.
 The flow itself has no application protocol or visual interface. A future host
 surface must obtain explicit user intent before it requests download or UAC.
 UAC cancellation remains a normal safe result. The returned process handle can
-be waited away from a UI thread, but successful launch or exit code is not proof
-that machine policy selected a release; the later acceptance scenario must read
-and verify the final installed policy.
+be waited away from a UI thread; after a zero exit, the native postcondition
+checks the final installed policy. Successful launch or exit alone remains
+insufficient proof.
 
 This intentionally does not create an automatic update path, a background
 service, a scheduler, a notification, a restart, a cache queue, or a general

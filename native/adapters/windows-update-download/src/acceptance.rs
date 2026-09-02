@@ -34,6 +34,10 @@ impl VerifiedDownloadedInstaller {
     pub fn retain_for_recovery(&mut self) {
         self.downloaded.retain_for_recovery();
     }
+
+    pub(crate) fn manifest(&self) -> &anodrel_windows_installer::ReleaseManifest {
+        self.image.manifest()
+    }
 }
 
 impl fmt::Debug for VerifiedDownloadedInstaller {

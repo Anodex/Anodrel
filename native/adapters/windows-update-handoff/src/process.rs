@@ -2,7 +2,10 @@
 
 use std::fmt;
 
-use anodrel_windows_update_download::VerifiedDownloadedInstaller;
+use anodrel_windows_update_download::{
+    UpdateCompletionError, VerifiedDownloadedInstaller, VerifiedUpdateInstallation,
+    verify_current_update_selection,
+};
 
 use crate::{UpdateHandoffError, raw::UpdateProcessHandle};
 
@@ -21,28 +24,77 @@ pub enum ElevatedUpdateExit {
 /// An exit outcome is not proof that machine policy selected a new release: the
 /// installed process independently reports only its own bounded command result.
 pub struct ElevatedUpdateProcess {
+    running: Option<RunningUpdate>,
+}
+
+struct RunningUpdate {
     process: UpdateProcessHandle,
     installer: VerifiedDownloadedInstaller,
 }
 
 impl ElevatedUpdateProcess {
-    /// Waits for process completion and then releases the private image.
-    pub fn wait(self) -> Result<ElevatedUpdateExit, UpdateHandoffError> {
-        self.process.wait().map(|succeeded| {
-            if succeeded {
-                ElevatedUpdateExit::Succeeded
-            } else {
-                ElevatedUpdateExit::Failed
+    /// Waits for process completion while retaining the image for postcondition proof.
+    pub fn wait(mut self) -> Result<CompletedElevatedUpdate, UpdateHandoffError> {
+        let Some(mut running) = self.running.take() else {
+            return Err(UpdateHandoffError::ProcessWaitFailed);
+        };
+        let succeeded = match running.process.wait() {
+            Ok(succeeded) => succeeded,
+            Err(error) => {
+                running.installer.retain_for_recovery();
+                return Err(error);
             }
-        })
+        };
+        let RunningUpdate { process, installer } = running;
+        drop(process);
+        let exit = if succeeded {
+            ElevatedUpdateExit::Succeeded
+        } else {
+            ElevatedUpdateExit::Failed
+        };
+        Ok(CompletedElevatedUpdate { exit, installer })
     }
 }
 
 impl Drop for ElevatedUpdateProcess {
     fn drop(&mut self) {
-        if self.process.completion_is_unconfirmed() {
-            self.installer.retain_for_recovery();
+        if let Some(running) = &mut self.running
+            && running.process.completion_is_unconfirmed()
+        {
+            running.installer.retain_for_recovery();
         }
+    }
+}
+
+/// One completed elevated update process retaining its candidate for verification.
+pub struct CompletedElevatedUpdate {
+    exit: ElevatedUpdateExit,
+    installer: VerifiedDownloadedInstaller,
+}
+
+impl CompletedElevatedUpdate {
+    /// Returns the installer process's conventional exit outcome.
+    #[must_use]
+    pub const fn exit(&self) -> ElevatedUpdateExit {
+        self.exit
+    }
+
+    /// Proves the current fixed policy selected this candidate after a zero exit.
+    ///
+    /// A nonzero process exit is never treated as an update and performs no
+    /// postcondition policy read. A successful result proves only current
+    /// machine-policy selection, not restart or user-visible completion.
+    pub fn verify_selection(self) -> Result<VerifiedUpdateInstallation, UpdateCompletionError> {
+        match self.exit {
+            ElevatedUpdateExit::Succeeded => verify_current_update_selection(&self.installer),
+            ElevatedUpdateExit::Failed => Err(UpdateCompletionError::InstallerReportedFailure),
+        }
+    }
+}
+
+impl fmt::Debug for CompletedElevatedUpdate {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("CompletedElevatedUpdate(..)")
     }
 }
 
@@ -72,5 +124,7 @@ pub fn begin_elevated_update(
         }
         Err(error) => return Err(error),
     };
-    Ok(ElevatedUpdateProcess { process, installer })
+    Ok(ElevatedUpdateProcess {
+        running: Some(RunningUpdate { process, installer }),
+    })
 }
