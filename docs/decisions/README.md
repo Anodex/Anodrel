@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0165: Owned update catalogues use attached CMS signatures.
+
 - 0164: Owned update catalogues bind one candidate before retrieval.
 
 - 0163: Owned release manifests derive facts from checked bundles.

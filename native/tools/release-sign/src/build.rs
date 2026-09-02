@@ -5,8 +5,9 @@ use std::path::Path;
 use anodrel_application::sha256;
 use anodrel_release_image::verify_release_image_for_publisher;
 use anodrel_windows_signature::verify_embedded_signature;
+use anodrel_windows_signing::{WindowsSigningError, sign_authenticode_file};
 
-use crate::{ReleaseSignError, output::FreshReleaseImage, raw};
+use crate::{ReleaseSignError, output::FreshReleaseImage};
 
 /// Signs one checked release image into one fresh verified output image.
 ///
@@ -28,7 +29,7 @@ pub fn sign_release_image(
     let mut output = FreshReleaseImage::copy_from(input, output)?;
     verify_release_image_for_publisher(output.path(), fingerprint)
         .map_err(ReleaseSignError::SignedImageInvalid)?;
-    raw::sign_with_current_user_certificate(output.path(), fingerprint)?;
+    sign_authenticode_file(output.path(), fingerprint).map_err(release_signing_error)?;
     verify_release_image_for_publisher(output.path(), fingerprint)
         .map_err(ReleaseSignError::SignedImageInvalid)?;
     let signer = verify_embedded_signature(output.path())
@@ -38,4 +39,22 @@ pub fn sign_release_image(
     }
     output.keep();
     Ok(())
+}
+
+fn release_signing_error(error: WindowsSigningError) -> ReleaseSignError {
+    match error {
+        WindowsSigningError::CertificateStoreUnavailable => {
+            ReleaseSignError::CertificateStoreUnavailable
+        }
+        WindowsSigningError::CertificateUnavailable => ReleaseSignError::CertificateUnavailable,
+        WindowsSigningError::AuthenticodeUnavailable => ReleaseSignError::SigningUnavailable,
+        WindowsSigningError::AuthenticodePathInvalid
+        | WindowsSigningError::AuthenticodeFailed
+        | WindowsSigningError::MessageLimitInvalid
+        | WindowsSigningError::MessageSigningFailed
+        | WindowsSigningError::MessageVerificationFailed
+        | WindowsSigningError::MessageSignerUnavailable
+        | WindowsSigningError::MessageFingerprintUnavailable
+        | WindowsSigningError::MessagePublisherMismatch => ReleaseSignError::SigningFailed,
+    }
 }

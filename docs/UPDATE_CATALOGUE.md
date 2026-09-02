@@ -1,7 +1,8 @@
 # Windows update catalogue contract
 
-**Status:** Implemented portable validation foundation. A catalogue is not yet
-signed, retrieved, written to disk, run, elevated, or installed.
+**Status:** Implemented portable validation and direct Windows attached-CMS
+signature foundation. A catalogue is not yet retrieved, written to disk, run,
+elevated, or installed.
 
 ## Purpose
 
@@ -62,17 +63,39 @@ exact HTTPS request, bounded image byte check
 existing Authenticode and installer update gates
 ~~~
 
-The parser itself is **not** a trust decision. A future direct Windows signing
-adapter must authenticate the catalogue to the installed publisher before any
-catalogue value is used. A future direct HTTPS adapter must refuse redirects,
-cookies, proxy discovery, automatic credentials, arbitrary URLs, and content
-outside the declared size and digest. The existing installer then independently
-checks the downloaded image's Authenticode signature, embedded publisher,
-payload, staged executable, forward version, and machine policy before update.
+The parser itself is **not** a trust decision. The direct Windows signature
+adapter uses attached CMS with exactly one valid signer certificate, requires
+that signer's SHA-256 fingerprint to equal the installed publisher, and only
+then returns the bounded decoded bytes for this parser. It proves a signature
+from that pinned publisher but does not independently establish certificate
+chain trust, timestamp validity, or installer trust.
+
+A future direct HTTPS adapter must refuse redirects, cookies, proxy discovery,
+automatic credentials, arbitrary URLs, and content outside the declared size
+and digest. The existing installer then independently checks the downloaded
+image's Authenticode signature, embedded publisher, payload, staged executable,
+forward version, and machine policy before update.
+
+## Owned signing command
+
+`anodrel-update-catalogue-sign` turns one absolute strict catalogue file into
+one new synchronized attached-CMS file. Its exact command is:
+
+~~~text
+anodrel-update-catalogue-sign sign <catalogue.json> <certificate-sha256> <new-catalogue.p7s>
+~~~
+
+It selects only the exact lowercase SHA-256 fingerprint from the current
+user's `MY` certificate store, includes that certificate with one CMS signer,
+and verifies the output against the same fingerprint before reporting success.
+It never overwrites a file, modifies its input, creates or imports a
+certificate, creates trust, retrieves an update, installs, launches, elevates,
+or starts a background service. The signer has no timestamp; an approved
+timestamp and certificate-renewal policy remain production decisions.
 
 No automatic schedule, endpoint discovery, key rotation, timestamp policy,
 user notification, background service, or network route is introduced here.
 Those require their own documented product and operating-system boundaries.
 
 See [Windows installer](WINDOWS_INSTALLER.md), [signing](SIGNING.md), and
-Decision 0164.
+Decisions 0164 and 0165.

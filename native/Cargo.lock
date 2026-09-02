@@ -442,6 +442,7 @@ dependencies = [
  "anodrel-release-bundle",
  "anodrel-release-image",
  "anodrel-windows-signature",
+ "anodrel-windows-signing",
 ]
 
 [[package]]
@@ -520,6 +521,16 @@ dependencies = [
  "anodrel-json",
  "anodrel-network",
  "anodrel-windows-installer",
+]
+
+[[package]]
+name = "anodrel-update-catalogue-sign"
+version = "0.1.0"
+dependencies = [
+ "anodrel-application",
+ "anodrel-update-catalogue",
+ "anodrel-windows-signing",
+ "anodrel-windows-update-catalogue-signature",
 ]
 
 [[package]]
@@ -778,6 +789,10 @@ name = "anodrel-windows-signature"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-windows-signing"
+version = "0.1.0"
+
+[[package]]
 name = "anodrel-windows-storage"
 version = "0.1.0"
 dependencies = [
@@ -810,6 +825,14 @@ dependencies = [
 [[package]]
 name = "anodrel-windows-uia-client"
 version = "0.1.0"
+
+[[package]]
+name = "anodrel-windows-update-catalogue-signature"
+version = "0.1.0"
+dependencies = [
+ "anodrel-update-catalogue",
+ "anodrel-windows-signing",
+]
 
 [[package]]
 name = "anodrel-wire"

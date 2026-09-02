@@ -1,4 +1,4 @@
-//! Direct Windows certificate-store lookup and Authenticode signing.
+//! Direct `SignerSignEx` composition for one caller-validated file.
 
 use std::{
     ffi::{c_char, c_void},
@@ -8,69 +8,56 @@ use std::{
     ptr,
 };
 
-use crate::ReleaseSignError;
+use crate::{
+    WindowsSigningError,
+    certificate::{CertificateContext, CertificateStore, SelectedCertificate},
+};
 
-type Dword = u32;
 type Handle = *mut c_void;
 type ModuleHandle = *mut c_void;
-type CertificateStore = *mut c_void;
 
-const X509_ASN_ENCODING: Dword = 0x0000_0001;
-const PKCS_7_ASN_ENCODING: Dword = 0x0001_0000;
-const CERT_FIND_SHA256_HASH: Dword = 22 << 16;
-const SIGNER_SUBJECT_FILE: Dword = 1;
-const SIGNER_CERT_STORE: Dword = 2;
-const SIGNER_CERT_POLICY_CHAIN_NO_ROOT: Dword = 8;
-const CALG_SHA_256: Dword = 0x0000_800C;
-const LOAD_LIBRARY_SEARCH_SYSTEM32: Dword = 0x0000_0800;
-
-#[repr(C)]
-struct CertificateContext {
-    _private: [u8; 0],
-}
-
-#[repr(C)]
-struct CryptHashBlob {
-    byte_count: Dword,
-    bytes: *mut u8,
-}
+const SIGNER_SUBJECT_FILE: u32 = 1;
+const SIGNER_CERT_STORE: u32 = 2;
+const SIGNER_CERT_POLICY_CHAIN_NO_ROOT: u32 = 8;
+const CALG_SHA_256: u32 = 0x0000_800C;
+const LOAD_LIBRARY_SEARCH_SYSTEM32: u32 = 0x0000_0800;
 
 #[repr(C)]
 struct SignerFileInfo {
-    size: Dword,
+    size: u32,
     file_name: *const u16,
     file: Handle,
 }
 
 #[repr(C)]
 struct SignerSubjectInfo {
-    size: Dword,
-    index: *mut Dword,
-    choice: Dword,
+    size: u32,
+    index: *mut u32,
+    choice: u32,
     file_info: *mut SignerFileInfo,
 }
 
 #[repr(C)]
 struct SignerCertificateStoreInfo {
-    size: Dword,
+    size: u32,
     certificate: *const CertificateContext,
-    policy: Dword,
+    policy: u32,
     store: CertificateStore,
 }
 
 #[repr(C)]
 struct SignerCertificate {
-    size: Dword,
-    choice: Dword,
+    size: u32,
+    choice: u32,
     store_info: *mut SignerCertificateStoreInfo,
     window: Handle,
 }
 
 #[repr(C)]
 struct SignerSignatureInfo {
-    size: Dword,
-    hash_algorithm: Dword,
-    attribute_choice: Dword,
+    size: u32,
+    hash_algorithm: u32,
+    attribute_choice: u32,
     authcode_attributes: *mut c_void,
     authenticated_attributes: *mut c_void,
     unauthenticated_attributes: *mut c_void,
@@ -82,7 +69,7 @@ struct SignerContext {
 }
 
 type SignerSignEx = unsafe extern "system" fn(
-    Dword,
+    u32,
     *mut SignerSubjectInfo,
     *mut SignerCertificate,
     *mut SignerSignatureInfo,
@@ -94,36 +81,21 @@ type SignerSignEx = unsafe extern "system" fn(
 ) -> i32;
 type SignerFreeContext = unsafe extern "system" fn(*mut SignerContext) -> i32;
 
-#[link(name = "crypt32")]
-unsafe extern "system" {
-    fn CertOpenSystemStoreW(provider: usize, store_name: *const u16) -> CertificateStore;
-    fn CertCloseStore(store: CertificateStore, flags: Dword) -> i32;
-    fn CertFindCertificateInStore(
-        store: CertificateStore,
-        encoding: Dword,
-        find_flags: Dword,
-        find_type: Dword,
-        find_parameter: *const c_void,
-        previous: *const CertificateContext,
-    ) -> *const CertificateContext;
-    fn CertFreeCertificateContext(certificate: *const CertificateContext) -> i32;
-}
-
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    fn LoadLibraryExW(name: *const u16, file: Handle, flags: Dword) -> ModuleHandle;
+    fn LoadLibraryExW(name: *const u16, file: Handle, flags: u32) -> ModuleHandle;
     fn GetProcAddress(module: ModuleHandle, name: *const c_char) -> *const c_void;
     fn FreeLibrary(module: ModuleHandle) -> i32;
 }
 
-/// Signs only one fresh release image using an exact current-user certificate.
-pub(super) fn sign_with_current_user_certificate(
-    image: &Path,
-    fingerprint: [u8; 32],
-) -> Result<(), ReleaseSignError> {
+/// Signs one caller-validated absolute file with one exact certificate.
+pub(super) fn sign_file(path: &Path, fingerprint: [u8; 32]) -> Result<(), WindowsSigningError> {
+    if !path.is_absolute() {
+        return Err(WindowsSigningError::AuthenticodePathInvalid);
+    }
     let certificate = SelectedCertificate::find(fingerprint)?;
     let signer = SigningLibrary::load()?;
-    let image_name = wide_null(image).ok_or(ReleaseSignError::SigningFailed)?;
+    let image_name = wide_null(path).ok_or(WindowsSigningError::AuthenticodePathInvalid)?;
     let mut file = SignerFileInfo {
         size: size_of::<SignerFileInfo>(),
         file_name: image_name.as_ptr(),
@@ -158,8 +130,8 @@ pub(super) fn sign_with_current_user_certificate(
     let mut raw_context = ptr::null_mut();
     // SAFETY: Every structure has the documented C layout and references data
     // that remains alive throughout this synchronous call. The certificate is
-    // selected from the live current-user store, the target is a fresh copy,
-    // and all optional pointer parameters are null by contract.
+    // selected from the live current-user store, and all optional pointer
+    // parameters are null by contract.
     let status = unsafe {
         (signer.sign)(
             0,
@@ -175,89 +147,9 @@ pub(super) fn sign_with_current_user_certificate(
     };
     let context = SigningContext::new(raw_context, signer.free);
     if status != 0 || context.is_empty() {
-        return Err(ReleaseSignError::SigningFailed);
+        return Err(WindowsSigningError::AuthenticodeFailed);
     }
     Ok(())
-}
-
-/// One exact certificate context with its current-user store still open.
-struct SelectedCertificate {
-    context: CertificateContextGuard,
-    store: CertificateStoreGuard,
-}
-
-impl SelectedCertificate {
-    fn find(fingerprint: [u8; 32]) -> Result<Self, ReleaseSignError> {
-        let store = CertificateStoreGuard::current_user_my()?;
-        let mut hash = CryptHashBlob {
-            byte_count: fingerprint.len() as Dword,
-            bytes: fingerprint.as_ptr().cast_mut(),
-        };
-        // SAFETY: store is an open current-user certificate store. `hash`
-        // points to the fixed 32 SHA-256 bytes for this synchronous lookup, and
-        // no previous certificate context is supplied.
-        let context = unsafe {
-            CertFindCertificateInStore(
-                store.handle,
-                X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                0,
-                CERT_FIND_SHA256_HASH,
-                (&mut hash as *mut CryptHashBlob).cast(),
-                ptr::null(),
-            )
-        };
-        if context.is_null() {
-            return Err(ReleaseSignError::CertificateUnavailable);
-        }
-        Ok(Self {
-            context: CertificateContextGuard(context),
-            store,
-        })
-    }
-
-    fn context(&self) -> *const CertificateContext {
-        self.context.0
-    }
-
-    fn store(&self) -> CertificateStore {
-        self.store.handle
-    }
-}
-
-struct CertificateStoreGuard {
-    handle: CertificateStore,
-}
-
-impl CertificateStoreGuard {
-    fn current_user_my() -> Result<Self, ReleaseSignError> {
-        let name = [u16::from(b'M'), u16::from(b'Y'), 0];
-        // SAFETY: `name` is the fixed NUL-terminated system-store name. A
-        // legacy provider of zero selects the current user's logical store.
-        let handle = unsafe { CertOpenSystemStoreW(0, name.as_ptr()) };
-        if handle.is_null() {
-            Err(ReleaseSignError::CertificateStoreUnavailable)
-        } else {
-            Ok(Self { handle })
-        }
-    }
-}
-
-impl Drop for CertificateStoreGuard {
-    fn drop(&mut self) {
-        // SAFETY: this value owns the successful certificate-store handle and
-        // closes it exactly once after any certificate context is released.
-        let _ = unsafe { CertCloseStore(self.handle, 0) };
-    }
-}
-
-struct CertificateContextGuard(*const CertificateContext);
-
-impl Drop for CertificateContextGuard {
-    fn drop(&mut self) {
-        // SAFETY: this context came from the still-open owned store and is
-        // released before that store because of SelectedCertificate field order.
-        let _ = unsafe { CertFreeCertificateContext(self.0) };
-    }
 }
 
 struct SigningLibrary {
@@ -267,7 +159,7 @@ struct SigningLibrary {
 }
 
 impl SigningLibrary {
-    fn load() -> Result<Self, ReleaseSignError> {
+    fn load() -> Result<Self, WindowsSigningError> {
         let module = SigningModule::load()?;
         let sign = symbol(module.0, b"SignerSignEx\0")?;
         let free = symbol(module.0, b"SignerFreeSignerContext\0")?;
@@ -283,8 +175,9 @@ impl SigningLibrary {
 struct SigningModule(ModuleHandle);
 
 impl SigningModule {
-    fn load() -> Result<Self, ReleaseSignError> {
-        let library = wide_null(Path::new("Mssign32.dll")).expect("fixed DLL name is valid");
+    fn load() -> Result<Self, WindowsSigningError> {
+        let library =
+            wide_null(Path::new("Mssign32.dll")).expect("the fixed signing library name is valid");
         // SAFETY: This requests only the fixed Windows system DLL and does not
         // consult the application directory or current working directory.
         let module = unsafe {
@@ -295,7 +188,7 @@ impl SigningModule {
             )
         };
         if module.is_null() {
-            Err(ReleaseSignError::SigningUnavailable)
+            Err(WindowsSigningError::AuthenticodeUnavailable)
         } else {
             Ok(Self(module))
         }
@@ -351,7 +244,7 @@ impl Drop for SigningContext {
     }
 }
 
-fn symbol<T>(module: ModuleHandle, name: &'static [u8]) -> Result<T, ReleaseSignError>
+fn symbol<T>(module: ModuleHandle, name: &'static [u8]) -> Result<T, WindowsSigningError>
 where
     T: Copy,
 {
@@ -359,7 +252,7 @@ where
     // NUL-terminated ASCII export name.
     let address = unsafe { GetProcAddress(module, name.as_ptr().cast()) };
     if address.is_null() {
-        return Err(ReleaseSignError::SigningUnavailable);
+        return Err(WindowsSigningError::AuthenticodeUnavailable);
     }
     // SAFETY: callers supply exactly the documented ABI signature for each
     // fixed Mssign32 export requested above.
@@ -375,8 +268,8 @@ fn wide_null(path: &Path) -> Option<Vec<u16>> {
     Some(wide)
 }
 
-const fn size_of<T>() -> Dword {
-    mem::size_of::<T>() as Dword
+const fn size_of<T>() -> u32 {
+    mem::size_of::<T>() as u32
 }
 
 #[cfg(test)]

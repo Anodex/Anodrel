@@ -1,0 +1,17 @@
+[package]
+name = "anodrel-update-catalogue-sign"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-update-catalogue-sign"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-update-catalogue = { path = "../../crates/update-catalogue" }
+anodrel-windows-update-catalogue-signature = { path = "../../adapters/windows-update-catalogue-signature" }
+
+[dev-dependencies]
+anodrel-windows-signing = { path = "../../adapters/windows-signing" }

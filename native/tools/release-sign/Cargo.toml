@@ -12,6 +12,7 @@ path = "src/main.rs"
 anodrel-application = { path = "../../crates/application" }
 anodrel-release-image = { path = "../release-image" }
 anodrel-windows-signature = { path = "../../adapters/windows-signature" }
+anodrel-windows-signing = { path = "../../adapters/windows-signing" }
 
 [dev-dependencies]
 anodrel-release-bundle = { path = "../../crates/release-bundle" }

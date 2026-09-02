@@ -11,7 +11,6 @@
 mod build;
 mod error;
 mod output;
-mod raw;
 
 pub use build::sign_release_image;
 pub use error::ReleaseSignError;
