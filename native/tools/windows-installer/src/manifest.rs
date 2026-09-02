@@ -9,6 +9,10 @@ use anodrel_protocol::Capability;
 
 use crate::{MAX_PAYLOAD_BYTES, MAX_RELEASE_MANIFEST_BYTES, ReleaseManifestError};
 
+mod metadata;
+
+pub use metadata::ProductMetadata;
+
 /// One release directory version, distinct from protocol compatibility.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct PackageVersion {
@@ -112,6 +116,7 @@ pub struct ReleaseManifest {
     capabilities: Vec<Capability>,
     network_origins: Vec<NetworkOrigin>,
     update_catalogue: Option<UpdateCatalogueLocation>,
+    product_metadata: Option<ProductMetadata>,
     payload: PayloadDescriptor,
 }
 
@@ -123,9 +128,19 @@ impl ReleaseManifest {
         }
         let root = JsonValue::parse(input).map_err(|_| ReleaseManifestError::Invalid)?;
         let fields = root.as_object().ok_or(ReleaseManifestError::Invalid)?;
-        let has_update_catalogue = parse_format_version(required_object(fields, "formatVersion")?)?;
-        let expected_fields = if has_update_catalogue {
-            &[
+        let format_version = parse_format_version(required_object(fields, "formatVersion")?)?;
+        let expected_fields = match format_version {
+            FormatVersion::Base => &[
+                "formatVersion",
+                "applicationId",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+                "payload",
+            ][..],
+            FormatVersion::Catalogue => &[
                 "formatVersion",
                 "applicationId",
                 "packageVersion",
@@ -135,9 +150,8 @@ impl ReleaseManifest {
                 "networkOrigins",
                 "updateCatalogue",
                 "payload",
-            ][..]
-        } else {
-            &[
+            ][..],
+            FormatVersion::ProductMetadata => &[
                 "formatVersion",
                 "applicationId",
                 "packageVersion",
@@ -145,8 +159,10 @@ impl ReleaseManifest {
                 "publisher",
                 "capabilities",
                 "networkOrigins",
+                "updateCatalogue",
+                "product",
                 "payload",
-            ][..]
+            ][..],
         };
         exact_fields(fields, expected_fields)?;
 
@@ -161,11 +177,16 @@ impl ReleaseManifest {
         let publisher_fingerprint = parse_publisher(required_object(fields, "publisher")?)?;
         let capabilities = parse_capabilities(fields.get("capabilities"))?;
         let network_origins = parse_network_origins(fields.get("networkOrigins"), &capabilities)?;
-        let update_catalogue = if has_update_catalogue {
+        let update_catalogue = if format_version.has_update_catalogue() {
             Some(parse_update_catalogue(required_object(
                 fields,
                 "updateCatalogue",
             )?)?)
+        } else {
+            None
+        };
+        let product_metadata = if format_version.has_product_metadata() {
+            Some(parse_product_metadata(required_object(fields, "product")?)?)
         } else {
             None
         };
@@ -180,6 +201,7 @@ impl ReleaseManifest {
             capabilities,
             network_origins,
             update_catalogue,
+            product_metadata,
             payload,
         })
     }
@@ -240,6 +262,12 @@ impl ReleaseManifest {
         self.update_catalogue.as_ref()
     }
 
+    /// Returns signed display metadata when this release declares version 1.2.
+    #[must_use]
+    pub fn product_metadata(&self) -> Option<&ProductMetadata> {
+        self.product_metadata.as_ref()
+    }
+
     /// Returns the signed embedded-payload descriptor.
     #[must_use]
     pub const fn payload(&self) -> PayloadDescriptor {
@@ -259,24 +287,53 @@ impl std::fmt::Debug for ReleaseManifest {
             .field("capabilities", &self.capabilities)
             .field("network_origins", &self.network_origins)
             .field("update_catalogue", &self.update_catalogue)
+            .field("product_metadata", &self.product_metadata)
             .field("payload", &self.payload)
             .finish()
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FormatVersion {
+    Base,
+    Catalogue,
+    ProductMetadata,
+}
+
+impl FormatVersion {
+    const fn has_update_catalogue(self) -> bool {
+        !matches!(self, Self::Base)
+    }
+
+    const fn has_product_metadata(self) -> bool {
+        matches!(self, Self::ProductMetadata)
+    }
+}
+
 fn parse_format_version(
     fields: &BTreeMap<String, JsonValue>,
-) -> Result<bool, ReleaseManifestError> {
+) -> Result<FormatVersion, ReleaseManifestError> {
     exact_fields(fields, &["major", "minor"])?;
     match (
         required_u16(fields, "major")?,
         required_u16(fields, "minor")?,
     ) {
-        (1, 0) => Ok(false),
-        (1, 1) => Ok(true),
+        (1, 0) => Ok(FormatVersion::Base),
+        (1, 1) => Ok(FormatVersion::Catalogue),
+        (1, 2) => Ok(FormatVersion::ProductMetadata),
         (1, _) => Err(ReleaseManifestError::VersionUnsupported),
         _ => Err(ReleaseManifestError::VersionUnsupported),
     }
+}
+
+fn parse_product_metadata(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<ProductMetadata, ReleaseManifestError> {
+    exact_fields(fields, &["displayName", "publisherName"])?;
+    ProductMetadata::new(
+        required_string(fields, "displayName")?,
+        required_string(fields, "publisherName")?,
+    )
 }
 
 fn parse_update_catalogue(

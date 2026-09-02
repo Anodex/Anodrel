@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0181: Product display metadata is signed and never authority.
+
 - 0180: Default installer entry composes fixed initial-install stages.
 
 - 0179: Initial-install elevation is fixed and one-shot.

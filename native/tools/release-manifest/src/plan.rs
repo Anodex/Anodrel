@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use anodrel_application::{UpdateCatalogueLocation, sha256};
 use anodrel_json::JsonValue;
 use anodrel_network::NetworkOrigin;
+use anodrel_windows_installer::ProductMetadata;
 
 use crate::ReleaseManifestAuthorError;
 
@@ -16,6 +17,7 @@ pub(super) struct ReleasePlan {
     capabilities: Vec<String>,
     network_origins: Vec<NetworkOrigin>,
     update_catalogue: Option<UpdateCatalogueLocation>,
+    product_metadata: Option<ProductMetadata>,
 }
 
 impl ReleasePlan {
@@ -25,9 +27,17 @@ impl ReleasePlan {
         let fields = root
             .as_object()
             .ok_or(ReleaseManifestAuthorError::PlanInvalid)?;
-        let has_update_catalogue = parse_format_version(required_object(fields, "formatVersion")?)?;
-        let expected_fields = if has_update_catalogue {
-            &[
+        let format_version = parse_format_version(required_object(fields, "formatVersion")?)?;
+        let expected_fields = match format_version {
+            PlanFormatVersion::Base => &[
+                "formatVersion",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+            ][..],
+            PlanFormatVersion::Catalogue => &[
                 "formatVersion",
                 "packageVersion",
                 "executable",
@@ -35,16 +45,17 @@ impl ReleasePlan {
                 "capabilities",
                 "networkOrigins",
                 "updateCatalogue",
-            ][..]
-        } else {
-            &[
+            ][..],
+            PlanFormatVersion::ProductMetadata => &[
                 "formatVersion",
                 "packageVersion",
                 "executable",
                 "publisher",
                 "capabilities",
                 "networkOrigins",
-            ][..]
+                "updateCatalogue",
+                "product",
+            ][..],
         };
         exact_fields(fields, expected_fields)?;
         let package = required_object(fields, "packageVersion")?;
@@ -64,11 +75,16 @@ impl ReleasePlan {
                 .ok_or(ReleaseManifestAuthorError::PlanInvalid)?;
         let capabilities = parse_capabilities(fields.get("capabilities"))?;
         let network_origins = parse_network_origins(fields.get("networkOrigins"))?;
-        let update_catalogue = if has_update_catalogue {
+        let update_catalogue = if format_version.has_update_catalogue() {
             Some(parse_update_catalogue(required_object(
                 fields,
                 "updateCatalogue",
             )?)?)
+        } else {
+            None
+        };
+        let product_metadata = if format_version.has_product_metadata() {
+            Some(parse_product_metadata(required_object(fields, "product")?)?)
         } else {
             None
         };
@@ -79,6 +95,7 @@ impl ReleasePlan {
             capabilities,
             network_origins,
             update_catalogue,
+            product_metadata,
         })
     }
 
@@ -128,14 +145,7 @@ impl ReleasePlan {
                     ("major".to_owned(), JsonValue::Number("1".to_owned())),
                     (
                         "minor".to_owned(),
-                        JsonValue::Number(
-                            if self.update_catalogue.is_some() {
-                                "1"
-                            } else {
-                                "0"
-                            }
-                            .to_owned(),
-                        ),
+                        JsonValue::Number(self.format_minor().to_string()),
                     ),
                 ])),
             ),
@@ -221,22 +231,76 @@ impl ReleasePlan {
                 ])),
             );
         }
+        if let Some(product) = &self.product_metadata {
+            fields.insert(
+                "product".to_owned(),
+                JsonValue::Object(BTreeMap::from([
+                    (
+                        "displayName".to_owned(),
+                        JsonValue::String(product.display_name().to_owned()),
+                    ),
+                    (
+                        "publisherName".to_owned(),
+                        JsonValue::String(product.publisher_name().to_owned()),
+                    ),
+                ])),
+            );
+        }
         JsonValue::Object(fields).to_json()
+    }
+
+    fn format_minor(&self) -> u8 {
+        if self.product_metadata.is_some() {
+            2
+        } else if self.update_catalogue.is_some() {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlanFormatVersion {
+    Base,
+    Catalogue,
+    ProductMetadata,
+}
+
+impl PlanFormatVersion {
+    const fn has_update_catalogue(self) -> bool {
+        !matches!(self, Self::Base)
+    }
+
+    const fn has_product_metadata(self) -> bool {
+        matches!(self, Self::ProductMetadata)
     }
 }
 
 fn parse_format_version(
     fields: &BTreeMap<String, JsonValue>,
-) -> Result<bool, ReleaseManifestAuthorError> {
+) -> Result<PlanFormatVersion, ReleaseManifestAuthorError> {
     exact_fields(fields, &["major", "minor"])?;
     match (
         required_u16(fields, "major")?,
         required_u16(fields, "minor")?,
     ) {
-        (1, 0) => Ok(false),
-        (1, 1) => Ok(true),
+        (1, 0) => Ok(PlanFormatVersion::Base),
+        (1, 1) => Ok(PlanFormatVersion::Catalogue),
+        (1, 2) => Ok(PlanFormatVersion::ProductMetadata),
         _ => Err(ReleaseManifestAuthorError::PlanInvalid),
     }
+}
+
+fn parse_product_metadata(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<ProductMetadata, ReleaseManifestAuthorError> {
+    exact_fields(fields, &["displayName", "publisherName"])?;
+    ProductMetadata::new(
+        required_string(fields, "displayName")?,
+        required_string(fields, "publisherName")?,
+    )
+    .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)
 }
 
 fn parse_capabilities(

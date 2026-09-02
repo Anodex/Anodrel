@@ -54,7 +54,7 @@ pub use install_acceptance::{
 pub use installation::{InstallCurrentError, InstalledRelease, install_current_signed_release};
 #[cfg(windows)]
 pub use machine_root::MachineRootError;
-pub use manifest::{PackageVersion, PayloadDescriptor, ReleaseManifest};
+pub use manifest::{PackageVersion, PayloadDescriptor, ProductMetadata, ReleaseManifest};
 pub use payload::{ReleasePayloadError, verify_bundle};
 #[cfg(windows)]
 pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed_release};

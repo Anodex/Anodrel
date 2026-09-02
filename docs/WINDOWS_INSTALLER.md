@@ -49,7 +49,8 @@ invalidate existing executable signatures.
 
 The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only
 the exact fields below. Version 1.1 adds exactly one `updateCatalogue` field.
-Unknown, missing, duplicate, or wrongly typed fields are rejected.
+Version 1.2 adds signed product display metadata while retaining that catalogue
+field. Unknown, missing, duplicate, or wrongly typed fields are rejected.
 
 ~~~json
 {
@@ -74,7 +75,7 @@ Unknown, missing, duplicate, or wrongly typed fields are rejected.
 
 | Field | Rule |
 | --- | --- |
-| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }` or 1.1. Version 1.1 requires `updateCatalogue`; version 1.0 has no discovery authority. |
+| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }`, 1.1, or 1.2. Versions 1.1 and 1.2 require `updateCatalogue`; 1.2 also requires `product`; version 1.0 has no discovery authority. |
 | `applicationId` | Existing 3–128 character Anodrel application identity. |
 | `packageVersion` | Three non-negative integers from 0 through 65,535; it identifies a staged release directory and is not protocol compatibility. |
 | `executable.path` | Relative, forward-slash-separated contained `.exe` path; no roots, drives, `.` or `..`. |
@@ -82,7 +83,8 @@ Unknown, missing, duplicate, or wrongly typed fields are rejected.
 | `publisher.leafCertificateSha256` | Lowercase SHA-256 leaf fingerprint the installer and extracted executable must both match. |
 | `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19 machine record, then asks the existing validator to accept it. |
 | `networkOrigins` | Exact host/port policy. It is empty unless `capabilities` includes `network.fetch`; the existing installed-record validator is authoritative. |
-| `updateCatalogue` | Version 1.1 only: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
+| `updateCatalogue` | Versions 1.1 and 1.2: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
+| `product` | Version 1.2 only: one signed `displayName` and `publisherName` for later host-owned Windows product surfaces. Neither value is a path, policy key, identity, or certificate selector. See [signed product display metadata](PRODUCT_METADATA.md). |
 | `payload` | Exact uncompressed byte length, at least 1 and at most 512 MiB, plus a lowercase SHA-256 digest. |
 
 The manifest contains no filesystem root, command line, registry location,
@@ -355,4 +357,4 @@ See [Windows release readiness](WINDOWS_RELEASE.md), [signing foundation](SIGNIN
 [installed application records](LAUNCH.md), [initial-install acceptance](INSTALL_ACCEPTANCE.md),
 [initial-install consent](INSTALL_CONSENT.md), [initial-install handoff](INSTALL_HANDOFF.md),
 [interactive initial-install flow](INSTALL_FLOW.md), and Decisions 0017–0020,
-0140, and 0177–0180.
+0140, and 0177–0181.

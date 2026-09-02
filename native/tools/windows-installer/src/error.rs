@@ -15,6 +15,8 @@ pub enum ReleaseManifestError {
     ExecutablePathInvalid,
     /// The manifest's capabilities and network origins did not form policy.
     PolicyInvalid,
+    /// The manifest's signed product display metadata was unsafe or malformed.
+    ProductMetadataInvalid,
     /// The manifest's payload descriptor exceeded its fixed bounds.
     PayloadInvalid,
 }
@@ -27,6 +29,7 @@ impl fmt::Display for ReleaseManifestError {
             Self::VersionUnsupported => "release manifest version is unsupported",
             Self::ExecutablePathInvalid => "release manifest executable path is invalid",
             Self::PolicyInvalid => "release manifest policy is invalid",
+            Self::ProductMetadataInvalid => "release manifest product metadata is invalid",
             Self::PayloadInvalid => "release manifest payload is invalid",
         };
         formatter.write_str(message)

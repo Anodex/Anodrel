@@ -41,13 +41,28 @@ Version 1.1 adds exactly one `updateCatalogue` object:
 }
 ~~~
 
-The format version is exactly 1.0 or 1.1. Version 1.1 requires this source and
-derives a final release manifest at 1.1; version 1.0 carries no update source.
-Package-version fields are unsigned 16-bit integers. The executable path,
-capability names, network origins, and catalogue location undergo the same
-strict validation as the final release manifest. The publisher is one lowercase
-SHA-256 leaf-certificate fingerprint. Unknown, duplicate, missing, or extra
-fields fail closed.
+The format version is exactly 1.0, 1.1, or 1.2. Version 1.1 requires this
+source and derives a final release manifest at 1.1; version 1.0 carries no
+update source. Version 1.2 retains this source and adds product display
+metadata. Package-version fields are unsigned 16-bit integers. The executable
+path, capability names, network origins, and catalogue location undergo the
+same strict validation as the final release manifest. The publisher is one
+lowercase SHA-256 leaf-certificate fingerprint. Unknown, duplicate, missing,
+or extra fields fail closed.
+
+Version 1.2 adds the required signed `product` object while retaining version
+1.1's required catalogue source:
+
+~~~json
+"product": {
+  "displayName": "Anodrel Sample",
+  "publisherName": "Anodrel"
+}
+~~~
+
+Its two bounded display values are for later host-owned Windows product
+surfaces only; they are never a path, application identity, policy key, or
+certificate selector. See [signed product display metadata](PRODUCT_METADATA.md).
 
 ## Creation contract
 

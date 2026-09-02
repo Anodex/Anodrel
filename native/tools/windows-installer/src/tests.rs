@@ -139,6 +139,28 @@ fn version_one_one_binds_one_catalogue_source_into_the_machine_record() {
 }
 
 #[test]
+fn version_one_two_binds_safe_product_metadata_to_the_signed_release() {
+    let manifest = release_manifest(PAYLOAD, "[]", "[]")
+        .replace("\"minor\": 0", "\"minor\": 2")
+        .replace(
+            "  \"payload\":",
+            "  \"updateCatalogue\": {\n    \"origin\": { \"host\": \"updates.example.test\", \"port\": 443 },\n    \"path\": \"/anodrel/stable.p7s\"\n  },\n  \"product\": {\n    \"displayName\": \"Anodrel Installer Test\",\n    \"publisherName\": \"Anodrel\"\n  },\n  \"payload\":",
+        );
+    let release = ReleaseManifest::parse(&manifest).expect("version 1.2 manifest is valid");
+    let product = release
+        .product_metadata()
+        .expect("version 1.2 has signed display metadata");
+    assert_eq!(product.display_name(), "Anodrel Installer Test");
+    assert_eq!(product.publisher_name(), "Anodrel");
+
+    let unsafe_text = manifest.replace("Anodrel Installer Test", "Anodrel\u{202E}Test");
+    assert!(matches!(
+        ReleaseManifest::parse(&unsafe_text),
+        Err(ReleaseManifestError::ProductMetadataInvalid)
+    ));
+}
+
+#[test]
 fn malformed_paths_unknown_fields_and_out_of_bounds_payloads_fail_closed() {
     let parent_path =
         release_manifest(PAYLOAD, "[]", "[]").replace("bin/Product.EXE", "bin/../Product.EXE");
