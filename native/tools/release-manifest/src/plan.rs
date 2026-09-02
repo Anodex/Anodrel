@@ -2,8 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use anodrel_application::sha256;
+use anodrel_application::{UpdateCatalogueLocation, sha256};
 use anodrel_json::JsonValue;
+use anodrel_network::NetworkOrigin;
 
 use crate::ReleaseManifestAuthorError;
 
@@ -14,11 +15,7 @@ pub(super) struct ReleasePlan {
     publisher: [u8; 32],
     capabilities: Vec<String>,
     network_origins: Vec<NetworkOrigin>,
-}
-
-struct NetworkOrigin {
-    host: String,
-    port: u16,
+    update_catalogue: Option<UpdateCatalogueLocation>,
 }
 
 impl ReleasePlan {
@@ -28,8 +25,8 @@ impl ReleasePlan {
         let fields = root
             .as_object()
             .ok_or(ReleaseManifestAuthorError::PlanInvalid)?;
-        exact_fields(
-            fields,
+        let has_update_catalogue = parse_format_version(required_object(fields, "formatVersion")?)?;
+        let expected_fields = if has_update_catalogue {
             &[
                 "formatVersion",
                 "packageVersion",
@@ -37,9 +34,19 @@ impl ReleasePlan {
                 "publisher",
                 "capabilities",
                 "networkOrigins",
-            ],
-        )?;
-        parse_format_version(required_object(fields, "formatVersion")?)?;
+                "updateCatalogue",
+            ][..]
+        } else {
+            &[
+                "formatVersion",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+            ][..]
+        };
+        exact_fields(fields, expected_fields)?;
         let package = required_object(fields, "packageVersion")?;
         exact_fields(package, &["major", "minor", "patch"])?;
         let package_version = [
@@ -57,12 +64,21 @@ impl ReleasePlan {
                 .ok_or(ReleaseManifestAuthorError::PlanInvalid)?;
         let capabilities = parse_capabilities(fields.get("capabilities"))?;
         let network_origins = parse_network_origins(fields.get("networkOrigins"))?;
+        let update_catalogue = if has_update_catalogue {
+            Some(parse_update_catalogue(required_object(
+                fields,
+                "updateCatalogue",
+            )?)?)
+        } else {
+            None
+        };
         Ok(Self {
             package_version,
             executable_path,
             publisher,
             capabilities,
             network_origins,
+            update_catalogue,
         })
     }
 
@@ -78,7 +94,7 @@ impl ReleasePlan {
         executable_digest: [u8; 32],
         bundle: &[u8],
     ) -> String {
-        JsonValue::Object(BTreeMap::from([
+        let mut fields = BTreeMap::from([
             (
                 "applicationId".to_owned(),
                 JsonValue::String(application_id.to_owned()),
@@ -110,7 +126,17 @@ impl ReleasePlan {
                 "formatVersion".to_owned(),
                 JsonValue::Object(BTreeMap::from([
                     ("major".to_owned(), JsonValue::Number("1".to_owned())),
-                    ("minor".to_owned(), JsonValue::Number("0".to_owned())),
+                    (
+                        "minor".to_owned(),
+                        JsonValue::Number(
+                            if self.update_catalogue.is_some() {
+                                "1"
+                            } else {
+                                "0"
+                            }
+                            .to_owned(),
+                        ),
+                    ),
                 ])),
             ),
             (
@@ -120,10 +146,13 @@ impl ReleasePlan {
                         .iter()
                         .map(|origin| {
                             JsonValue::Object(BTreeMap::from([
-                                ("host".to_owned(), JsonValue::String(origin.host.clone())),
+                                (
+                                    "host".to_owned(),
+                                    JsonValue::String(origin.hostname().to_owned()),
+                                ),
                                 (
                                     "port".to_owned(),
-                                    JsonValue::Number(origin.port.to_string()),
+                                    JsonValue::Number(origin.port().to_string()),
                                 ),
                             ]))
                         })
@@ -167,18 +196,47 @@ impl ReleasePlan {
                     JsonValue::String(sha256::to_lower_hex(&self.publisher)),
                 )])),
             ),
-        ]))
-        .to_json()
+        ]);
+        if let Some(location) = &self.update_catalogue {
+            fields.insert(
+                "updateCatalogue".to_owned(),
+                JsonValue::Object(BTreeMap::from([
+                    (
+                        "origin".to_owned(),
+                        JsonValue::Object(BTreeMap::from([
+                            (
+                                "host".to_owned(),
+                                JsonValue::String(location.origin().hostname().to_owned()),
+                            ),
+                            (
+                                "port".to_owned(),
+                                JsonValue::Number(location.origin().port().to_string()),
+                            ),
+                        ])),
+                    ),
+                    (
+                        "path".to_owned(),
+                        JsonValue::String(location.request_path().to_owned()),
+                    ),
+                ])),
+            );
+        }
+        JsonValue::Object(fields).to_json()
     }
 }
 
 fn parse_format_version(
     fields: &BTreeMap<String, JsonValue>,
-) -> Result<(), ReleaseManifestAuthorError> {
+) -> Result<bool, ReleaseManifestAuthorError> {
     exact_fields(fields, &["major", "minor"])?;
-    (required_u16(fields, "major")? == 1 && required_u16(fields, "minor")? == 0)
-        .then_some(())
-        .ok_or(ReleaseManifestAuthorError::PlanInvalid)
+    match (
+        required_u16(fields, "major")?,
+        required_u16(fields, "minor")?,
+    ) {
+        (1, 0) => Ok(false),
+        (1, 1) => Ok(true),
+        _ => Err(ReleaseManifestAuthorError::PlanInvalid),
+    }
 }
 
 fn parse_capabilities(
@@ -214,12 +272,28 @@ fn parse_network_origins(
                 .as_object()
                 .ok_or(ReleaseManifestAuthorError::PlanInvalid)?;
             exact_fields(fields, &["host", "port"])?;
-            Ok(NetworkOrigin {
-                host: required_string(fields, "host")?.to_owned(),
-                port: required_u16(fields, "port")?,
-            })
+            NetworkOrigin::new(
+                required_string(fields, "host")?,
+                required_u16(fields, "port")?,
+            )
+            .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)
         })
         .collect()
+}
+
+fn parse_update_catalogue(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<UpdateCatalogueLocation, ReleaseManifestAuthorError> {
+    exact_fields(fields, &["origin", "path"])?;
+    let origin = required_object(fields, "origin")?;
+    exact_fields(origin, &["host", "port"])?;
+    let origin = NetworkOrigin::new(
+        required_string(origin, "host")?,
+        required_u16(origin, "port")?,
+    )
+    .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)?;
+    UpdateCatalogueLocation::new(origin, required_string(fields, "path")?)
+        .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)
 }
 
 fn exact_fields(

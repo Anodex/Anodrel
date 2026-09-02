@@ -14,9 +14,7 @@ shipping a browser runtime.
   browser engine, webview, or Node.js runtime.
 
 It is not an application itself, an Anodex source mirror, or a finished
-Electron replacement. Owned Windows release foundations are implemented, but
-production certificate custody, signed acceptance, delivery, updates, and macOS/Linux desktop hosts remain planned work. Linux has authenticated local
-transport, a private child transport with one host-owned lifecycle, bounded state, and a fixed Wayland child/view diagnostic—not an application desktop host or product launcher.
+Electron replacement. Owned Windows release foundations include signed catalogue discovery and private image staging; production certificate custody, signed acceptance, elevation handoff, update recovery, and macOS/Linux desktop hosts remain planned work. Linux has authenticated local transport, a private child transport with one host-owned lifecycle, bounded state, and a fixed Wayland child/view diagnostic—not an application desktop host or product launcher.
 
 Anodex will be the first application built on Anodrel. Anodex is not being
 moved into this repository yet; it remains an independent project until the
@@ -215,9 +213,7 @@ signed executable currently validate.
 This is a development-machine fixture and is never presented as a product
 launch. It relies on a locally generated certificate installed into machine
 trust, and **that has not been done on any machine yet, so the joined signed
-path remains unvalidated in practice**. The owned release foundations do not
-remove the remaining production-identity, delivery, and recovery decisions; see
-`ROADMAP.md` and `docs/PRODUCT_FIXTURE.md`.
+path remains unvalidated in practice**. The owned release foundations do not remove the remaining production-identity, elevation-handoff, and recovery decisions; see `ROADMAP.md` and `docs/PRODUCT_FIXTURE.md`.
 
 First-party surfaces are drawn by a software renderer rather than by
 platform drawing primitives: a portable rasterizer with antialiasing, gradients,

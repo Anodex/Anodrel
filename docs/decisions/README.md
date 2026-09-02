@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0168: Signed installed policy selects update catalogue source.
+
 - 0167: Verified update images stream to fresh private files.
 
 - 0166: Direct Windows HTTPS transfer is shared and streaming.

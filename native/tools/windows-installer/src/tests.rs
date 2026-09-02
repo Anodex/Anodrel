@@ -1,6 +1,9 @@
 //! Contract tests for the owned installer release-manifest foundation.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use anodrel_application::{InstalledApplication, sha256};
 use anodrel_release_bundle::{BundleEntryInput, ReleaseBundleError, encode};
@@ -11,6 +14,7 @@ use crate::{
 
 const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
 const PAYLOAD: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+static NEXT_STAGED_PACKAGE: AtomicU64 = AtomicU64::new(0);
 
 fn release_manifest(executable_digest: &str, capabilities: &str, origins: &str) -> String {
     format!(
@@ -105,6 +109,36 @@ fn network_permission_requires_one_exact_origin_and_canonicalizes_it() {
 }
 
 #[test]
+fn version_one_one_binds_one_catalogue_source_into_the_machine_record() {
+    let package = StagedPackage::new();
+    let executable_digest = package.executable_digest();
+    let manifest = release_manifest(&executable_digest, "[]", "[]")
+        .replace("\"minor\": 0", "\"minor\": 1")
+        .replace(
+            "  \"payload\":",
+            "  \"updateCatalogue\": {\n    \"origin\": { \"host\": \"updates.example.test\", \"port\": 443 },\n    \"path\": \"/anodrel/stable.p7s\"\n  },\n  \"payload\":",
+        );
+    let release = ReleaseManifest::parse(&manifest).expect("version 1.1 manifest is valid");
+    let location = release
+        .update_catalogue_location()
+        .expect("signed source is present");
+    assert_eq!(location.origin().hostname(), "updates.example.test");
+    assert_eq!(location.request_path(), "/anodrel/stable.p7s");
+
+    let record = release.render_install_record(package.root());
+    let installed =
+        InstalledApplication::load_from_trusted_record(&record, "org.anodrel.installer-test")
+            .expect("the version 1.20 record is valid");
+    assert_eq!(
+        installed
+            .update_catalogue_location()
+            .expect("installed source is present")
+            .request_path(),
+        "/anodrel/stable.p7s"
+    );
+}
+
+#[test]
 fn malformed_paths_unknown_fields_and_out_of_bounds_payloads_fail_closed() {
     let parent_path =
         release_manifest(PAYLOAD, "[]", "[]").replace("bin/Product.EXE", "bin/../Product.EXE");
@@ -168,11 +202,12 @@ struct StagedPackage(PathBuf);
 
 impl StagedPackage {
     fn new() -> Self {
+        let sequence = NEXT_STAGED_PACKAGE.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
-            "anodrel-windows-installer-test-{}",
-            std::process::id()
+            "anodrel-windows-installer-test-{}-{sequence}",
+            std::process::id(),
         ));
-        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir(&root).expect("temporary package root is created");
         std::fs::create_dir_all(root.join("content")).expect("the content directory is created");
         std::fs::create_dir_all(root.join("bin")).expect("the binary directory is created");
         let content = b"installer record validation";

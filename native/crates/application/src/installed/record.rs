@@ -1,14 +1,14 @@
 //! Strict parsing of the host-selected installed-application record.
 
 use anodrel_json::JsonValue;
-use anodrel_network::NetworkOriginPolicy;
+use anodrel_network::{NetworkOrigin, NetworkOriginPolicy};
 use anodrel_protocol::Capability;
 
 use crate::{MAX_INSTALL_RECORD_BYTES, manifest, network_policy, sha256};
 
 use super::{
-    InstalledApplicationError, exact_fields, is_valid_executable_path, required_object,
-    required_string, validate_version,
+    InstalledApplicationError, UpdateCatalogueLocation, exact_fields, is_valid_executable_path,
+    required_object, required_string, validate_version,
 };
 
 pub(super) struct ParsedRecord {
@@ -19,6 +19,7 @@ pub(super) struct ParsedRecord {
     pub(super) publisher_fingerprint: [u8; 32],
     pub(super) capabilities: Vec<Capability>,
     pub(super) network_policy: Option<NetworkOriginPolicy>,
+    pub(super) update_catalogue: Option<UpdateCatalogueLocation>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -43,6 +44,7 @@ pub(super) enum RecordVersion {
     V1_17,
     V1_18,
     V1_19,
+    V1_20,
 }
 
 impl RecordVersion {
@@ -94,6 +96,17 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
             "packageRoot",
             "executable",
             "publisher",
+        ][..]
+    } else if version.accepts(RecordVersion::V1_20) {
+        &[
+            "recordVersion",
+            "applicationId",
+            "packageRoot",
+            "executable",
+            "publisher",
+            "capabilities",
+            "networkOrigins",
+            "updateCatalogue",
         ][..]
     } else if version.accepts(RecordVersion::V1_14) {
         &[
@@ -166,6 +179,14 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
     } else {
         None
     };
+    let update_catalogue = if version.accepts(RecordVersion::V1_20) {
+        Some(parse_update_catalogue(required_object(
+            fields,
+            "updateCatalogue",
+        )?)?)
+    } else {
+        None
+    };
 
     Ok(ParsedRecord {
         application_id: application_id.to_owned(),
@@ -175,7 +196,26 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
         publisher_fingerprint,
         capabilities,
         network_policy,
+        update_catalogue,
     })
+}
+
+fn parse_update_catalogue(
+    fields: &std::collections::BTreeMap<String, JsonValue>,
+) -> Result<UpdateCatalogueLocation, InstalledApplicationError> {
+    exact_fields(fields, &["origin", "path"])?;
+    let origin = required_object(fields, "origin")?;
+    exact_fields(origin, &["host", "port"])?;
+    let origin = NetworkOrigin::new(
+        required_string(origin, "host")?,
+        origin
+            .get("port")
+            .and_then(JsonValue::as_u16)
+            .ok_or(InstalledApplicationError::InvalidRecord)?,
+    )
+    .map_err(|_| InstalledApplicationError::InvalidRecord)?;
+    UpdateCatalogueLocation::new(origin, required_string(fields, "path")?)
+        .map_err(|_| InstalledApplicationError::InvalidRecord)
 }
 
 fn capability_for_record_version(

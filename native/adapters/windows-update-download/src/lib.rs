@@ -9,11 +9,15 @@
 //! surface. See `docs/UPDATE_DELIVERY.md` and Decision 0167.
 
 mod candidate;
+mod discovery;
+mod discovery_error;
 mod download;
 mod error;
 mod file;
 
 pub use candidate::{PreparedUpdateDownload, prepare_current_update_download};
+pub use discovery::retrieve_current_update_download;
+pub use discovery_error::UpdateCatalogueDiscoveryError;
 pub use download::download_prepared_update;
 pub use error::UpdateDownloadError;
 pub use file::DownloadedInstaller;

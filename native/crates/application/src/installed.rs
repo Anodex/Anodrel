@@ -25,6 +25,11 @@ use crate::{
 const PACKAGE_MANIFEST_NAME: &str = "anodrel.application.json";
 
 mod record;
+mod update_catalogue;
+
+pub use update_catalogue::{
+    MAX_UPDATE_CATALOGUE_PATH_BYTES, UpdateCatalogueLocation, UpdateCatalogueLocationError,
+};
 
 /// A fixed SHA-256 fingerprint for the publisher approved by an installed
 /// application record.
@@ -54,6 +59,7 @@ pub struct InstalledApplication {
     publisher_fingerprint: PublisherFingerprint,
     capabilities: Vec<Capability>,
     network_policy: Option<NetworkOriginPolicy>,
+    update_catalogue: Option<UpdateCatalogueLocation>,
 }
 
 impl InstalledApplication {
@@ -152,6 +158,15 @@ impl InstalledApplication {
         self.network_policy.as_ref()
     }
 
+    /// Returns the signed update-catalogue location, when this release opted in.
+    ///
+    /// This remains private host-composition data. It is not application network
+    /// authority and must never be serialized into a protocol response.
+    #[must_use]
+    pub fn update_catalogue_location(&self) -> Option<&UpdateCatalogueLocation> {
+        self.update_catalogue.as_ref()
+    }
+
     /// Rechecks an executable path and hashes bytes read from a caller-held
     /// file handle against this record's expected digest.
     ///
@@ -227,6 +242,7 @@ fn validate_record(
         publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
         capabilities: record.capabilities,
         network_policy: record.network_policy,
+        update_catalogue: record.update_catalogue,
     })
 }
 
@@ -410,6 +426,7 @@ fn validate_version(
         (1, 17) => Ok(record::RecordVersion::V1_17),
         (1, 18) => Ok(record::RecordVersion::V1_18),
         (1, 19) => Ok(record::RecordVersion::V1_19),
+        (1, 20) => Ok(record::RecordVersion::V1_20),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }

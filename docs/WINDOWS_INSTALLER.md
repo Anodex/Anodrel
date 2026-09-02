@@ -48,8 +48,8 @@ invalidate existing executable signatures.
 ## `anodrel.release.v1` manifest
 
 The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only
-the exact fields below. Unknown, missing, duplicate, or wrongly typed fields
-are rejected.
+the exact fields below. Version 1.1 adds exactly one `updateCatalogue` field.
+Unknown, missing, duplicate, or wrongly typed fields are rejected.
 
 ~~~json
 {
@@ -74,7 +74,7 @@ are rejected.
 
 | Field | Rule |
 | --- | --- |
-| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }`. A later version must be a documented strict superset. |
+| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }` or 1.1. Version 1.1 requires `updateCatalogue`; version 1.0 has no discovery authority. |
 | `applicationId` | Existing 3–128 character Anodrel application identity. |
 | `packageVersion` | Three non-negative integers from 0 through 65,535; it identifies a staged release directory and is not protocol compatibility. |
 | `executable.path` | Relative, forward-slash-separated contained `.exe` path; no roots, drives, `.` or `..`. |
@@ -82,10 +82,13 @@ are rejected.
 | `publisher.leafCertificateSha256` | Lowercase SHA-256 leaf fingerprint the installer and extracted executable must both match. |
 | `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19 machine record, then asks the existing validator to accept it. |
 | `networkOrigins` | Exact host/port policy. It is empty unless `capabilities` includes `network.fetch`; the existing installed-record validator is authoritative. |
+| `updateCatalogue` | Version 1.1 only: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
 | `payload` | Exact uncompressed byte length, at least 1 and at most 512 MiB, plus a lowercase SHA-256 digest. |
 
 The manifest contains no filesystem root, command line, registry location,
-download URL, certificate subject, token, user data, or child argument.
+image download URL, certificate subject, token, user data, or child argument.
+Version 1.1's bounded update-catalogue source is the sole documented network
+location and it enters the fixed machine record only through installer gates.
 
 ## Current implementation
 
@@ -93,8 +96,9 @@ download URL, certificate subject, token, user data, or child argument.
 foundation. It bounds and parses one release manifest, validates its executable
 and payload descriptors, then requires the complete payload to match before its
 owned per-file bundle decoder runs. It canonicalizes permitted network origins
-and renders the existing version-1.19 installed-record shape for later host-side
-validation. The direct Windows resource reader selects only the two fixed
+and renders version 1.19 or 1.20 installed-record policy for later host-side
+validation. Version 1.20 retains the signed release's optional strict catalogue
+source, not an application-provided or arbitrary download route. The direct Windows resource reader selects only the two fixed
 current-image resources and fails closed when they are absent. Its contract tests
 prove that the rendered record passes the same `anodrel-application` validator
 the Windows host reads. The activation gate now asks Windows to verify the
@@ -204,7 +208,7 @@ unselected for a later recovery route.
 
 ## Update-candidate preflight contract
 
-Before later update delivery or installation work can use a candidate, the
+Before later update retrieval or installation work can use a candidate, the
 current signed installer release is compared to the fixed selected installed
 record for the same embedded application identity. Windows must accept the
 installed executable's Authenticode signature; that signer must match both the
@@ -296,7 +300,7 @@ host's only policy source.
    and reject any file outside the destination tree.
 3. Check the extracted application package, executable path, executable digest,
    and executable Authenticode fingerprint. It must match the installer.
-4. Compose the proposed version-1.19 installed record and validate it through
+4. Compose the proposed version-1.19 or 1.20 installed record and validate it through
    `anodrel-application` before any registry write.
 5. Rename the verified staging directory to its version directory, atomically
    publish the one registry `record` value, and retain the prior complete
@@ -324,8 +328,9 @@ validates one sidecar manifest and cannot write machine state.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, shortcuts, file associations, service installation, and
-notifications. The read-only update-candidate preflight is the first update
-foundation; delivery and installation remain separate trust boundaries.
+notifications. The signed catalogue source, CMS verification, and private image
+staging foundations are implemented; elevation handoff and installation remain
+separate trust boundaries.
 
 ## Production decision still required
 

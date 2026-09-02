@@ -17,7 +17,10 @@ pub mod sha256;
 use std::{fmt, io};
 
 pub use authoring::write_text_package;
-pub use installed::{InstalledApplication, InstalledApplicationError};
+pub use installed::{
+    InstalledApplication, InstalledApplicationError, MAX_UPDATE_CATALOGUE_PATH_BYTES,
+    UpdateCatalogueLocation, UpdateCatalogueLocationError,
+};
 pub use manifest::{
     ApplicationIdentity, ApplicationManifest, is_valid_application_id, is_valid_display_name,
 };

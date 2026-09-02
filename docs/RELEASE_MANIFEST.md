@@ -16,7 +16,8 @@ those facts.
 
 ## Release plan format
 
-`anodrel.release-plan.v1` is strict UTF-8 JSON with exactly these fields:
+`anodrel.release-plan.v1` is strict UTF-8 JSON. Version 1.0 has exactly these
+fields:
 
 ~~~json
 {
@@ -31,11 +32,22 @@ those facts.
 }
 ~~~
 
-The format version is exactly 1.0. Package-version fields are unsigned 16-bit
-integers. The executable path, capability names, and network origins undergo
-the same validation as the final release manifest. The publisher is one
-lowercase SHA-256 leaf-certificate fingerprint. Unknown, duplicate, missing,
-or extra fields fail closed.
+Version 1.1 adds exactly one `updateCatalogue` object:
+
+~~~json
+"updateCatalogue": {
+  "origin": { "host": "updates.example.test", "port": 443 },
+  "path": "/anodrel/catalogues/stable.p7s"
+}
+~~~
+
+The format version is exactly 1.0 or 1.1. Version 1.1 requires this source and
+derives a final release manifest at 1.1; version 1.0 carries no update source.
+Package-version fields are unsigned 16-bit integers. The executable path,
+capability names, network origins, and catalogue location undergo the same
+strict validation as the final release manifest. The publisher is one lowercase
+SHA-256 leaf-certificate fingerprint. Unknown, duplicate, missing, or extra
+fields fail closed.
 
 ## Creation contract
 
@@ -74,5 +86,5 @@ removes only the newly created output file.
 The plan is an authoring input, not runtime policy and not a signed artifact by
 itself. Its values become authoritative only after the derived final manifest
 is embedded in an image and that image is signed by the same publisher
-fingerprint. See [release bundle](RELEASE_BUNDLE.md),
+fingerprint. See [update discovery](UPDATE_DISCOVERY.md), [release bundle](RELEASE_BUNDLE.md),
 [release image](RELEASE_IMAGE.md), [signing](SIGNING.md), and Decision 0163.

@@ -7,7 +7,7 @@ use anodrel_json::JsonValue;
 use crate::ReleaseManifest;
 
 impl ReleaseManifest {
-    /// Renders the version-1.19 machine record for one host-selected package root.
+    /// Renders the version-1.19 or 1.20 machine record for one host-selected package root.
     ///
     /// The caller must validate this record against the extracted package before
     /// writing it. The root comes from installer code, never the embedded
@@ -29,54 +29,84 @@ impl ReleaseManifest {
                 ])
             })
             .collect();
-        JsonValue::Object(
-            [
-                (
-                    "recordVersion".to_owned(),
-                    object([
-                        ("major", JsonValue::Number("1".to_owned())),
-                        ("minor", JsonValue::Number("19".to_owned())),
-                    ]),
-                ),
-                (
-                    "applicationId".to_owned(),
-                    JsonValue::String(self.application_id().to_owned()),
-                ),
-                (
-                    "packageRoot".to_owned(),
-                    JsonValue::String(package_root.display().to_string()),
-                ),
-                (
-                    "executable".to_owned(),
-                    object([
-                        ("path", JsonValue::String(self.executable_path().to_owned())),
-                        (
-                            "sha256",
-                            JsonValue::String(anodrel_application::sha256::to_lower_hex(
-                                self.executable_digest(),
-                            )),
+        let mut fields = vec![
+            (
+                "recordVersion".to_owned(),
+                object([
+                    ("major", JsonValue::Number("1".to_owned())),
+                    (
+                        "minor",
+                        JsonValue::Number(
+                            if self.update_catalogue_location().is_some() {
+                                "20"
+                            } else {
+                                "19"
+                            }
+                            .to_owned(),
                         ),
-                    ]),
-                ),
-                (
-                    "publisher".to_owned(),
-                    object([(
-                        "leafCertificateSha256",
+                    ),
+                ]),
+            ),
+            (
+                "applicationId".to_owned(),
+                JsonValue::String(self.application_id().to_owned()),
+            ),
+            (
+                "packageRoot".to_owned(),
+                JsonValue::String(package_root.display().to_string()),
+            ),
+            (
+                "executable".to_owned(),
+                object([
+                    ("path", JsonValue::String(self.executable_path().to_owned())),
+                    (
+                        "sha256",
                         JsonValue::String(anodrel_application::sha256::to_lower_hex(
-                            self.publisher_fingerprint(),
+                            self.executable_digest(),
                         )),
-                    )]),
-                ),
-                ("capabilities".to_owned(), JsonValue::Array(capabilities)),
-                (
-                    "networkOrigins".to_owned(),
-                    JsonValue::Array(network_origins),
-                ),
-            ]
-            .into_iter()
-            .collect(),
-        )
-        .to_json()
+                    ),
+                ]),
+            ),
+            (
+                "publisher".to_owned(),
+                object([(
+                    "leafCertificateSha256",
+                    JsonValue::String(anodrel_application::sha256::to_lower_hex(
+                        self.publisher_fingerprint(),
+                    )),
+                )]),
+            ),
+            ("capabilities".to_owned(), JsonValue::Array(capabilities)),
+            (
+                "networkOrigins".to_owned(),
+                JsonValue::Array(network_origins),
+            ),
+        ];
+        if let Some(location) = self.update_catalogue_location() {
+            fields.push((
+                "updateCatalogue".to_owned(),
+                object([
+                    (
+                        "origin",
+                        object([
+                            (
+                                "host",
+                                JsonValue::String(location.origin().hostname().to_owned()),
+                            ),
+                            (
+                                "port",
+                                JsonValue::Number(location.origin().port().to_string()),
+                            ),
+                        ]),
+                    ),
+                    (
+                        "path",
+                        JsonValue::String(location.request_path().to_owned()),
+                    ),
+                ]),
+            ));
+        }
+        JsonValue::Object(fields.into_iter().collect()).to_json()
     }
 }
 

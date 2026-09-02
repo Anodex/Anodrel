@@ -179,8 +179,8 @@ checked bundle bytes, embeds them into fresh images, and signs only fresh checke
 image copies with one explicit current-user certificate through Windows
 Authenticode. Its no-argument machine routes select only their
 current signed release and fixed 64-bit Program Files root. Production
-certificate custody, timestamping, a signed positive acceptance run, update
-delivery, recovery proof, and a real production identity remain separate work.
+certificate custody, timestamping, a signed positive acceptance run, elevation
+handoff, recovery proof, and a real production identity remain separate work.
 See `docs/SIGNING.md`, `docs/RELEASE_MANIFEST.md`, `docs/LAUNCH.md`,
 `docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`, and Decisions 0017
 through 0020, 0061, and 0140 through 0163.

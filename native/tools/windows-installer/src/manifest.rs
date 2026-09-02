@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use anodrel_application::{is_valid_application_id, sha256};
+use anodrel_application::{UpdateCatalogueLocation, is_valid_application_id, sha256};
 use anodrel_json::JsonValue;
 use anodrel_network::{NetworkOrigin, NetworkOriginPolicy};
 use anodrel_protocol::Capability;
@@ -111,6 +111,7 @@ pub struct ReleaseManifest {
     publisher_fingerprint: [u8; 32],
     capabilities: Vec<Capability>,
     network_origins: Vec<NetworkOrigin>,
+    update_catalogue: Option<UpdateCatalogueLocation>,
     payload: PayloadDescriptor,
 }
 
@@ -122,8 +123,20 @@ impl ReleaseManifest {
         }
         let root = JsonValue::parse(input).map_err(|_| ReleaseManifestError::Invalid)?;
         let fields = root.as_object().ok_or(ReleaseManifestError::Invalid)?;
-        exact_fields(
-            fields,
+        let has_update_catalogue = parse_format_version(required_object(fields, "formatVersion")?)?;
+        let expected_fields = if has_update_catalogue {
+            &[
+                "formatVersion",
+                "applicationId",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+                "updateCatalogue",
+                "payload",
+            ][..]
+        } else {
             &[
                 "formatVersion",
                 "applicationId",
@@ -133,9 +146,9 @@ impl ReleaseManifest {
                 "capabilities",
                 "networkOrigins",
                 "payload",
-            ],
-        )?;
-        parse_format_version(required_object(fields, "formatVersion")?)?;
+            ][..]
+        };
+        exact_fields(fields, expected_fields)?;
 
         let application_id = required_string(fields, "applicationId")?;
         if !is_valid_application_id(application_id) {
@@ -148,6 +161,14 @@ impl ReleaseManifest {
         let publisher_fingerprint = parse_publisher(required_object(fields, "publisher")?)?;
         let capabilities = parse_capabilities(fields.get("capabilities"))?;
         let network_origins = parse_network_origins(fields.get("networkOrigins"), &capabilities)?;
+        let update_catalogue = if has_update_catalogue {
+            Some(parse_update_catalogue(required_object(
+                fields,
+                "updateCatalogue",
+            )?)?)
+        } else {
+            None
+        };
         let payload = parse_payload(required_object(fields, "payload")?)?;
 
         Ok(Self {
@@ -158,6 +179,7 @@ impl ReleaseManifest {
             publisher_fingerprint,
             capabilities,
             network_origins,
+            update_catalogue,
             payload,
         })
     }
@@ -212,6 +234,12 @@ impl ReleaseManifest {
         &self.network_origins
     }
 
+    /// Returns the signed update-catalogue source, when this release opted in.
+    #[must_use]
+    pub fn update_catalogue_location(&self) -> Option<&UpdateCatalogueLocation> {
+        self.update_catalogue.as_ref()
+    }
+
     /// Returns the signed embedded-payload descriptor.
     #[must_use]
     pub const fn payload(&self) -> PayloadDescriptor {
@@ -230,21 +258,40 @@ impl std::fmt::Debug for ReleaseManifest {
             .field("publisher_fingerprint", &"[redacted]")
             .field("capabilities", &self.capabilities)
             .field("network_origins", &self.network_origins)
+            .field("update_catalogue", &self.update_catalogue)
             .field("payload", &self.payload)
             .finish()
     }
 }
 
-fn parse_format_version(fields: &BTreeMap<String, JsonValue>) -> Result<(), ReleaseManifestError> {
+fn parse_format_version(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<bool, ReleaseManifestError> {
     exact_fields(fields, &["major", "minor"])?;
     match (
         required_u16(fields, "major")?,
         required_u16(fields, "minor")?,
     ) {
-        (1, 0) => Ok(()),
+        (1, 0) => Ok(false),
+        (1, 1) => Ok(true),
         (1, _) => Err(ReleaseManifestError::VersionUnsupported),
         _ => Err(ReleaseManifestError::VersionUnsupported),
     }
+}
+
+fn parse_update_catalogue(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<UpdateCatalogueLocation, ReleaseManifestError> {
+    exact_fields(fields, &["origin", "path"])?;
+    let origin = required_object(fields, "origin")?;
+    exact_fields(origin, &["host", "port"])?;
+    let origin = NetworkOrigin::new(
+        required_string(origin, "host")?,
+        required_u16(origin, "port")?,
+    )
+    .map_err(|_| ReleaseManifestError::PolicyInvalid)?;
+    UpdateCatalogueLocation::new(origin, required_string(fields, "path")?)
+        .map_err(|_| ReleaseManifestError::PolicyInvalid)
 }
 
 fn parse_package_version(
