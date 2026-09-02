@@ -7,7 +7,7 @@ use anodrel_json::JsonValue;
 use crate::ReleaseManifest;
 
 impl ReleaseManifest {
-    /// Renders the version-1.19, 1.20, or 1.21 machine record for one host-selected package root.
+    /// Renders the version-1.19 through 1.22 record for one host-selected package root.
     ///
     /// The caller must validate this record against the extracted package before
     /// writing it. The root comes from installer code, never the embedded
@@ -97,18 +97,25 @@ impl ReleaseManifest {
             ));
         }
         if let Some(product) = self.product_metadata() {
+            let mut product_fields = vec![
+                (
+                    "displayName".to_owned(),
+                    JsonValue::String(product.display_name().to_owned()),
+                ),
+                (
+                    "publisherName".to_owned(),
+                    JsonValue::String(product.publisher_name().to_owned()),
+                ),
+            ];
+            if let Some(name) = self.start_menu_name() {
+                product_fields.push((
+                    "startMenuName".to_owned(),
+                    JsonValue::String(name.as_str().to_owned()),
+                ));
+            }
             fields.push((
                 "product".to_owned(),
-                object([
-                    (
-                        "displayName",
-                        JsonValue::String(product.display_name().to_owned()),
-                    ),
-                    (
-                        "publisherName",
-                        JsonValue::String(product.publisher_name().to_owned()),
-                    ),
-                ]),
+                JsonValue::Object(product_fields.into_iter().collect()),
             ));
         }
         JsonValue::Object(fields.into_iter().collect()).to_json()
@@ -116,7 +123,9 @@ impl ReleaseManifest {
 }
 
 fn record_minor(release: &ReleaseManifest) -> u8 {
-    if release.product_metadata().is_some() {
+    if release.start_menu_name().is_some() {
+        22
+    } else if release.product_metadata().is_some() {
         21
     } else if release.update_catalogue_location().is_some() {
         20

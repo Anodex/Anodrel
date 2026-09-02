@@ -172,6 +172,43 @@ fn version_one_two_binds_safe_product_metadata_to_the_signed_release() {
 }
 
 #[test]
+fn version_one_three_binds_a_windows_safe_start_menu_name_to_selected_policy() {
+    let package = StagedPackage::new();
+    let manifest = release_manifest(&package.executable_digest(), "[]", "[]")
+        .replace("\"minor\": 0", "\"minor\": 3")
+        .replace(
+            "  \"payload\":",
+            "  \"updateCatalogue\": {\n    \"origin\": { \"host\": \"updates.example.test\", \"port\": 443 },\n    \"path\": \"/anodrel/stable.p7s\"\n  },\n  \"product\": {\n    \"displayName\": \"Anodrel Installer Test\",\n    \"publisherName\": \"Anodrel\",\n    \"startMenuName\": \"Anodrel Installer Test\"\n  },\n  \"payload\":",
+        );
+    let release = ReleaseManifest::parse(&manifest).expect("version 1.3 manifest is valid");
+    assert_eq!(
+        release
+            .start_menu_name()
+            .expect("version 1.3 has a Start-menu name")
+            .as_str(),
+        "Anodrel Installer Test"
+    );
+
+    let record = release.render_install_record(package.root());
+    let installed =
+        InstalledApplication::load_from_trusted_record(&record, "org.anodrel.installer-test")
+            .expect("the version 1.22 record is valid");
+    assert_eq!(
+        installed
+            .start_menu_name()
+            .expect("selected record retains the Start-menu name")
+            .as_str(),
+        "Anodrel Installer Test"
+    );
+
+    let unsafe_name = manifest.replace("Anodrel Installer Test\"\n  },", "NUL\"\n  },");
+    assert!(matches!(
+        ReleaseManifest::parse(&unsafe_name),
+        Err(ReleaseManifestError::ProductMetadataInvalid)
+    ));
+}
+
+#[test]
 fn malformed_paths_unknown_fields_and_out_of_bounds_payloads_fail_closed() {
     let parent_path =
         release_manifest(PAYLOAD, "[]", "[]").replace("bin/Product.EXE", "bin/../Product.EXE");

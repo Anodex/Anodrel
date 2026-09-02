@@ -26,9 +26,11 @@ const PACKAGE_MANIFEST_NAME: &str = "anodrel.application.json";
 
 mod product;
 mod record;
+mod start_menu_name;
 mod update_catalogue;
 
 pub use product::{ProductDisplayMetadata, ProductDisplayMetadataError};
+pub use start_menu_name::{StartMenuName, StartMenuNameError};
 pub use update_catalogue::{
     MAX_UPDATE_CATALOGUE_PATH_BYTES, UpdateCatalogueLocation, UpdateCatalogueLocationError,
 };
@@ -63,6 +65,7 @@ pub struct InstalledApplication {
     network_policy: Option<NetworkOriginPolicy>,
     update_catalogue: Option<UpdateCatalogueLocation>,
     product_metadata: Option<ProductDisplayMetadata>,
+    start_menu_name: Option<StartMenuName>,
 }
 
 impl InstalledApplication {
@@ -179,6 +182,15 @@ impl InstalledApplication {
         self.product_metadata.as_ref()
     }
 
+    /// Returns the signed Windows-safe Start-menu link name, when selected.
+    ///
+    /// This remains private native-host composition data. It is never an
+    /// application protocol response or a general filesystem path.
+    #[must_use]
+    pub fn start_menu_name(&self) -> Option<&StartMenuName> {
+        self.start_menu_name.as_ref()
+    }
+
     /// Rechecks an executable path and hashes bytes read from a caller-held
     /// file handle against this record's expected digest.
     ///
@@ -256,6 +268,7 @@ fn validate_record(
         network_policy: record.network_policy,
         update_catalogue: record.update_catalogue,
         product_metadata: record.product_metadata,
+        start_menu_name: record.start_menu_name,
     })
 }
 
@@ -441,6 +454,7 @@ fn validate_version(
         (1, 19) => Ok(record::RecordVersion::V1_19),
         (1, 20) => Ok(record::RecordVersion::V1_20),
         (1, 21) => Ok(record::RecordVersion::V1_21),
+        (1, 22) => Ok(record::RecordVersion::V1_22),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }

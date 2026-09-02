@@ -1,8 +1,8 @@
 # Signed product display metadata
 
-**Status:** Version 1.2 parsing, first-party manifest authoring, and matching
-installed-record v1.21 rendering are implemented. Windows registration
-surfaces remain separate work.
+**Status:** Version 1.2 display metadata and version 1.3's separately signed
+Windows Start-menu name are implemented, including matching record v1.22
+rendering. Direct Windows registration remains separate work.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ The names are signed release facts. They are not application protocol input,
 runtime configuration, a filesystem name, an executable path, a registry key,
 or a certificate subject.
 
-## Version 1.2 fields
+## Version 1.2 display fields
 
 Release-plan version 1.2 and derived `anodrel.release.v1` manifest version 1.2
 add the required `product` object:
@@ -53,6 +53,30 @@ it with the selected policy, so a later product surface can change only after
 the same identity, signature, and release-policy checks that govern
 installation, update, or rollback.
 
+## Version 1.3 Start-menu name
+
+Windows shows a Shell Link's filename, rather than its description, in the
+Start menu. Version 1.3 therefore retains version 1.2 and adds a third signed
+field:
+
+~~~json
+"product": {
+  "displayName": "Anodrel Sample",
+  "publisherName": "Anodrel",
+  "startMenuName": "Anodrel Sample"
+}
+~~~
+
+`startMenuName` uses the display-text bounds and additionally must be one
+Windows-safe filename component: no `/`, `\\`, `:`, `*`, `?`, `\"`, `<`, `>`, or
+`|`; no trailing period; no `.` or `..` segment; and no Windows device name
+(such as `CON`, `NUL`, `COM1`, or `LPT1`, case-insensitively). It is a signed
+filename for the one future Start-menu link, not a general display value.
+Record v1.22 retains it beside the v1.21 product metadata.
+
+Version 1.21 deliberately has no inferred filename, so it cannot create a
+Start-menu entry. Version 1.3 continues to require the exact update catalogue.
+
 ## Exclusions
 
 This contract does not create shortcuts, Apps & features records, icons,
@@ -60,4 +84,4 @@ uninstall commands, file associations, a custom installer window, translated
 strings, an application protocol field, or a code-signing identity.
 
 See [release-manifest authoring](RELEASE_MANIFEST.md), [product registration](PRODUCT_REGISTRATION.md),
-[Windows installer](WINDOWS_INSTALLER.md), and Decisions 0181 and 0182.
+[Windows installer](WINDOWS_INSTALLER.md), and Decisions 0181, 0182, and 0184.

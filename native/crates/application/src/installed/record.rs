@@ -7,8 +7,8 @@ use anodrel_protocol::Capability;
 use crate::{MAX_INSTALL_RECORD_BYTES, manifest, network_policy, sha256};
 
 use super::{
-    InstalledApplicationError, ProductDisplayMetadata, UpdateCatalogueLocation, exact_fields,
-    is_valid_executable_path, required_object, required_string, validate_version,
+    InstalledApplicationError, ProductDisplayMetadata, StartMenuName, UpdateCatalogueLocation,
+    exact_fields, is_valid_executable_path, required_object, required_string, validate_version,
 };
 
 pub(super) struct ParsedRecord {
@@ -21,6 +21,7 @@ pub(super) struct ParsedRecord {
     pub(super) network_policy: Option<NetworkOriginPolicy>,
     pub(super) update_catalogue: Option<UpdateCatalogueLocation>,
     pub(super) product_metadata: Option<ProductDisplayMetadata>,
+    pub(super) start_menu_name: Option<StartMenuName>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -47,6 +48,7 @@ pub(super) enum RecordVersion {
     V1_19,
     V1_20,
     V1_21,
+    V1_22,
 }
 
 impl RecordVersion {
@@ -201,10 +203,14 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
     } else {
         None
     };
-    let product_metadata = if version.accepts(RecordVersion::V1_21) {
-        Some(parse_product_metadata(required_object(fields, "product")?)?)
+    let (product_metadata, start_menu_name) = if version.accepts(RecordVersion::V1_22) {
+        let (metadata, name) = parse_product_metadata(required_object(fields, "product")?, true)?;
+        (Some(metadata), name)
+    } else if version.accepts(RecordVersion::V1_21) {
+        let (metadata, name) = parse_product_metadata(required_object(fields, "product")?, false)?;
+        (Some(metadata), name)
     } else {
-        None
+        (None, None)
     };
 
     Ok(ParsedRecord {
@@ -217,18 +223,32 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
         network_policy,
         update_catalogue,
         product_metadata,
+        start_menu_name,
     })
 }
 
 fn parse_product_metadata(
     fields: &std::collections::BTreeMap<String, JsonValue>,
-) -> Result<ProductDisplayMetadata, InstalledApplicationError> {
-    exact_fields(fields, &["displayName", "publisherName"])?;
-    ProductDisplayMetadata::new(
+    requires_start_menu_name: bool,
+) -> Result<(ProductDisplayMetadata, Option<StartMenuName>), InstalledApplicationError> {
+    let expected_fields = if requires_start_menu_name {
+        &["displayName", "publisherName", "startMenuName"][..]
+    } else {
+        &["displayName", "publisherName"][..]
+    };
+    exact_fields(fields, expected_fields)?;
+    let metadata = ProductDisplayMetadata::new(
         required_string(fields, "displayName")?,
         required_string(fields, "publisherName")?,
     )
-    .map_err(|_| InstalledApplicationError::InvalidRecord)
+    .map_err(|_| InstalledApplicationError::InvalidRecord)?;
+    let name = requires_start_menu_name
+        .then(|| {
+            StartMenuName::new(required_string(fields, "startMenuName")?)
+                .map_err(|_| InstalledApplicationError::InvalidRecord)
+        })
+        .transpose()?;
+    Ok((metadata, name))
 }
 
 fn parse_update_catalogue(

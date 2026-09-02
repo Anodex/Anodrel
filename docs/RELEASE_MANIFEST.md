@@ -41,10 +41,11 @@ Version 1.1 adds exactly one `updateCatalogue` object:
 }
 ~~~
 
-The format version is exactly 1.0, 1.1, or 1.2. Version 1.1 requires this
+The format version is exactly 1.0, 1.1, 1.2, or 1.3. Version 1.1 requires this
 source and derives a final release manifest at 1.1; version 1.0 carries no
 update source. Version 1.2 retains this source and adds product display
-metadata. Package-version fields are unsigned 16-bit integers. The executable
+metadata. Version 1.3 adds the separately signed Windows-safe Start-menu name.
+Package-version fields are unsigned 16-bit integers. The executable
 path, capability names, network origins, and catalogue location undergo the
 same strict validation as the final release manifest. The publisher is one
 lowercase SHA-256 leaf-certificate fingerprint. Unknown, duplicate, missing,
@@ -63,6 +64,11 @@ Version 1.2 adds the required signed `product` object while retaining version
 Its two bounded display values are for later host-owned Windows product
 surfaces only; they are never a path, application identity, policy key, or
 certificate selector. See [signed product display metadata](PRODUCT_METADATA.md).
+
+Version 1.3 uses the same object with required `startMenuName`. That value is
+the sole exception: it is a strictly validated signed Windows filename component
+for the one future Start-menu link. It is not an identity, path selected by an
+application, or source of authority. See [signed product display metadata](PRODUCT_METADATA.md).
 
 ## Creation contract
 

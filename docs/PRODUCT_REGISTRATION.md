@@ -1,8 +1,8 @@
 # Windows product-registration foundation
 
-**Status:** Installed-record version 1.21 parsing and release-manifest
-rendering are implemented. Windows Start-menu and Apps & features integration
-remain separate work.
+**Status:** Installed-record versions 1.21 and 1.22 are implemented, including
+the separately signed Start-menu name. Windows Start-menu and Apps & features
+integration remain separate work.
 
 ## Purpose
 
@@ -28,7 +28,8 @@ The two strings use the [signed product display metadata](PRODUCT_METADATA.md)
 grammar exactly. The installer renders them only from a signed release-manifest
 v1.2. The installed-record parser validates them before it returns a selected
 application. Version 1.20 and earlier records remain exact and contain no
-product object.
+product object. Version 1.22 strictly extends 1.21 with its signed Windows-safe
+`startMenuName`; only that version may later create the one Start-menu link.
 
 ## Boundaries
 

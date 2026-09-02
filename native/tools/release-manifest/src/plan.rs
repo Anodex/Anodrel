@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use anodrel_application::{UpdateCatalogueLocation, sha256};
+use anodrel_application::{StartMenuName, UpdateCatalogueLocation, sha256};
 use anodrel_json::JsonValue;
 use anodrel_network::NetworkOrigin;
 use anodrel_windows_installer::ProductMetadata;
@@ -18,6 +18,7 @@ pub(super) struct ReleasePlan {
     network_origins: Vec<NetworkOrigin>,
     update_catalogue: Option<UpdateCatalogueLocation>,
     product_metadata: Option<ProductMetadata>,
+    start_menu_name: Option<StartMenuName>,
 }
 
 impl ReleasePlan {
@@ -56,6 +57,16 @@ impl ReleasePlan {
                 "updateCatalogue",
                 "product",
             ][..],
+            PlanFormatVersion::ProductRegistration => &[
+                "formatVersion",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+                "updateCatalogue",
+                "product",
+            ][..],
         };
         exact_fields(fields, expected_fields)?;
         let package = required_object(fields, "packageVersion")?;
@@ -83,10 +94,14 @@ impl ReleasePlan {
         } else {
             None
         };
-        let product_metadata = if format_version.has_product_metadata() {
-            Some(parse_product_metadata(required_object(fields, "product")?)?)
+        let (product_metadata, start_menu_name) = if format_version.has_product_metadata() {
+            let (metadata, name) = parse_product_metadata(
+                required_object(fields, "product")?,
+                format_version.has_start_menu_name(),
+            )?;
+            (Some(metadata), name)
         } else {
-            None
+            (None, None)
         };
         Ok(Self {
             package_version,
@@ -96,6 +111,7 @@ impl ReleasePlan {
             network_origins,
             update_catalogue,
             product_metadata,
+            start_menu_name,
         })
     }
 
@@ -232,25 +248,31 @@ impl ReleasePlan {
             );
         }
         if let Some(product) = &self.product_metadata {
-            fields.insert(
-                "product".to_owned(),
-                JsonValue::Object(BTreeMap::from([
-                    (
-                        "displayName".to_owned(),
-                        JsonValue::String(product.display_name().to_owned()),
-                    ),
-                    (
-                        "publisherName".to_owned(),
-                        JsonValue::String(product.publisher_name().to_owned()),
-                    ),
-                ])),
-            );
+            let mut product_fields = BTreeMap::from([
+                (
+                    "displayName".to_owned(),
+                    JsonValue::String(product.display_name().to_owned()),
+                ),
+                (
+                    "publisherName".to_owned(),
+                    JsonValue::String(product.publisher_name().to_owned()),
+                ),
+            ]);
+            if let Some(name) = &self.start_menu_name {
+                product_fields.insert(
+                    "startMenuName".to_owned(),
+                    JsonValue::String(name.as_str().to_owned()),
+                );
+            }
+            fields.insert("product".to_owned(), JsonValue::Object(product_fields));
         }
         JsonValue::Object(fields).to_json()
     }
 
     fn format_minor(&self) -> u8 {
-        if self.product_metadata.is_some() {
+        if self.start_menu_name.is_some() {
+            3
+        } else if self.product_metadata.is_some() {
             2
         } else if self.update_catalogue.is_some() {
             1
@@ -265,6 +287,7 @@ enum PlanFormatVersion {
     Base,
     Catalogue,
     ProductMetadata,
+    ProductRegistration,
 }
 
 impl PlanFormatVersion {
@@ -273,7 +296,11 @@ impl PlanFormatVersion {
     }
 
     const fn has_product_metadata(self) -> bool {
-        matches!(self, Self::ProductMetadata)
+        matches!(self, Self::ProductMetadata | Self::ProductRegistration)
+    }
+
+    const fn has_start_menu_name(self) -> bool {
+        matches!(self, Self::ProductRegistration)
     }
 }
 
@@ -288,19 +315,33 @@ fn parse_format_version(
         (1, 0) => Ok(PlanFormatVersion::Base),
         (1, 1) => Ok(PlanFormatVersion::Catalogue),
         (1, 2) => Ok(PlanFormatVersion::ProductMetadata),
+        (1, 3) => Ok(PlanFormatVersion::ProductRegistration),
         _ => Err(ReleaseManifestAuthorError::PlanInvalid),
     }
 }
 
 fn parse_product_metadata(
     fields: &BTreeMap<String, JsonValue>,
-) -> Result<ProductMetadata, ReleaseManifestAuthorError> {
-    exact_fields(fields, &["displayName", "publisherName"])?;
-    ProductMetadata::new(
+    requires_start_menu_name: bool,
+) -> Result<(ProductMetadata, Option<StartMenuName>), ReleaseManifestAuthorError> {
+    let expected_fields = if requires_start_menu_name {
+        &["displayName", "publisherName", "startMenuName"][..]
+    } else {
+        &["displayName", "publisherName"][..]
+    };
+    exact_fields(fields, expected_fields)?;
+    let metadata = ProductMetadata::new(
         required_string(fields, "displayName")?,
         required_string(fields, "publisherName")?,
     )
-    .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)
+    .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)?;
+    let start_menu_name = requires_start_menu_name
+        .then(|| {
+            StartMenuName::new(required_string(fields, "startMenuName")?)
+                .map_err(|_| ReleaseManifestAuthorError::PlanInvalid)
+        })
+        .transpose()?;
+    Ok((metadata, start_menu_name))
 }
 
 fn parse_capabilities(

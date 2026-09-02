@@ -1,7 +1,8 @@
 # Windows Start-menu registration
 
-**Status:** The signed selected-policy preflight is implemented. The direct
-Shell Link writer and installer composition remain separate work.
+**Status:** The signed selected-policy preflight, version 1.3 release metadata,
+and matching record v1.22 are implemented. The direct Shell Link writer and
+installer composition remain separate work.
 
 ## Purpose
 
@@ -11,19 +12,19 @@ or a shortcut location from an application or command line. Before a future
 writer can run, its preflight verifies the current signed installer, reads only
 that installer identity's selected record, validates the selected executable's
 Authenticode signer against both policy and the installer, and requires record
-v1.21's signed product display metadata.
+v1.22's signed product display metadata and Start-menu filename.
 
 ## Planned fixed target
 
 The later direct Windows writer will derive exactly one all-users link:
 
 ~~~text
-Common Programs\Anodrel\<application-id>.lnk
+Common Programs\Anodrel\<signed-start-menu-name>.lnk
 ~~~
 
-The application ID is a safe stable machine-policy key, not product-facing
-text. The link's target and visible display values come only from the verified
-selected record. The display name is never used in a filename, directory,
+The link's target and visible filename come only from the verified selected
+record. `startMenuName` is a separately signed, Windows-safe file component;
+the general product display name is never used in a filename, directory,
 registry key, command, URL, or authority decision.
 
 ## Preflight boundary
@@ -31,7 +32,7 @@ registry key, command, URL, or authority decision.
 The opaque preflight result has no application protocol, user input, path,
 shortcut filename, icon, working directory, arguments, registry-write,
 COM-object, link, launch, notification, or removal operation. A legacy record
-without v1.21 product metadata refuses registration rather than inventing a
+without v1.22 Start-menu metadata refuses registration rather than inventing a
 label.
 
 ## Exclusions
@@ -42,4 +43,4 @@ choose an icon, pass command-line arguments, launch an application, or report
 whether a person saw a Start-menu item.
 
 See [product registration](PRODUCT_REGISTRATION.md), [installed application records](LAUNCH.md),
-and Decision 0183.
+and Decisions 0183 and 0184.

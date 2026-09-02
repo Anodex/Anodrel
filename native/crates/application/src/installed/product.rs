@@ -52,7 +52,7 @@ impl ProductDisplayMetadata {
     }
 }
 
-fn is_safe_display_text(value: &str) -> bool {
+pub(super) fn is_safe_display_text(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 120
         && value == value.trim()

@@ -7,7 +7,7 @@ use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 
 use crate::{SignedReleaseError, verify_current_signed_release};
 
-/// Opaque proof that the current selected release has signed product metadata.
+/// Opaque proof that the current selected release has signed Start-menu data.
 ///
 /// This does not retain a target path or product text. A later shell-link
 /// operation must establish its own fresh proof immediately before it writes
@@ -35,8 +35,8 @@ pub enum ProductShortcutPreflightError {
     SelectedPolicyPublisherMismatch,
     /// The selected executable signer differed from the signed installer.
     InstallerPublisherMismatch,
-    /// The selected record predates signed product display metadata.
-    ProductMetadataUnavailable,
+    /// The selected record predates signed Start-menu registration metadata.
+    StartMenuNameUnavailable,
 }
 
 impl fmt::Display for ProductShortcutPreflightError {
@@ -53,8 +53,8 @@ impl fmt::Display for ProductShortcutPreflightError {
             Self::InstallerPublisherMismatch => {
                 "the selected executable publisher does not match the installer"
             }
-            Self::ProductMetadataUnavailable => {
-                "the selected application does not declare signed product metadata"
+            Self::StartMenuNameUnavailable => {
+                "the selected application does not declare a signed Start-menu name"
             }
         };
         formatter.write_str(message)
@@ -69,7 +69,7 @@ impl std::error::Error for ProductShortcutPreflightError {
             Self::SelectedSignatureInvalid(error) => Some(error),
             Self::SelectedPolicyPublisherMismatch
             | Self::InstallerPublisherMismatch
-            | Self::ProductMetadataUnavailable => None,
+            | Self::StartMenuNameUnavailable => None,
         }
     }
 }
@@ -79,7 +79,7 @@ impl std::error::Error for ProductShortcutPreflightError {
 /// The signed current installer chooses the application identity. This reads
 /// only that identity's selected machine policy, validates the selected
 /// executable's Authenticode signer against both policy and installer, and
-/// requires version 1.21 signed product metadata. It does not create or remove
+/// requires version 1.22 signed product metadata and a Start-menu name. It does not create or remove
 /// a shortcut, query a shell folder, initialize COM, write policy, elevate,
 /// launch an application, or expose product data.
 pub fn verify_current_product_shortcut_target()
@@ -97,8 +97,8 @@ pub fn verify_current_product_shortcut_target()
     if !manifest.matches_publisher_fingerprint(signer.as_bytes()) {
         return Err(ProductShortcutPreflightError::InstallerPublisherMismatch);
     }
-    if selected.product_metadata().is_none() {
-        return Err(ProductShortcutPreflightError::ProductMetadataUnavailable);
+    if selected.product_metadata().is_none() || selected.start_menu_name().is_none() {
+        return Err(ProductShortcutPreflightError::StartMenuNameUnavailable);
     }
     Ok(VerifiedProductShortcutTarget { _private: () })
 }
@@ -126,8 +126,8 @@ mod tests {
     #[test]
     fn failure_and_debug_text_do_not_disclose_product_or_machine_paths() {
         assert_eq!(
-            ProductShortcutPreflightError::ProductMetadataUnavailable.to_string(),
-            "the selected application does not declare signed product metadata"
+            ProductShortcutPreflightError::StartMenuNameUnavailable.to_string(),
+            "the selected application does not declare a signed Start-menu name"
         );
         assert_eq!(
             format!("{:?}", VerifiedProductShortcutTarget { _private: () }),
