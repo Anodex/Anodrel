@@ -1,0 +1,8 @@
+[package]
+name = "anodrel-windows-install-consent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-windows-installer = { path = "../../tools/windows-installer" }

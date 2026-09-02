@@ -20,6 +20,14 @@ impl fmt::Debug for PreparedInitialInstall {
     }
 }
 
+impl PreparedInitialInstall {
+    /// Returns the signed release version for the fixed native confirmation.
+    #[must_use]
+    pub const fn candidate_version(&self) -> PackageVersion {
+        self.release.release().manifest().package_version()
+    }
+}
+
 /// A safe failure while preparing a possible first installation.
 #[derive(Debug)]
 pub enum InitialInstallPreflightError {
