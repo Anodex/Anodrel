@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0188: Development fixture proves the verified launcher route.
+
 - 0187: Start-menu links launch a verified product launcher.
 
 - 0186: Product shortcuts follow completed policy transitions.

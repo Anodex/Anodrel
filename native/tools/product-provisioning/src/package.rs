@@ -35,15 +35,24 @@ pub fn stage(package_root: &Path) -> io::Result<()> {
     )
 }
 
-/// Returns the canonical executable path the record will bind, if it exists.
+/// Returns the canonical child path the record will bind, if it exists.
 pub fn executable(package_root: &Path) -> io::Result<PathBuf> {
-    let path = fs::canonicalize(package_root.join("bin").join(fixture::EXECUTABLE_FILE_NAME))?;
+    staged_image(package_root, fixture::EXECUTABLE_FILE_NAME)
+}
+
+/// Returns the canonical host-launcher path the record will bind, if it exists.
+pub fn launcher(package_root: &Path) -> io::Result<PathBuf> {
+    staged_image(package_root, fixture::LAUNCHER_FILE_NAME)
+}
+
+fn staged_image(package_root: &Path, file_name: &str) -> io::Result<PathBuf> {
+    let path = fs::canonicalize(package_root.join("bin").join(file_name))?;
     if fs::metadata(&path)?.is_file() {
         Ok(path)
     } else {
         Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "the staged fixture executable is not a regular file",
+            "the staged fixture image is not a regular file",
         ))
     }
 }
@@ -81,7 +90,7 @@ fn write_exact(path: &Path, bytes: &[u8]) -> io::Result<()> {
 mod tests {
     use anodrel_application::ApplicationManifest;
 
-    use super::{fixture, manifest, stage};
+    use super::{fixture, launcher, manifest, stage};
 
     #[test]
     fn the_staged_manifest_parses_and_matches_its_own_content_digest() {
@@ -105,8 +114,9 @@ mod tests {
                 .expect("the staged package validates");
         assert_eq!(package.identity().application_id(), fixture::APPLICATION_ID);
         // The executable directory exists but is deliberately still empty: the
-        // provisioning script stages and signs the binary separately.
+        // provisioning script stages and signs both images separately.
         assert!(root.join("bin").is_dir());
+        assert!(launcher(&root).is_err());
 
         std::fs::remove_dir_all(root).expect("the fixture staging directory is removed");
     }

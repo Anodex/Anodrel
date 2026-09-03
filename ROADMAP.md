@@ -428,10 +428,10 @@ and direct Windows APIs. A separate compiled UI diagnostic now proves one
 document replacement, revision-bound semantic action, and session close through
 the same owned native window path without Node.js or machine-trust setup.
 
-Decision 0061 adds a first-party signed fixture child that runs the verified
-product session end to end: machine policy, locked digest revalidation,
-Authenticode publisher match, child-only bootstrap delivery, authenticated
-pipe, host-owned native window, one semantic action, and coordinated shutdown.
+Decisions 0061 and 0188 add a first-party signed fixture child and launcher that run the
+verified product session end to end: machine policy, locked digest revalidation, Authenticode
+publisher match, child-only bootstrap delivery, authenticated pipe, host-owned native window,
+one semantic action, and coordinated shutdown.
 This is a development-machine fixture, not an installed product: it depends on
 a locally generated certificate placed in machine trust, and it says nothing
 about packaging, installation, updates, multi-window policy, restart, or

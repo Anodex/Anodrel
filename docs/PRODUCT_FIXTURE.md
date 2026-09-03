@@ -3,8 +3,7 @@
 **Status:** Development-only Windows verification fixture. This is **not** a
 public SDK surface, an application capability, a packaging format, an installer,
 or an update mechanism. It exists so the verified product-session coordinator
-defined in `docs/PRODUCT_SESSIONS.md` can be exercised end to end on a developer
-machine.
+and its launcher route can be exercised end to end on a developer machine.
 
 ## Why a fixture exists
 
@@ -14,15 +13,17 @@ native window. Every one of those boundaries is already implemented and tested
 in isolation, but the joined path has never run, because the repository ships no
 signed executable and no machine policy record.
 
-A fixture closes that gap without inventing a product. It supplies exactly three
+A fixture closes that gap without inventing a product. It supplies exactly four
 things:
 
 1. a first-party child executable that speaks the existing authenticated
    protocol and nothing else through `anodrel-client` and the direct
    `anodrel-windows-client` adapter;
-2. a staged package directory holding that executable and a valid
+2. a copied Anodrel host launcher that can prove its selected path, digest, and
+   publisher before it creates the child session;
+3. a staged package directory holding both executables and a valid
    `anodrel.application.json`; and
-3. one machine-policy record under the existing
+4. one machine-policy record under the existing
    `HKEY_LOCAL_MACHINE\Software\Anodrel\Applications\<applicationId>` location.
 
 Nothing about the fixture changes the host's trust rules. The host still reads
@@ -36,8 +37,11 @@ delivers the invitation only over the child-only bootstrap handle.
 | --- | --- |
 | Application ID | `org.anodrel.product-fixture` |
 | Display name | `Anodrel Product Fixture` |
-| Executable | `bin/anodrel-product-fixture.exe` |
-| Record version | `1.2` |
+| Child executable | `bin/anodrel-product-fixture.exe` |
+| Host launcher | `bin/anodrel-windows-host.exe` |
+| Record version | `1.23` |
+| Product metadata | Fixed development-only display and Start-menu values |
+| Update catalogue | Fixed reserved location; the fixture performs no update request |
 | Grants | `ui.document.write`, `ui.events.read`, `session.close` |
 
 The identity is deliberately distinct from `org.anodrel.sample`, so provisioning
@@ -57,7 +61,8 @@ input and carries no authority by itself.
 ├── content/
 │   └── main.txt                 # bounded anodrel.text.v1 content
 └── bin/
-    └── anodrel-product-fixture.exe   # first-party, Authenticode-signed
+    ├── anodrel-product-fixture.exe   # first-party, Authenticode-signed child
+    └── anodrel-windows-host.exe       # first-party, Authenticode-signed launcher
 ~~~
 
 The record lives **outside** this directory, in the machine registry. The
@@ -125,10 +130,11 @@ exit the launch service uses when it terminates a child during host shutdown.
 
 ## Signing and machine trust
 
-The fixture is signed with a **development** code-signing certificate created on
-the developer's own machine by Windows PowerShell's `New-SelfSignedCertificate`
-and applied by `Set-AuthenticodeSignature`. Both ship with Windows; the fixture
-introduces no third-party signing tool and no third-party runtime.
+The fixture child and launcher are signed with the same **development**
+code-signing certificate created on the developer's own machine by Windows
+PowerShell's `New-SelfSignedCertificate` and applied by
+`Set-AuthenticodeSignature`. Both ship with Windows; the fixture introduces no
+third-party signing tool and no third-party runtime.
 
 Windows Authenticode accepts the signature only if the certificate chains to a
 trusted root. The provisioning script therefore installs the generated
@@ -149,16 +155,16 @@ never installs trust, never writes the registry, and never signs anything.
 Provisioning is a two-part operation and both parts are outside the host:
 
 1. `scripts/provision-product-fixture.ps1` — Windows tooling only. It builds the
-   fixture and the helper with Cargo, stages the package, creates or reuses the
-   development certificate, signs the executable, installs machine trust, and
-   then calls the helper. Removal reverses every step. Provisioning and removal
-   require elevation; a separate `-Verify` switch reports the current state as a
-   query only and needs none.
+   fixture, host, and helper with Cargo, stages the package, creates or reuses
+   the development certificate, signs both executables, installs machine trust,
+   and then calls the helper. Removal reverses every step. Provisioning and
+   removal require elevation; a separate `-Verify` switch reports the current
+   state as a query only and needs none.
 2. `anodrel-product-provisioning` — a first-party Rust helper. Given the staged
-   package root it recomputes the executable's SHA-256 digest, asks the existing
-   Windows Authenticode adapter for the accepted leaf certificate fingerprint,
-   composes the strict record defined in `docs/LAUNCH.md`, validates that record
-   through the same parser the host uses, and only then writes the single
+   package root it recomputes both SHA-256 digests, asks the existing Windows
+   Authenticode adapter for both accepted leaf fingerprints, requires them to
+   match, composes record v1.23 from fixed development data, validates that
+   record through the same parser the host uses, and only then writes the single
    `record` value under the machine policy key.
 
 The helper is the only component in this repository that writes machine policy.
@@ -175,6 +181,16 @@ a record it could not itself validate.
 
 Two host-only entry points consume the fixture. Neither is reachable from an
 application, a package, a protocol message, or rendered content.
+
+### `--product-launch org.anodrel.product-fixture`
+
+The staged launcher route. The provisioning script prints the exact PowerShell
+command after successful provisioning. It starts only the copied, selected host
+with the fixed fixture identity. Before it creates a window, that host compares
+its own canonical path, locked digest, and Authenticode publisher against record
+v1.23, then enters the same coordinator as the direct route below. The fixture
+does not create a Shell Link; testing Explorer and installed registration still
+requires a signed installed release.
 
 ### `--product-session <applicationId>`
 
@@ -250,8 +266,8 @@ session when that window is destroyed.
 
 Automated coverage lives with each component:
 
-- the fixture's document, action name, and stage codes are unit tested without
-  Windows;
+- the fixture's document, action name, stage codes, record v1.23 shape,
+  launcher digest, and publisher-match refusal are unit tested without Windows;
 - the provisioning helper's record composition is unit tested, along with its
   refusals: an unsigned executable, an absent executable, a record whose digest
   no longer matches its package, and a record offered under another
@@ -273,7 +289,8 @@ test that needs no provisioning, the following remain unverified in practice:
 - that Windows Authenticode accepts the generated development certificate;
 - that the composed record passes the host's own parser against a real signed
   executable;
-- that the locked launch, bootstrap delivery, and child start succeed together;
+- that launcher self-verification, locked child launch, bootstrap delivery, and
+  child start succeed together;
 - that the Startup Lab tile goes live and back again with provisioning; and
 - that the child, pipe worker, and window shut down cleanly on each path.
 

@@ -21,7 +21,7 @@ use std::{env, process::ExitCode};
 const USAGE: &str = concat!(
     "usage: anodrel-product-provisioning <command>\n",
     "  stage <package-root>       write the fixture manifest and content\n",
-    "  provision <package-root>   verify the signed executable and write machine policy\n",
+    "  provision <package-root>   verify signed child and launcher images, then write machine policy\n",
     "  verify                     report whether the machine record currently validates\n",
     "  remove                     delete the fixture machine-policy key",
 );
@@ -54,9 +54,10 @@ fn stage(package_root: &str) -> Result<String, String> {
         "the fixture package could not be staged; check the target directory".to_owned()
     })?;
     Ok(format!(
-        "Staged the {} package manifest and content. Copy the signed executable to bin\\{} next.",
+        "Staged the {} package manifest and content. Copy signed child and launcher images to bin\\{} and bin\\{} next.",
         fixture::APPLICATION_ID,
-        fixture::EXECUTABLE_FILE_NAME
+        fixture::EXECUTABLE_FILE_NAME,
+        fixture::LAUNCHER_FILE_NAME,
     ))
 }
 
@@ -69,10 +70,16 @@ fn provision(package_root: &str) -> Result<String, String> {
             fixture::EXECUTABLE_FILE_NAME
         )
     })?;
+    let launcher = package::launcher(&root).map_err(|_| {
+        format!(
+            "no staged product launcher was found at bin\\{}",
+            fixture::LAUNCHER_FILE_NAME
+        )
+    })?;
 
     // Composition performs the digest, Authenticode, and record checks, so a
     // record that cannot pass the host's own parser is never written.
-    let composed = record::compose(&root, &executable)
+    let composed = record::compose(&root, &executable, &launcher)
         .map_err(|error| format!("{error}. Nothing changed."))?;
     registry::write_record(fixture::APPLICATION_ID, &composed)
         .map_err(|error| format!("{error}. Nothing changed."))?;

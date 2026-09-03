@@ -130,6 +130,20 @@ function Remove-FixtureCertificates {
     }
 }
 
+function Sign-StagedImage {
+    param(
+        [Parameter(Mandatory)] [string] $FilePath,
+        [Parameter(Mandatory)] $Certificate,
+        [Parameter(Mandatory)] [string] $Label
+    )
+
+    Write-Host "Signing the staged fixture $Label."
+    $signature = Set-AuthenticodeSignature -FilePath $FilePath -Certificate $Certificate -HashAlgorithm SHA256
+    if ($signature.Status -ne 'Valid') {
+        throw "Signing the fixture $Label did not produce a valid signature (status: $($signature.Status)). Nothing was provisioned."
+    }
+}
+
 if ($Remove -and $Verify) {
     throw 'Choose either -Remove or -Verify, not both.'
 }
@@ -166,9 +180,10 @@ if ($Remove) {
     return
 }
 
-Build-Tools -Packages @('anodrel-product-fixture', 'anodrel-product-provisioning')
+Build-Tools -Packages @('anodrel-product-fixture', 'anodrel-product-provisioning', 'anodrel-windows-host')
 
 $fixtureBinary = Get-ToolPath -Name 'anodrel-product-fixture'
+$launcherBinary = Get-ToolPath -Name 'anodrel-windows-host'
 $helper = Get-ToolPath -Name 'anodrel-product-provisioning'
 
 Write-Host "Staging the fixture package at $StagingRoot."
@@ -176,7 +191,9 @@ Invoke-Native -FilePath $helper -Arguments @('stage', $StagingRoot) `
     -FailureMessage 'The fixture package could not be staged. Nothing was provisioned.' | Out-Null
 
 $stagedExecutable = Join-Path $StagingRoot 'bin\anodrel-product-fixture.exe'
+$stagedLauncher = Join-Path $StagingRoot 'bin\anodrel-windows-host.exe'
 Copy-Item $fixtureBinary $stagedExecutable -Force
+Copy-Item $launcherBinary $stagedLauncher -Force
 
 $certificate = Get-ChildItem Cert:\LocalMachine\My |
     Where-Object { $_.Subject -eq $CertificateSubject -and $_.NotAfter -gt (Get-Date) } |
@@ -208,11 +225,8 @@ else {
     Write-Host 'Reusing the existing development code-signing certificate.'
 }
 
-Write-Host 'Signing the staged fixture executable.'
-$signature = Set-AuthenticodeSignature -FilePath $stagedExecutable -Certificate $certificate -HashAlgorithm SHA256
-if ($signature.Status -ne 'Valid') {
-    throw "Signing did not produce a valid signature (status: $($signature.Status)). Nothing was provisioned."
-}
+Sign-StagedImage -FilePath $stagedExecutable -Certificate $certificate -Label 'child executable'
+Sign-StagedImage -FilePath $stagedLauncher -Certificate $certificate -Label 'host launcher'
 
 Write-Host 'Writing the machine-policy record.'
 Invoke-Native -FilePath $helper -Arguments @('provision', $StagingRoot) `
@@ -220,8 +234,8 @@ Invoke-Native -FilePath $helper -Arguments @('provision', $StagingRoot) `
 
 Write-Host ''
 Write-Host 'The development product fixture is provisioned.'
-Write-Host 'Run the host route:'
-Write-Host '  cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --product-session org.anodrel.product-fixture'
+Write-Host 'Run the staged verified launcher route:'
+Write-Host "  & `"$stagedLauncher`" --product-launch org.anodrel.product-fixture"
 Write-Host ''
 Write-Host 'Check the state at any time with -Verify; no elevation is needed for that.'
 Write-Host 'Run this script with -Remove when you are finished.'

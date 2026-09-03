@@ -25,8 +25,8 @@ failure that names each file exceeding the limit.
 ## provision-product-fixture.ps1
 
 Provisions or removes the development-only Windows product fixture described in
-`docs/PRODUCT_FIXTURE.md`. It builds the fixture and its provisioning helper,
-stages a package outside the repository, signs the executable with a locally
+`docs/PRODUCT_FIXTURE.md`. It builds the fixture, host, and provisioning helper,
+stages a package outside the repository, signs both executables with a locally
 generated development certificate, installs that certificate into machine trust,
 and writes one machine-policy record.
 

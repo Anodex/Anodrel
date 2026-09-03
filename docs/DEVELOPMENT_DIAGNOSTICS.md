@@ -452,10 +452,10 @@ minutes for the action.
 
 ## Development Windows product fixture
 
-This is the only path that exercises the complete verified product session:
-machine policy, locked digest revalidation, Authenticode publisher match,
-child-only bootstrap delivery, authenticated pipe, host-owned native window,
-one semantic action, and coordinated shutdown.
+This is the only path that exercises the complete verified launcher and product
+session: machine policy, locked digest revalidation, Authenticode publisher
+match, child-only bootstrap delivery, authenticated pipe, native window, one
+semantic action, and coordinated shutdown.
 
 It is a **development-machine** procedure. Provisioning installs a locally
 generated code-signing certificate into the machine root and trusted-publisher
@@ -469,10 +469,10 @@ From an **elevated** PowerShell session at the repository root:
 .\scripts\provision-product-fixture.ps1
 ~~~
 
-The script builds the fixture and its provisioning helper, stages a package
+The script builds the fixture, host, and provisioning helper, stages a package
 under `%LOCALAPPDATA%\Anodrel\ProductFixture`, creates or reuses the development
-certificate, signs the staged executable, installs machine trust, and writes the
-record. It ends by reporting that the machine record validates.
+certificate, signs both staged executables, installs machine trust, and writes
+the record. It ends by reporting that the machine record validates.
 
 To check the current state at any time — including before provisioning anything
 — use the query-only switch, which changes nothing and needs no elevation:
@@ -484,7 +484,7 @@ To check the current state at any time — including before provisioning anythin
 Then, from an ordinary session:
 
 ~~~powershell
-cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --product-session org.anodrel.product-fixture
+& "$env:LOCALAPPDATA\Anodrel\ProductFixture\bin\anodrel-windows-host.exe" --product-launch org.anodrel.product-fixture
 ~~~
 
 Confirm each of the following:
