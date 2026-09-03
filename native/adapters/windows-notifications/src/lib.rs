@@ -7,11 +7,10 @@
 //! no sound, accepts no application artwork, and returns no native status. See
 //! `docs/NOTIFICATIONS.md` and Decision 0062.
 
-mod raw;
-
-use std::{fmt, io};
+use std::fmt;
 
 use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
+use anodrel_windows_notification_area::{NotificationArea, NotificationAreaError};
 
 /// The hover text shown for the host's notification-area entry.
 ///
@@ -26,7 +25,7 @@ const ENTRY_TIP: &str = "Anodrel";
 /// also dismiss the balloon that was just requested, so the entry's lifetime is
 /// the session's, not the message's.
 pub struct WindowsNotifications {
-    window: raw::Handle,
+    area: NotificationArea,
 }
 
 impl WindowsNotifications {
@@ -42,30 +41,18 @@ impl WindowsNotifications {
         if window == 0 {
             return Err(NotificationSetupError::NoWindow);
         }
-        let icon = if icon == 0 { raw::default_icon() } else { icon };
-        raw::add_icon(window, icon, ENTRY_TIP).map_err(NotificationSetupError::Io)?;
-        Ok(Self { window })
+        let area = NotificationArea::create(window, icon, ENTRY_TIP).map_err(map_setup_error)?;
+        Ok(Self { area })
     }
 }
 
 impl NotificationService for WindowsNotifications {
     fn show(&self, notification: &Notification) -> Result<(), NotificationServiceError> {
-        raw::show_balloon(
-            self.window,
-            notification.title().as_str(),
-            notification.body().as_str(),
-        )
-        // Every native failure collapses to one category. A refusal must not
-        // distinguish a muted application from a busy shell.
-        .map_err(|_| NotificationServiceError::Unavailable)
-    }
-}
-
-impl Drop for WindowsNotifications {
-    fn drop(&mut self) {
-        // A stale entry left in the notification area would outlive the surface
-        // it belongs to. An already-removed entry makes this harmless.
-        let _ = raw::remove_icon(self.window);
+        self.area
+            .show_information(notification.title().as_str(), notification.body().as_str())
+            // Every native failure collapses to one category. A refusal must not
+            // distinguish a muted application from a busy shell.
+            .map_err(|_| NotificationServiceError::Unavailable)
     }
 }
 
@@ -81,14 +68,25 @@ impl fmt::Debug for WindowsNotifications {
 pub enum NotificationSetupError {
     /// The caller supplied no host window to attach the entry to.
     NoWindow,
+    /// The adapter's fixed host tooltip did not fit the Shell32 field rules.
+    TooltipInvalid,
     /// Windows refused to create the notification-area entry.
-    Io(io::Error),
+    Io(std::io::Error),
+}
+
+fn map_setup_error(error: NotificationAreaError) -> NotificationSetupError {
+    match error {
+        NotificationAreaError::NoWindow => NotificationSetupError::NoWindow,
+        NotificationAreaError::TooltipInvalid => NotificationSetupError::TooltipInvalid,
+        NotificationAreaError::Io(error) => NotificationSetupError::Io(error),
+    }
 }
 
 impl fmt::Display for NotificationSetupError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::NoWindow => "notifications need a host window",
+            Self::TooltipInvalid => "notifications need a valid host tooltip",
             Self::Io(_) => "the notification area is unavailable",
         };
         formatter.write_str(message)
@@ -99,7 +97,7 @@ impl std::error::Error for NotificationSetupError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
-            Self::NoWindow => None,
+            Self::NoWindow | Self::TooltipInvalid => None,
         }
     }
 }
@@ -129,14 +127,5 @@ mod tests {
         // An application cannot supply or read this, so the entry cannot be
         // made to name or impersonate anything.
         assert_eq!(ENTRY_TIP, "Anodrel");
-    }
-
-    #[test]
-    fn a_live_entry_never_reveals_its_handle_in_debug_output() {
-        let entry = WindowsNotifications { window: -1 };
-        assert_eq!(format!("{entry:?}"), "WindowsNotifications(..)");
-        // Dropping an entry that was never added is harmless best-effort
-        // cleanup, which is what keeps every error path free of a stale icon.
-        drop(entry);
     }
 }

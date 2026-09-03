@@ -1,9 +1,10 @@
 [package]
-name = "anodrel-windows-notifications"
+name = "anodrel-windows-notification-area"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
 anodrel-notifications = { path = "../../crates/notifications" }
-anodrel-windows-notification-area = { path = "../windows-notification-area" }

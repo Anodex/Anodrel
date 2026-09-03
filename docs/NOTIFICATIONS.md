@@ -141,6 +141,11 @@ mailbox from the same timer that already drives document polling and file
 dialogs. The Shell32 call runs outside the window registry's lock, so a slow
 shell cannot block every other window's message handling.
 
+The one Shell32 entry is now owned by the lower-level
+[notification-area foundation](NOTIFICATION_AREA.md). This keeps its native
+lifetime separate from this one-way text contract and prepares one shared host
+resource for a future semantic tray surface without adding a second icon.
+
 ## Windows mapping
 
 The first Windows adapter uses `Shell_NotifyIconW` from Shell32. It uses only

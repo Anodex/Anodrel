@@ -67,6 +67,7 @@ members = [
   "adapters/windows-crash",
   "adapters/windows-credentials",
   "adapters/windows-clipboard",
+  "adapters/windows-notification-area",
   "adapters/windows-notifications",
   "adapters/windows-external-links",
   "adapters/windows-network",
