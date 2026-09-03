@@ -10,7 +10,7 @@ remove an Anodrel application with the same discipline that protects the
 development host today. It does **not** mean feature-for-feature Electron
 parity, nor that every possible desktop application is already expressible.
 
-The estimate is currently **about 65%** of that Windows release goal. The host,
+The estimate is currently **about 67%** of that Windows release goal. The host,
 private transport, package validation, native UI foundation, direct Windows
 services, performance guard, and first accessibility provider are substantial
 working foundations. The remaining work is concentrated in distribution,
@@ -22,7 +22,7 @@ breadth rather than in a missing window or transport base.
 | Gate | State | Current evidence | Required to close it |
 | --- | --- | --- | --- |
 | Native host and private child session | Built | Direct Win32 host, authenticated named pipe, CNG invitation, single-instance behaviour, group shutdown, and product-session coordinator. | Repeat the joined fixture check as part of each release candidate. |
-| Controlled package and executable launch | Built for development | Canonical containment, content digest, locked executable revalidation, Authenticode verification, and an external installed record are implemented. | Adopt a production identity and install path. |
+| Controlled package and executable launch | Built for development | Canonical containment, content digest, locked executable revalidation, Authenticode verification, external installed record, and a separately verified Start-menu launcher route are implemented. | Adopt a production identity and prove the installed signed launcher path. |
 | Native application UI | In progress | Owned layout, input, menus, scrolling, text entry, high-contrast palette, and multiple windows are directly rendered by the Windows host. | Expand only the reusable controls and behaviours required by the first real application; test each as a bounded host capability. |
 | Accessibility | In progress | The UI Automation provider supports reading, navigation, hit testing, focus, Invoke, Value, structure, live-status, and scroll boundaries. | Complete every documented manual Narrator and Inspect check for the current provider, then add further patterns only when a real UI requires them. |
 | Performance | Guarded | The release-only frame guard currently measures 6.68 ms average and 8.08 ms worst sustained frame against a 16 ms interval. | Keep the release guard, startup report, and equivalent real-application measurements in each release candidate. |

@@ -26,6 +26,7 @@ static NEXT_STAGING_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 pub(crate) struct StagedRelease {
     package_root: PathBuf,
     executable_path: PathBuf,
+    product_launcher_path: Option<PathBuf>,
     install_record: String,
     cleanup_on_drop: bool,
 }
@@ -41,6 +42,12 @@ impl StagedRelease {
     #[must_use]
     pub(crate) fn executable_path(&self) -> &Path {
         &self.executable_path
+    }
+
+    /// Returns the validated product launcher when this release declares one.
+    #[must_use]
+    pub(crate) fn product_launcher_path(&self) -> Option<&Path> {
+        self.product_launcher_path.as_deref()
     }
 
     /// Transfers the retained record after a successful directory promotion.
@@ -129,6 +136,12 @@ pub(crate) fn stage_checked_release(
     if bundle.file(manifest.executable_path()).is_none() {
         return Err(StagedReleaseError::BundlePathInvalid);
     }
+    if manifest
+        .product_launcher()
+        .is_some_and(|launcher| bundle.file(launcher.path()).is_none())
+    {
+        return Err(StagedReleaseError::BundlePathInvalid);
+    }
 
     let staging = create_staging_directory(&parent, manifest)?;
     let guard = StagingGuard::new(staging);
@@ -138,7 +151,11 @@ pub(crate) fn stage_checked_release(
         InstalledApplication::load_from_trusted_record(&record, manifest.application_id())
             .map_err(StagedReleaseError::PackageInvalid)?;
 
-    Ok(guard.finish(record, installed.executable_path().to_path_buf()))
+    Ok(guard.finish(
+        record,
+        installed.executable_path().to_path_buf(),
+        installed.product_launcher_path().map(Path::to_path_buf),
+    ))
 }
 
 fn canonical_staging_parent(path: &Path) -> Result<PathBuf, StagedReleaseError> {
@@ -243,11 +260,17 @@ impl StagingGuard {
         &self.path
     }
 
-    fn finish(mut self, install_record: String, executable_path: PathBuf) -> StagedRelease {
+    fn finish(
+        mut self,
+        install_record: String,
+        executable_path: PathBuf,
+        product_launcher_path: Option<PathBuf>,
+    ) -> StagedRelease {
         self.retain = true;
         StagedRelease {
             package_root: self.path.clone(),
             executable_path,
+            product_launcher_path,
             install_record,
             cleanup_on_drop: true,
         }

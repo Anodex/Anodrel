@@ -237,6 +237,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return product::run(application_id);
     }
+    if let [command, application_id] = arguments.as_slice()
+        && command == "--product-launch"
+    {
+        return product::run_product_launcher(application_id);
+    }
     if let [command, manifest_path] = arguments.as_slice()
         && command == "--application"
     {

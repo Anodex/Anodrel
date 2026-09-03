@@ -4,6 +4,10 @@
 
 **Date:** 2026-09-02
 
+**Superseded in part:** Decision 0187 replaces the selected child target and
+no-arguments rule with a selected product launcher and one fixed generated
+product-launch argument.
+
 ## Context
 
 Anodrel installation and selected policy are machine-wide. A per-user shortcut
@@ -16,9 +20,12 @@ path can also leave a partial product surface if Shell Link persistence fails.
 Resolve the fixed `FOLDERID_CommonPrograms` Windows-known folder directly and
 place exactly one link at `Anodrel\\<signed-start-menu-name>.lnk`. Require both
 the known folder and the Anodrel child to be normal non-reparse directories.
-Set only the selected executable target and selected package-root working
-directory through `IShellLinkW`; do not set arguments, a custom icon,
-description, source URL, or Application User Model ID.
+The original writer set the selected executable target and selected package-root
+working directory through `IShellLinkW`, with no arguments. Decision 0187
+corrects that launch contract: the link targets the separately verified product
+launcher and carries only its fixed generated product-launch argument. It still
+does not set a custom icon, description, source URL, or Application User Model
+ID.
 
 Persist the link first to a system-created temporary ordinary file in that same
 directory. Replace the final link only with same-directory `MoveFileExW`

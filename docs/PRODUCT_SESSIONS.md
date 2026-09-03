@@ -1,10 +1,12 @@
 # Windows verified product sessions
 
-**Status:** Internal Windows-host contract. It is not a public SDK surface. Two
-host-only entry points activate it: the `--product-session <applicationId>`
+**Status:** Internal Windows-host contract. It is not a public SDK surface.
+The development entry points are the `--product-session <applicationId>`
 command and the Startup Lab launch tile, which exists only while a machine
-record and signed executable currently validate. The one application that can
-be provisioned today is the development fixture in `docs/PRODUCT_FIXTURE.md`.
+record and signed executable currently validate. An installed product Start-menu
+entry uses the separately verified `--product-launch <applicationId>` route.
+The one application that can be provisioned today is the development fixture in
+`docs/PRODUCT_FIXTURE.md`.
 
 ## Purpose
 
@@ -56,6 +58,13 @@ for it, then runs the authenticated window on the host's own UI thread and calls
 `finish` when that window returns. The identity selects which already-provisioned
 machine record to read; it supplies no record, package, executable, capability,
 or child argument.
+
+`--product-launch <applicationId>` is the installed-product route. Before it
+starts the same coordinator, it verifies that the current executable is the
+selected product launcher and that its locked digest and publisher still match
+the selected record. It is generated only by the Start-menu writer; it accepts
+no child path, record path, capability, or application-defined argument. See
+`docs/PRODUCT_LAUNCHER.md` and Decision 0187.
 
 The Startup Lab tile takes a different ownership route because its message loop
 is already running. A click starts the coordinator on a worker; the worker posts

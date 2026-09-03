@@ -68,8 +68,8 @@ struct ShellLinkVtable {
     set_description: *const c_void,
     get_working_directory: *const c_void,
     set_working_directory: unsafe extern "system" fn(*mut ShellLink, *const u16) -> Hresult,
-    get_arguments: *const c_void,
-    set_arguments: *const c_void,
+    get_arguments: unsafe extern "system" fn(*mut ShellLink, *mut u16, i32) -> Hresult,
+    set_arguments: unsafe extern "system" fn(*mut ShellLink, *const u16) -> Hresult,
     get_hotkey: *const c_void,
     set_hotkey: *const c_void,
     get_show_cmd: *const c_void,
@@ -94,7 +94,7 @@ struct PersistFileVtable {
     release: *const c_void,
     get_class_id: *const c_void,
     is_dirty: *const c_void,
-    load: *const c_void,
+    load: unsafe extern "system" fn(*mut PersistFile, *const u16, u32) -> Hresult,
     save: unsafe extern "system" fn(*mut PersistFile, *const u16, i32) -> Hresult,
     save_completed: *const c_void,
     get_cur_file: *const c_void,
@@ -115,14 +115,16 @@ unsafe extern "system" {
 
 /// Persists one fixed staged Shell Link from already verified private paths.
 pub(super) fn persist_link(
-    executable_path: &Path,
+    launcher_path: &Path,
     package_root: &Path,
+    arguments: &str,
     temporary_path: &Path,
 ) -> Result<(), ShortcutWriteError> {
     let _apartment = ComApartment::initialize()?;
     let link = create_shell_link()?;
-    set_link_path(&link, executable_path)?;
+    set_link_path(&link, launcher_path)?;
     set_link_working_directory(&link, package_root)?;
+    set_link_arguments(&link, arguments)?;
     let persistence = query_persist_file(&link)?;
     let temporary_path = wide_path(temporary_path)?;
     // SAFETY: `persistence` owns a valid `IPersistFile`; the staged path is
@@ -131,6 +133,17 @@ pub(super) fn persist_link(
     let result = unsafe {
         ((*(*persistence.as_ptr()).vtable).save)(persistence.as_ptr(), temporary_path.as_ptr(), 1)
     };
+    succeeded(result)
+        .then_some(())
+        .ok_or(ShortcutWriteError::LinkSaveFailed)
+}
+
+fn set_link_arguments(link: &Com<ShellLink>, arguments: &str) -> Result<(), ShortcutWriteError> {
+    let arguments = wide_text(arguments)?;
+    // SAFETY: `link` owns an `IShellLinkW`; the fixed generated argument text
+    // is NUL terminated for this synchronous documented call.
+    let result =
+        unsafe { ((*(*link.as_ptr()).vtable).set_arguments)(link.as_ptr(), arguments.as_ptr()) };
     succeeded(result)
         .then_some(())
         .ok_or(ShortcutWriteError::LinkSaveFailed)
@@ -192,6 +205,46 @@ fn query_persist_file(link: &Com<ShellLink>) -> Result<Com<PersistFile>, Shortcu
         return Err(ShortcutWriteError::ComUnavailable);
     }
     Com::from_out(raw_persistence.cast::<PersistFile>())
+}
+
+fn wide_text(value: &str) -> Result<Vec<u16>, ShortcutWriteError> {
+    if value.is_empty() || value.encode_utf16().any(|unit| unit == 0) {
+        return Err(ShortcutWriteError::PathInvalid);
+    }
+    Ok(value.encode_utf16().chain(Some(0)).collect())
+}
+
+#[cfg(test)]
+pub(super) fn read_persisted_arguments(path: &Path) -> Result<String, ShortcutWriteError> {
+    let _apartment = ComApartment::initialize()?;
+    let link = create_shell_link()?;
+    let persistence = query_persist_file(&link)?;
+    let path = wide_path(path)?;
+    // SAFETY: `persistence` owns an `IPersistFile`; the test-created path is
+    // NUL terminated and its mode is the documented read-only value.
+    let loaded =
+        unsafe { ((*(*persistence.as_ptr()).vtable).load)(persistence.as_ptr(), path.as_ptr(), 0) };
+    if !succeeded(loaded) {
+        return Err(ShortcutWriteError::LinkSaveFailed);
+    }
+    let mut buffer = [0_u16; 256];
+    // SAFETY: `link` owns an `IShellLinkW` and `buffer` supplies a bounded
+    // writable UTF-16 result range including a terminator slot.
+    let read = unsafe {
+        ((*(*link.as_ptr()).vtable).get_arguments)(
+            link.as_ptr(),
+            buffer.as_mut_ptr(),
+            buffer.len() as i32,
+        )
+    };
+    if !succeeded(read) {
+        return Err(ShortcutWriteError::LinkSaveFailed);
+    }
+    let length = buffer
+        .iter()
+        .position(|unit| *unit == 0)
+        .ok_or(ShortcutWriteError::LinkSaveFailed)?;
+    String::from_utf16(&buffer[..length]).map_err(|_| ShortcutWriteError::LinkSaveFailed)
 }
 
 fn succeeded(result: Hresult) -> bool {

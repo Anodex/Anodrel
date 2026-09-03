@@ -22,6 +22,7 @@ pub(super) struct ParsedRecord {
     pub(super) update_catalogue: Option<UpdateCatalogueLocation>,
     pub(super) product_metadata: Option<ProductDisplayMetadata>,
     pub(super) start_menu_name: Option<StartMenuName>,
+    pub(super) product_launcher: Option<(String, [u8; 32])>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -49,6 +50,7 @@ pub(super) enum RecordVersion {
     V1_20,
     V1_21,
     V1_22,
+    V1_23,
 }
 
 impl RecordVersion {
@@ -100,6 +102,19 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
             "packageRoot",
             "executable",
             "publisher",
+        ][..]
+    } else if version.accepts(RecordVersion::V1_23) {
+        &[
+            "recordVersion",
+            "applicationId",
+            "packageRoot",
+            "executable",
+            "publisher",
+            "capabilities",
+            "networkOrigins",
+            "updateCatalogue",
+            "product",
+            "launcher",
         ][..]
     } else if version.accepts(RecordVersion::V1_21) {
         &[
@@ -212,6 +227,10 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
     } else {
         (None, None)
     };
+    let product_launcher = version
+        .accepts(RecordVersion::V1_23)
+        .then(|| parse_product_launcher(required_object(fields, "launcher")?))
+        .transpose()?;
 
     Ok(ParsedRecord {
         application_id: application_id.to_owned(),
@@ -224,7 +243,21 @@ pub(super) fn parse(input: &str) -> Result<ParsedRecord, InstalledApplicationErr
         update_catalogue,
         product_metadata,
         start_menu_name,
+        product_launcher,
     })
+}
+
+fn parse_product_launcher(
+    fields: &std::collections::BTreeMap<String, JsonValue>,
+) -> Result<(String, [u8; 32]), InstalledApplicationError> {
+    exact_fields(fields, &["path", "sha256"])?;
+    let path = required_string(fields, "path")?;
+    if !is_valid_executable_path(path) {
+        return Err(InstalledApplicationError::InvalidExecutablePath);
+    }
+    let digest = sha256::parse_lower_hex(required_string(fields, "sha256")?)
+        .ok_or(InstalledApplicationError::InvalidRecord)?;
+    Ok((path.to_owned(), digest))
 }
 
 fn parse_product_metadata(

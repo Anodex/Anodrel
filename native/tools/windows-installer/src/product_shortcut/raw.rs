@@ -6,7 +6,7 @@ use std::{
     ptr,
 };
 
-use anodrel_application::StartMenuName;
+use anodrel_application::{StartMenuName, is_valid_application_id};
 
 mod com;
 
@@ -48,6 +48,29 @@ pub(super) enum ShortcutWriteError {
     LinkReplacementFailed,
     /// Windows did not remove the fixed Shell Link.
     LinkRemovalFailed,
+}
+
+/// One fixed command line for a selected product launcher.
+pub(super) struct ProductLaunchArguments(String);
+
+impl ProductLaunchArguments {
+    /// Derives the only Shell Link argument sequence Anodrel product launch uses.
+    pub(super) fn for_application(application_id: &str) -> Result<Self, ShortcutWriteError> {
+        if !is_valid_application_id(application_id) {
+            return Err(ShortcutWriteError::PathInvalid);
+        }
+        Ok(Self(format!("--product-launch {application_id}")))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for ProductLaunchArguments {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ProductLaunchArguments(..)")
+    }
 }
 
 #[repr(C)]
@@ -102,18 +125,19 @@ unsafe extern "system" {
 
 /// Replaces one fixed all-users Start-menu link using already verified data.
 pub(super) fn replace_common_programs_shortcut(
-    executable_path: &Path,
+    launcher_path: &Path,
     package_root: &Path,
+    arguments: &ProductLaunchArguments,
     start_menu_name: &StartMenuName,
 ) -> Result<(), ShortcutWriteError> {
-    verify_normal_file(executable_path)?;
+    verify_normal_file(launcher_path)?;
     verify_normal_directory(package_root)?;
     let common_programs = common_programs_directory()?;
     verify_normal_directory(&common_programs)?;
     let anodrel_directory = common_programs.join("Anodrel");
     create_or_verify_normal_directory(&anodrel_directory)?;
     let link_path = anodrel_directory.join(format!("{}.lnk", start_menu_name.as_str()));
-    replace_link(executable_path, package_root, &link_path)
+    replace_link(launcher_path, package_root, arguments, &link_path)
 }
 
 /// Removes one fixed all-users Start-menu link using already verified data.
@@ -159,15 +183,21 @@ fn create_or_verify_normal_directory(path: &Path) -> Result<(), ShortcutWriteErr
 }
 
 fn replace_link(
-    executable_path: &Path,
+    launcher_path: &Path,
     package_root: &Path,
+    arguments: &ProductLaunchArguments,
     link_path: &Path,
 ) -> Result<(), ShortcutWriteError> {
     verify_absent_or_regular_file(link_path)?;
     let parent = link_path.parent().ok_or(ShortcutWriteError::PathInvalid)?;
     verify_normal_directory(parent)?;
     let temporary = TemporaryLink::create(parent)?;
-    com::persist_link(executable_path, package_root, temporary.path())?;
+    com::persist_link(
+        launcher_path,
+        package_root,
+        arguments.as_str(),
+        temporary.path(),
+    )?;
     temporary.replace(link_path)
 }
 

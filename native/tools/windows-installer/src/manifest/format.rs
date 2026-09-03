@@ -19,6 +19,8 @@ pub(super) enum FormatVersion {
     ProductMetadata,
     /// The product-registration release shape with a Start-menu filename.
     ProductRegistration,
+    /// The product-launch release shape with a verified host executable.
+    ProductLauncher,
 }
 
 impl FormatVersion {
@@ -29,12 +31,20 @@ impl FormatVersion {
 
     /// Whether this release shape requires general product display metadata.
     pub(super) const fn has_product_metadata(self) -> bool {
-        matches!(self, Self::ProductMetadata | Self::ProductRegistration)
+        matches!(
+            self,
+            Self::ProductMetadata | Self::ProductRegistration | Self::ProductLauncher
+        )
     }
 
     /// Whether this release shape requires a Windows Start-menu filename.
     pub(super) const fn has_start_menu_name(self) -> bool {
-        matches!(self, Self::ProductRegistration)
+        matches!(self, Self::ProductRegistration | Self::ProductLauncher)
+    }
+
+    /// Whether this release carries a verified Windows host launcher.
+    pub(super) const fn has_product_launcher(self) -> bool {
+        matches!(self, Self::ProductLauncher)
     }
 }
 
@@ -51,6 +61,7 @@ pub(super) fn parse(
         (1, 1) => Ok(FormatVersion::Catalogue),
         (1, 2) => Ok(FormatVersion::ProductMetadata),
         (1, 3) => Ok(FormatVersion::ProductRegistration),
+        (1, 4) => Ok(FormatVersion::ProductLauncher),
         (1, _) => Err(ReleaseManifestError::VersionUnsupported),
         _ => Err(ReleaseManifestError::VersionUnsupported),
     }

@@ -118,13 +118,31 @@ impl ReleaseManifest {
                 JsonValue::Object(product_fields.into_iter().collect()),
             ));
         }
+        if let Some(launcher) = self.product_launcher() {
+            fields.push((
+                "launcher".to_owned(),
+                object([
+                    ("path", JsonValue::String(launcher.path().to_owned())),
+                    (
+                        "sha256",
+                        JsonValue::String(anodrel_application::sha256::to_lower_hex(
+                            launcher.digest(),
+                        )),
+                    ),
+                ]),
+            ));
+        }
         JsonValue::Object(fields.into_iter().collect()).to_json()
     }
 }
 
 fn record_minor(release: &ReleaseManifest) -> u8 {
     if release.start_menu_name().is_some() {
-        22
+        if release.product_launcher().is_some() {
+            23
+        } else {
+            22
+        }
     } else if release.product_metadata().is_some() {
         21
     } else if release.update_catalogue_location().is_some() {

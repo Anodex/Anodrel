@@ -38,6 +38,10 @@ pub enum PreparedReleaseError {
     ExecutableSignatureInvalid(SignatureError),
     /// The staged executable signer differed from the embedded release publisher.
     ExecutablePublisherMismatch,
+    /// Windows did not accept the staged product launcher's signature.
+    LauncherSignatureInvalid(SignatureError),
+    /// The staged product launcher signer differed from the release publisher.
+    LauncherPublisherMismatch,
 }
 
 impl fmt::Display for PreparedReleaseError {
@@ -51,6 +55,12 @@ impl fmt::Display for PreparedReleaseError {
             Self::ExecutablePublisherMismatch => {
                 "the staged executable publisher does not match the release"
             }
+            Self::LauncherSignatureInvalid(_) => {
+                "Windows did not accept the staged product launcher signature"
+            }
+            Self::LauncherPublisherMismatch => {
+                "the staged product launcher publisher does not match the release"
+            }
         };
         formatter.write_str(message)
     }
@@ -62,7 +72,8 @@ impl std::error::Error for PreparedReleaseError {
             Self::InstallerInvalid(error) => Some(error),
             Self::StagingInvalid(error) => Some(error),
             Self::ExecutableSignatureInvalid(error) => Some(error),
-            Self::ExecutablePublisherMismatch => None,
+            Self::LauncherSignatureInvalid(error) => Some(error),
+            Self::ExecutablePublisherMismatch | Self::LauncherPublisherMismatch => None,
         }
     }
 }
@@ -97,7 +108,7 @@ pub(crate) fn prepare_verified_signed_release(
     let application_id = manifest.application_id().to_owned();
     let staged = stage_checked_release(staging_parent, manifest, release.release().bundle())
         .map_err(PreparedReleaseError::StagingInvalid)?;
-    verify_staged_executable(&staged, manifest)?;
+    verify_staged_images(&staged, manifest)?;
     Ok(PreparedRelease {
         staged,
         version,
@@ -112,7 +123,7 @@ pub(crate) fn into_promotion_parts(
     (prepared.staged, prepared.version, prepared.application_id)
 }
 
-fn verify_staged_executable(
+fn verify_staged_images(
     staged: &StagedRelease,
     manifest: &ReleaseManifest,
 ) -> Result<(), PreparedReleaseError> {
@@ -121,7 +132,16 @@ fn verify_staged_executable(
     manifest
         .matches_publisher_fingerprint(signer.as_bytes())
         .then_some(())
-        .ok_or(PreparedReleaseError::ExecutablePublisherMismatch)
+        .ok_or(PreparedReleaseError::ExecutablePublisherMismatch)?;
+    if let Some(launcher_path) = staged.product_launcher_path() {
+        let signer = verify_embedded_signature(launcher_path)
+            .map_err(PreparedReleaseError::LauncherSignatureInvalid)?;
+        manifest
+            .matches_publisher_fingerprint(signer.as_bytes())
+            .then_some(())
+            .ok_or(PreparedReleaseError::LauncherPublisherMismatch)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -135,7 +155,7 @@ mod tests {
     use crate::staging::stage_checked_release;
     use crate::{ReleaseManifest, verify_bundle};
 
-    use super::{PreparedReleaseError, verify_staged_executable};
+    use super::{PreparedReleaseError, verify_staged_images};
 
     const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
 
@@ -167,7 +187,7 @@ mod tests {
             .expect("the checked fixture stages before signer validation");
 
         assert!(matches!(
-            verify_staged_executable(&staged, &manifest),
+            verify_staged_images(&staged, &manifest),
             Err(PreparedReleaseError::ExecutableSignatureInvalid(
                 SignatureError::TrustRejected
             ))

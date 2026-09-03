@@ -209,6 +209,51 @@ fn version_one_three_binds_a_windows_safe_start_menu_name_to_selected_policy() {
 }
 
 #[test]
+fn version_one_four_binds_a_distinct_product_launcher_to_selected_policy() {
+    let package = StagedPackage::new();
+    let launcher_digest = package.launcher_digest();
+    let manifest = release_manifest(&package.executable_digest(), "[]", "[]")
+        .replace("\"minor\": 0", "\"minor\": 4")
+        .replace(
+            "  \"payload\":",
+            &format!(
+                "  \"updateCatalogue\": {{\n    \"origin\": {{ \"host\": \"updates.example.test\", \"port\": 443 }},\n    \"path\": \"/anodrel/stable.p7s\"\n  }},\n  \"product\": {{\n    \"displayName\": \"Anodrel Installer Test\",\n    \"publisherName\": \"Anodrel\",\n    \"startMenuName\": \"Anodrel Installer Test\"\n  }},\n  \"launcher\": {{ \"path\": \"bin/anodrel-windows-host.exe\", \"sha256\": \"{launcher_digest}\" }},\n  \"payload\":"
+            ),
+        );
+    let release = ReleaseManifest::parse(&manifest).expect("version 1.4 manifest is valid");
+    assert_eq!(
+        release
+            .product_launcher()
+            .expect("version 1.4 has a launcher")
+            .path(),
+        "bin/anodrel-windows-host.exe"
+    );
+
+    let record = release.render_install_record(package.root());
+    let installed =
+        InstalledApplication::load_from_trusted_record(&record, "org.anodrel.installer-test")
+            .expect("the version 1.23 record is valid");
+    assert_eq!(
+        installed
+            .product_launcher_path()
+            .expect("selected record retains the launcher"),
+        std::fs::canonicalize(package.launcher_path())
+            .expect("the staged launcher canonicalizes")
+            .as_path()
+    );
+    let mut launcher = std::fs::File::open(package.launcher_path()).expect("launcher opens");
+    installed
+        .revalidate_product_launcher(&package.launcher_path(), &mut launcher)
+        .expect("launcher revalidates through its record digest");
+
+    let same_as_child = manifest.replace("bin/anodrel-windows-host.exe", "bin/Product.EXE");
+    assert!(matches!(
+        ReleaseManifest::parse(&same_as_child),
+        Err(ReleaseManifestError::ExecutablePathInvalid)
+    ));
+}
+
+#[test]
 fn malformed_paths_unknown_fields_and_out_of_bounds_payloads_fail_closed() {
     let parent_path =
         release_manifest(PAYLOAD, "[]", "[]").replace("bin/Product.EXE", "bin/../Product.EXE");
@@ -285,6 +330,11 @@ impl StagedPackage {
             .expect("the package content is written");
         std::fs::write(root.join("bin").join("Product.EXE"), b"placeholder image")
             .expect("the package executable is written");
+        std::fs::write(
+            root.join("bin").join("anodrel-windows-host.exe"),
+            b"placeholder host image",
+        )
+        .expect("the package launcher is written");
         let content_digest = sha256::to_lower_hex(&sha256::digest(content));
         std::fs::write(
             root.join("anodrel.application.json"),
@@ -313,6 +363,15 @@ impl StagedPackage {
     fn executable_digest(&self) -> String {
         let bytes = std::fs::read(self.0.join("bin").join("Product.EXE"))
             .expect("the package executable is read");
+        sha256::to_lower_hex(&sha256::digest(&bytes))
+    }
+
+    fn launcher_path(&self) -> PathBuf {
+        self.0.join("bin").join("anodrel-windows-host.exe")
+    }
+
+    fn launcher_digest(&self) -> String {
+        let bytes = std::fs::read(self.launcher_path()).expect("the package launcher is read");
         sha256::to_lower_hex(&sha256::digest(&bytes))
     }
 }

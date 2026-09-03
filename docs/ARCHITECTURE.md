@@ -159,10 +159,12 @@ The installed application-record foundation binds the expected executable
 digest and signer fingerprint to a validated package identity in a record
 outside that package. The policy-store adapter reads that record only from a
 fixed, machine-wide 64-bit Windows registry location using query access. The
-host-only launch service locks the executable, rechecks containment and digest,
-checks Authenticode and the publisher fingerprint, creates only the exact
-argument-free `.exe`, and returns a child handle that terminates on host
-shutdown. `anodrel-windows-product-session` now joins that child, one
+host-only launch service locks the application executable, rechecks containment
+and digest, checks Authenticode and the publisher fingerprint, creates only the
+exact argument-free child, and returns a handle that terminates on host
+shutdown. A signed product launcher separately rechecks its own selected path,
+digest, and publisher before it enters that host-only route from the Windows
+Start menu. `anodrel-windows-product-session` now joins that child, one
 registered interactive pipe, and one grouped native UI session under one
 host-owned lifetime. A separate verification-only entry point runs the same
 pre-launch sequence without creating a process, so a surface can decide whether
@@ -190,9 +192,10 @@ Authenticode. Its no-argument machine routes select only their
   remain separate work.
 See `docs/SIGNING.md`, `docs/RELEASE_MANIFEST.md`, `docs/LAUNCH.md`,
   `docs/PRODUCT_FIXTURE.md`, `docs/WINDOWS_INSTALLER.md`,
-  `docs/UPDATE_HANDOFF.md`, `docs/UPDATE_CACHE.md`, `docs/UPDATE_FLOW.md`, and
-  `docs/UPDATE_ACCEPTANCE.md`, `docs/UPDATE_CONSENT.md`, and Decisions 0017
-  through 0020, 0061, and 0140 through 0173.
+  `docs/UPDATE_HANDOFF.md`, `docs/UPDATE_CACHE.md`, `docs/UPDATE_FLOW.md`,
+  `docs/PRODUCT_LAUNCHER.md`, `docs/UPDATE_ACCEPTANCE.md`,
+  `docs/UPDATE_CONSENT.md`, and Decisions 0017 through 0020, 0061, 0140
+  through 0173, and 0187.
 
 The Windows paths adapter reads the current user's Local AppData known folder
 and passes it to a portable layout builder. The Linux paths adapter obtains the

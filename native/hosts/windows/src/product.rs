@@ -14,7 +14,9 @@ use std::{error::Error, io, thread};
 
 use anodrel_application::is_valid_application_id;
 use anodrel_diagnostics::Event;
-use anodrel_windows_launch::verify_registered_application;
+use anodrel_windows_launch::{
+    LaunchError, verify_registered_application, verify_registered_product_launcher,
+};
 use anodrel_windows_product_session::{
     ProductSessionError, RunningProductSession, start_registered_product_session,
 };
@@ -70,6 +72,26 @@ pub fn run(application_id: &str) -> Result<(), Box<dyn Error>> {
     window_result?;
     finish_result?;
     Ok(())
+}
+
+/// Runs one installed product from its selected verified launcher.
+///
+/// This is the one route a Windows Start-menu link may name. Before any
+/// product window exists, it proves that this host image is exactly the
+/// selected record's launcher and then enters the existing verified child
+/// session. The identity is the link's generated fixed argument, never a
+/// record, package path, child path, capability, or bootstrap value.
+pub fn run_product_launcher(application_id: &str) -> Result<(), Box<dyn Error>> {
+    if !is_valid_application_id(application_id) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the product launcher application identity is invalid",
+        )
+        .into());
+    }
+    let current_process = std::env::current_exe()?;
+    verify_launcher_off_the_ui_thread(application_id, current_process)?;
+    run(application_id)
 }
 
 /// One launch preflight running on its own worker thread.
@@ -191,15 +213,37 @@ fn start_off_the_ui_thread(
     })?
 }
 
+/// Verifies this executable before product-window creation, off the UI thread.
+fn verify_launcher_off_the_ui_thread(
+    application_id: &str,
+    current_process: std::path::PathBuf,
+) -> Result<(), LaunchError> {
+    let application_id = application_id.to_owned();
+    let worker = thread::Builder::new()
+        .name("anodrel-product-launcher-verify".to_owned())
+        .spawn(move || verify_registered_product_launcher(&application_id, &current_process))
+        .map_err(LaunchError::Io)?;
+    worker
+        .join()
+        .map_err(|_| LaunchError::Io(io::Error::other("product launcher verifier stopped")))?
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{FixturePreflight, PreflightOutcome, is_launchable, run};
+    use super::{FixturePreflight, PreflightOutcome, is_launchable, run, run_product_launcher};
 
     #[test]
     fn an_invalid_identity_never_reaches_machine_policy_or_a_window() {
         let error = run("org.anodrel/escape").expect_err("an invalid identity is rejected");
         assert!(error.to_string().contains("identity is invalid"));
         assert!(!is_launchable("org.anodrel/escape"));
+    }
+
+    #[test]
+    fn an_invalid_launcher_identity_never_reaches_the_current_executable() {
+        let error = run_product_launcher("org.anodrel/escape")
+            .expect_err("an invalid launcher identity is rejected");
+        assert!(error.to_string().contains("identity is invalid"));
     }
 
     #[test]

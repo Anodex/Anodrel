@@ -37,9 +37,18 @@ pub fn create_release_manifest(
     let executable = bundle
         .file(plan.executable_path())
         .ok_or(ReleaseManifestAuthorError::ExecutableUnavailable)?;
+    let launcher = plan
+        .launcher_path()
+        .map(|path| {
+            bundle
+                .file(path)
+                .ok_or(ReleaseManifestAuthorError::LauncherUnavailable)
+        })
+        .transpose()?;
     let manifest_text = plan.render(
         application.identity().application_id(),
         sha256::digest(executable),
+        launcher.map(sha256::digest),
         &bundle_bytes,
     );
     let manifest = ReleaseManifest::parse(&manifest_text)

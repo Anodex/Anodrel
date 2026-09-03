@@ -10,7 +10,7 @@ it is not a package manager, archive builder, signer, installer, or updater.
 
 The operator supplies an absolute release-plan file, an absolute checked bundle,
 and a previously absent absolute manifest output. The tool derives the
-application identity, application content check, executable digest, bundle
+application identity, application content check, application-child and launcher digests, bundle
 length, and bundle digest from the bundle. A plan cannot supply or override
 those facts.
 
@@ -41,10 +41,11 @@ Version 1.1 adds exactly one `updateCatalogue` object:
 }
 ~~~
 
-The format version is exactly 1.0, 1.1, 1.2, or 1.3. Version 1.1 requires this
+The format version is exactly 1.0 through 1.4. Version 1.1 requires this
 source and derives a final release manifest at 1.1; version 1.0 carries no
 update source. Version 1.2 retains this source and adds product display
 metadata. Version 1.3 adds the separately signed Windows-safe Start-menu name.
+Version 1.4 adds one distinct product-launcher bundle path.
 Package-version fields are unsigned 16-bit integers. The executable
 path, capability names, network origins, and catalogue location undergo the
 same strict validation as the final release manifest. The publisher is one
@@ -70,6 +71,19 @@ the sole exception: it is a strictly validated signed Windows filename component
 for the one future Start-menu link. It is not an identity, path selected by an
 application, or source of authority. See [signed product display metadata](PRODUCT_METADATA.md).
 
+Version 1.4 retains that object and adds a required `launcher` object:
+
+~~~json
+"launcher": {
+  "path": "bin/anodrel-windows-host.exe"
+}
+~~~
+
+The plan supplies only this contained `.exe` path. The authoring tool requires
+the corresponding checked bundle file and derives its SHA-256 digest into the
+final signed manifest. It cannot equal the application child path. See
+[product launcher](PRODUCT_LAUNCHER.md).
+
 ## Creation contract
 
 ~~~text
@@ -77,7 +91,7 @@ release plan + checked anodrel.bundle.v1
                     |
                     v
 read root anodrel.application.json and its declared text content
-derive application ID, executable digest, and payload facts
+derive application ID, application-child and launcher digests, and payload facts
                     |
                     v
 render and re-parse one strict anodrel.release.v1 manifest
@@ -87,8 +101,9 @@ write and synchronize one new manifest file
 ~~~
 
 The bundle must contain exactly the root `anodrel.application.json`, its
-declared valid UTF-8 text content with the declared digest, and the exact
-release-plan executable path. The final manifest is parsed and checked against
+declared valid UTF-8 text content with the declared digest, the exact
+release-plan executable path, and a version-1.4 launcher path when declared.
+The final manifest is parsed and checked against
 the same bundle before its output file is created.
 
 The command is:

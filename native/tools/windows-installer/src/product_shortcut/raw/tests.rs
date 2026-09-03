@@ -5,7 +5,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use super::{remove_regular_link, replace_link};
+use super::{ProductLaunchArguments, remove_regular_link, replace_link};
 
 static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
@@ -14,9 +14,12 @@ fn writes_one_shell_link_in_a_regular_temporary_directory() {
     let directory = TemporaryDirectory::new();
     let executable = std::env::current_exe().expect("current test image is available");
     let link = directory.path().join("Anodrel Test.lnk");
+    let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
+        .expect("fixed test identity is valid");
     replace_link(
         &executable,
         executable.parent().expect("test image has a parent"),
+        &arguments,
         &link,
     )
     .expect("direct Shell Link persistence succeeds");
@@ -28,14 +31,37 @@ fn removes_only_the_regular_shell_link_it_just_created() {
     let directory = TemporaryDirectory::new();
     let executable = std::env::current_exe().expect("current test image is available");
     let link = directory.path().join("Anodrel Test.lnk");
+    let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
+        .expect("fixed test identity is valid");
     replace_link(
         &executable,
         executable.parent().expect("test image has a parent"),
+        &arguments,
         &link,
     )
     .expect("direct Shell Link persistence succeeds");
     remove_regular_link(&link).expect("regular temporary Shell Link removes");
     assert!(!link.exists());
+}
+
+#[test]
+fn persists_only_the_fixed_product_launch_arguments() {
+    let directory = TemporaryDirectory::new();
+    let executable = std::env::current_exe().expect("current test image is available");
+    let link = directory.path().join("Anodrel Arguments Test.lnk");
+    let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
+        .expect("fixed test identity is valid");
+    replace_link(
+        &executable,
+        executable.parent().expect("test image has a parent"),
+        &arguments,
+        &link,
+    )
+    .expect("direct Shell Link persistence succeeds");
+    assert_eq!(
+        super::com::read_persisted_arguments(&link).expect("link arguments are readable"),
+        "--product-launch org.anodrel.shortcut-test"
+    );
 }
 
 struct TemporaryDirectory(PathBuf);

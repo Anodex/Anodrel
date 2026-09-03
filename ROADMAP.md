@@ -408,10 +408,10 @@ Status: **Direct Windows host in progress**
   verification-only entry point that runs the same sequence without creating a
   process. A development-only signed fixture, a controlled provisioning helper,
   the host `--product-session` route, and a preflight-resolved Startup Lab tile
-  exercise the whole path on a development machine (Decision 0061). Owned release
-  foundations now include signed catalogue discovery, private image staging,
-  native consent, elevation handoff, and post-update policy proof. Production identity
-  and a signed end-to-end acceptance run remain required before a shipped application uses it.
+  exercise the whole path on a development machine (Decision 0061). A selected product record may register a Start-menu link only through a separately signed, digest-verified Anodrel launcher.
+  That launcher enters the host-owned product-session route rather than starting the child directly (Decision 0187). Release foundations include signed catalogue discovery and private image staging,
+  native consent, elevation handoff, and post-update policy proof. Production identity and a signed
+  end-to-end acceptance run remain required before a shipped application uses it.
 
 Acceptance gate: a sample application can run without Electron and exercise the
 core platform services safely.

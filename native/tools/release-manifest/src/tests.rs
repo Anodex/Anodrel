@@ -134,6 +134,60 @@ fn version_one_three_plan_derives_a_signed_start_menu_name() {
 }
 
 #[test]
+fn version_one_four_plan_derives_a_launcher_digest_from_the_checked_bundle() {
+    let directory = TemporaryDirectory::new();
+    let plan = directory.path().join("release-plan.json");
+    let bundle = directory.path().join("release.bundle");
+    let output = directory.path().join("release-manifest.json");
+    let plan_text = valid_plan()
+        .replace(
+            "\"formatVersion\":{\"major\":1,\"minor\":0}",
+            "\"formatVersion\":{\"major\":1,\"minor\":4}",
+        )
+        .replace(
+            "\"networkOrigins\":[]}",
+            "\"networkOrigins\":[],\"updateCatalogue\":{\"origin\":{\"host\":\"updates.example.test\",\"port\":443},\"path\":\"/anodrel/stable.p7s\"},\"product\":{\"displayName\":\"Release Manifest Test\",\"publisherName\":\"Anodrel\",\"startMenuName\":\"Release Manifest Test\"},\"launcher\":{\"path\":\"bin/anodrel-windows-host.exe\"}}",
+        );
+    fs::write(&plan, plan_text).expect("version 1.4 plan is written");
+    fs::write(&bundle, valid_bundle(b"product")).expect("bundle is written");
+
+    create_release_manifest(&plan, &bundle, &output).expect("manifest is authored");
+    let manifest =
+        ReleaseManifest::parse(&fs::read_to_string(output).expect("manifest output is readable"))
+            .expect("derived manifest is valid");
+    let launcher = manifest
+        .product_launcher()
+        .expect("derived manifest has a product launcher");
+    assert_eq!(launcher.path(), "bin/anodrel-windows-host.exe");
+    assert!(launcher.matches_digest(sha256::digest(b"Anodrel product launcher")));
+}
+
+#[test]
+fn version_one_four_plan_refuses_a_launcher_absent_from_the_checked_bundle() {
+    let directory = TemporaryDirectory::new();
+    let plan = directory.path().join("release-plan.json");
+    let bundle = directory.path().join("release.bundle");
+    let output = directory.path().join("release-manifest.json");
+    let plan_text = valid_plan()
+        .replace(
+            "\"formatVersion\":{\"major\":1,\"minor\":0}",
+            "\"formatVersion\":{\"major\":1,\"minor\":4}",
+        )
+        .replace(
+            "\"networkOrigins\":[]}",
+            "\"networkOrigins\":[],\"updateCatalogue\":{\"origin\":{\"host\":\"updates.example.test\",\"port\":443},\"path\":\"/anodrel/stable.p7s\"},\"product\":{\"displayName\":\"Release Manifest Test\",\"publisherName\":\"Anodrel\",\"startMenuName\":\"Release Manifest Test\"},\"launcher\":{\"path\":\"bin/missing-host.exe\"}}",
+        );
+    fs::write(&plan, plan_text).expect("version 1.4 plan is written");
+    fs::write(&bundle, valid_bundle(b"product")).expect("bundle is written");
+
+    assert!(matches!(
+        create_release_manifest(&plan, &bundle, &output),
+        Err(ReleaseManifestAuthorError::LauncherUnavailable)
+    ));
+    assert!(!output.exists());
+}
+
+#[test]
 fn does_not_overwrite_an_existing_manifest_output() {
     let directory = TemporaryDirectory::new();
     let plan = directory.path().join("release-plan.json");
@@ -220,6 +274,10 @@ fn valid_bundle(executable: &[u8]) -> Vec<u8> {
         BundleEntryInput {
             path: "anodrel.application.json",
             contents: &application_manifest,
+        },
+        BundleEntryInput {
+            path: "bin/anodrel-windows-host.exe",
+            contents: b"Anodrel product launcher",
         },
         BundleEntryInput {
             path: "bin/product.exe",

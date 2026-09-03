@@ -19,6 +19,7 @@ pub(super) struct ReleasePlan {
     update_catalogue: Option<UpdateCatalogueLocation>,
     product_metadata: Option<ProductMetadata>,
     start_menu_name: Option<StartMenuName>,
+    launcher_path: Option<String>,
 }
 
 impl ReleasePlan {
@@ -67,6 +68,17 @@ impl ReleasePlan {
                 "updateCatalogue",
                 "product",
             ][..],
+            PlanFormatVersion::ProductLauncher => &[
+                "formatVersion",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+                "updateCatalogue",
+                "product",
+                "launcher",
+            ][..],
         };
         exact_fields(fields, expected_fields)?;
         let package = required_object(fields, "packageVersion")?;
@@ -103,6 +115,10 @@ impl ReleasePlan {
         } else {
             (None, None)
         };
+        let launcher_path = format_version
+            .has_product_launcher()
+            .then(|| parse_launcher_path(required_object(fields, "launcher")?))
+            .transpose()?;
         Ok(Self {
             package_version,
             executable_path,
@@ -112,6 +128,7 @@ impl ReleasePlan {
             update_catalogue,
             product_metadata,
             start_menu_name,
+            launcher_path,
         })
     }
 
@@ -120,11 +137,17 @@ impl ReleasePlan {
         &self.executable_path
     }
 
+    /// Returns the exact planned launcher bundle path when product launch is selected.
+    pub(super) fn launcher_path(&self) -> Option<&str> {
+        self.launcher_path.as_deref()
+    }
+
     /// Renders one final manifest from facts derived from checked bundle bytes.
     pub(super) fn render(
         &self,
         application_id: &str,
         executable_digest: [u8; 32],
+        launcher_digest: Option<[u8; 32]>,
         bundle: &[u8],
     ) -> String {
         let mut fields = BTreeMap::from([
@@ -266,11 +289,25 @@ impl ReleasePlan {
             }
             fields.insert("product".to_owned(), JsonValue::Object(product_fields));
         }
+        if let (Some(path), Some(digest)) = (&self.launcher_path, launcher_digest) {
+            fields.insert(
+                "launcher".to_owned(),
+                JsonValue::Object(BTreeMap::from([
+                    ("path".to_owned(), JsonValue::String(path.clone())),
+                    (
+                        "sha256".to_owned(),
+                        JsonValue::String(sha256::to_lower_hex(&digest)),
+                    ),
+                ])),
+            );
+        }
         JsonValue::Object(fields).to_json()
     }
 
     fn format_minor(&self) -> u8 {
-        if self.start_menu_name.is_some() {
+        if self.launcher_path.is_some() {
+            4
+        } else if self.start_menu_name.is_some() {
             3
         } else if self.product_metadata.is_some() {
             2
@@ -288,6 +325,7 @@ enum PlanFormatVersion {
     Catalogue,
     ProductMetadata,
     ProductRegistration,
+    ProductLauncher,
 }
 
 impl PlanFormatVersion {
@@ -296,11 +334,18 @@ impl PlanFormatVersion {
     }
 
     const fn has_product_metadata(self) -> bool {
-        matches!(self, Self::ProductMetadata | Self::ProductRegistration)
+        matches!(
+            self,
+            Self::ProductMetadata | Self::ProductRegistration | Self::ProductLauncher
+        )
     }
 
     const fn has_start_menu_name(self) -> bool {
-        matches!(self, Self::ProductRegistration)
+        matches!(self, Self::ProductRegistration | Self::ProductLauncher)
+    }
+
+    const fn has_product_launcher(self) -> bool {
+        matches!(self, Self::ProductLauncher)
     }
 }
 
@@ -316,8 +361,16 @@ fn parse_format_version(
         (1, 1) => Ok(PlanFormatVersion::Catalogue),
         (1, 2) => Ok(PlanFormatVersion::ProductMetadata),
         (1, 3) => Ok(PlanFormatVersion::ProductRegistration),
+        (1, 4) => Ok(PlanFormatVersion::ProductLauncher),
         _ => Err(ReleaseManifestAuthorError::PlanInvalid),
     }
+}
+
+fn parse_launcher_path(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<String, ReleaseManifestAuthorError> {
+    exact_fields(fields, &["path"])?;
+    Ok(required_string(fields, "path")?.to_owned())
 }
 
 fn parse_product_metadata(

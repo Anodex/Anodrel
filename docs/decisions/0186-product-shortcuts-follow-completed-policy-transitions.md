@@ -4,6 +4,10 @@
 
 **Date:** 2026-09-02
 
+**Superseded in part:** Decision 0187 restricts a new link to records carrying
+a verified product launcher; a record with only an older Start-menu name now
+removes a prior link instead of retaining a direct-child target.
+
 ## Context
 
 The direct Start-menu writer can create one verified link, but installation,
@@ -44,7 +48,8 @@ refuses a reparse point or non-regular file.
 - Legacy records that never declared a Start-menu name remain installable and
   do not acquire an inferred product link.
 - Link registration remains a separate, reviewable post-policy stage with no
-  application input, generic path, icon, arguments, AUMID, or activation.
+  application input, generic path, icon, AUMID, or application activation.
+  Decision 0187 adds one fixed host-generated product-launch argument.
 
 ## Revisit conditions
 

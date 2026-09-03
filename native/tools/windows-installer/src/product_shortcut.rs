@@ -62,6 +62,16 @@ pub enum ProductShortcutPreflightError {
     InstallerPublisherMismatch,
     /// The selected record predates signed Start-menu registration metadata.
     StartMenuNameUnavailable,
+    /// The selected record has no verified product launcher.
+    ProductLauncherUnavailable,
+    /// Windows did not accept the selected launcher signature.
+    LauncherSignatureInvalid(SignatureError),
+    /// The selected launcher signer differed from its fixed machine policy.
+    LauncherPolicyPublisherMismatch,
+    /// The selected launcher signer differed from the signed installer.
+    InstallerLauncherPublisherMismatch,
+    /// A selected identity could not become the fixed launcher command.
+    LauncherArgumentsInvalid,
 }
 
 impl fmt::Display for ProductShortcutPreflightError {
@@ -81,6 +91,19 @@ impl fmt::Display for ProductShortcutPreflightError {
             Self::StartMenuNameUnavailable => {
                 "the selected application does not declare a signed Start-menu name"
             }
+            Self::ProductLauncherUnavailable => {
+                "the selected application does not declare a product launcher"
+            }
+            Self::LauncherSignatureInvalid(_) => {
+                "Windows did not accept the selected product launcher signature"
+            }
+            Self::LauncherPolicyPublisherMismatch => {
+                "the selected product launcher publisher does not match policy"
+            }
+            Self::InstallerLauncherPublisherMismatch => {
+                "the selected product launcher publisher does not match the installer"
+            }
+            Self::LauncherArgumentsInvalid => "the selected product launcher command is invalid",
         };
         formatter.write_str(message)
     }
@@ -92,9 +115,14 @@ impl std::error::Error for ProductShortcutPreflightError {
             Self::InstallerInvalid(error) => Some(error),
             Self::SelectedPolicyInvalid(error) => Some(error),
             Self::SelectedSignatureInvalid(error) => Some(error),
+            Self::LauncherSignatureInvalid(error) => Some(error),
             Self::SelectedPolicyPublisherMismatch
             | Self::InstallerPublisherMismatch
-            | Self::StartMenuNameUnavailable => None,
+            | Self::StartMenuNameUnavailable
+            | Self::ProductLauncherUnavailable
+            | Self::LauncherPolicyPublisherMismatch
+            | Self::InstallerLauncherPublisherMismatch
+            | Self::LauncherArgumentsInvalid => None,
         }
     }
 }
@@ -129,8 +157,9 @@ impl std::error::Error for ProductShortcutRegistrationError {
 }
 
 struct SelectedProductShortcut {
-    executable_path: PathBuf,
+    launcher_path: Option<PathBuf>,
     package_root: PathBuf,
+    application_id: String,
     start_menu_name: Option<StartMenuName>,
 }
 
@@ -151,14 +180,17 @@ impl PriorProductShortcut {
 ///
 /// The signed current installer chooses the application identity. This reads
 /// only that identity's selected machine policy, validates the selected
-/// executable's Authenticode signer against both policy and installer, and
-/// requires version 1.22 signed product metadata and a Start-menu name. It does not create or remove
+/// child and launcher Authenticode signers against both policy and installer,
+/// and requires version 1.23 signed product-launch metadata and a Start-menu
+/// name. It does not create or remove
 /// a shortcut, query a shell folder, initialize COM, write policy, elevate,
 /// launch an application, or expose product data.
 pub fn verify_current_product_shortcut_target()
 -> Result<VerifiedProductShortcutTarget, ProductShortcutPreflightError> {
     let target = select_current_product_shortcut_target()?;
     require_start_menu_name(&target)?;
+    require_product_launcher(&target)?;
+    product_launch_arguments(&target)?;
     Ok(VerifiedProductShortcutTarget { _private: () })
 }
 
@@ -166,19 +198,25 @@ pub fn verify_current_product_shortcut_target()
 ///
 /// The function accepts no application input. It repeats the signed-policy
 /// proof immediately before asking Windows to create one link under the common
-/// Programs folder. The target, working directory, and signed filename come
-/// only from that fresh proof. It does not create an Application User Model ID,
-/// pass an argument, launch an application, alter machine policy, or report a
-/// person's interaction with the Start menu.
+/// Programs folder. The launcher target, working directory, generated fixed
+/// arguments, and signed filename come only from that fresh proof. It does not
+/// create an Application User Model ID, accept an argument, launch an
+/// application, alter machine policy, or report a person's interaction with the
+/// Start menu.
 pub fn refresh_current_product_shortcut()
 -> Result<RegisteredProductShortcut, ProductShortcutRegistrationError> {
     let target = select_current_product_shortcut_target()
         .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
     let start_menu_name = require_start_menu_name(&target)
         .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
+    let launcher_path = require_product_launcher(&target)
+        .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
+    let arguments = product_launch_arguments(&target)
+        .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
     raw::replace_common_programs_shortcut(
-        &target.executable_path,
+        launcher_path,
         &target.package_root,
+        &arguments,
         start_menu_name,
     )
     .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
@@ -208,18 +246,25 @@ pub(crate) fn synchronize_current_product_shortcut(
 ) -> Result<RegisteredProductShortcut, ProductShortcutRegistrationError> {
     let target = select_current_product_shortcut_target()
         .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
-    if let Some(start_menu_name) = &target.start_menu_name {
+    let active_start_menu_name = if let Some(launcher_path) = &target.launcher_path {
+        let start_menu_name = require_start_menu_name(&target)
+            .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
+        let arguments = product_launch_arguments(&target)
+            .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
         raw::replace_common_programs_shortcut(
-            &target.executable_path,
+            launcher_path,
             &target.package_root,
+            &arguments,
             start_menu_name,
         )
         .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
-    }
-    if let Some(start_menu_name) = stale_start_menu_name(
-        prior.start_menu_name.as_ref(),
-        target.start_menu_name.as_ref(),
-    ) {
+        Some(start_menu_name)
+    } else {
+        None
+    };
+    if let Some(start_menu_name) =
+        stale_start_menu_name(prior.start_menu_name.as_ref(), active_start_menu_name)
+    {
         raw::remove_common_programs_shortcut(start_menu_name)
             .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
     }
@@ -257,9 +302,21 @@ fn select_current_product_shortcut_target()
     if !manifest.matches_publisher_fingerprint(signer.as_bytes()) {
         return Err(ProductShortcutPreflightError::InstallerPublisherMismatch);
     }
+    let launcher_path = selected.product_launcher_path().map(PathBuf::from);
+    if let Some(launcher_path) = &launcher_path {
+        let signer = verify_embedded_signature(launcher_path)
+            .map_err(ProductShortcutPreflightError::LauncherSignatureInvalid)?;
+        if !selected.matches_publisher(signer.as_bytes()) {
+            return Err(ProductShortcutPreflightError::LauncherPolicyPublisherMismatch);
+        }
+        if !manifest.matches_publisher_fingerprint(signer.as_bytes()) {
+            return Err(ProductShortcutPreflightError::InstallerLauncherPublisherMismatch);
+        }
+    }
     Ok(SelectedProductShortcut {
-        executable_path: selected.executable_path().to_path_buf(),
+        launcher_path,
         package_root: selected.package_root().to_path_buf(),
+        application_id: selected.identity().application_id().to_owned(),
         start_menu_name: selected.start_menu_name().cloned(),
     })
 }
@@ -271,6 +328,22 @@ fn require_start_menu_name(
         .start_menu_name
         .as_ref()
         .ok_or(ProductShortcutPreflightError::StartMenuNameUnavailable)
+}
+
+fn require_product_launcher(
+    target: &SelectedProductShortcut,
+) -> Result<&PathBuf, ProductShortcutPreflightError> {
+    target
+        .launcher_path
+        .as_ref()
+        .ok_or(ProductShortcutPreflightError::ProductLauncherUnavailable)
+}
+
+fn product_launch_arguments(
+    target: &SelectedProductShortcut,
+) -> Result<raw::ProductLaunchArguments, ProductShortcutPreflightError> {
+    raw::ProductLaunchArguments::for_application(&target.application_id)
+        .map_err(|_| ProductShortcutPreflightError::LauncherArgumentsInvalid)
 }
 
 fn stale_start_menu_name<'a>(

@@ -14,71 +14,13 @@ use crate::{MAX_PAYLOAD_BYTES, MAX_RELEASE_MANIFEST_BYTES, ReleaseManifestError}
 pub use anodrel_application::ProductDisplayMetadata as ProductMetadata;
 
 mod format;
+mod launcher;
 mod product;
+mod version;
 
 use format::FormatVersion;
-
-/// One release directory version, distinct from protocol compatibility.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct PackageVersion {
-    major: u16,
-    minor: u16,
-    patch: u16,
-}
-
-impl PackageVersion {
-    /// Creates one exact three-component release version.
-    #[must_use]
-    pub const fn new(major: u16, minor: u16, patch: u16) -> Self {
-        Self {
-            major,
-            minor,
-            patch,
-        }
-    }
-
-    /// Returns the release version's major component.
-    #[must_use]
-    pub const fn major(self) -> u16 {
-        self.major
-    }
-
-    /// Returns the release version's minor component.
-    #[must_use]
-    pub const fn minor(self) -> u16 {
-        self.minor
-    }
-
-    /// Returns the release version's patch component.
-    #[must_use]
-    pub const fn patch(self) -> u16 {
-        self.patch
-    }
-
-    /// Parses the exact canonical name of an owned release directory.
-    ///
-    /// Release promotion creates only `major.minor.patch` names with ordinary
-    /// decimal components. Rejecting alternate spellings keeps a version
-    /// directory from having more than one textual identity.
-    pub fn from_canonical_directory_name(name: &str) -> Option<Self> {
-        let mut components = name.split('.');
-        let major = parse_directory_component(components.next()?)?;
-        let minor = parse_directory_component(components.next()?)?;
-        let patch = parse_directory_component(components.next()?)?;
-        components.next().is_none().then_some(Self {
-            major,
-            minor,
-            patch,
-        })
-    }
-}
-
-fn parse_directory_component(component: &str) -> Option<u16> {
-    (!component.is_empty()
-        && component.bytes().all(|byte| byte.is_ascii_digit())
-        && (component.len() == 1 || !component.starts_with('0')))
-    .then(|| component.parse().ok())?
-}
+pub use launcher::ProductLauncher;
+pub use version::PackageVersion;
 
 /// The bounded embedded-payload facts a signed manifest declares.
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -123,6 +65,7 @@ pub struct ReleaseManifest {
     update_catalogue: Option<UpdateCatalogueLocation>,
     product_metadata: Option<ProductMetadata>,
     start_menu_name: Option<StartMenuName>,
+    product_launcher: Option<ProductLauncher>,
     payload: PayloadDescriptor,
 }
 
@@ -181,6 +124,19 @@ impl ReleaseManifest {
                 "product",
                 "payload",
             ][..],
+            FormatVersion::ProductLauncher => &[
+                "formatVersion",
+                "applicationId",
+                "packageVersion",
+                "executable",
+                "publisher",
+                "capabilities",
+                "networkOrigins",
+                "updateCatalogue",
+                "product",
+                "launcher",
+                "payload",
+            ][..],
         };
         exact_fields(fields, expected_fields)?;
 
@@ -212,6 +168,16 @@ impl ReleaseManifest {
         } else {
             (None, None)
         };
+        let product_launcher = format_version
+            .has_product_launcher()
+            .then(|| ProductLauncher::parse(required_object(fields, "launcher")?))
+            .transpose()?;
+        if product_launcher
+            .as_ref()
+            .is_some_and(|launcher| launcher.path().eq_ignore_ascii_case(&executable_path))
+        {
+            return Err(ReleaseManifestError::ExecutablePathInvalid);
+        }
         let payload = parse_payload(required_object(fields, "payload")?)?;
 
         Ok(Self {
@@ -225,6 +191,7 @@ impl ReleaseManifest {
             update_catalogue,
             product_metadata,
             start_menu_name,
+            product_launcher,
             payload,
         })
     }
@@ -297,6 +264,12 @@ impl ReleaseManifest {
         self.start_menu_name.as_ref()
     }
 
+    /// Returns the signed product launcher when this release declares version 1.4.
+    #[must_use]
+    pub fn product_launcher(&self) -> Option<&ProductLauncher> {
+        self.product_launcher.as_ref()
+    }
+
     /// Returns the signed embedded-payload descriptor.
     #[must_use]
     pub const fn payload(&self) -> PayloadDescriptor {
@@ -318,6 +291,7 @@ impl std::fmt::Debug for ReleaseManifest {
             .field("update_catalogue", &self.update_catalogue)
             .field("product_metadata", &self.product_metadata)
             .field("start_menu_name", &self.start_menu_name)
+            .field("product_launcher", &self.product_launcher)
             .field("payload", &self.payload)
             .finish()
     }
@@ -342,11 +316,11 @@ fn parse_package_version(
     fields: &BTreeMap<String, JsonValue>,
 ) -> Result<PackageVersion, ReleaseManifestError> {
     exact_fields(fields, &["major", "minor", "patch"])?;
-    Ok(PackageVersion {
-        major: required_u16(fields, "major")?,
-        minor: required_u16(fields, "minor")?,
-        patch: required_u16(fields, "patch")?,
-    })
+    Ok(PackageVersion::new(
+        required_u16(fields, "major")?,
+        required_u16(fields, "minor")?,
+        required_u16(fields, "patch")?,
+    ))
 }
 
 fn parse_executable(

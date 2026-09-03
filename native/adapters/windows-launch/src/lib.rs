@@ -10,7 +10,7 @@
 
 mod raw;
 
-use std::{fmt, io};
+use std::{fmt, fs, io, path::Path};
 
 use anodrel_application::InstalledApplicationError;
 use anodrel_bootstrap::BootstrapInvitation;
@@ -60,6 +60,37 @@ pub fn launch_registered_application(
 /// Call this from a worker, never the Win32 UI thread.
 pub fn verify_registered_application(application_id: &str) -> Result<(), LaunchError> {
     verify_locked_executable(application_id).map(|_| ())
+}
+
+/// Verifies that the current host process is the selected product launcher.
+///
+/// This must run before the host creates a product window. It compares the
+/// caller's canonical executable path with selected policy, then locks,
+/// rehashes, and Authenticode-verifies that launcher. It does not start a
+/// child, create a bootstrap record, or expose a process path to an
+/// application.
+pub fn verify_registered_product_launcher(
+    application_id: &str,
+    current_process: &Path,
+) -> Result<(), LaunchError> {
+    let installed = load_installed_application(application_id).map_err(LaunchError::Policy)?;
+    let launcher_path = installed
+        .product_launcher_path()
+        .ok_or(LaunchError::ProductLauncherUnavailable)?;
+    let current_path = fs::canonicalize(current_process).map_err(LaunchError::Io)?;
+    if current_path != launcher_path {
+        return Err(LaunchError::ProductLauncherMismatch);
+    }
+    let mut launcher = raw::lock_executable(launcher_path).map_err(LaunchError::Io)?;
+    let locked_path = launcher.path().to_path_buf();
+    installed
+        .revalidate_product_launcher(&locked_path, &mut launcher)
+        .map_err(LaunchError::Record)?;
+    let signer = verify_embedded_signature(&locked_path).map_err(LaunchError::Signature)?;
+    if !installed.matches_publisher(signer.as_bytes()) {
+        return Err(LaunchError::PublisherMismatch);
+    }
+    Ok(())
 }
 
 /// One executable that passed every pre-launch check, with its lock still held.
@@ -127,6 +158,8 @@ pub enum LaunchError {
     Record(InstalledApplicationError),
     Signature(SignatureError),
     PublisherMismatch,
+    ProductLauncherUnavailable,
+    ProductLauncherMismatch,
     InvalidExecutablePath,
     Command(CommandError),
     Bootstrap(BootstrapLaunchError),
@@ -140,6 +173,12 @@ impl fmt::Display for LaunchError {
             Self::Record(_) => "registered application executable did not revalidate",
             Self::Signature(_) => "registered application signature did not verify",
             Self::PublisherMismatch => "registered application publisher is not approved",
+            Self::ProductLauncherUnavailable => {
+                "registered application does not declare a product launcher"
+            }
+            Self::ProductLauncherMismatch => {
+                "current product launcher does not match registered policy"
+            }
             Self::InvalidExecutablePath => "registered application executable path is invalid",
             Self::Command(_) => "registered application launch command is invalid",
             Self::Bootstrap(_) => "registered application bootstrap launch failed",
@@ -157,7 +196,10 @@ impl std::error::Error for LaunchError {
             Self::Signature(error) => Some(error),
             Self::Command(error) => Some(error),
             Self::Bootstrap(error) => Some(error),
-            Self::PublisherMismatch | Self::InvalidExecutablePath => None,
+            Self::PublisherMismatch
+            | Self::ProductLauncherUnavailable
+            | Self::ProductLauncherMismatch
+            | Self::InvalidExecutablePath => None,
         }
     }
 }
@@ -166,7 +208,7 @@ impl std::error::Error for LaunchError {
 mod tests {
     use anodrel_windows_policy::PolicyStoreError;
 
-    use super::{LaunchError, verify_registered_application};
+    use super::{LaunchError, verify_registered_application, verify_registered_product_launcher};
 
     #[test]
     fn verification_rejects_an_invalid_identity_before_reading_machine_policy() {
@@ -192,5 +234,13 @@ mod tests {
         // name a path, certificate, digest, or Windows status.
         let message = LaunchError::PublisherMismatch.to_string();
         assert_eq!(message, "registered application publisher is not approved");
+    }
+
+    #[test]
+    fn product_launcher_verification_rejects_an_invalid_identity_before_reading_policy() {
+        assert!(matches!(
+            verify_registered_product_launcher("org.anodrel/escape", std::path::Path::new("x")),
+            Err(LaunchError::Policy(PolicyStoreError::InvalidApplicationId))
+        ));
     }
 }

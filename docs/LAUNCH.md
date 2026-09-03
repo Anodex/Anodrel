@@ -50,7 +50,8 @@ by Decision 0099. Version 1.15 adds `dialog.open_folder`; 1.16 adds
 required private `updateCatalogue` source. Version 1.21 retains that source and
 adds required signed `product` display metadata for later host-owned Windows
 registration. Version 1.22 strictly extends it with a signed Windows-safe
-Start-menu filename.
+Start-menu filename. Version 1.23 adds a verified Windows product-launcher
+descriptor.
 Unknown, missing, duplicate, and wrongly typed fields are rejected.
 
 ~~~json
@@ -71,7 +72,7 @@ Unknown, missing, duplicate, and wrongly typed fields are rejected.
 
 | Field | Rule |
 | --- | --- |
-| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing; every later supported minor requires `capabilities`; 1.20 requires `updateCatalogue`; 1.21 additionally requires `product`; 1.22 requires the product's `startMenuName`. |
+| `recordVersion` | Object with numeric `major: 1`; minor `0` grants nothing; every later supported minor requires `capabilities`; 1.20 requires `updateCatalogue`; 1.21 additionally requires `product`; 1.22 requires the product's `startMenuName`; 1.23 also requires `launcher`. |
 | `applicationId` | Uses the same 3â€“128 character identity grammar as the validated package manifest and exactly equals its `applicationId`. |
 | `packageRoot` | Absolute local directory path. Its canonical value is private host data and is never rendered. |
 | `executable.path` | Relative forward-slash-separated package path. It cannot contain roots, drives, `.` or `..`, or backslashes, and must end in `.exe` (case-insensitive). The canonical result remains inside `packageRoot`. |
@@ -80,7 +81,8 @@ Unknown, missing, duplicate, and wrongly typed fields are rejected.
 | `capabilities` | Required in 1.1 and later. Exact non-duplicate supported grants selected by machine policy. 1.1 supports `diagnostics.read`, `ui.document.write`, `ui.events.read`, `session.close`, `clipboard.read`, `clipboard.write`, and `external.open`; 1.2 additionally supports `dialog.open_file`, `dialog.save_file`, `file.read_text`, `storage.state.read`, `storage.state.replace`, `storage.state.clear`, `credential.read`, `credential.write`, and `credential.delete`; 1.3 adds `notification.show`; 1.4 adds `window.title`; 1.5 adds `ui.fields.read`; 1.6 adds `window.state`; 1.7 adds `file.write_text`; 1.8 adds `menu.write`; 1.9 adds `window.focus`; 1.10 adds `window.fullscreen`; 1.11 adds `file.write_binary`; 1.12 adds `window.size`; 1.13 adds `window.open` plus `window.close`; 1.14 adds `network.fetch`; 1.15 adds `dialog.open_folder`; 1.16 adds `folder.read_entries`; 1.17 adds `window.state.read`; 1.18 adds `window.state.observe`; and 1.19 adds `menu.context.write`. Each version is a strict superset of the one before, and naming a later version's grant in an earlier record is invalid. |
 | `networkOrigins` | Required in 1.14 and later. An array of zero through eight exact `{ "host", "port" }` objects. Each host is a valid canonicalizable DNS hostname and each port is an integer from 1 through 65,535. Entries must be unique after host canonicalization. The array must contain one through eight values exactly when `capabilities` contains `network.fetch`; otherwise it must be empty. It is machine-policy data and never a protocol, renderer, or application-configuration value. |
 | `updateCatalogue` | Required in 1.20 and later. One exact signed-release update source, private to the native updater and unrelated to application network authority. |
-| `product` | Required in 1.21. Exact signed `displayName` and `publisherName` values are for a future Windows product surface only. Record 1.22 additionally requires the separately signed, Windows-safe `startMenuName` filename for its one future Start-menu link. None is application protocol or authority. See [product registration](PRODUCT_REGISTRATION.md). |
+| `product` | Required in 1.21. Exact signed `displayName` and `publisherName` values are for a future Windows product surface only. Record 1.22 additionally requires the separately signed, Windows-safe `startMenuName` filename. None is application protocol or authority. See [product registration](PRODUCT_REGISTRATION.md). |
+| `launcher` | Required in 1.23. A distinct contained Anodrel Windows host `.exe` path plus its lowercase SHA-256 digest. It is private native-host composition data, never an application command, executable selector, or protocol field. Only this descriptor makes the signed Start-menu name eligible for one link. See [product launcher](PRODUCT_LAUNCHER.md). |
 
 The package root must contain `anodrel.application.json`. The parser loads it
 with normal containment and content-digest checks before accepting the record's
@@ -167,7 +169,8 @@ Version 1.0 remains a no-grants migration format; version 1.1 accepts only its
 original machine-policy grants, version 1.2 accepts the documented later grant
 set, version 1.3 adds `notification.show`, version 1.14 adds the
 `network.fetch`/`networkOrigins` pair, version 1.20 adds the private update
-source, and version 1.21 adds signed display metadata. Each version fails
+source, version 1.21 adds signed display metadata, version 1.22 adds a signed
+Start-menu name, and version 1.23 adds the verified product launcher. Each version fails
 closed for unknown values, and for any grant or policy field a later version
 introduced.
 
@@ -244,3 +247,20 @@ strict installed application record
 
 See `docs/SIGNING.md`, `docs/APPLICATIONS.md`, and Decisions 0018 through
 0023.
+
+## Windows product-launch sequence
+
+A normal installed product does not launch the selected child from Explorer.
+For record 1.23, the fixed all-users Start-menu link targets the selected
+launcher and passes only generated `--product-launch <applicationId>`. Before
+it presents a product window, that route compares its own canonical executable
+path with selected policy, locks and rehashes the launcher, and verifies its
+Authenticode publisher. It then enters the existing coordinator above, which
+independently performs the locked child launch sequence.
+
+The launcher self-check detects a stale or incorrectly targeted link. It is
+not a substitute for executable trust before process start: that boundary is
+the signed installer deployment into the machine-owned Program Files hierarchy
+and Windows' normal executable trust controls. Records through 1.22 have no
+launcher and therefore do not create a Start-menu link. See
+[product launcher](PRODUCT_LAUNCHER.md) and Decision 0187.

@@ -1,9 +1,9 @@
 # Windows product-registration foundation
 
-**Status:** Installed-record versions 1.21 and 1.22 are implemented, including
-the separately signed Start-menu name. The direct Start-menu writer and its
-post-policy installer composition are implemented; Apps & features remains
-separate work.
+**Status:** Installed-record versions 1.21 through 1.23 are implemented,
+including the separately signed Start-menu name and product launcher. The
+direct Start-menu writer and its post-policy installer composition are
+implemented; Apps & features remains separate work.
 
 ## Purpose
 
@@ -30,7 +30,20 @@ grammar exactly. The installer renders them only from a signed release-manifest
 v1.2. The installed-record parser validates them before it returns a selected
 application. Version 1.20 and earlier records remain exact and contain no
 product object. Version 1.22 strictly extends 1.21 with its signed Windows-safe
-`startMenuName`; only that version may later create the one Start-menu link.
+`startMenuName`. Version 1.23 requires a separate signed launcher descriptor:
+
+~~~json
+"launcher": {
+  "path": "bin/anodrel-windows-host.exe",
+  "sha256": "64 lowercase hexadecimal characters"
+}
+~~~
+
+The launcher is a distinct contained host executable. The installer derives
+its digest from the checked release bundle, validates it with the selected
+package, and requires its Authenticode publisher to match the release before
+promotion. Only record 1.23 can create the one Start-menu link; older records
+do not target the authenticated child directly. See [product launcher](PRODUCT_LAUNCHER.md).
 
 ## Boundaries
 
@@ -42,8 +55,8 @@ executable selection remain derived from the validated application identity and
 record, never these display strings.
 
 The installer and host must re-read the selected record for a product-surface
-change. Update and rollback therefore select both the executable target and its
-signed display facts atomically through existing machine-policy publication.
+change. Update and rollback therefore select the child, launcher, and signed
+display facts atomically through existing machine-policy publication.
 The Start-menu link is then synchronized as a separate post-policy step; it
 cannot replace, roll back, or otherwise change that selected policy.
 
@@ -54,4 +67,4 @@ association, define an Application User Model ID, or allow applications to read
 or edit registration.
 
 See [installed application records](LAUNCH.md), [signed product display metadata](PRODUCT_METADATA.md),
-and Decision 0182.
+and Decisions 0182 and 0187.

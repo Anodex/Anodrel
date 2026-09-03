@@ -25,6 +25,8 @@ pub enum ReleaseManifestAuthorError {
     ApplicationContentInvalid,
     /// The release-plan executable did not name one bundle entry.
     ExecutableUnavailable,
+    /// The planned product launcher did not name one checked bundle entry.
+    LauncherUnavailable,
     /// The derived final manifest did not meet the owned release contract.
     ManifestInvalid(ReleaseManifestError),
     /// The checked final manifest did not match the source bundle bytes.
@@ -56,6 +58,9 @@ impl fmt::Display for ReleaseManifestAuthorError {
             Self::ExecutableUnavailable => {
                 "the planned executable is unavailable in the release bundle"
             }
+            Self::LauncherUnavailable => {
+                "the planned product launcher is unavailable in the release bundle"
+            }
             Self::ManifestInvalid(_) => "the derived release manifest is invalid",
             Self::PayloadInvalid(_) => "the derived release payload is invalid",
             Self::OutputInvalid => "the release manifest output path is invalid",
@@ -80,6 +85,7 @@ impl std::error::Error for ReleaseManifestAuthorError {
             | Self::ApplicationManifestUnavailable
             | Self::ApplicationContentInvalid
             | Self::ExecutableUnavailable
+            | Self::LauncherUnavailable
             | Self::OutputInvalid
             | Self::OutputAlreadyExists
             | Self::OutputCreationFailed

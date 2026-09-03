@@ -51,8 +51,9 @@ The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only
 the exact fields below. Version 1.1 adds exactly one `updateCatalogue` field.
 Version 1.2 adds signed product display metadata while retaining that catalogue
 field. Version 1.3 adds the separately signed Windows-safe `startMenuName` to
-that product metadata. Unknown, missing, duplicate, or wrongly typed fields are
-rejected.
+that product metadata. Version 1.4 adds a distinct signed product-launcher
+path; the release author derives its digest from the checked bundle. Unknown,
+missing, duplicate, or wrongly typed fields are rejected.
 
 ~~~json
 {
@@ -77,16 +78,17 @@ rejected.
 
 | Field | Rule |
 | --- | --- |
-| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }`, 1.1, 1.2, or 1.3. Versions 1.1 through 1.3 require `updateCatalogue`; 1.2 requires `product`; 1.3 requires `product` with `startMenuName`; version 1.0 has no discovery authority. |
+| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }` through 1.4. Versions 1.1 through 1.4 require `updateCatalogue`; 1.2 requires `product`; 1.3 requires `product` with `startMenuName`; 1.4 additionally requires `launcher`; version 1.0 has no discovery authority. |
 | `applicationId` | Existing 3–128 character Anodrel application identity. |
 | `packageVersion` | Three non-negative integers from 0 through 65,535; it identifies a staged release directory and is not protocol compatibility. |
 | `executable.path` | Relative, forward-slash-separated contained `.exe` path; no roots, drives, `.` or `..`. |
 | `executable.sha256` | Lowercase SHA-256 of the extracted executable. |
 | `publisher.leafCertificateSha256` | Lowercase SHA-256 leaf fingerprint the installer and extracted executable must both match. |
-| `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19, 1.20, 1.21, or 1.22 machine record, then asks the existing validator to accept it. |
+| `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19 through 1.23 machine record, then asks the existing validator to accept it. |
 | `networkOrigins` | Exact host/port policy. It is empty unless `capabilities` includes `network.fetch`; the existing installed-record validator is authoritative. |
-| `updateCatalogue` | Versions 1.1 through 1.3: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
-| `product` | Versions 1.2 and 1.3: signed `displayName` and `publisherName` for host-owned Windows product surfaces; version 1.3 additionally requires the Windows-safe `startMenuName`. None are a path, policy key, identity, or certificate selector. See [signed product display metadata](PRODUCT_METADATA.md). |
+| `updateCatalogue` | Versions 1.1 through 1.4: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
+| `product` | Versions 1.2 through 1.4: signed `displayName` and `publisherName` for host-owned Windows product surfaces; version 1.3 additionally requires the Windows-safe `startMenuName`. None are a path, policy key, identity, or certificate selector. See [signed product display metadata](PRODUCT_METADATA.md). |
+| `launcher` | Version 1.4: one distinct contained Anodrel Windows host `.exe` path and a digest derived from checked bundle bytes. The installer validates its path and digest with the package and requires its Authenticode publisher to match before promotion. It is not an application-selected command. See [product launcher](PRODUCT_LAUNCHER.md). |
 | `payload` | Exact uncompressed byte length, at least 1 and at most 512 MiB, plus a lowercase SHA-256 digest. |
 
 The manifest contains no filesystem root, command line, registry location,
@@ -100,12 +102,12 @@ location and it enters the fixed machine record only through installer gates.
 foundation. It bounds and parses one release manifest, validates its executable
 and payload descriptors, then requires the complete payload to match before its
 owned per-file bundle decoder runs. It canonicalizes permitted network origins
-and renders version 1.19, 1.20, 1.21, or 1.22 installed-record policy for later
+and renders version 1.19 through 1.23 installed-record policy for later
 host-side validation. Version 1.20 retains the signed release's optional strict
 catalogue source, not an application-provided or arbitrary download route;
-version 1.21 additionally retains signed product display metadata, and version
-1.22 adds the separately signed Start-menu name for the fixed host-owned Windows
-surface. The direct Windows resource reader selects only the two fixed
+version 1.21 additionally retains signed product display metadata, version
+1.22 adds the separately signed Start-menu name, and version 1.23 retains the
+distinct signed product launcher for the fixed host-owned Windows surface. The direct Windows resource reader selects only the two fixed
 current-image resources and fails closed when they are absent. Its contract tests
 prove that the rendered record passes the same `anodrel-application` validator
 the Windows host reads. The activation gate now asks Windows to verify the
@@ -114,7 +116,7 @@ test image through the real Authenticode path.
 
 The library can then stage only a checked release under an installer-owned
 parent, revalidate its package and rendered record, and call Windows
-Authenticode for the staged executable before it is promotion-ready. An unsigned
+Authenticode for the staged executable and, when declared, product launcher before it is promotion-ready. An unsigned
 staged executable fails closed in the direct test; the matching-signer positive
 path remains an operator fixture until a signed resource-bearing installer and
 application are available.
@@ -149,14 +151,14 @@ reserved path characters, and overlong output paths, then creates a new regular
 file. It syncs and rehashes that file before continuing. Existing files,
 directories, links, and registry values are never reused as staging input.
 
-After every bundle file is present, the installer renders the version-1.19,
-1.20, or 1.21 record for the staging root and runs the existing
+After every bundle file is present, the installer renders the version-1.19
+through 1.23 record for the staging root and runs the existing
 installed-record validator.
 That independently checks the application manifest, content digest, executable
 containment, executable digest, application identity, capabilities, and network
-policy. The signer gate then verifies the staged executable through Windows
-Authenticode and compares its opaque accepted leaf fingerprint to the same
-embedded publisher value before it becomes promotion-ready. Atomic promotion,
+policy. The signer gate then verifies the staged executable and any declared
+launcher through Windows Authenticode and compares each opaque accepted leaf
+fingerprint to the same embedded publisher value before it becomes promotion-ready. Atomic promotion,
 registry publication, recovery, and uninstall remain separate.
 
 ## Promotion contract
@@ -313,7 +315,7 @@ host's only policy source.
    and reject any file outside the destination tree.
 3. Check the extracted application package, executable path, executable digest,
    and executable Authenticode fingerprint. It must match the installer.
-4. Compose the proposed version-1.19, 1.20, 1.21, or 1.22 installed record and validate it through
+4. Compose the proposed version-1.19 through 1.23 installed record and validate it through
    `anodrel-application` before any registry write.
 5. Rename the verified staging directory to its version directory, atomically
    publish the one registry `record` value, and retain the prior complete

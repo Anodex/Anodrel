@@ -24,6 +24,7 @@ use crate::{
 
 const PACKAGE_MANIFEST_NAME: &str = "anodrel.application.json";
 
+mod launcher;
 mod product;
 mod record;
 mod start_menu_name;
@@ -66,6 +67,7 @@ pub struct InstalledApplication {
     update_catalogue: Option<UpdateCatalogueLocation>,
     product_metadata: Option<ProductDisplayMetadata>,
     start_menu_name: Option<StartMenuName>,
+    product_launcher: Option<launcher::ProductLauncher>,
 }
 
 impl InstalledApplication {
@@ -191,6 +193,34 @@ impl InstalledApplication {
         self.start_menu_name.as_ref()
     }
 
+    /// Returns the selected product launcher for private Windows host composition.
+    ///
+    /// This never reaches an application protocol response or general process
+    /// interface. A record without version 1.23 product-launch data returns no
+    /// launcher and cannot become a Start-menu target.
+    #[must_use]
+    pub fn product_launcher_path(&self) -> Option<&Path> {
+        self.product_launcher
+            .as_ref()
+            .map(launcher::ProductLauncher::path)
+    }
+
+    /// Rechecks the selected product launcher through a caller-held file lock.
+    ///
+    /// The caller must compare the resulting canonical path with its current
+    /// executable before it creates a product window. This is private host
+    /// composition, not an application process API.
+    pub fn revalidate_product_launcher<R: Read>(
+        &self,
+        path: &Path,
+        reader: &mut R,
+    ) -> Result<(), InstalledApplicationError> {
+        self.product_launcher
+            .as_ref()
+            .ok_or(InstalledApplicationError::ProductLauncherUnavailable)?
+            .revalidate(path, reader)
+    }
+
     /// Rechecks an executable path and hashes bytes read from a caller-held
     /// file handle against this record's expected digest.
     ///
@@ -257,6 +287,12 @@ fn validate_record(
     if actual_digest != record.executable_digest {
         return Err(InstalledApplicationError::ExecutableDigestMismatch);
     }
+    let product_launcher = record
+        .product_launcher
+        .map(|(path, digest)| {
+            launcher::ProductLauncher::from_record(&package_root, &executable_path, &path, digest)
+        })
+        .transpose()?;
 
     Ok(InstalledApplication {
         identity: package.identity().clone(),
@@ -269,6 +305,7 @@ fn validate_record(
         update_catalogue: record.update_catalogue,
         product_metadata: record.product_metadata,
         start_menu_name: record.start_menu_name,
+        product_launcher,
     })
 }
 
@@ -291,6 +328,10 @@ pub enum InstalledApplicationError {
     ExecutableNotFile,
     ExecutableTooLarge,
     ExecutableDigestMismatch,
+    ProductLauncherUnavailable,
+    ProductLauncherMatchesApplication,
+    ProductLauncherPathChanged,
+    ProductLauncherDigestMismatch,
 }
 
 impl fmt::Display for InstalledApplicationError {
@@ -321,6 +362,18 @@ impl fmt::Display for InstalledApplicationError {
             Self::ExecutableTooLarge => "installed application executable exceeds its limit",
             Self::ExecutableDigestMismatch => {
                 "installed application executable digest does not match"
+            }
+            Self::ProductLauncherUnavailable => {
+                "installed application does not declare a product launcher"
+            }
+            Self::ProductLauncherMatchesApplication => {
+                "installed application product launcher is not distinct"
+            }
+            Self::ProductLauncherPathChanged => {
+                "installed application product launcher changed after policy validation"
+            }
+            Self::ProductLauncherDigestMismatch => {
+                "installed application product launcher digest does not match"
             }
         };
         formatter.write_str(message)
@@ -455,6 +508,7 @@ fn validate_version(
         (1, 20) => Ok(record::RecordVersion::V1_20),
         (1, 21) => Ok(record::RecordVersion::V1_21),
         (1, 22) => Ok(record::RecordVersion::V1_22),
+        (1, 23) => Ok(record::RecordVersion::V1_23),
         _ => Err(InstalledApplicationError::InvalidRecord),
     }
 }

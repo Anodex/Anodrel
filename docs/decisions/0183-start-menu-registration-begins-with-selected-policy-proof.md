@@ -4,6 +4,9 @@
 
 **Date:** 2026-09-02
 
+**Superseded in part:** Decision 0187 replaces the later writer's direct-child
+target with a separately verified Anodrel product launcher.
+
 ## Context
 
 A Windows Start-menu link is a product-facing launch surface. A path held by an
