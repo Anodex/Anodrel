@@ -22,6 +22,9 @@ mod revision;
 mod service;
 mod session;
 mod shortcut;
+mod tray;
+mod tray_mailbox;
+mod tray_service;
 
 pub use context::{ContextMenuModel, MAX_CONTEXT_MENU_ITEMS};
 pub use context_mailbox::{CONTEXT_MENU_RESPONSE_TIMEOUT, ContextMenuMailbox, ContextMenuRequest};
@@ -40,3 +43,6 @@ pub use revision::MenuRevision;
 pub use service::{MenuService, MenuServiceError, UnavailableMenuService};
 pub use session::{MenuActionEvent, MenuSession};
 pub use shortcut::MenuShortcut;
+pub use tray::{TrayActionEvent, TrayRevision, TraySession};
+pub use tray_mailbox::{TRAY_RESPONSE_TIMEOUT, TrayMailbox, TrayRequest};
+pub use tray_service::{TrayService, TrayServiceError, UnavailableTrayService};
