@@ -1,8 +1,8 @@
 # Windows product-registration foundation
 
 **Status:** Installed-record versions 1.21 and 1.22 are implemented, including
-the separately signed Start-menu name. The direct Start-menu writer is
-implemented; automatic installer composition and Apps & features remain
+the separately signed Start-menu name. The direct Start-menu writer and its
+post-policy installer composition are implemented; Apps & features remains
 separate work.
 
 ## Purpose
@@ -44,13 +44,14 @@ record, never these display strings.
 The installer and host must re-read the selected record for a product-surface
 change. Update and rollback therefore select both the executable target and its
 signed display facts atomically through existing machine-policy publication.
+The Start-menu link is then synchronized as a separate post-policy step; it
+cannot replace, roll back, or otherwise change that selected policy.
 
 ## Exclusions
 
-This does not automatically refresh a Start-menu shortcut after a policy
-transaction, write an Apps & features entry, copy an uninstaller, add a file
-association, define an Application User Model ID, or allow applications to
-read or edit registration.
+This does not write an Apps & features entry, copy an uninstaller, add a file
+association, define an Application User Model ID, or allow applications to read
+or edit registration.
 
 See [installed application records](LAUNCH.md), [signed product display metadata](PRODUCT_METADATA.md),
 and Decision 0182.

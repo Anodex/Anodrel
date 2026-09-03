@@ -8,9 +8,13 @@ use anodrel_windows_policy::{
 use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 
 use crate::machine_root::existing_machine_application_root;
+use crate::product_shortcut::{
+    capture_current_product_shortcut, synchronize_current_product_shortcut,
+};
 use crate::publication::restore_previous_record;
 use crate::{
-    MachineRootError, PackageVersion, RollbackPublicationError, SignedReleaseError,
+    MachineRootError, PackageVersion, ProductShortcutPreflightError,
+    ProductShortcutRegistrationError, RollbackPublicationError, SignedReleaseError,
     verify_current_signed_release,
 };
 
@@ -140,6 +144,10 @@ pub enum RollbackCurrentError {
     PreflightInvalid(RollbackPreflightError),
     /// The retained prior record could not become the fixed selected record.
     PublicationFailed(RollbackPublicationError),
+    /// The current product link could not be proved before policy changed.
+    PriorProductShortcutInvalid(ProductShortcutPreflightError),
+    /// Policy selected the prior release, but its fixed Start-menu link is incomplete.
+    ProductShortcutRegistrationFailed(ProductShortcutRegistrationError),
 }
 
 impl fmt::Display for RollbackCurrentError {
@@ -149,6 +157,11 @@ impl fmt::Display for RollbackCurrentError {
             Self::PublicationFailed(_) => {
                 formatter.write_str("the rollback policy could not be selected")
             }
+            Self::PriorProductShortcutInvalid(_) => {
+                formatter.write_str("the current Start-menu registration state is invalid")
+            }
+            Self::ProductShortcutRegistrationFailed(_) => formatter
+                .write_str("the rollback was selected but Start-menu registration is incomplete"),
         }
     }
 }
@@ -158,6 +171,8 @@ impl std::error::Error for RollbackCurrentError {
         match self {
             Self::PreflightInvalid(error) => Some(error),
             Self::PublicationFailed(error) => Some(error),
+            Self::PriorProductShortcutInvalid(error) => Some(error),
+            Self::ProductShortcutRegistrationFailed(error) => Some(error),
         }
     }
 }
@@ -205,8 +220,12 @@ pub fn verify_current_rollback_target() -> Result<VerifiedRollbackTarget, Rollba
 pub fn rollback_current_signed_release() -> Result<RolledBackRelease, RollbackCurrentError> {
     let target =
         verify_current_rollback_target().map_err(RollbackCurrentError::PreflightInvalid)?;
+    let prior = capture_current_product_shortcut()
+        .map_err(RollbackCurrentError::PriorProductShortcutInvalid)?;
     restore_previous_record(target.application_id())
         .map_err(RollbackCurrentError::PublicationFailed)?;
+    synchronize_current_product_shortcut(prior)
+        .map_err(RollbackCurrentError::ProductShortcutRegistrationFailed)?;
     Ok(RolledBackRelease { target })
 }
 

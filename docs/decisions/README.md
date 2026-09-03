@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0186: Product shortcuts follow completed policy transitions.
+
 - 0185: Start-menu registration is an all-users atomic Shell Link.
 
 - 0184: Start-menu names are separately signed file components.

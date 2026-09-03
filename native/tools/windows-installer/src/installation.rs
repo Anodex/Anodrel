@@ -5,10 +5,11 @@ use std::fmt;
 use anodrel_windows_policy::{PolicyStoreError, load_installed_application};
 
 use crate::machine_root::current_machine_application_root;
+use crate::product_shortcut::{PriorProductShortcut, synchronize_current_product_shortcut};
 use crate::{
-    MachineRootError, PreparedReleaseError, PromotionError, PublicationError, SignedReleaseError,
-    prepare_current_signed_release, promote_prepared_release, publish_promoted_release,
-    verify_current_signed_release,
+    MachineRootError, PreparedReleaseError, ProductShortcutRegistrationError, PromotionError,
+    PublicationError, SignedReleaseError, prepare_current_signed_release, promote_prepared_release,
+    publish_promoted_release, verify_current_signed_release,
 };
 
 /// A release selected by the fixed machine policy through this installation transaction.
@@ -42,6 +43,8 @@ pub enum InstallCurrentError {
     PromotionFailed(PromotionError),
     /// The promoted record could not become the fixed selected machine policy.
     PublicationFailed(PublicationError),
+    /// Policy selected the release, but its fixed Start-menu link is incomplete.
+    ProductShortcutRegistrationFailed(ProductShortcutRegistrationError),
 }
 
 impl fmt::Display for InstallCurrentError {
@@ -58,6 +61,9 @@ impl fmt::Display for InstallCurrentError {
             Self::PreparationFailed(_) => "the signed release could not be prepared",
             Self::PromotionFailed(_) => "the signed release could not be promoted",
             Self::PublicationFailed(_) => "the signed release could not be selected",
+            Self::ProductShortcutRegistrationFailed(_) => {
+                "the release was selected but Start-menu registration is incomplete"
+            }
         };
         formatter.write_str(message)
     }
@@ -73,6 +79,7 @@ impl std::error::Error for InstallCurrentError {
             Self::PreparationFailed(error) => Some(error),
             Self::PromotionFailed(error) => Some(error),
             Self::PublicationFailed(error) => Some(error),
+            Self::ProductShortcutRegistrationFailed(error) => Some(error),
         }
     }
 }
@@ -98,6 +105,8 @@ pub fn install_current_signed_release() -> Result<InstalledRelease, InstallCurre
         promote_prepared_release(prepared).map_err(InstallCurrentError::PromotionFailed)?;
     let published =
         publish_promoted_release(promoted).map_err(InstallCurrentError::PublicationFailed)?;
+    synchronize_current_product_shortcut(PriorProductShortcut::none())
+        .map_err(InstallCurrentError::ProductShortcutRegistrationFailed)?;
     Ok(InstalledRelease { published })
 }
 

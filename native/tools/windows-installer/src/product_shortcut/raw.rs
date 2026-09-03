@@ -46,6 +46,8 @@ pub(super) enum ShortcutWriteError {
     LinkSaveFailed,
     /// Windows did not replace the existing fixed Shell Link.
     LinkReplacementFailed,
+    /// Windows did not remove the fixed Shell Link.
+    LinkRemovalFailed,
 }
 
 #[repr(C)]
@@ -114,6 +116,20 @@ pub(super) fn replace_common_programs_shortcut(
     replace_link(executable_path, package_root, &link_path)
 }
 
+/// Removes one fixed all-users Start-menu link using already verified data.
+pub(super) fn remove_common_programs_shortcut(
+    start_menu_name: &StartMenuName,
+) -> Result<(), ShortcutWriteError> {
+    let common_programs = common_programs_directory()?;
+    verify_normal_directory(&common_programs)?;
+    let anodrel_directory = common_programs.join("Anodrel");
+    if !existing_normal_directory(&anodrel_directory)? {
+        return Ok(());
+    }
+    let link_path = anodrel_directory.join(format!("{}.lnk", start_menu_name.as_str()));
+    remove_regular_link(&link_path)
+}
+
 fn common_programs_directory() -> Result<PathBuf, ShortcutWriteError> {
     let mut raw_path = ptr::null_mut();
     // SAFETY: the fixed folder ID, null token, and writable output slot follow
@@ -155,6 +171,21 @@ fn replace_link(
     temporary.replace(link_path)
 }
 
+fn remove_regular_link(link_path: &Path) -> Result<(), ShortcutWriteError> {
+    let Some(attributes) = existing_attributes(link_path)? else {
+        return Ok(());
+    };
+    if attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
+        return Err(ShortcutWriteError::PathInvalid);
+    }
+    let path = wide_path(link_path)?;
+    // SAFETY: the fixed signed link path names an existing regular file under
+    // the verified Common Programs Anodrel directory.
+    (unsafe { DeleteFileW(path.as_ptr()) } != 0)
+        .then_some(())
+        .ok_or(ShortcutWriteError::LinkRemovalFailed)
+}
+
 fn verify_normal_file(path: &Path) -> Result<(), ShortcutWriteError> {
     let attributes = attributes(path)?;
     (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT) == 0)
@@ -170,22 +201,39 @@ fn verify_normal_directory(path: &Path) -> Result<(), ShortcutWriteError> {
         .ok_or(ShortcutWriteError::PathInvalid)
 }
 
+fn existing_normal_directory(path: &Path) -> Result<bool, ShortcutWriteError> {
+    let Some(attributes) = existing_attributes(path)? else {
+        return Ok(false);
+    };
+    (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)
+        == FILE_ATTRIBUTE_DIRECTORY)
+        .then_some(true)
+        .ok_or(ShortcutWriteError::PathInvalid)
+}
+
 fn verify_absent_or_regular_file(path: &Path) -> Result<(), ShortcutWriteError> {
-    let path = wide_path(path)?;
-    // SAFETY: the path remains NUL terminated for this read-only Windows call.
-    let attributes = unsafe { GetFileAttributesW(path.as_ptr()) };
-    if attributes == INVALID_FILE_ATTRIBUTES {
-        // SAFETY: this obtains the result from the immediately preceding call.
-        return matches!(
-            unsafe { GetLastError() },
-            ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND
-        )
-        .then_some(())
-        .ok_or(ShortcutWriteError::PathInvalid);
-    }
+    let Some(attributes) = existing_attributes(path)? else {
+        return Ok(());
+    };
     (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT) == 0)
         .then_some(())
         .ok_or(ShortcutWriteError::PathInvalid)
+}
+
+fn existing_attributes(path: &Path) -> Result<Option<u32>, ShortcutWriteError> {
+    let path = wide_path(path)?;
+    // SAFETY: the path remains NUL terminated for this read-only Windows call.
+    let attributes = unsafe { GetFileAttributesW(path.as_ptr()) };
+    if attributes != INVALID_FILE_ATTRIBUTES {
+        return Ok(Some(attributes));
+    }
+    // SAFETY: this obtains the result from the immediately preceding call.
+    matches!(
+        unsafe { GetLastError() },
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND
+    )
+    .then_some(None)
+    .ok_or(ShortcutWriteError::PathInvalid)
 }
 
 fn attributes(path: &Path) -> Result<u32, ShortcutWriteError> {

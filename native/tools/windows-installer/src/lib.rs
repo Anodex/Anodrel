@@ -63,8 +63,8 @@ pub use prepared::{PreparedRelease, PreparedReleaseError, prepare_current_signed
 #[cfg(windows)]
 pub use product_shortcut::{
     ProductShortcutPreflightError, ProductShortcutRegistrationError, RegisteredProductShortcut,
-    VerifiedProductShortcutTarget, refresh_current_product_shortcut,
-    verify_current_product_shortcut_target,
+    RemovedProductShortcut, VerifiedProductShortcutTarget, refresh_current_product_shortcut,
+    remove_current_product_shortcut, verify_current_product_shortcut_target,
 };
 #[cfg(windows)]
 pub use promotion::{PromotedRelease, PromotionError, promote_prepared_release};

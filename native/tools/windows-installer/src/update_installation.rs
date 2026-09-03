@@ -4,10 +4,13 @@ use std::fmt;
 
 use crate::machine_root::current_machine_application_root;
 use crate::prepared::prepare_verified_signed_release;
+use crate::product_shortcut::{
+    capture_current_product_shortcut, synchronize_current_product_shortcut,
+};
 use crate::{
-    MachineRootError, PreparedReleaseError, PromotionError, SignedReleaseError,
-    UpdatePreflightError, UpdatePublicationError, verify_current_signed_release,
-    verify_current_update_candidate,
+    MachineRootError, PreparedReleaseError, ProductShortcutPreflightError,
+    ProductShortcutRegistrationError, PromotionError, SignedReleaseError, UpdatePreflightError,
+    UpdatePublicationError, verify_current_signed_release, verify_current_update_candidate,
 };
 
 /// A new release selected by the fixed machine policy through an update transaction.
@@ -41,6 +44,10 @@ pub enum UpdateCurrentError {
     PromotionFailed(PromotionError),
     /// The promoted record could not become the fixed selected machine policy.
     PublicationFailed(UpdatePublicationError),
+    /// The prior selected product link could not be proved before policy changed.
+    PriorProductShortcutInvalid(ProductShortcutPreflightError),
+    /// Policy selected the release, but its fixed Start-menu link is incomplete.
+    ProductShortcutRegistrationFailed(ProductShortcutRegistrationError),
 }
 
 impl fmt::Display for UpdateCurrentError {
@@ -55,6 +62,12 @@ impl fmt::Display for UpdateCurrentError {
             Self::PreparationFailed(_) => "the signed update could not be prepared",
             Self::PromotionFailed(_) => "the signed update could not be promoted",
             Self::PublicationFailed(_) => "the signed update could not be selected",
+            Self::PriorProductShortcutInvalid(_) => {
+                "the current Start-menu registration state is invalid"
+            }
+            Self::ProductShortcutRegistrationFailed(_) => {
+                "the update was selected but Start-menu registration is incomplete"
+            }
         };
         formatter.write_str(message)
     }
@@ -69,6 +82,8 @@ impl std::error::Error for UpdateCurrentError {
             Self::PreparationFailed(error) => Some(error),
             Self::PromotionFailed(error) => Some(error),
             Self::PublicationFailed(error) => Some(error),
+            Self::PriorProductShortcutInvalid(error) => Some(error),
+            Self::ProductShortcutRegistrationFailed(error) => Some(error),
             Self::CandidateChanged => None,
         }
     }
@@ -85,6 +100,8 @@ impl std::error::Error for UpdateCurrentError {
 pub fn update_current_signed_release() -> Result<UpdatedRelease, UpdateCurrentError> {
     let candidate =
         verify_current_update_candidate().map_err(UpdateCurrentError::CandidateInvalid)?;
+    let prior = capture_current_product_shortcut()
+        .map_err(UpdateCurrentError::PriorProductShortcutInvalid)?;
     let release =
         verify_current_signed_release().map_err(UpdateCurrentError::CandidateRefreshInvalid)?;
     if !candidate.matches_manifest(release.release().manifest()) {
@@ -98,6 +115,8 @@ pub fn update_current_signed_release() -> Result<UpdatedRelease, UpdateCurrentEr
         crate::promote_prepared_release(prepared).map_err(UpdateCurrentError::PromotionFailed)?;
     let published =
         crate::publish_promoted_update(promoted).map_err(UpdateCurrentError::PublicationFailed)?;
+    synchronize_current_product_shortcut(prior)
+        .map_err(UpdateCurrentError::ProductShortcutRegistrationFailed)?;
     Ok(UpdatedRelease { published })
 }
 

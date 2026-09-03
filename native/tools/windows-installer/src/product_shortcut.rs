@@ -24,9 +24,20 @@ pub struct RegisteredProductShortcut {
     _private: (),
 }
 
+/// A completed removal of one fixed all-users Start-menu registration.
+pub struct RemovedProductShortcut {
+    _private: (),
+}
+
 impl fmt::Debug for RegisteredProductShortcut {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("RegisteredProductShortcut(..)")
+    }
+}
+
+impl fmt::Debug for RemovedProductShortcut {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("RemovedProductShortcut(..)")
     }
 }
 
@@ -93,7 +104,7 @@ impl std::error::Error for ProductShortcutPreflightError {
 pub enum ProductShortcutRegistrationError {
     /// Fresh selected-policy proof did not establish a shortcut target.
     TargetInvalid(ProductShortcutPreflightError),
-    /// Windows could not create the fixed Start-menu link safely.
+    /// Windows could not update the fixed Start-menu link safely.
     ShellOperationFailed,
 }
 
@@ -101,7 +112,9 @@ impl fmt::Display for ProductShortcutRegistrationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::TargetInvalid(_) => "the Start-menu shortcut target is invalid",
-            Self::ShellOperationFailed => "the Windows Start-menu shortcut could not be created",
+            Self::ShellOperationFailed => {
+                "the Windows Start-menu shortcut could not be updated safely"
+            }
         })
     }
 }
@@ -118,7 +131,20 @@ impl std::error::Error for ProductShortcutRegistrationError {
 struct SelectedProductShortcut {
     executable_path: PathBuf,
     package_root: PathBuf,
-    start_menu_name: StartMenuName,
+    start_menu_name: Option<StartMenuName>,
+}
+
+/// Previously selected optional product-link data held only during one policy transition.
+pub(crate) struct PriorProductShortcut {
+    start_menu_name: Option<StartMenuName>,
+}
+
+impl PriorProductShortcut {
+    pub(crate) const fn none() -> Self {
+        Self {
+            start_menu_name: None,
+        }
+    }
 }
 
 /// Proves one current selected release is eligible for a fixed Start-menu link.
@@ -131,7 +157,9 @@ struct SelectedProductShortcut {
 /// launch an application, or expose product data.
 pub fn verify_current_product_shortcut_target()
 -> Result<VerifiedProductShortcutTarget, ProductShortcutPreflightError> {
-    select_current_product_shortcut_target().map(|_| VerifiedProductShortcutTarget { _private: () })
+    let target = select_current_product_shortcut_target()?;
+    require_start_menu_name(&target)?;
+    Ok(VerifiedProductShortcutTarget { _private: () })
 }
 
 /// Replaces the fixed all-users Start-menu link from fresh selected policy.
@@ -146,13 +174,72 @@ pub fn refresh_current_product_shortcut()
 -> Result<RegisteredProductShortcut, ProductShortcutRegistrationError> {
     let target = select_current_product_shortcut_target()
         .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
+    let start_menu_name = require_start_menu_name(&target)
+        .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
     raw::replace_common_programs_shortcut(
         &target.executable_path,
         &target.package_root,
-        &target.start_menu_name,
+        start_menu_name,
     )
     .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
     Ok(RegisteredProductShortcut { _private: () })
+}
+
+/// Captures only the current optional signed link name before a policy change.
+///
+/// This repeats selected-policy and signer proof, but does not access Windows
+/// shell folders or change any registration. A record without Start-menu
+/// metadata is valid and produces an empty prior state.
+pub(crate) fn capture_current_product_shortcut()
+-> Result<PriorProductShortcut, ProductShortcutPreflightError> {
+    let target = select_current_product_shortcut_target()?;
+    Ok(PriorProductShortcut {
+        start_menu_name: target.start_menu_name,
+    })
+}
+
+/// Synchronizes the fixed product link after machine policy selected a release.
+///
+/// The prior value comes only from `capture_current_product_shortcut` before
+/// the policy transition. Fresh selected-policy proof chooses the replacement.
+/// A new link is persisted before a differently named older link is removed.
+pub(crate) fn synchronize_current_product_shortcut(
+    prior: PriorProductShortcut,
+) -> Result<RegisteredProductShortcut, ProductShortcutRegistrationError> {
+    let target = select_current_product_shortcut_target()
+        .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
+    if let Some(start_menu_name) = &target.start_menu_name {
+        raw::replace_common_programs_shortcut(
+            &target.executable_path,
+            &target.package_root,
+            start_menu_name,
+        )
+        .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
+    }
+    if let Some(start_menu_name) = stale_start_menu_name(
+        prior.start_menu_name.as_ref(),
+        target.start_menu_name.as_ref(),
+    ) {
+        raw::remove_common_programs_shortcut(start_menu_name)
+            .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
+    }
+    Ok(RegisteredProductShortcut { _private: () })
+}
+
+/// Removes the current selected product's fixed link before an uninstall.
+///
+/// Fresh selected-policy proof chooses the only filename that may be removed.
+/// A legacy selected record with no signed Start-menu name has no link to
+/// remove. This does not alter policy or package files.
+pub fn remove_current_product_shortcut()
+-> Result<RemovedProductShortcut, ProductShortcutRegistrationError> {
+    let target = select_current_product_shortcut_target()
+        .map_err(ProductShortcutRegistrationError::TargetInvalid)?;
+    if let Some(start_menu_name) = &target.start_menu_name {
+        raw::remove_common_programs_shortcut(start_menu_name)
+            .map_err(|_| ProductShortcutRegistrationError::ShellOperationFailed)?;
+    }
+    Ok(RemovedProductShortcut { _private: () })
 }
 
 fn select_current_product_shortcut_target()
@@ -170,17 +257,27 @@ fn select_current_product_shortcut_target()
     if !manifest.matches_publisher_fingerprint(signer.as_bytes()) {
         return Err(ProductShortcutPreflightError::InstallerPublisherMismatch);
     }
-    if selected.product_metadata().is_none() || selected.start_menu_name().is_none() {
-        return Err(ProductShortcutPreflightError::StartMenuNameUnavailable);
-    }
     Ok(SelectedProductShortcut {
         executable_path: selected.executable_path().to_path_buf(),
         package_root: selected.package_root().to_path_buf(),
-        start_menu_name: selected
-            .start_menu_name()
-            .expect("the preceding selected-policy check requires this value")
-            .clone(),
+        start_menu_name: selected.start_menu_name().cloned(),
     })
+}
+
+fn require_start_menu_name(
+    target: &SelectedProductShortcut,
+) -> Result<&StartMenuName, ProductShortcutPreflightError> {
+    target
+        .start_menu_name
+        .as_ref()
+        .ok_or(ProductShortcutPreflightError::StartMenuNameUnavailable)
+}
+
+fn stale_start_menu_name<'a>(
+    prior: Option<&'a StartMenuName>,
+    current: Option<&StartMenuName>,
+) -> Option<&'a StartMenuName> {
+    (prior != current).then_some(prior).flatten()
 }
 
 #[cfg(test)]
@@ -189,8 +286,8 @@ mod tests {
 
     use super::{
         ProductShortcutPreflightError, ProductShortcutRegistrationError, RegisteredProductShortcut,
-        VerifiedProductShortcutTarget, refresh_current_product_shortcut,
-        verify_current_product_shortcut_target,
+        RemovedProductShortcut, VerifiedProductShortcutTarget, refresh_current_product_shortcut,
+        stale_start_menu_name, verify_current_product_shortcut_target,
     };
     use crate::SignedReleaseError;
 
@@ -230,5 +327,24 @@ mod tests {
             format!("{:?}", RegisteredProductShortcut { _private: () }),
             "RegisteredProductShortcut(..)"
         );
+        assert_eq!(
+            format!("{:?}", RemovedProductShortcut { _private: () }),
+            "RemovedProductShortcut(..)"
+        );
+    }
+
+    #[test]
+    fn only_a_differing_prior_signed_name_requires_stale_link_removal() {
+        let first = anodrel_application::StartMenuName::new("Anodrel First")
+            .expect("safe fixed product name");
+        let second = anodrel_application::StartMenuName::new("Anodrel Second")
+            .expect("safe fixed product name");
+        assert_eq!(stale_start_menu_name(Some(&first), Some(&first)), None);
+        assert_eq!(
+            stale_start_menu_name(Some(&first), Some(&second)),
+            Some(&first)
+        );
+        assert_eq!(stale_start_menu_name(Some(&first), None), Some(&first));
+        assert_eq!(stale_start_menu_name(None, Some(&second)), None);
     }
 }

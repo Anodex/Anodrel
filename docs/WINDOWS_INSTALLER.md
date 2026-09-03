@@ -50,7 +50,9 @@ invalidate existing executable signatures.
 The strict UTF-8 JSON manifest is at most **16 KiB**. Version 1.0 accepts only
 the exact fields below. Version 1.1 adds exactly one `updateCatalogue` field.
 Version 1.2 adds signed product display metadata while retaining that catalogue
-field. Unknown, missing, duplicate, or wrongly typed fields are rejected.
+field. Version 1.3 adds the separately signed Windows-safe `startMenuName` to
+that product metadata. Unknown, missing, duplicate, or wrongly typed fields are
+rejected.
 
 ~~~json
 {
@@ -75,16 +77,16 @@ field. Unknown, missing, duplicate, or wrongly typed fields are rejected.
 
 | Field | Rule |
 | --- | --- |
-| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }`, 1.1, or 1.2. Versions 1.1 and 1.2 require `updateCatalogue`; 1.2 also requires `product`; version 1.0 has no discovery authority. |
+| `formatVersion` | Exactly `{ "major": 1, "minor": 0 }`, 1.1, 1.2, or 1.3. Versions 1.1 through 1.3 require `updateCatalogue`; 1.2 requires `product`; 1.3 requires `product` with `startMenuName`; version 1.0 has no discovery authority. |
 | `applicationId` | Existing 3–128 character Anodrel application identity. |
 | `packageVersion` | Three non-negative integers from 0 through 65,535; it identifies a staged release directory and is not protocol compatibility. |
 | `executable.path` | Relative, forward-slash-separated contained `.exe` path; no roots, drives, `.` or `..`. |
 | `executable.sha256` | Lowercase SHA-256 of the extracted executable. |
 | `publisher.leafCertificateSha256` | Lowercase SHA-256 leaf fingerprint the installer and extracted executable must both match. |
-| `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19, 1.20, or 1.21 machine record, then asks the existing validator to accept it. |
+| `capabilities` | Unique installed-record grant names. The installer renders them into a version-1.19, 1.20, 1.21, or 1.22 machine record, then asks the existing validator to accept it. |
 | `networkOrigins` | Exact host/port policy. It is empty unless `capabilities` includes `network.fetch`; the existing installed-record validator is authoritative. |
-| `updateCatalogue` | Versions 1.1 and 1.2: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
-| `product` | Version 1.2 only: one signed `displayName` and `publisherName` for later host-owned Windows product surfaces. Neither value is a path, policy key, identity, or certificate selector. See [signed product display metadata](PRODUCT_METADATA.md). |
+| `updateCatalogue` | Versions 1.1 through 1.3: one exact `origin` and canonical `.p7s` path for signed product-update metadata. It is unrelated to application `network.fetch` authority. See [update discovery](UPDATE_DISCOVERY.md). |
+| `product` | Versions 1.2 and 1.3: signed `displayName` and `publisherName` for host-owned Windows product surfaces; version 1.3 additionally requires the Windows-safe `startMenuName`. None are a path, policy key, identity, or certificate selector. See [signed product display metadata](PRODUCT_METADATA.md). |
 | `payload` | Exact uncompressed byte length, at least 1 and at most 512 MiB, plus a lowercase SHA-256 digest. |
 
 The manifest contains no filesystem root, command line, registry location,
@@ -98,11 +100,12 @@ location and it enters the fixed machine record only through installer gates.
 foundation. It bounds and parses one release manifest, validates its executable
 and payload descriptors, then requires the complete payload to match before its
 owned per-file bundle decoder runs. It canonicalizes permitted network origins
-and renders version 1.19, 1.20, or 1.21 installed-record policy for later
+and renders version 1.19, 1.20, 1.21, or 1.22 installed-record policy for later
 host-side validation. Version 1.20 retains the signed release's optional strict
 catalogue source, not an application-provided or arbitrary download route;
-version 1.21 additionally retains signed product display metadata for a later
-host-owned Windows surface. The direct Windows resource reader selects only the two fixed
+version 1.21 additionally retains signed product display metadata, and version
+1.22 adds the separately signed Start-menu name for the fixed host-owned Windows
+surface. The direct Windows resource reader selects only the two fixed
 current-image resources and fails closed when they are absent. Its contract tests
 prove that the rendered record passes the same `anodrel-application` validator
 the Windows host reads. The activation gate now asks Windows to verify the
@@ -237,8 +240,10 @@ the same private preparation, staged-executable signer, no-overwrite promotion,
 and fixed policy-publication boundaries as initial installation.
 
 An update transaction accepts no parameter and creates no download, background
-service, user-data directory, process, trust, shortcut, file association, or
-network connection. The already-selected version directory is retained after
+service, user-data directory, process, trust, file association, or network
+connection. After publication, a separate fixed registration stage may derive
+one Start-menu link from fresh selected policy; it cannot change the policy
+transaction. The already-selected version directory is retained after
 the fixed record points at the new complete version. Before it selects that new
 record, it copies the current fixed record into one private `previous` policy
 value. Publisher-key rotation and the later rollback command remain separate
@@ -271,9 +276,11 @@ starts. Preparation privately stages and checks the package and executable,
 promotion uses its existing no-overwrite same-volume rename, and publication
 writes the existing fixed policy record.
 
-The transaction accepts no parameter. It creates no trust, shortcut, file
-association, service, process, network connection, updater, or user-data
-directory. An unsigned current executable fails before Program Files selection.
+The transaction accepts no parameter. It creates no trust, file association,
+service, process, network connection, updater, or user-data directory. After
+publication, a separate fixed registration stage may derive one Start-menu link
+from fresh selected policy; it cannot change the policy transaction. An unsigned
+current executable fails before Program Files selection.
 If promotion succeeds but policy publication fails, the complete version stays
 unselected while the prior policy remains authoritative; the transaction never
 replaces a version or deletes existing content to hide that failure.
@@ -306,7 +313,7 @@ host's only policy source.
    and reject any file outside the destination tree.
 3. Check the extracted application package, executable path, executable digest,
    and executable Authenticode fingerprint. It must match the installer.
-4. Compose the proposed version-1.19, 1.20, or 1.21 installed record and validate it through
+4. Compose the proposed version-1.19, 1.20, 1.21, or 1.22 installed record and validate it through
    `anodrel-application` before any registry write.
 5. Rename the verified staging directory to its version directory, atomically
    publish the one registry `record` value, and retain the prior complete
@@ -344,10 +351,11 @@ no-argument command now composes those stages for an initial installation; see
 commands still require an explicitly elevated shell.
 
 Initial release work deliberately excludes automatic download, background
-updates, key rotation, shortcuts, file associations, service installation, and
-notifications. The signed catalogue source, CMS verification, and private image
-staging foundations are implemented; elevation handoff and installation remain
-separate trust boundaries.
+updates, key rotation, file associations, service installation, and
+notifications. Start-menu registration is limited to one signed policy-derived
+link; the signed catalogue source, CMS verification, and private image staging
+foundations are implemented; elevation handoff and installation remain separate
+trust boundaries.
 
 ## Production decision still required
 
