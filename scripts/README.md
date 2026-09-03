@@ -36,3 +36,13 @@ when finished.
 
 `-Verify` reports whether the machine record currently validates. It is a query
 only, changes nothing, and needs no elevation.
+
+## prepare-installed-product-fixture.ps1
+
+Prepares one signed development installer for the fixed product fixture through
+Anodrel's own bundle, manifest, resource-embedding, and signing tools. It needs
+an elevated development PowerShell session because it adds a temporary local
+certificate to machine trust, but it does **not** install the fixture itself.
+The printed signed installer command preserves the native consent and UAC
+checks. Follow [the installed fixture guide](../docs/INSTALLED_PRODUCT_FIXTURE.md)
+for preparation, acceptance, and removal.

@@ -27,7 +27,7 @@ breadth rather than in a missing window or transport base.
 | Accessibility | In progress | The UI Automation provider supports reading, navigation, hit testing, focus, Invoke, Value, structure, live-status, and scroll boundaries. | Complete every documented manual Narrator and Inspect check for the current provider, then add further patterns only when a real UI requires them. |
 | Performance | Guarded | The release-only frame guard currently measures 6.68 ms average and 8.08 ms worst sustained frame against a 16 ms interval. | Keep the release guard, startup report, and equivalent real-application measurements in each release candidate. |
 | Product fixture | Built, operator verification pending | A first-party child and launcher fixture exercises machine record, dual-signature verification, child bootstrap, session UI, and shutdown. | Run its elevated provision, launcher launch, action, and removal paths on the release machine. |
-| Signed distribution and installation | Foundation in progress | The owned tools author bounded bundles, validate and embed strict release manifests, sign one fresh checked image through direct Windows APIs and an explicit current-user certificate, verify current-image Authenticode, privately stage, match extracted signers, promote without overwrite, publish fixed policy, recover, uninstall, and require direct elevation—without an installer framework. | Choose certificate custody and timestamp policy, prove the signed positive path, and complete release verification/recovery proof. |
+| Signed distribution and installation | Development acceptance prepared | The owned tools author bounded bundles, validate and embed strict release manifests, sign one fresh checked image through direct Windows APIs and an explicit current-user certificate, verify current-image Authenticode, privately stage, match extracted signers, promote without overwrite, publish fixed policy, recover, uninstall, and require direct elevation—without an installer framework. A fixed development script now prepares that complete signed installer chain without auto-installing it. | Choose certificate custody and timestamp policy, run the signed installer fixture through consent, UAC, Start menu, uninstall, and recovery proof, then complete production release verification. |
 | Updates | Foundation in progress | A current signed candidate must match the selected installed publisher and be strictly newer; a no-argument transaction refreshes that decision, retains one fixed prior record, and a separately verified fixed command can restore it. A signed release can declare one fixed catalogue source; direct Windows CMS verifies one exact publisher; and the direct downloader can stream a preflight-eligible image into one fresh hash-verified private file. | Define production endpoint operation, key rotation, elevation handoff, recovery proof, and user-visible update policy after distribution identity is chosen. |
 | Release documentation and templates | Development-complete | Native SDK, templates, package tool, Startup Lab, diagnostics, and contract documents are maintained in the repository. | Publish installation, upgrade, recovery, and support documentation with the production package design. |
 
@@ -60,6 +60,8 @@ in `docs/DEVELOPMENT.md` and the feature documents:
 - Narrator and Inspect checks for the published accessibility tree, focus,
   actions, field values, structure changes, hierarchy, scroll, and live status;
 - signed fixture provision, launch, action, close, verification, and removal;
+- signed installer fixture preparation, consent, UAC, Start-menu launch,
+  verification, uninstall, and removal;
 - release frame-budget, startup-report, and transport performance measurements.
 
 A procedure that needs an elevated trust change remains an operator action. A
@@ -89,6 +91,7 @@ than three partially complete platforms.
 - [Architecture](ARCHITECTURE.md)
 - [Windows signing foundation](SIGNING.md)
 - [Development product fixture](PRODUCT_FIXTURE.md)
+- [Installed development fixture](INSTALLED_PRODUCT_FIXTURE.md)
 - [Performance plan](PERFORMANCE.md)
 - [Accessibility](ACCESSIBILITY.md)
 - [Development verification](DEVELOPMENT.md)

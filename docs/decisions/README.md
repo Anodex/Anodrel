@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0189: Development installer fixture keeps release assembly fixed.
+
 - 0188: Development fixture proves the verified launcher route.
 
 - 0187: Start-menu links launch a verified product launcher.

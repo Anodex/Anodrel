@@ -252,7 +252,9 @@ session when that window is destroyed.
 
 - It is not a product, an installer, or an update path. Nothing here creates
   Program Files content, a service, a shortcut, a scheduled task, or an
-  uninstall entry.
+  uninstall entry. The separate [installed development fixture](INSTALLED_PRODUCT_FIXTURE.md)
+  prepares one fixed signed installer specifically to test those release
+  boundaries without changing this staged fixture's scope.
 - It is not a public SDK. No package, protocol message, or application API can
   provision, select, launch, inspect, or terminate a fixture session.
 - It is not evidence of Electron parity. It proves one authenticated window
@@ -300,5 +302,6 @@ certificate is acceptable: provision, run the host route, confirm the delivered
 document, activate the action, watch the window close, and confirm the child is
 gone.
 
-See `docs/LAUNCH.md`, `docs/PRODUCT_SESSIONS.md`, `docs/SIGNING.md`, and
-Decisions 0017 through 0020, 0058 through 0060, and 0061.
+See `docs/LAUNCH.md`, `docs/PRODUCT_SESSIONS.md`, `docs/SIGNING.md`, the
+[installed development fixture](INSTALLED_PRODUCT_FIXTURE.md), and Decisions
+0017 through 0020, 0058 through 0060, 0061, 0188, and 0189.

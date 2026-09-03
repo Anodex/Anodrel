@@ -535,3 +535,8 @@ provisioning:
 cargo test --manifest-path native/Cargo.toml -p anodrel-product-fixture
 ~~~
 
+For the separate signed installer, Program Files, and Start-menu route, follow
+[installed development product fixture](INSTALLED_PRODUCT_FIXTURE.md). It
+prepares the image but leaves consent, UAC, launch, and removal visible
+operator checks.
+
