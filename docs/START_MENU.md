@@ -1,8 +1,9 @@
 # Windows Start-menu registration
 
 **Status:** The signed selected-policy preflight, version 1.3 release metadata,
-and matching record v1.22 are implemented. The direct Shell Link writer and
-installer composition remain separate work.
+matching record v1.22, and direct Shell Link writer are implemented. Installer
+composition after install, update, rollback, and uninstall remains separate
+work.
 
 ## Purpose
 
@@ -16,7 +17,7 @@ v1.22's signed product display metadata and Start-menu filename.
 
 ## Planned fixed target
 
-The later direct Windows writer will derive exactly one all-users link:
+The direct Windows writer derives exactly one all-users link:
 
 ~~~text
 Common Programs\Anodrel\<signed-start-menu-name>.lnk
@@ -35,12 +36,27 @@ COM-object, link, launch, notification, or removal operation. A legacy record
 without v1.22 Start-menu metadata refuses registration rather than inventing a
 label.
 
+## Native link write
+
+`refresh_current_product_shortcut` repeats the full selected-policy proof
+immediately before its one Shell Link operation. It resolves `FOLDERID_CommonPrograms`
+directly, requires that directory and its fixed `Anodrel` child to be ordinary
+non-reparse directories, and writes the link through a temporary ordinary file
+followed by same-directory replacement with write-through. The link's target is
+the selected executable and its working directory is the selected package root.
+It has no argument, custom icon, description, source URL, application input,
+or runtime path discovery.
+
+The direct writer has an automated Windows test that creates a link only inside
+a temporary directory and removes it afterwards. Its product-facing
+route still requires a signed v1.3 installer and selected v1.22 machine record.
+
 ## Exclusions
 
-This does not yet create or remove a link, register an Application User Model
-ID, write Apps & features data, add a taskbar pin, create a desktop shortcut,
-choose an icon, pass command-line arguments, launch an application, or report
+This does not yet remove a link, register an Application User Model ID, write
+Apps & features data, add a taskbar pin, create a desktop shortcut, choose a
+custom icon, pass command-line arguments, launch an application, or report
 whether a person saw a Start-menu item.
 
 See [product registration](PRODUCT_REGISTRATION.md), [installed application records](LAUNCH.md),
-and Decisions 0183 and 0184.
+and Decisions 0183 through 0185.
