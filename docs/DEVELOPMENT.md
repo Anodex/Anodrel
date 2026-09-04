@@ -268,6 +268,17 @@ executable is still being read from disk.
 See `docs/PERFORMANCE.md` for what the figures exclude and what has to be true
 before either is compared with another runtime.
 
+For one repeatable non-interactive Windows release-evidence pass, run:
+
+~~~text
+.\scripts\verify-windows-release.ps1
+~~~
+
+It runs formatting, source and documentation checks, the complete native
+workspace suite, the release frame budget, and the sample startup report. It
+does not create trust or installation state and cannot replace the documented
+native desktop and signed-fixture acceptance checks.
+
 
 ## Direct Linux Wayland lab
 

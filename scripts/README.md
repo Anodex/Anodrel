@@ -22,6 +22,19 @@ failure that names each file exceeding the limit.
 .\scripts\check-source-size.ps1
 ~~~
 
+## verify-windows-release.ps1
+
+Runs the complete non-interactive Windows release evidence set: formatting,
+source-size, documentation links, whitespace, the native workspace tests, the
+release-only frame budget, and the sample host startup report. It makes no
+trust, installation, network, or desktop-UI change. It cannot replace the
+separate manual native consent, UAC, Start-menu, file-picker, accessibility,
+and signed-fixture checks in `docs/WINDOWS_RELEASE.md`.
+
+~~~powershell
+.\scripts\verify-windows-release.ps1
+~~~
+
 ## provision-product-fixture.ps1
 
 Provisions or removes the development-only Windows product fixture described in
