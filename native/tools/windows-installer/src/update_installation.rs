@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use crate::apps_features::{AppsFeaturesRegistrationError, refresh_current_apps_features};
 use crate::machine_root::current_machine_application_root;
 use crate::prepared::prepare_verified_signed_release;
 use crate::product_shortcut::{
@@ -48,6 +49,8 @@ pub enum UpdateCurrentError {
     PriorProductShortcutInvalid(ProductShortcutPreflightError),
     /// Policy selected the release, but its fixed Start-menu link is incomplete.
     ProductShortcutRegistrationFailed(ProductShortcutRegistrationError),
+    /// Policy selected the release, but Apps & features registration is incomplete.
+    AppsFeaturesRegistrationFailed(AppsFeaturesRegistrationError),
 }
 
 impl fmt::Display for UpdateCurrentError {
@@ -68,6 +71,9 @@ impl fmt::Display for UpdateCurrentError {
             Self::ProductShortcutRegistrationFailed(_) => {
                 "the update was selected but Start-menu registration is incomplete"
             }
+            Self::AppsFeaturesRegistrationFailed(_) => {
+                "the update was selected but Apps & features registration is incomplete"
+            }
         };
         formatter.write_str(message)
     }
@@ -84,6 +90,7 @@ impl std::error::Error for UpdateCurrentError {
             Self::PublicationFailed(error) => Some(error),
             Self::PriorProductShortcutInvalid(error) => Some(error),
             Self::ProductShortcutRegistrationFailed(error) => Some(error),
+            Self::AppsFeaturesRegistrationFailed(error) => Some(error),
             Self::CandidateChanged => None,
         }
     }
@@ -117,6 +124,7 @@ pub fn update_current_signed_release() -> Result<UpdatedRelease, UpdateCurrentEr
         crate::publish_promoted_update(promoted).map_err(UpdateCurrentError::PublicationFailed)?;
     synchronize_current_product_shortcut(prior)
         .map_err(UpdateCurrentError::ProductShortcutRegistrationFailed)?;
+    refresh_current_apps_features().map_err(UpdateCurrentError::AppsFeaturesRegistrationFailed)?;
     Ok(UpdatedRelease { published })
 }
 

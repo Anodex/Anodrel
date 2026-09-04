@@ -4,6 +4,7 @@ use std::fmt;
 
 use anodrel_windows_policy::{PolicyStoreError, load_installed_application};
 
+use crate::apps_features::{AppsFeaturesRegistrationError, refresh_current_apps_features};
 use crate::machine_root::current_machine_application_root;
 use crate::product_shortcut::{PriorProductShortcut, synchronize_current_product_shortcut};
 use crate::{
@@ -45,6 +46,8 @@ pub enum InstallCurrentError {
     PublicationFailed(PublicationError),
     /// Policy selected the release, but its fixed Start-menu link is incomplete.
     ProductShortcutRegistrationFailed(ProductShortcutRegistrationError),
+    /// Policy selected the release, but Apps & features registration is incomplete.
+    AppsFeaturesRegistrationFailed(AppsFeaturesRegistrationError),
 }
 
 impl fmt::Display for InstallCurrentError {
@@ -64,6 +67,9 @@ impl fmt::Display for InstallCurrentError {
             Self::ProductShortcutRegistrationFailed(_) => {
                 "the release was selected but Start-menu registration is incomplete"
             }
+            Self::AppsFeaturesRegistrationFailed(_) => {
+                "the release was selected but Apps & features registration is incomplete"
+            }
         };
         formatter.write_str(message)
     }
@@ -80,6 +86,7 @@ impl std::error::Error for InstallCurrentError {
             Self::PromotionFailed(error) => Some(error),
             Self::PublicationFailed(error) => Some(error),
             Self::ProductShortcutRegistrationFailed(error) => Some(error),
+            Self::AppsFeaturesRegistrationFailed(error) => Some(error),
         }
     }
 }
@@ -107,6 +114,7 @@ pub fn install_current_signed_release() -> Result<InstalledRelease, InstallCurre
         publish_promoted_release(promoted).map_err(InstallCurrentError::PublicationFailed)?;
     synchronize_current_product_shortcut(PriorProductShortcut::none())
         .map_err(InstallCurrentError::ProductShortcutRegistrationFailed)?;
+    refresh_current_apps_features().map_err(InstallCurrentError::AppsFeaturesRegistrationFailed)?;
     Ok(InstalledRelease { published })
 }
 

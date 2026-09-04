@@ -3,8 +3,9 @@
 **Status:** Installed-record versions 1.21 through 1.23 are implemented,
 including the separately signed Start-menu name and product launcher. The
 direct Start-menu writer and its post-policy installer composition are
-implemented. Apps & features has a defined signed-image contract and remains
-separate implementation work.
+implemented. Apps & features has a selected signed-image contract and complete
+installer composition; its desktop and signed-fixture acceptance remain
+separate work.
 
 ## Purpose
 
@@ -63,10 +64,10 @@ cannot replace, roll back, or otherwise change that selected policy.
 
 ## Exclusions
 
-This does not yet write an Apps & features entry or copy an uninstaller. Their
-fixed selected-policy contract is defined in [Apps & features](APPS_AND_FEATURES.md).
-It does not add a file association, define an Application User Model ID, or
-allow applications to read or edit registration.
+Apps & features writes one fixed selected-policy entry and uses the fixed
+native removal route defined in [Apps & features](APPS_AND_FEATURES.md). This
+does not add a file association, define an Application User Model ID, or allow
+applications to read or edit registration.
 
 See [installed application records](LAUNCH.md), [signed product display metadata](PRODUCT_METADATA.md),
 [Apps & features](APPS_AND_FEATURES.md), and Decisions 0182, 0187, and 0196.

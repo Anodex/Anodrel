@@ -2,8 +2,8 @@
 
 **Status:** The signed selected-policy preflight, version 1.4 release metadata,
 matching record v1.23, direct Shell Link writer, fixed launcher route, and
-policy-transaction composition are implemented. Apps & features and AUMID
-registration remain separate work.
+policy-transaction composition are implemented. Apps & features is a separate
+implemented Windows surface; AUMID registration remains separate work.
 
 ## Purpose
 

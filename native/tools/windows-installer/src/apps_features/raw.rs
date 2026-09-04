@@ -198,7 +198,7 @@ fn display_version(version: crate::PackageVersion) -> String {
 }
 
 fn uninstall_command(path: &Path) -> String {
-    format!("\"{}\" uninstall", path.display())
+    format!("\"{}\" remove", path.display())
 }
 
 fn wide(value: &str) -> Result<Vec<u16>, ()> {
@@ -239,7 +239,7 @@ mod tests {
             uninstall_command(std::path::Path::new(
                 "C:\\Program Files\\Anodrel\\remove.exe"
             )),
-            "\"C:\\Program Files\\Anodrel\\remove.exe\" uninstall"
+            "\"C:\\Program Files\\Anodrel\\remove.exe\" remove"
         );
     }
 }

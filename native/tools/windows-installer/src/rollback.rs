@@ -7,6 +7,7 @@ use anodrel_windows_policy::{
 };
 use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 
+use crate::apps_features::{AppsFeaturesRegistrationError, refresh_current_apps_features};
 use crate::machine_root::existing_machine_application_root;
 use crate::product_shortcut::{
     capture_current_product_shortcut, synchronize_current_product_shortcut,
@@ -148,6 +149,8 @@ pub enum RollbackCurrentError {
     PriorProductShortcutInvalid(ProductShortcutPreflightError),
     /// Policy selected the prior release, but its fixed Start-menu link is incomplete.
     ProductShortcutRegistrationFailed(ProductShortcutRegistrationError),
+    /// Policy selected the prior release, but Apps & features registration is incomplete.
+    AppsFeaturesRegistrationFailed(AppsFeaturesRegistrationError),
 }
 
 impl fmt::Display for RollbackCurrentError {
@@ -162,6 +165,9 @@ impl fmt::Display for RollbackCurrentError {
             }
             Self::ProductShortcutRegistrationFailed(_) => formatter
                 .write_str("the rollback was selected but Start-menu registration is incomplete"),
+            Self::AppsFeaturesRegistrationFailed(_) => formatter.write_str(
+                "the rollback was selected but Apps & features registration is incomplete",
+            ),
         }
     }
 }
@@ -173,6 +179,7 @@ impl std::error::Error for RollbackCurrentError {
             Self::PublicationFailed(error) => Some(error),
             Self::PriorProductShortcutInvalid(error) => Some(error),
             Self::ProductShortcutRegistrationFailed(error) => Some(error),
+            Self::AppsFeaturesRegistrationFailed(error) => Some(error),
         }
     }
 }
@@ -226,6 +233,8 @@ pub fn rollback_current_signed_release() -> Result<RolledBackRelease, RollbackCu
         .map_err(RollbackCurrentError::PublicationFailed)?;
     synchronize_current_product_shortcut(prior)
         .map_err(RollbackCurrentError::ProductShortcutRegistrationFailed)?;
+    refresh_current_apps_features()
+        .map_err(RollbackCurrentError::AppsFeaturesRegistrationFailed)?;
     Ok(RolledBackRelease { target })
 }
 

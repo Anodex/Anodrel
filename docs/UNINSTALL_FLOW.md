@@ -1,8 +1,8 @@
 # Windows Apps & features removal flow
 
 **Status:** The fixed native consent, UAC handoff, repeated elevated preflight,
-and policy-absence proof are implemented in the installer shell. Apps &
-features registration has not yet been composed to invoke the route.
+and policy-absence proof are implemented in the installer shell. The Apps &
+features registration now invokes the route after its selected-policy proof.
 
 ## Purpose
 

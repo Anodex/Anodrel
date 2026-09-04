@@ -4,7 +4,7 @@ use std::fs;
 
 use anodrel_windows_installer::{
     MAX_RELEASE_MANIFEST_BYTES, ReleaseManifest, install_current_signed_release,
-    remove_current_product_shortcut, remove_policy_removed_package,
+    remove_current_apps_features, remove_current_product_shortcut, remove_policy_removed_package,
     remove_verified_uninstall_policy, rollback_current_signed_release,
     update_current_signed_release, verify_current_signed_release, verify_current_uninstall_target,
 };
@@ -104,6 +104,7 @@ fn rollback() -> Result<String, String> {
 fn uninstall() -> Result<String, String> {
     let target = verify_current_uninstall_target().map_err(display_error)?;
     remove_current_product_shortcut().map_err(display_error)?;
+    remove_current_apps_features().map_err(display_error)?;
     let policy_removed = remove_verified_uninstall_policy(target).map_err(display_error)?;
     remove_policy_removed_package(policy_removed).map_err(display_error)?;
     Ok("Current signed Anodrel release uninstalled.".to_owned())

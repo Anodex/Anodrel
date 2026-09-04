@@ -89,7 +89,9 @@ After approving the native confirmation and the Windows UAC prompt:
 5. Confirm the window and fixture child both exit promptly.
 6. From a normal PowerShell session, run the printed signed installer with
    `verify`; it must accept the selected installed release.
-7. Close the product window with its title-bar button in a separate run and
+7. Confirm **Anodrel Product Fixture** appears in Windows **Installed apps**
+   with the signed display name, publisher, and version.
+8. Close the product window with its title-bar button in a separate run and
    confirm the child also exits.
 
 The prepared image makes the signed installer and its direct policy checks
