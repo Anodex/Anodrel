@@ -1,8 +1,10 @@
 # Windows Apps & features registration
 
-**Status:** Planned. The signed product metadata, selected-policy Start-menu
-route, and bounded uninstall transaction are implemented. This document fixes
-the next registration contract before its Windows registry writer is added.
+**Status:** The signed product metadata, selected-policy Start-menu route, and
+bounded uninstall transaction are implemented. The Apps & features
+selected-policy preflight and fixed registry writer are implemented but are not
+yet composed into installation or removal while native consent and UAC handoff
+remain separate work.
 
 ## Purpose
 

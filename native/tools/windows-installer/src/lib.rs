@@ -8,6 +8,8 @@
 //! promote a version directory, change the registry, install a certificate, or
 //! launch an application.
 
+#[cfg(windows)]
+mod apps_features;
 mod error;
 #[cfg(windows)]
 mod image;
@@ -45,6 +47,12 @@ mod update;
 #[cfg(windows)]
 mod update_installation;
 
+#[cfg(windows)]
+pub use apps_features::{
+    AppsFeaturesPreflightError, AppsFeaturesRegistrationError, RegisteredAppsFeatures,
+    RemovedAppsFeatures, VerifiedAppsFeaturesTarget, refresh_current_apps_features,
+    remove_current_apps_features, verify_current_apps_features_target,
+};
 pub use error::ReleaseManifestError;
 #[cfg(windows)]
 pub use image::{InstallerImageError, VerifiedInstallerImage, verify_locked_installer_image};
