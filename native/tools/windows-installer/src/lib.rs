@@ -16,6 +16,8 @@ mod install_acceptance;
 #[cfg(windows)]
 mod installation;
 #[cfg(windows)]
+mod installed_uninstaller;
+#[cfg(windows)]
 mod machine_root;
 mod manifest;
 mod payload;
@@ -54,6 +56,8 @@ pub use install_acceptance::{
 };
 #[cfg(windows)]
 pub use installation::{InstallCurrentError, InstalledRelease, install_current_signed_release};
+#[cfg(windows)]
+pub use installed_uninstaller::InstalledUninstallerError;
 #[cfg(windows)]
 pub use machine_root::MachineRootError;
 pub use manifest::{PackageVersion, PayloadDescriptor, ProductMetadata, ReleaseManifest};

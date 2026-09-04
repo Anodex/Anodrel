@@ -20,7 +20,7 @@ pub(super) fn output_path(root: &Path, bundle_path: &str) -> Option<PathBuf> {
 }
 
 /// Creates only missing normal directories already below the supplied stage root.
-pub(super) fn create_private_directories(root: &Path, target: &Path) -> Result<(), ()> {
+pub(crate) fn create_private_directories(root: &Path, target: &Path) -> Result<(), ()> {
     let relative = target.strip_prefix(root).map_err(|_| ())?;
     let mut current = root.to_path_buf();
     for component in relative.components() {

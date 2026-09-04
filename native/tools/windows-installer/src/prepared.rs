@@ -4,6 +4,7 @@ use std::{fmt, path::Path};
 
 use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 
+use crate::installed_uninstaller::{InstalledUninstallerError, stage_current_installer_image};
 use crate::staging::{StagedRelease, stage_checked_release};
 use crate::{
     PackageVersion, ReleaseManifest, SignedReleaseError, StagedReleaseError,
@@ -34,6 +35,8 @@ pub enum PreparedReleaseError {
     InstallerInvalid(SignedReleaseError),
     /// Checked files could not become a private valid package stage.
     StagingInvalid(StagedReleaseError),
+    /// The current signed installer could not become the fixed staged uninstaller.
+    UninstallerStagingFailed(InstalledUninstallerError),
     /// Windows did not accept the staged executable's signature.
     ExecutableSignatureInvalid(SignatureError),
     /// The staged executable signer differed from the embedded release publisher.
@@ -49,6 +52,9 @@ impl fmt::Display for PreparedReleaseError {
         let message = match self {
             Self::InstallerInvalid(_) => "the signed installer release is invalid",
             Self::StagingInvalid(_) => "the release could not be staged safely",
+            Self::UninstallerStagingFailed(_) => {
+                "the installed uninstaller image could not be prepared"
+            }
             Self::ExecutableSignatureInvalid(_) => {
                 "Windows did not accept the staged executable signature"
             }
@@ -71,6 +77,7 @@ impl std::error::Error for PreparedReleaseError {
         match self {
             Self::InstallerInvalid(error) => Some(error),
             Self::StagingInvalid(error) => Some(error),
+            Self::UninstallerStagingFailed(error) => Some(error),
             Self::ExecutableSignatureInvalid(error) => Some(error),
             Self::LauncherSignatureInvalid(error) => Some(error),
             Self::ExecutablePublisherMismatch | Self::LauncherPublisherMismatch => None,
@@ -108,6 +115,8 @@ pub(crate) fn prepare_verified_signed_release(
     let application_id = manifest.application_id().to_owned();
     let staged = stage_checked_release(staging_parent, manifest, release.release().bundle())
         .map_err(PreparedReleaseError::StagingInvalid)?;
+    stage_current_installer_image(&staged, manifest)
+        .map_err(PreparedReleaseError::UninstallerStagingFailed)?;
     verify_staged_images(&staged, manifest)?;
     Ok(PreparedRelease {
         staged,

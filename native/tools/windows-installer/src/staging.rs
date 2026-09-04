@@ -210,6 +210,11 @@ fn write_bundle(root: &Path, bundle: &ReleaseBundle<'_>) -> Result<(), StagedRel
     Ok(())
 }
 
+/// Creates one fixed normal directory below a private staging root.
+pub(crate) fn create_private_directory(root: &Path, target: &Path) -> Result<(), ()> {
+    path::create_private_directories(root, target)
+}
+
 fn write_entry(root: &Path, entry: &BundleEntry<'_>) -> Result<(), StagedReleaseError> {
     let output =
         path::output_path(root, entry.path()).ok_or(StagedReleaseError::BundlePathInvalid)?;
