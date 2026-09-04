@@ -222,6 +222,64 @@ fn a_session_without_a_context_menu_bridge_has_no_context_menu_route() {
 }
 
 #[test]
+fn a_session_without_a_tray_bridge_has_no_tray_route() {
+    let view = UiSessionView::new(
+        UiDocumentMailbox::new(),
+        UiInputMailbox::new(),
+        SessionCloseSignal::default(),
+        FileDialogMailbox::new(),
+        WindowsFileTextService::new(),
+        NotificationMailbox::new(),
+    );
+    assert!(view.take_tray_request().is_none());
+    assert!(!view.complete_tray_request(1, true));
+    assert!(view.tray().is_none());
+}
+
+#[test]
+fn a_tray_model_crosses_only_its_supplied_ui_thread_mailbox() {
+    let mailbox = anodrel_menu::TrayMailbox::new();
+    let view = UiSessionView::new(
+        UiDocumentMailbox::new(),
+        UiInputMailbox::new(),
+        SessionCloseSignal::default(),
+        FileDialogMailbox::new(),
+        WindowsFileTextService::new(),
+        NotificationMailbox::new(),
+    )
+    .with_tray(mailbox.clone());
+    let worker = mailbox.clone();
+    let waiting = std::thread::spawn(move || {
+        anodrel_menu::TrayService::replace(
+            &worker,
+            anodrel_menu::TrayRevision::INITIAL
+                .next()
+                .expect("the first revision exists"),
+            tray_model(),
+        )
+    });
+    let request = loop {
+        if let Some(request) = view.take_tray_request() {
+            break request;
+        }
+        std::thread::yield_now();
+    };
+    assert_eq!(request.revision().value(), 1);
+    assert_eq!(request.model().items()[0].id().as_str(), "window.open");
+    assert!(view.complete_tray_request(request.id(), true));
+    assert!(waiting.join().expect("tray worker does not panic").is_ok());
+}
+
+fn tray_model() -> anodrel_menu::ContextMenuModel {
+    anodrel_menu::ContextMenuModel::new(vec![anodrel_menu::MenuAction::new(
+        anodrel_menu::MenuActionId::new("window.open").expect("fixed ID is valid"),
+        anodrel_menu::MenuText::new("Open window").expect("fixed label is valid"),
+        true,
+    )])
+    .expect("fixed model is valid")
+}
+
+#[test]
 fn consumes_only_its_supplied_session_close_signal() {
     let signal = SessionCloseSignal::default();
     let mut view = UiSessionView::new(

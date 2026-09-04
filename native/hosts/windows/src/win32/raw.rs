@@ -25,6 +25,7 @@ pub(super) const SW_SHOW: i32 = 5;
 pub(super) const SW_MINIMIZE: i32 = 6;
 pub(super) const SW_RESTORE: i32 = 9;
 pub(super) const WM_DESTROY: Uint = 0x0002;
+pub(super) const WM_NULL: Uint = 0x0000;
 pub(super) const WM_CLOSE: Uint = 0x0010;
 pub(super) const WM_PAINT: Uint = 0x000F;
 pub(super) const WM_ERASEBKGND: Uint = 0x0014;
@@ -40,6 +41,7 @@ pub(super) const WM_MOUSEWHEEL: Uint = 0x020A;
 pub(super) const WM_MOUSEMOVE: Uint = 0x0200;
 pub(super) const WM_LBUTTONDOWN: Uint = 0x0201;
 pub(super) const WM_LBUTTONUP: Uint = 0x0202;
+pub(super) const WM_RBUTTONUP: Uint = 0x0205;
 pub(super) const WM_CAPTURECHANGED: Uint = 0x0215;
 pub(super) const WM_MOUSELEAVE: Uint = 0x02A3;
 pub(super) const WM_TIMER: Uint = 0x0113;
@@ -102,6 +104,11 @@ pub(super) const WM_ANODREL_UIA_FOCUS: Uint = WM_APP + 2;
 /// The selected viewport and closed command stay in host-owned route memory;
 /// an externally posted copy cannot select a target or inject scroll data.
 pub(super) const WM_ANODREL_UIA_SCROLL: Uint = WM_APP + 3;
+/// Private callback for the one host-created notification-area entry.
+///
+/// Shell32 chooses the local mouse-message payload. The application never
+/// supplies this number or any callback value.
+pub(super) const WM_ANODREL_NOTIFICATION_AREA: Uint = WM_APP + 4;
 
 /// Timer driving the Startup Lab's reveal, at roughly 60 frames per second.
 pub(super) const REVEAL_TIMER: usize = 1;
@@ -280,6 +287,7 @@ unsafe extern "system" {
     pub(super) fn EndPaint(window: Hwnd, paint: *const PaintStruct) -> Bool;
     pub(super) fn GetClientRect(window: Hwnd, rectangle: *mut Rect) -> Bool;
     pub(super) fn ClientToScreen(window: Hwnd, point: *mut Point) -> Bool;
+    pub(super) fn GetCursorPos(point: *mut Point) -> Bool;
     pub(super) fn LoadCursorW(instance: Hinstance, cursor_name: *const u16) -> Hcursor;
     pub(super) fn SetCursor(cursor: Hcursor) -> Hcursor;
     pub(super) fn SetCapture(window: Hwnd) -> Hwnd;

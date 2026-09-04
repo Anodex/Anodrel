@@ -39,6 +39,7 @@ mod startup_lab;
 mod startup_views;
 mod stats;
 mod text;
+mod tray;
 mod ui_lab;
 mod ui_session_view;
 mod uia_focus_event_probe;

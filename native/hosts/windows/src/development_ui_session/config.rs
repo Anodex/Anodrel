@@ -25,6 +25,12 @@ pub(super) const CONTEXT_MENU_GRANTS: [Capability; 4] = [
     Capability::ContextMenuWrite,
     Capability::SessionClose,
 ];
+pub(super) const TRAY_GRANTS: [Capability; 4] = [
+    Capability::UiDocumentWrite,
+    Capability::UiEventsRead,
+    Capability::TrayWrite,
+    Capability::SessionClose,
+];
 pub(super) const MULTI_WINDOW_GRANTS: [Capability; 5] = [
     Capability::UiDocumentWrite,
     Capability::UiEventsRead,
@@ -49,6 +55,7 @@ enum DevelopmentUiSessionKind {
     Form,
     Menu,
     ContextMenu,
+    Tray,
     MultiWindow,
     WindowControls,
 }
@@ -132,6 +139,23 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration whose only additional permission is one
+    /// complete host-owned notification-area tray replacement.
+    pub(crate) const fn with_tray(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::Tray,
+        }
+    }
+
     /// Creates a configuration for the explicit bounded multi-window route.
     ///
     /// Window creation and secondary close are additional fixed grants on this
@@ -174,6 +198,7 @@ impl DevelopmentUiSessionConfig {
             DevelopmentUiSessionKind::Form => &FORM_GRANTS,
             DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
             DevelopmentUiSessionKind::ContextMenu => &CONTEXT_MENU_GRANTS,
+            DevelopmentUiSessionKind::Tray => &TRAY_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
             DevelopmentUiSessionKind::WindowControls => &WINDOW_CONTROLS_GRANTS,
         }
@@ -185,6 +210,10 @@ impl DevelopmentUiSessionConfig {
 
     pub(super) const fn supports_context_menu(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::ContextMenu)
+    }
+
+    pub(super) const fn supports_tray(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::Tray)
     }
 
     pub(super) const fn supports_fields(self) -> bool {
@@ -206,7 +235,7 @@ mod tests {
 
     use super::{
         CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS,
-        MULTI_WINDOW_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
+        MULTI_WINDOW_GRANTS, TRAY_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
     };
 
     #[test]
@@ -235,6 +264,12 @@ mod tests {
             "Anodrel Context Menu Test",
             "completed context menu",
         );
+        let tray = DevelopmentUiSessionConfig::with_tray(
+            "anodrel.test-tray",
+            "test-tray-session",
+            "Anodrel Tray Test",
+            "completed tray",
+        );
         let multi_window = DevelopmentUiSessionConfig::with_multi_window(
             "anodrel.test-multi-window",
             "test-multi-window-session",
@@ -262,6 +297,10 @@ mod tests {
         assert_eq!(context_menu.grants(), CONTEXT_MENU_GRANTS);
         assert!(context_menu.supports_context_menu());
         assert!(!context_menu.supports_menu());
+        assert_eq!(tray.grants(), TRAY_GRANTS);
+        assert!(tray.supports_tray());
+        assert!(!tray.supports_menu());
+        assert!(!tray.supports_context_menu());
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
         assert!(!multi_window.supports_menu());
         assert!(multi_window.supports_multi_window());

@@ -1,8 +1,8 @@
 # Native tray menus
 
-**Status:** Protocol 1.33, its portable core boundary, and the typed Rust
-facade are implemented. The direct Windows notification-area adapter remains
-the next implementation section.
+**Status:** Protocol 1.33, its portable core boundary, typed Rust facade, and
+direct Windows Shell32/User32 bridge are implemented. A real desktop
+notification-area interaction remains the manual acceptance check.
 
 ## Purpose
 
@@ -122,6 +122,24 @@ five-second bounded handover discipline as native context menus. A failed
 replacement retains the last accepted model. The host builds private Windows
 menu objects before it commits the model, so native construction failure cannot
 erase a working tray menu.
+
+## Windows implementation and verification
+
+The direct Windows host creates the existing host-selected Shell32 entry only
+after a notification or accepted tray model needs it. A tray model configures
+one private `WM_APP` callback on that same entry; it never adds another icon.
+On a local right-button release, the host reads the current cursor position
+only inside the callback, creates a temporary User32 popup, maps a selected
+private command to its semantic action, and destroys the popup before the
+callback returns. A local left-button release makes only a best-effort Windows
+foreground request for the same session's main window.
+
+The host's focused tests cover command isolation, callback filtering, mailbox
+handover, and the shared-entry lifetime. The remaining desktop proof is to use
+an invited session that publishes a tray model, right-click its visible Anodrel
+notification-area icon, choose the enabled command, and verify the child reads
+the matching `tray.action.invoked` event before it closes its own session. No
+synthetic input test is presented as that user interaction proof.
 
 ## Security and privacy
 

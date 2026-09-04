@@ -83,7 +83,7 @@ pub(crate) fn take_notification_request(
 ) -> io::Result<
     Option<(
         anodrel_notifications::NotificationRequest,
-        Option<std::sync::Arc<anodrel_windows_notifications::WindowsNotifications>>,
+        Option<std::sync::Arc<anodrel_windows_notification_area::NotificationArea>>,
     )>,
 > {
     let mut views = lock_views()?;
@@ -99,7 +99,7 @@ pub(crate) fn complete_notification_request(
     window: Hwnd,
     request_id: u64,
     shown: bool,
-    entry: Option<std::sync::Arc<anodrel_windows_notifications::WindowsNotifications>>,
+    entry: Option<std::sync::Arc<anodrel_windows_notification_area::NotificationArea>>,
 ) -> io::Result<Option<bool>> {
     let mut views = lock_views()?;
     match views.get_mut(&window) {
@@ -111,6 +111,81 @@ pub(crate) fn complete_notification_request(
                 session.complete_notification_request(request_id, shown),
             ))
         }
+        _ => Ok(None),
+    }
+}
+
+/// Takes one pending tray replacement only from its associated UI session.
+///
+/// The native mapping is built after this registry lock is released, so a
+/// Shell32 or User32 failure cannot block other session views.
+pub(crate) fn take_tray_request(
+    window: Hwnd,
+) -> io::Result<
+    Option<(
+        anodrel_menu::TrayRequest,
+        Option<std::sync::Arc<anodrel_windows_notification_area::NotificationArea>>,
+    )>,
+> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session
+            .take_tray_request()
+            .map(|request| (request, session.notification_entry()))),
+        _ => Ok(None),
+    }
+}
+
+/// Retains a complete host-built tray and optionally its first shared entry.
+pub(crate) fn replace_tray(
+    window: Hwnd,
+    tray: super::super::tray::TrayMenu,
+    entry: Option<std::sync::Arc<anodrel_windows_notification_area::NotificationArea>>,
+) -> io::Result<Option<bool>> {
+    let mut views = lock_views()?;
+    match views.get_mut(&window) {
+        Some(View::UiSession(session)) => {
+            if let Some(entry) = entry {
+                session.set_notification_entry(entry);
+            }
+            Ok(Some(session.replace_tray(tray)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Completes one tray replacement only through its associated view.
+pub(crate) fn complete_tray_request(
+    window: Hwnd,
+    request_id: u64,
+    applied: bool,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => {
+            Ok(Some(session.complete_tray_request(request_id, applied)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Returns a current tray mapping for one host-owned local callback.
+pub(crate) fn tray(window: Hwnd) -> io::Result<Option<super::super::tray::TrayMenu>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(session.tray()),
+        _ => Ok(None),
+    }
+}
+
+/// Offers one selected current tray action to the session's shared queue.
+pub(crate) fn offer_tray_candidate(
+    window: Hwnd,
+    candidate: anodrel_ui_session::TrayInputCandidate,
+) -> io::Result<Option<bool>> {
+    let views = lock_views()?;
+    match views.get(&window) {
+        Some(View::UiSession(session)) => Ok(Some(session.offer_tray_candidate(candidate))),
         _ => Ok(None),
     }
 }

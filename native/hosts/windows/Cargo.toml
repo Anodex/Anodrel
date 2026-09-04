@@ -41,6 +41,7 @@ anodrel-windows-storage = { path = "../../adapters/windows-storage" }
 anodrel-notifications = { path = "../../crates/notifications" }
 anodrel-window = { path = "../../crates/window" }
 anodrel-windows-notifications = { path = "../../adapters/windows-notifications" }
+anodrel-windows-notification-area = { path = "../../adapters/windows-notification-area" }
 anodrel-windows-network = { path = "../../adapters/windows-network" }
 anodrel-windows-uia = { path = "../../adapters/windows-uia" }
 anodrel-windows-uia-client = { path = "../../adapters/windows-uia-client" }

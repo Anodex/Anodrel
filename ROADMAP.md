@@ -477,9 +477,9 @@ Status: **First starter-package slice in progress**
   check. Decision 0121 now adds a separately selected native context-menu
   template: its `init-context-menu` generator and fixed four-grant Windows
   host route exercise Protocol 1.32 without broadening any earlier template.
-  A generated child has completed a real-pipe session with its complete model,
-  revision-bound context action, and self-close. The remaining acceptance check
-  is the documented real User32 right-click. Decision 0094 now adds a third,
+  A generated child completed its real-pipe context-menu session; its real User32 right-click remains the acceptance check.
+  Protocol 1.33's semantic tray has an implemented Windows bridge; real notification-area interaction remains manual. See `docs/TRAY.md`.
+  Decision 0094 now adds a third,
   separately selected native template:
   its `init-multi-window` generator and fixed five-grant Windows host route
   exercise Protocol 1.25 without broadening the regular or menu templates.

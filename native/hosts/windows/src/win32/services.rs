@@ -6,8 +6,10 @@
 //! native state through this module.
 
 use super::*;
+mod notification_area;
 mod window_presentation;
 
+pub(super) use notification_area::{service_notification, service_tray};
 #[cfg(test)]
 pub(super) use window_presentation::{observed_presentation_state, presentation_command};
 pub(super) use window_presentation::{
@@ -305,40 +307,6 @@ pub(super) fn client_origin(window: Hwnd) -> anodrel_windows_accessibility::Clie
     // The layout is already composed at the display's real pixel density, so
     // its logical units are physical ones and need no further scaling.
     anodrel_windows_accessibility::ClientOrigin::new(origin.x, origin.y, 1.0)
-}
-
-/// Shows one pending notification for a session window, if it has one.
-///
-/// The Shell32 call runs outside the window registry's lock, so a slow shell
-/// cannot block every other window's message handling. The notification-area
-/// entry is created on first use and then reused, because creating one eagerly
-/// would put an icon on screen for sessions that never notify.
-pub(super) fn service_notification(window: Hwnd) {
-    let Ok(Some((request, entry))) = registry::take_notification_request(window) else {
-        return;
-    };
-
-    let (entry, created) = match entry {
-        Some(entry) => (Some(entry), None),
-        // Host-owned brand artwork, the same icon the window already carries.
-        // An application cannot supply, select, or replace it.
-        None => match anodrel_windows_notifications::WindowsNotifications::create(
-            window,
-            ICONS.get_or_init(appicon::create).0.unwrap_or(0),
-        ) {
-            Ok(entry) => {
-                let entry = std::sync::Arc::new(entry);
-                (Some(std::sync::Arc::clone(&entry)), Some(entry))
-            }
-            Err(_) => (None, None),
-        },
-    };
-
-    let shown = entry.is_some_and(|entry| {
-        anodrel_notifications::NotificationService::show(entry.as_ref(), request.notification())
-            .is_ok()
-    });
-    let _ = registry::complete_notification_request(window, request.id(), shown, created);
 }
 
 /// Answers one pending field read for a session window, if it has one.

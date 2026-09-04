@@ -16,7 +16,7 @@ use anodrel_core::{HostPolicy, HostServices, SessionCloseSignal};
 use anodrel_file_access::{SaveFileDialogMailbox, SelectionFileDialogMailbox};
 use anodrel_file_dialog::FileDialogMailbox;
 use anodrel_folder_access::FolderFileDialogMailbox;
-use anodrel_menu::{ContextMenuMailbox, MenuMailbox};
+use anodrel_menu::{ContextMenuMailbox, MenuMailbox, TrayMailbox};
 use anodrel_notifications::NotificationMailbox;
 use anodrel_session_policy::host_policy_for_installed_application;
 use anodrel_ui_session::{
@@ -52,6 +52,7 @@ pub struct RegisteredSessionUi {
     notification_mailbox: NotificationMailbox,
     menu_mailbox: MenuMailbox,
     context_menu_mailbox: ContextMenuMailbox,
+    tray_mailbox: TrayMailbox,
     window_title_mailbox: WindowTitleMailbox,
     window_state_mailbox: WindowStateMailbox,
     window_state_read_mailbox: WindowStateReadMailbox,
@@ -82,6 +83,7 @@ impl RegisteredSessionUi {
             notification_mailbox: NotificationMailbox::new(),
             menu_mailbox: MenuMailbox::new(),
             context_menu_mailbox: ContextMenuMailbox::new(),
+            tray_mailbox: TrayMailbox::new(),
             window_title_mailbox: WindowTitleMailbox::new(),
             window_state_mailbox: WindowStateMailbox::new(),
             window_state_read_mailbox: WindowStateReadMailbox::new(),
@@ -164,6 +166,15 @@ impl RegisteredSessionUi {
     #[must_use]
     pub fn context_menu_mailbox(&self) -> ContextMenuMailbox {
         self.context_menu_mailbox.clone()
+    }
+
+    /// Returns this session's one-request UI-thread notification-area tray mailbox.
+    ///
+    /// The native icon, callback, popup placement, and private command mapping
+    /// stay with the Windows host; this carries only a complete semantic model.
+    #[must_use]
+    pub fn tray_mailbox(&self) -> TrayMailbox {
+        self.tray_mailbox.clone()
     }
 
     /// Returns this session's one-request UI-thread window-title mailbox.
@@ -387,6 +398,9 @@ fn registered_interactive_services(
         // Context menus use their own capability, mailbox, and local User32
         // popup route. The service carries no target, coordinate, or handle.
         .with_context_menu(ui.context_menu_mailbox())
+        // The tray shares the session window's host-owned notification-area
+        // entry and keeps Shell32 and User32 work off the pipe worker.
+        .with_tray(ui.tray_mailbox())
         // A window caption reaches User32 the same way, and the UI thread holds
         // the validated display name it composes with.
         .with_window_title(ui.window_title_mailbox())

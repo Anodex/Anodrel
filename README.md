@@ -188,15 +188,12 @@ adds a separate `window.state.observe` grant and immediate coalesced
 with no target, timing, history, wait, callback, or subscription; see
 `docs/WINDOW_STATE_CHANGES.md`.
 
-Protocol 1.32 adds the direct Windows-native context-menu route. Its distinct
-`menu.context.write` grant replaces one complete semantic model of up to
-sixteen ID, label, and enabled-state items. The UI thread owns the local
-pointer trigger, User32 popup, private command mapping, and action routing; it
-exposes no browser selection, link, coordinate, target, callback, shortcut,
-native handle, command identifier, or result readback. The SDK, mock host,
-installed-record 1.19 policy, and revision-checked `ui.events.read` delivery
-are implemented through the direct Windows popup bridge. See
-`docs/CONTEXT_MENUS.md`.
+Protocol 1.32 adds a semantic native context-menu with its own `menu.context.write`
+grant; the direct Windows popup bridge retains every pointer, command, and
+callback fact locally. Protocol 1.33 similarly adds a semantic tray menu that
+shares the host notification-area entry. Its direct Windows bridge and Rust
+facade are implemented; live notification-area interaction remains a manual
+acceptance check. See `docs/CONTEXT_MENUS.md` and `docs/TRAY.md`.
 
 The Windows pipe also has a host-only stop signal, so lifecycle shutdown can
 cancel a pending accept or read without exposing IPC control to applications.
@@ -367,7 +364,8 @@ its explicit ownership boundary, and the remaining manual verification.
 `docs/CONTEXT_MENUS.md` defines the separate bounded native context-menu
 contract and its implemented direct Windows popup bridge.
 `docs/NATIVE_CONTEXT_MENU_TEMPLATE.md` defines the matching first-party Rust
-development template and its explicit four-grant host route.
+development template and its explicit four-grant host route; `docs/TRAY.md`
+defines the shared Windows notification-area tray contract.
 `docs/NOTIFICATIONS.md` defines the one-way bounded notification boundary,
 implemented from portable values through the Shell32 adapter, Protocol 1.13, and
 a development diagnostic. It reports only that the host accepted a notification,

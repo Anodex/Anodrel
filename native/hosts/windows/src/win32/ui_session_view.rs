@@ -5,7 +5,9 @@ use std::sync::Arc;
 use anodrel_canvas::Point;
 use anodrel_core::SessionCloseSignal;
 use anodrel_file_dialog::{FileDialogMailbox, FileDialogRequest, FileDialogSelection};
-use anodrel_menu::{ContextMenuMailbox, ContextMenuRequest, MenuMailbox, MenuRequest};
+use anodrel_menu::{
+    ContextMenuMailbox, ContextMenuRequest, MenuMailbox, MenuRequest, TrayMailbox, TrayRequest,
+};
 use anodrel_notifications::{NotificationMailbox, NotificationRequest};
 use anodrel_ui::{ElementId, Status, UiEvent};
 use anodrel_ui_session::{
@@ -19,11 +21,12 @@ use anodrel_window::{
 };
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_folder_access::WindowsFolderEntryService;
-use anodrel_windows_notifications::WindowsNotifications;
+use anodrel_windows_notification_area::NotificationArea;
 use anodrel_windows_product_session::RunningProductSession;
 
 mod bridges;
 mod interaction;
+mod tray_bridge;
 
 use super::{
     Hwnd, Lparam, Wparam,
@@ -57,13 +60,17 @@ pub(super) struct UiSessionView {
     context_menu_mailbox: Option<ContextMenuMailbox>,
     /// The current host-retained context-menu model and private command mapping.
     context_menu: Option<ContextMenu>,
+    /// This session's one-request notification-area tray bridge, when it has one.
+    tray_mailbox: Option<TrayMailbox>,
+    /// The current host-retained tray model and private command mapping.
+    tray: Option<super::tray::TrayMenu>,
     /// This session's notification-area entry, created the first time it
     /// actually shows something.
     ///
     /// Creating it eagerly would put an icon in the notification area for every
     /// session window, including diagnostics that never notify. The entry lives
     /// as long as the view, so it is shared rather than recreated.
-    notification_entry: Option<Arc<WindowsNotifications>>,
+    notification_entry: Option<Arc<NotificationArea>>,
     /// This session's one-request window-title bridge, when it has one.
     ///
     /// A diagnostic session view holds `None` and answers every proposal as
@@ -166,6 +173,8 @@ impl UiSessionView {
             menu_bar: None,
             context_menu_mailbox: None,
             context_menu: None,
+            tray_mailbox: None,
+            tray: None,
             notification_entry: None,
             window_title: None,
             window_state: None,
@@ -201,6 +210,7 @@ impl UiSessionView {
             display_name,
             menu,
             context_menu,
+            tray,
             window_state,
             window_state_read,
             window_state_changes,
@@ -222,6 +232,7 @@ impl UiSessionView {
                 ui.display_name().to_owned(),
                 ui.menu_mailbox(),
                 ui.context_menu_mailbox(),
+                ui.tray_mailbox(),
                 ui.window_state_mailbox(),
                 ui.window_state_read_mailbox(),
                 ui.window_state_changes_mailbox(),
@@ -244,6 +255,7 @@ impl UiSessionView {
         .with_window_title(window_title, display_name)
         .with_menu(menu)
         .with_context_menu(context_menu)
+        .with_tray(tray)
         .with_window_state(window_state)
         .with_window_state_read(window_state_read)
         .with_window_state_changes(window_state_changes)

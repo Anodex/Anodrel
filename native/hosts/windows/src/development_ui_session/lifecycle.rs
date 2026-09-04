@@ -84,6 +84,17 @@ where
                 HostServices::unavailable().with_context_menu(ui.context_menu.clone()),
             )?;
         (server, invitation, None)
+    } else if config.supports_tray() {
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                HostServices::unavailable().with_tray(ui.tray.clone()),
+            )?;
+        (server, invitation, None)
     } else if config.supports_fields() {
         let (server, invitation) =
             WindowsPipeServer::create_with_session_components_and_service_bundle(
@@ -156,6 +167,7 @@ where
                 ui.notifications,
                 ui.menu,
                 ui.context_menu,
+                ui.tray,
                 ui.window_title,
                 ui.window_state,
                 ui.window_state_read,

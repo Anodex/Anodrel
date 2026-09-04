@@ -21,6 +21,7 @@ pub fn run_ui_session(
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     context_menu: ContextMenuMailbox,
+    tray: anodrel_menu::TrayMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -42,6 +43,7 @@ pub fn run_ui_session(
         notifications,
         menu,
         context_menu,
+        tray,
         window_title,
         window_state,
         window_state_read,
@@ -69,6 +71,7 @@ pub(crate) fn run_ui_session_after_shown<F>(
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     context_menu: ContextMenuMailbox,
+    tray: anodrel_menu::TrayMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -94,6 +97,7 @@ where
         notifications,
         menu,
         context_menu,
+        tray,
         window_title,
         window_state,
         window_state_read,
@@ -154,6 +158,7 @@ pub fn run_authenticated_ui_session(
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     context_menu: ContextMenuMailbox,
+    tray: anodrel_menu::TrayMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -175,6 +180,7 @@ pub fn run_authenticated_ui_session(
         notifications,
         menu,
         context_menu,
+        tray,
         window_title,
         window_state,
         window_state_read,
@@ -199,6 +205,7 @@ fn run_authenticated_ui_session_after_shown<F>(
     notifications: NotificationMailbox,
     menu: MenuMailbox,
     context_menu: ContextMenuMailbox,
+    tray: anodrel_menu::TrayMailbox,
     window_title: WindowTitleMailbox,
     window_state: WindowStateMailbox,
     window_state_read: WindowStateReadMailbox,
@@ -231,6 +238,7 @@ where
                 .with_folder_entries(folder_entries)
                 .with_menu(menu)
                 .with_context_menu(context_menu)
+                .with_tray(tray)
                 .with_window_title(window_title, display_name)
                 .with_window_state(window_state)
                 .with_window_state_read(window_state_read)

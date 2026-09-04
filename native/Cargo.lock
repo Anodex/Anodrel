@@ -678,6 +678,7 @@ dependencies = [
  "anodrel-windows-instance",
  "anodrel-windows-launch",
  "anodrel-windows-network",
+ "anodrel-windows-notification-area",
  "anodrel-windows-notifications",
  "anodrel-windows-paths",
  "anodrel-windows-pipe",

@@ -369,14 +369,22 @@ impl UiSessionView {
     /// window registry's lock.
     pub(in crate::win32) fn take_notification_request(
         &self,
-    ) -> Option<(NotificationRequest, Option<Arc<WindowsNotifications>>)> {
+    ) -> Option<(NotificationRequest, Option<Arc<NotificationArea>>)> {
         let request = self.notifications.take()?;
         Some((request, self.notification_entry.clone()))
     }
 
     /// Records the entry this session created on its first notification.
-    pub(in crate::win32) fn set_notification_entry(&mut self, entry: Arc<WindowsNotifications>) {
+    pub(in crate::win32) fn set_notification_entry(&mut self, entry: Arc<NotificationArea>) {
         self.notification_entry = Some(entry);
+    }
+
+    /// Clones the current shared notification-area entry for host composition.
+    ///
+    /// This remains host-only resource state. It exposes no icon, callback,
+    /// native status, or handle to the authenticated session.
+    pub(in crate::win32) fn notification_entry(&self) -> Option<Arc<NotificationArea>> {
+        self.notification_entry.clone()
     }
 
     /// Completes a notification after the host UI thread returns from Shell32.

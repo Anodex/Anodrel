@@ -73,6 +73,9 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         service_accessibility_scroll(window);
         return 0;
     }
+    if message == WM_ANODREL_NOTIFICATION_AREA && tray::handle_callback(window, lparam) {
+        return 0;
+    }
     if let Some(result) = super::input::handle_input_message(window, message, wparam, lparam) {
         return result;
     }
@@ -186,6 +189,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_session_window_open(window);
             service_session_window_close(window);
             service_notification(window);
+            service_tray(window);
             service_menu(window);
             service_context_menu(window);
             service_window_title(window);
