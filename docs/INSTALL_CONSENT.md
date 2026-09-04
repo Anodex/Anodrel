@@ -1,8 +1,8 @@
 # Windows initial-install consent
 
-**Status:** The host-owned native confirmation is implemented. The later fixed
-UAC handoff, completion proof, restart, and completion presentation remain
-separate work.
+**Status:** The host-owned native confirmation is implemented and composed by
+the fixed no-argument installer route with its UAC handoff and completion
+proof. Restart and completion presentation remain separate work.
 
 ## Purpose
 
@@ -29,7 +29,7 @@ native UI thread after the signed preflight, not from application protocol
 code.
 
 `Yes` creates an opaque approval that retains the original prepared
-installation. Only that approval may enter the later UAC-handoff boundary.
+installation. Only that approval may enter the fixed UAC-handoff boundary.
 `No` is an ordinary decline. The adapter does not download, elevate, launch,
 install, write policy, remember a preference, or retain a decision.
 

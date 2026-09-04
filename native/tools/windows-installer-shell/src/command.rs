@@ -21,9 +21,9 @@ const USAGE: &str = concat!(
     "  anodrel-windows-installer uninstall\n",
     "  anodrel-windows-installer validate-manifest <release-manifest.json>\n",
     "\n",
-    "No command starts the fixed signed initial-install flow. Named install, update,\n",
-    "rollback, and uninstall commands require an elevated shell and accept no target\n",
-    "or policy arguments. validate-manifest is development-only and does not install anything.",
+    "No-argument invocation starts the fixed signed initial-install flow. Named install,\n",
+    "update, rollback, and uninstall commands require an elevated shell and accept no\n",
+    "target or policy arguments. validate-manifest is development-only and does not install anything.",
 );
 
 /// One fixed command accepted by the installer executable.
@@ -156,6 +156,7 @@ mod tests {
         ] {
             assert_eq!(parse(&arguments(invalid)), Err(USAGE.to_owned()));
         }
+        assert!(USAGE.contains("No-argument invocation starts"));
     }
 
     fn arguments(values: &[&str]) -> Vec<String> {

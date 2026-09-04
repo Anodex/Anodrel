@@ -1,9 +1,9 @@
 # Windows initial-install elevation handoff
 
 **Status:** The fixed UAC launcher and process-lifecycle boundary are
-implemented. The default interactive installer command, a completion surface,
-restart handling, and signed end-to-end fixture verification remain separate
-work.
+implemented and composed by the default installer command. A completion
+surface, restart handling, and signed end-to-end fixture verification remain
+separate work.
 
 ## Purpose
 
@@ -38,10 +38,11 @@ machine-policy gates.
 
 ## Exclusions
 
-This boundary does not display confirmation, create a default installer route,
-download, install a certificate, choose an elevation target, show progress,
-parse child output, write machine policy, recover files, restart applications,
-or claim a user-visible completion result.
+This boundary does not itself display confirmation, download, install a
+certificate, choose an elevation target, show progress, parse child output,
+write machine policy, recover files, restart applications, or claim a
+user-visible completion result. The default installer route composes this
+boundary only after the separate native confirmation succeeds.
 
 See [Windows installer](WINDOWS_INSTALLER.md), [initial-install consent](INSTALL_CONSENT.md),
 [initial-install acceptance](INSTALL_ACCEPTANCE.md), and Decision 0179.

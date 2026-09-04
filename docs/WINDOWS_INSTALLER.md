@@ -341,23 +341,20 @@ show that the current signed embedded release was accepted without writing
 machine state. The development-only `validate-manifest <path>` command still
 validates one sidecar manifest and cannot write machine state.
 
-The installer now also exposes an opaque initial-install preflight and matching
-postcondition proof for a later native consent/UAC surface; see
-[initial-install acceptance](INSTALL_ACCEPTANCE.md). A direct native, no-by-default
-confirmation may turn that prepared result into an opaque approval; see
-[initial-install consent](INSTALL_CONSENT.md). Only that approval can enter a
-fixed direct UAC handoff, whose zero exit still requires the postcondition
-proof; see [initial-install handoff](INSTALL_HANDOFF.md). The current
-no-argument command now composes those stages for an initial installation; see
-[interactive initial-install flow](INSTALL_FLOW.md). Named machine-changing
+The installer exposes an opaque initial-install preflight and matching
+postcondition proof; its no-argument route composes them with a direct native,
+no-by-default confirmation and fixed UAC handoff. A zero child exit still
+requires the postcondition proof. See [initial-install acceptance](INSTALL_ACCEPTANCE.md),
+[initial-install consent](INSTALL_CONSENT.md), [initial-install handoff](INSTALL_HANDOFF.md),
+and [interactive initial-install flow](INSTALL_FLOW.md). Named machine-changing
 commands still require an explicitly elevated shell.
 
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, file associations, service installation, and
 notifications. Start-menu registration is limited to one signed policy-derived
 link; the signed catalogue source, CMS verification, and private image staging
-foundations are implemented; elevation handoff and installation remain separate
-trust boundaries.
+foundations are implemented; elevation handoff and installation remain bounded
+separate trust boundaries.
 
 ## Production decision still required
 

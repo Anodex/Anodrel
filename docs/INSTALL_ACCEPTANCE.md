@@ -1,8 +1,9 @@
 # Windows initial-install acceptance
 
-**Status:** The signed initial-install preflight and postcondition proof are
-implemented. A later native installer surface must provide explicit consent and
-direct UAC handoff before a person can use this as an interactive flow.
+**Status:** The signed initial-install preflight, no-by-default native consent,
+direct UAC handoff, and postcondition proof are implemented. A signed
+end-to-end fixture run remains required before this can be claimed as verified
+on a real machine.
 
 ## Purpose
 
@@ -42,10 +43,10 @@ result. A nonzero elevated exit has no proof route.
 
 ## Exclusions
 
-This does not add a default installer command, a UAC launcher, a UI dialog, a
-shortcut, an uninstall entry, automatic repair, rollback, data migration,
-restart, notification, background service, or application protocol capability.
-Those each need their own host-owned boundary.
+This does not add a full installer window, shortcut, uninstall entry, automatic
+repair, rollback, data migration, restart, notification, background service,
+or application protocol capability. The fixed no-argument route is limited to
+the documented native confirmation, fixed UAC handoff, and policy proof.
 
 See [Windows installer](WINDOWS_INSTALLER.md), [update acceptance](UPDATE_ACCEPTANCE.md),
 and Decision 0177.
