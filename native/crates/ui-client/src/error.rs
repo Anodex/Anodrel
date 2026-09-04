@@ -21,6 +21,10 @@ pub enum UiClientError {
     TrayInvalid,
     /// The supplied notification text failed the fixed portable rules.
     NotificationInvalid,
+    /// The supplied host-owned file-dialog filters were invalid.
+    FileDialogFiltersInvalid,
+    /// The supplied retained-output text exceeded its fixed bound.
+    FileTextInvalid,
     /// The supplied secondary-window title failed its fixed portable rules.
     WindowTitleInvalid,
     /// The authenticated underlying conversation could not continue.
@@ -39,6 +43,8 @@ impl fmt::Display for UiClientError {
             Self::ContextMenuInvalid => "the native context-menu model was invalid",
             Self::TrayInvalid => "the native tray model was invalid",
             Self::NotificationInvalid => "the notification text was invalid",
+            Self::FileDialogFiltersInvalid => "the file-dialog filters were invalid",
+            Self::FileTextInvalid => "the selected-output text was invalid",
             Self::WindowTitleInvalid => "the window title was invalid",
             Self::Conversation(_) => "the authenticated UI conversation could not continue",
             Self::ResponseInvalid => "the host returned an invalid UI response",

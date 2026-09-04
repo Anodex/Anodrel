@@ -36,6 +36,12 @@ pub(super) const NOTIFICATION_GRANTS: [Capability; 3] = [
     Capability::NotificationShow,
     Capability::SessionClose,
 ];
+pub(super) const FILE_WRITE_GRANTS: [Capability; 4] = [
+    Capability::UiDocumentWrite,
+    Capability::DialogSaveFile,
+    Capability::FileWriteText,
+    Capability::SessionClose,
+];
 pub(super) const MULTI_WINDOW_GRANTS: [Capability; 5] = [
     Capability::UiDocumentWrite,
     Capability::UiEventsRead,
@@ -62,6 +68,7 @@ enum DevelopmentUiSessionKind {
     ContextMenu,
     Tray,
     Notification,
+    FileWrite,
     MultiWindow,
     WindowControls,
 }
@@ -179,6 +186,25 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration for one retained selected-output text write.
+    ///
+    /// The host retains the selected native object. This route does not grant
+    /// a path-based filesystem operation, input events, or output readback.
+    pub(crate) const fn with_file_write(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::FileWrite,
+        }
+    }
+
     /// Creates a configuration for the explicit bounded multi-window route.
     ///
     /// Window creation and secondary close are additional fixed grants on this
@@ -223,6 +249,7 @@ impl DevelopmentUiSessionConfig {
             DevelopmentUiSessionKind::ContextMenu => &CONTEXT_MENU_GRANTS,
             DevelopmentUiSessionKind::Tray => &TRAY_GRANTS,
             DevelopmentUiSessionKind::Notification => &NOTIFICATION_GRANTS,
+            DevelopmentUiSessionKind::FileWrite => &FILE_WRITE_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
             DevelopmentUiSessionKind::WindowControls => &WINDOW_CONTROLS_GRANTS,
         }
@@ -244,6 +271,10 @@ impl DevelopmentUiSessionConfig {
         matches!(self.kind, DevelopmentUiSessionKind::Notification)
     }
 
+    pub(super) const fn supports_file_write(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::FileWrite)
+    }
+
     pub(super) const fn supports_fields(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::Form)
     }
@@ -262,8 +293,9 @@ mod tests {
     use anodrel_protocol::Capability;
 
     use super::{
-        CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS,
-        MULTI_WINDOW_GRANTS, NOTIFICATION_GRANTS, TRAY_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
+        CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FILE_WRITE_GRANTS, FORM_GRANTS,
+        MENU_GRANTS, MULTI_WINDOW_GRANTS, NOTIFICATION_GRANTS, TRAY_GRANTS, UI_GRANTS,
+        WINDOW_CONTROLS_GRANTS,
     };
 
     #[test]
@@ -304,6 +336,12 @@ mod tests {
             "Anodrel Notification Test",
             "completed notification",
         );
+        let file_write = DevelopmentUiSessionConfig::with_file_write(
+            "anodrel.test-file-write",
+            "test-file-write-session",
+            "Anodrel File Write Test",
+            "completed file write",
+        );
         let multi_window = DevelopmentUiSessionConfig::with_multi_window(
             "anodrel.test-multi-window",
             "test-multi-window-session",
@@ -338,6 +376,11 @@ mod tests {
         assert_eq!(notification.grants(), NOTIFICATION_GRANTS);
         assert!(notification.supports_notification());
         assert!(!notification.supports_tray());
+        assert_eq!(file_write.grants(), FILE_WRITE_GRANTS);
+        assert!(file_write.supports_file_write());
+        assert!(!file_write.supports_notification());
+        assert!(!file_write.supports_fields());
+        assert!(!file_write.supports_menu());
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
         assert!(!multi_window.supports_menu());
         assert!(multi_window.supports_multi_window());

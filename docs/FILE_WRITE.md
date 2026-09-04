@@ -1,6 +1,9 @@
 # Selection-scoped file writing
 
 **Status:** Implemented for the direct Windows UI-session host in Protocol 1.17.
+The first-party native file-write template and real invited-pipe test now cover
+the typed route; the interactive Windows picker and created-file check remain
+a manual acceptance step.
 
 Anodrel's legacy save picker is intentionally only a user choice. This document
 defines the separate Protocol 1.17 text-write boundary. It does not make
@@ -94,5 +97,6 @@ persistent permission, recovery, and non-Windows adapters are intentionally
 outside this contract. Each needs a new decision and threat-model entry.
 
 See Decision 0079, `docs/FILE_DIALOGS.md`, `docs/FILE_ACCESS.md`, and
-`docs/FILE_BINARY_WRITE.md`; `docs/PROTOCOL.md` defines both output
+`docs/FILE_BINARY_WRITE.md`; `docs/NATIVE_FILE_WRITE_TEMPLATE.md` documents
+the fixed development walkthrough, and `docs/PROTOCOL.md` defines both output
 operations.

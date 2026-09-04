@@ -30,8 +30,9 @@ pipe names, tokens, raw Windows errors, raw host responses, or host diagnostics.
 The facade preserves the documented typed operations from `anodrel-ui-client`:
 strict v1/v2/v3 document replacement, bounded semantic-event reads,
 whole-surface field snapshots, complete menu and tray replacement, opaque
-secondary-view operations, one-way notification delivery, and group close. It also exposes targetless controls
-for the authenticated session's own host window:
+secondary-view operations, one-way notification delivery, retained output
+selection and text writing, and group close. It also exposes targetless
+controls for the authenticated session's own host window:
 
 | Method | Existing operation | Result |
 | --- | --- | --- |
@@ -43,6 +44,8 @@ for the authenticated session's own host window:
 | `replace_tray_v1` | `tray.replace` | opaque semantic tray revision |
 | `read_tray_actions` | `ui.events.read` | revision-bound tray action batch |
 | `show_notification` | `notification.show` | accepted one-way host handover |
+| `select_save_file_v2` | `dialog.save_file.v2` | cancelled or display path with opaque retained output reference |
+| `write_selected_text` | `file.write_text` | accepted bounded one-use retained text write |
 
 `WindowState`, `WindowFullscreenMode`, and `WindowSize` are re-exported by the
 facade, so an application does not import an implementation crate. The methods
@@ -62,11 +65,12 @@ need public documentation and generated-template compatibility coverage. A
 removal or incompatible type change requires a new decision and a new `0.2`
 minor line. Registry publication is intentionally separate work.
 
-The generated UI, menu, context-menu, tray, notification, form, live-status, multi-window,
-scroll-window, and window-controls projects are the real consumers. Their isolated release builds
-and authenticated Windows-pipe sessions prove that the SDK has no hidden
-host-source dependency. The window-controls project specifically covers every
-targetless window-control method under the host's exact fixed grants.
+The generated UI, menu, context-menu, tray, notification, file-write, form,
+live-status, multi-window, scroll-window, and window-controls projects are the
+real consumers. Their isolated release builds and authenticated Windows-pipe
+sessions prove that the SDK has no hidden host-source dependency. The
+window-controls project specifically covers every targetless window-control
+method under the host's exact fixed grants.
 
 See Decision 0104 and `docs/NATIVE_CLIENT.md` for the lower-level private
 transport contract.

@@ -245,9 +245,11 @@ generators. The UI probe and regular generated-template route receive only
 document replacement, semantic-event pull, and their own close grant. The
 separate menu route adds only `menu.write`; the separate multi-window route adds
 only `window.open` and `window.close`; the separate form route adds only
-`ui.fields.read`; and the separate notification route adds only one-way
-`notification.show` with fixed text and duration. Neither route lets a template supply grants, identity, title,
-a session ID, a native handle, field selector, keyboard source, or
+`ui.fields.read`; the separate notification route adds only one-way
+`notification.show` with fixed text and duration; and the separate file-write
+route adds only `dialog.save_file` and `file.write_text` with one fixed filter
+and text value. Neither route lets a template supply grants, identity, title,
+a session ID, a native handle, field selector, keyboard source, path, or
 operating-system authority. In particular, a multi-window executable receives
 an opaque logical secondary identity only after the host has validated, created,
 and registered the private native view, while a form executable receives one

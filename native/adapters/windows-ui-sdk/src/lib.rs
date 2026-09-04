@@ -16,11 +16,11 @@ use anodrel_windows_client::WindowsClientStream;
 
 pub use anodrel_client::InteractivePollSchedule;
 pub use anodrel_ui_client::{
-    ContextMenuRevision, DocumentRevision, MenuRevision, SecondaryWindowId, SessionWindowId,
-    TrayRevision, UiAction, UiActionBatch, UiClientError, UiContextMenuAction,
-    UiContextMenuActionBatch, UiEvent, UiEventBatch, UiFieldSnapshot, UiFieldValue, UiTrayAction,
-    UiTrayActionBatch, WindowFullscreenMode, WindowSize, WindowState, WindowUiAction,
-    WindowUiActionBatch,
+    ContextMenuRevision, DocumentRevision, FileDialogFilter, MenuRevision, SaveReference,
+    SaveSelection, SaveSelectionResult, SecondaryWindowId, SessionWindowId, TrayRevision, UiAction,
+    UiActionBatch, UiClientError, UiContextMenuAction, UiContextMenuActionBatch, UiEvent,
+    UiEventBatch, UiFieldSnapshot, UiFieldValue, UiTrayAction, UiTrayActionBatch,
+    WindowFullscreenMode, WindowSize, WindowState, WindowUiAction, WindowUiActionBatch,
 };
 
 /// Closed outcomes while establishing one invited Windows UI session.
@@ -136,6 +136,29 @@ impl WindowsUiSession {
     /// the notification. The host alone owns its Shell32 entry and artwork.
     pub fn show_notification(&mut self, title: &str, body: &str) -> Result<(), UiClientError> {
         self.session.show_notification(title, body)
+    }
+
+    /// Opens one host-owned save picker and captures one retained output object.
+    ///
+    /// The selected path is display data only. Writing requires the opaque,
+    /// one-use reference from the selected result.
+    pub fn select_save_file_v2(
+        &mut self,
+        filters: &[FileDialogFilter],
+    ) -> Result<SaveSelectionResult, UiClientError> {
+        self.session.select_save_file_v2(filters)
+    }
+
+    /// Writes one bounded UTF-8 value through a retained selected output.
+    ///
+    /// This does not accept a path, native handle, offset, append flag, or a
+    /// durable/atomicity option.
+    pub fn write_selected_text(
+        &mut self,
+        reference: &SaveReference,
+        text: &str,
+    ) -> Result<(), UiClientError> {
+        self.session.write_selected_text(reference, text)
     }
 
     /// Proposes a title for this session's own host window.

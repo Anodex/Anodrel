@@ -1,5 +1,7 @@
 //! Creation and isolated-build verification for generated native projects.
 
+mod file_write;
+
 use std::{error::Error, fmt, fs, path::Path};
 
 use crate::{
@@ -7,14 +9,16 @@ use crate::{
     paths::{anodrel_root, relative_path, resolve_new_project, write_new_file},
     template::{
         TemplateContext, cargo_toml, context_menu_main_source, context_menu_readme,
-        form_main_source, form_readme, live_status_main_source, live_status_readme, main_source,
-        menu_main_source, menu_readme, multi_window_main_source, multi_window_readme,
-        notification_main_source, notification_readme, readme, scroll_window_main_source,
-        scroll_window_readme, tray_main_source, tray_readme, window_controls_main_source,
-        window_controls_readme,
+        file_write_main_source, file_write_readme, form_main_source, form_readme,
+        live_status_main_source, live_status_readme, main_source, menu_main_source, menu_readme,
+        multi_window_main_source, multi_window_readme, notification_main_source,
+        notification_readme, readme, scroll_window_main_source, scroll_window_readme,
+        tray_main_source, tray_readme, window_controls_main_source, window_controls_readme,
     },
     validation::{validate_display_label, validate_project_slug},
 };
+
+pub use file_write::initialize_file_write;
 
 #[derive(Debug)]
 pub struct InitError(&'static str);
@@ -191,6 +195,11 @@ fn initialize_template(
             notification_readme(&context),
             "Created Anodrel native notification project.",
         ),
+        TemplateKind::FileWrite => (
+            file_write_main_source(display_label),
+            file_write_readme(&context),
+            "Created Anodrel native file-write project.",
+        ),
         TemplateKind::MultiWindow => (
             multi_window_main_source(display_label),
             multi_window_readme(&context),
@@ -238,6 +247,8 @@ fn template_context(
 
 #[cfg(test)]
 mod tests {
+    mod file_write;
+
     use std::{
         fs,
         process::Command,

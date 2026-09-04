@@ -14,6 +14,7 @@ use crate::{
     UiClientError, UiEvent, UiSession,
 };
 
+mod file_write;
 mod foundation;
 mod notification;
 mod tray;

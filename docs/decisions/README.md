@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0194: Development native file-write templates keep output retained.
+
 - 0193: Development native notification templates stay one-way.
 
 - 0192: Development native tray templates stay explicit.

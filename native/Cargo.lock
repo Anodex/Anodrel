@@ -237,6 +237,8 @@ name = "anodrel-native-app-tool"
 version = "0.1.0"
 dependencies = [
  "anodrel-core",
+ "anodrel-file-access",
+ "anodrel-file-dialog",
  "anodrel-menu",
  "anodrel-notifications",
  "anodrel-protocol",
@@ -500,6 +502,8 @@ version = "0.1.0"
 dependencies = [
  "anodrel-bootstrap",
  "anodrel-client",
+ "anodrel-file-access",
+ "anodrel-file-dialog",
  "anodrel-json",
  "anodrel-menu",
  "anodrel-notifications",

@@ -9,9 +9,9 @@ use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_wire::{FrameDecoder, encode_json};
 
 use super::{
-    ContextMenuRevision, TrayRevision, UiClientError, UiContextMenuActionBatch, UiTrayActionBatch,
-    WindowFullscreenMode, WindowSize, WindowState, WindowsUiConnectionError, WindowsUiSession,
-    establish_session,
+    ContextMenuRevision, FileDialogFilter, SaveReference, SaveSelectionResult, TrayRevision,
+    UiClientError, UiContextMenuActionBatch, UiTrayActionBatch, WindowFullscreenMode, WindowSize,
+    WindowState, WindowsUiConnectionError, WindowsUiSession, establish_session,
 };
 
 const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.windows-sdk-test";
@@ -143,4 +143,13 @@ fn facade_exposes_only_typed_targetless_window_controls() {
         WindowsUiSession::read_tray_actions;
     let _show_notification: fn(&mut WindowsUiSession, &str, &str) -> Result<(), UiClientError> =
         WindowsUiSession::show_notification;
+    let _select_save_file: fn(
+        &mut WindowsUiSession,
+        &[FileDialogFilter],
+    ) -> Result<SaveSelectionResult, UiClientError> = WindowsUiSession::select_save_file_v2;
+    let _write_selected_text: fn(
+        &mut WindowsUiSession,
+        &SaveReference,
+        &str,
+    ) -> Result<(), UiClientError> = WindowsUiSession::write_selected_text;
 }

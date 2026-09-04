@@ -6,6 +6,8 @@ license.workspace = true
 
 [dependencies]
 anodrel-client = { path = "../client" }
+anodrel-file-access = { path = "../file-access" }
+anodrel-file-dialog = { path = "../file-dialog" }
 anodrel-json = { path = "../json" }
 anodrel-menu = { path = "../menu" }
 anodrel-notifications = { path = "../notifications" }

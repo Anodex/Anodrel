@@ -42,13 +42,15 @@ use anodrel_external_links::{ExternalLink, ExternalLinkOpenError, ExternalLinkSe
 use anodrel_file_access::{
     FileBinaryData, FileBinaryDataError, FileBinaryWriteService, FileBinaryWriteServiceError,
     FileSelectionResult, FileSelectionService, FileSelectionServiceError, FileTextService,
-    FileTextServiceError, FileTextWriteService, FileTextWriteServiceError, SaveReference,
+    FileTextServiceError, FileTextWriteService, FileTextWriteServiceError,
+    MAX_FILE_TEXT_WRITE_BYTES as FILE_ACCESS_MAX_FILE_TEXT_WRITE_BYTES, SaveReference,
     SaveSelectionResult, SaveSelectionService, SaveSelectionServiceError, SelectionReference,
     UnavailableFileBinaryWriteService, UnavailableFileSelectionService, UnavailableFileTextService,
     UnavailableFileTextWriteService, UnavailableSaveSelectionService,
 };
 use anodrel_file_dialog::{
     FileDialogFilter, FileDialogSelection, FileDialogService, FileDialogServiceError,
+    MAX_FILE_DIALOG_FILTERS as FILE_DIALOG_MAX_FILE_DIALOG_FILTERS,
 };
 use anodrel_folder_access::{
     FolderEntryService, FolderEntryServiceError, FolderReference, FolderSelectionResult,
@@ -89,9 +91,9 @@ pub const MAX_EXTERNAL_LINK_REQUEST_BYTES: usize = 2 * 1024;
 /// Maximum bytes in the exact `network.fetch_text` URL payload.
 pub const MAX_NETWORK_FETCH_REQUEST_BYTES: usize = 2 * 1024;
 pub const MAX_FILE_DIALOG_REQUEST_BYTES: usize = 2 * 1024;
-pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
+pub const MAX_FILE_DIALOG_FILTERS: usize = FILE_DIALOG_MAX_FILE_DIALOG_FILTERS;
 pub const MAX_FILE_TEXT_RESPONSE_BYTES: usize = 8 * 1024;
-pub const MAX_FILE_TEXT_WRITE_BYTES: usize = 8 * 1024;
+pub const MAX_FILE_TEXT_WRITE_BYTES: usize = FILE_ACCESS_MAX_FILE_TEXT_WRITE_BYTES;
 /// Maximum encoded JSON bytes in one complete native-menu replacement payload.
 pub const MAX_MENU_REPLACE_REQUEST_BYTES: usize = 16 * 1024;
 /// Maximum encoded JSON bytes in one complete native context-menu replacement.

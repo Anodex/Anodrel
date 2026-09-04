@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 mod context_menu;
+mod file_write;
 mod form;
 mod live_status;
 mod menu;
@@ -86,6 +87,14 @@ pub fn notification_main_source(display_label: &str) -> String {
 
 pub fn notification_readme(context: &TemplateContext) -> String {
     notification::readme(context)
+}
+
+pub fn file_write_main_source(display_label: &str) -> String {
+    file_write::main_source(display_label)
+}
+
+pub fn file_write_readme(context: &TemplateContext) -> String {
+    file_write::readme(context)
 }
 
 pub fn multi_window_main_source(display_label: &str) -> String {
@@ -260,9 +269,10 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        TemplateContext, cargo_toml, context_menu_main_source, document_json, form_main_source,
-        live_status_main_source, main_source, menu_main_source, multi_window_main_source,
-        scroll_window_main_source, tray_main_source, window_controls_main_source,
+        TemplateContext, cargo_toml, context_menu_main_source, document_json,
+        file_write_main_source, form_main_source, live_status_main_source, main_source,
+        menu_main_source, multi_window_main_source, scroll_window_main_source, tray_main_source,
+        window_controls_main_source,
     };
 
     #[test]
@@ -320,6 +330,18 @@ mod tests {
         assert!(source.contains("template.tray.complete"));
         assert!(!source.contains("replace_context_menu_v1"));
         assert!(!source.contains("replace_menu_v1"));
+    }
+
+    #[test]
+    fn file_write_source_keeps_the_selected_output_retained() {
+        let source = file_write_main_source("File \"Write\" Template");
+        assert!(source.contains("select_save_file_v2"));
+        assert!(source.contains("write_selected_text"));
+        assert!(source.contains("SaveSelectionResult::Selected"));
+        assert!(!source.contains("read_actions"));
+        assert!(!source.contains("replace_tray_v1"));
+        assert!(!source.contains("protocolVersion"));
+        assert!(!source.contains("--native-"));
     }
 
     #[test]

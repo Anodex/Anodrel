@@ -23,6 +23,8 @@ pub use mailbox::{
 
 /// Maximum number of extensions in one filter.
 pub const MAX_FILTER_EXTENSIONS: usize = 8;
+/// Maximum number of filters in one host-owned dialog request.
+pub const MAX_FILE_DIALOG_FILTERS: usize = 8;
 /// Maximum UTF-8 bytes in one selected file path.
 pub const MAX_SELECTED_PATH_BYTES: usize = 32 * 1024;
 /// Exact UTF-8 byte length of a Version 1 opaque selection reference.

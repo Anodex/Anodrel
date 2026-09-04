@@ -14,6 +14,7 @@ mod context_menu_revision;
 mod error;
 mod events;
 mod fields;
+mod file_write;
 mod menu_model;
 mod menu_revision;
 mod notification;
@@ -26,6 +27,10 @@ mod tray_revision;
 mod window_controls;
 mod window_id;
 
+pub use anodrel_file_access::{
+    MAX_FILE_TEXT_WRITE_BYTES, SaveReference, SaveSelection, SaveSelectionResult,
+};
+pub use anodrel_file_dialog::{FileDialogFilter, MAX_FILE_DIALOG_FILTERS};
 pub use anodrel_window::{WindowFullscreenMode, WindowSize, WindowState};
 pub use context_menu_revision::ContextMenuRevision;
 pub use error::UiClientError;

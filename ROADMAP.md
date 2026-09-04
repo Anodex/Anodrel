@@ -478,7 +478,7 @@ Status: **First starter-package slice in progress**
   host route exercise Protocol 1.32 without broadening any earlier template.
   A generated child completed its real-pipe context-menu session; its real User32 right-click remains the acceptance check.
   Protocol 1.33's semantic tray has an implemented Windows bridge; real notification-area interaction remains manual. See `docs/TRAY.md`.
-  Decision 0193 adds an explicit native notification template with only document write, one-way notification show, and self-close; its generated child completed a real invited-pipe handover, while seeing the Shell32 notification remains manual.
+  Decision 0193 adds an explicit native notification template with only document write, one-way notification show, and self-close; its generated child completed a real invited-pipe handover, while seeing the Shell32 notification remains manual. Decision 0194 similarly adds a file-write template with only document write, retained save selection, text writing, and self-close; its generated child proves one opaque reference handover and fixed write, while a real save dialog and file-content check remain manual.
   Decision 0094 now adds a third,
   separately selected native template:
   its `init-multi-window` generator and fixed five-grant Windows host route

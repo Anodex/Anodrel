@@ -34,7 +34,7 @@ pub use save_selection::{
 };
 pub use text::{
     FileTextService, FileTextServiceError, FileTextWriteService, FileTextWriteServiceError,
-    UnavailableFileTextService, UnavailableFileTextWriteService,
+    MAX_FILE_TEXT_WRITE_BYTES, UnavailableFileTextService, UnavailableFileTextWriteService,
 };
 
 /// Maximum live file selections for one authenticated session.

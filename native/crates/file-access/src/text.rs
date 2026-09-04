@@ -4,6 +4,12 @@ use std::fmt;
 
 use crate::{SaveReference, SelectionReference};
 
+/// Maximum UTF-8 source bytes in one selected-output text replacement.
+///
+/// The protocol owns no stream or partial-write route, so this keeps one
+/// complete request bounded with headroom inside one Wire v1 message.
+pub const MAX_FILE_TEXT_WRITE_BYTES: usize = 8 * 1024;
+
 /// Reads bounded UTF-8 text from one session-bound selected-file reference.
 ///
 /// Implementations must never accept a path, native handle, or caller-selected

@@ -11,6 +11,7 @@ pub enum TemplateKind {
     ContextMenu,
     Tray,
     Notification,
+    FileWrite,
     MultiWindow,
     ScrollWindow,
     WindowControls,
@@ -34,6 +35,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
         Some("init-context-menu") => TemplateKind::ContextMenu,
         Some("init-tray") => TemplateKind::Tray,
         Some("init-notification") => TemplateKind::Notification,
+        Some("init-file-write") => TemplateKind::FileWrite,
         Some("init-multi-window") => TemplateKind::MultiWindow,
         Some("init-scroll-window") => TemplateKind::ScrollWindow,
         Some("init-window-controls") => TemplateKind::WindowControls,
@@ -94,6 +96,23 @@ mod tests {
                 destination: PathBuf::from("out/live-status"),
                 project_slug: "live-status-app".to_owned(),
                 display_label: "Live Status App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(
+                [
+                    "init-file-write",
+                    "out/file-write",
+                    "file-write-app",
+                    "File Write App",
+                ]
+                .map(String::from)
+            ),
+            Ok(InitCommand {
+                template_kind: TemplateKind::FileWrite,
+                destination: PathBuf::from("out/file-write"),
+                project_slug: "file-write-app".to_owned(),
+                display_label: "File Write App".to_owned(),
             })
         );
         assert_eq!(
