@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0198: Apps & features removal uses fixed native consent.
+
 - 0197: The installed uninstaller cleans itself at restart.
 
 - 0196: Apps & features reuses the selected signed installer.

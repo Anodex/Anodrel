@@ -3,8 +3,8 @@
 **Status:** The signed product metadata, selected-policy Start-menu route, and
 bounded uninstall transaction are implemented. The Apps & features
 selected-policy preflight and fixed registry writer are implemented but are not
-yet composed into installation or removal while native consent and UAC handoff
-remain separate work.
+yet composed into installation or removal while the fixed native consent and
+UAC route remains separate work.
 
 ## Purpose
 
@@ -70,10 +70,10 @@ removal to delete that image, the empty directory, and the empty package root
 at the next restart. A missing registration key is harmless. An unsafe or
 undeletable key leaves selected policy untouched.
 
-Apps & features invokes the installed image's fixed interactive uninstall
-route. That route will obtain new native consent and a fixed UAC handoff before
-it executes the already-elevated removal command. A zero child exit still will
-not be presented as proof until the selected policy is absent.
+Apps & features invokes the installed image's fixed interactive removal route.
+It obtains new native consent and a fixed UAC handoff before it executes the
+already-elevated removal command. A zero child exit still will not be presented
+as proof until the selected policy is absent. See [uninstall flow](UNINSTALL_FLOW.md).
 
 ## Exclusions
 
@@ -83,4 +83,5 @@ an installation date, custom icons, a desktop shortcut, telemetry, or
 application access to registration.
 
 See [product registration](PRODUCT_REGISTRATION.md), [Windows installer](WINDOWS_INSTALLER.md),
-[Windows release readiness](WINDOWS_RELEASE.md), and Decisions 0196 and 0197.
+[Windows release readiness](WINDOWS_RELEASE.md), [uninstall flow](UNINSTALL_FLOW.md),
+and Decisions 0196 through 0198.
