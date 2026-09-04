@@ -7,7 +7,10 @@ use anodrel_menu::MenuActionId;
 use anodrel_ui::ElementId;
 use anodrel_ui_session::{MAX_SESSION_WINDOWS, UI_INPUT_QUEUE_CAPACITY};
 
-use crate::{ContextMenuRevision, DocumentRevision, MenuRevision, SessionWindowId, UiClientError};
+use crate::{
+    DocumentRevision, MenuRevision, SessionWindowId, UiClientError,
+    popup_events::{UiContextMenuAction, UiTrayAction},
+};
 
 /// The host's maximum number of interaction candidates from one primary view
 /// per pull.
@@ -74,27 +77,6 @@ pub struct UiMenuAction {
     action: MenuActionId,
 }
 
-/// One current host-owned context-menu action accepted by the session.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UiContextMenuAction {
-    revision: ContextMenuRevision,
-    action: MenuActionId,
-}
-
-impl UiContextMenuAction {
-    /// Returns the exact complete context-menu revision that produced this action.
-    #[must_use]
-    pub const fn revision(&self) -> ContextMenuRevision {
-        self.revision
-    }
-
-    /// Returns the validated semantic context-menu action ID.
-    #[must_use]
-    pub fn action(&self) -> &str {
-        self.action.as_str()
-    }
-}
-
 impl UiMenuAction {
     /// Returns the exact complete-menu revision that produced this action.
     #[must_use]
@@ -118,6 +100,8 @@ pub enum UiEvent {
     MenuAction(UiMenuAction),
     /// A local popup action from the host-controlled context-menu surface.
     ContextMenuAction(UiContextMenuAction),
+    /// A notification-area menu action from the host-controlled tray surface.
+    TrayAction(UiTrayAction),
 }
 
 /// One bounded `ui.events.read` result accepting every documented event shape.
@@ -174,6 +158,10 @@ impl UiEventBatch {
             discarded,
         })
     }
+
+    pub(crate) fn into_parts(self) -> (Vec<UiEvent>, u32, u32) {
+        (self.events, self.dropped, self.discarded)
+    }
 }
 
 /// One bounded document-only `ui.events.read` result.
@@ -215,56 +203,7 @@ impl UiActionBatch {
                 UiEvent::DocumentAction(action) => Ok(action),
                 UiEvent::MenuAction(_) => Err(UiClientError::ResponseInvalid),
                 UiEvent::ContextMenuAction(_) => Err(UiClientError::ResponseInvalid),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self {
-            actions,
-            dropped: batch.dropped,
-            discarded: batch.discarded,
-        })
-    }
-}
-
-/// One bounded context-menu-only `ui.events.read` result.
-///
-/// This preserves the existing document and menu APIs: neither silently
-/// accepts a new local-popup event kind.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UiContextMenuActionBatch {
-    actions: Vec<UiContextMenuAction>,
-    dropped: u32,
-    discarded: u32,
-}
-
-impl UiContextMenuActionBatch {
-    /// Returns current context-menu actions in host delivery order.
-    #[must_use]
-    pub fn actions(&self) -> &[UiContextMenuAction] {
-        &self.actions
-    }
-
-    /// Returns candidates dropped because the host interaction queue was full.
-    #[must_use]
-    pub const fn dropped(&self) -> u32 {
-        self.dropped
-    }
-
-    /// Returns candidates discarded by host revision/action validation.
-    #[must_use]
-    pub const fn discarded(&self) -> u32 {
-        self.discarded
-    }
-
-    pub(crate) fn parse(result: &JsonValue) -> Result<Self, UiClientError> {
-        let batch = UiEventBatch::parse(result)?;
-        let actions = batch
-            .events
-            .into_iter()
-            .map(|event| match event {
-                UiEvent::ContextMenuAction(action) => Ok(action),
-                UiEvent::DocumentAction(_) | UiEvent::MenuAction(_) => {
-                    Err(UiClientError::ResponseInvalid)
-                }
+                UiEvent::TrayAction(_) => Err(UiClientError::ResponseInvalid),
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
@@ -360,6 +299,9 @@ impl UiEvent {
             (Some("menu.context.action.invoked"), Some("native.context_menu")) => {
                 UiContextMenuAction::parse(event).map(Self::ContextMenuAction)
             }
+            (Some("tray.action.invoked"), Some("native.tray")) => {
+                UiTrayAction::parse(event).map(Self::TrayAction)
+            }
             _ => Err(UiClientError::ResponseInvalid),
         }
     }
@@ -442,34 +384,6 @@ impl UiMenuAction {
     }
 }
 
-impl UiContextMenuAction {
-    fn parse(event: &JsonValue) -> Result<Self, UiClientError> {
-        let fields = event.as_object().ok_or(UiClientError::ResponseInvalid)?;
-        if fields.get("kind").and_then(JsonValue::as_string) != Some("event")
-            || !is_version_at_least(fields.get("protocolVersion"), 32)
-            || !is_exact_schema_v1(fields.get("schemaVersion"), 32)
-        {
-            return Err(UiClientError::ResponseInvalid);
-        }
-        let payload = fields
-            .get("payload")
-            .and_then(JsonValue::as_object)
-            .ok_or(UiClientError::ResponseInvalid)?;
-        let revision = payload
-            .get("contextMenuRevision")
-            .and_then(JsonValue::as_string)
-            .ok_or(UiClientError::ResponseInvalid)
-            .and_then(ContextMenuRevision::parse)?;
-        let action = payload
-            .get("action")
-            .and_then(JsonValue::as_string)
-            .ok_or(UiClientError::ResponseInvalid)?;
-        let action =
-            MenuActionId::new(action.to_owned()).map_err(|_| UiClientError::ResponseInvalid)?;
-        Ok(Self { revision, action })
-    }
-}
-
 fn as_array(value: &JsonValue) -> Option<&[JsonValue]> {
     match value {
         JsonValue::Array(values) => Some(values),
@@ -490,7 +404,7 @@ fn as_canonical_u32(value: &JsonValue) -> Option<u32> {
         .filter(|number| number.to_string() == *value)
 }
 
-fn is_version_at_least(value: Option<&JsonValue>, minimum_minor: u16) -> bool {
+pub(crate) fn is_version_at_least(value: Option<&JsonValue>, minimum_minor: u16) -> bool {
     let Some(fields) = value.and_then(JsonValue::as_object) else {
         return false;
     };
@@ -501,7 +415,7 @@ fn is_version_at_least(value: Option<&JsonValue>, minimum_minor: u16) -> bool {
             .is_some_and(|minor| minor >= minimum_minor)
 }
 
-fn is_exact_schema_v1(value: Option<&JsonValue>, minor: u16) -> bool {
+pub(crate) fn is_exact_schema_v1(value: Option<&JsonValue>, minor: u16) -> bool {
     let Some(fields) = value.and_then(JsonValue::as_object) else {
         return false;
     };

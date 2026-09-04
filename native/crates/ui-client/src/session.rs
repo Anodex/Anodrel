@@ -19,6 +19,8 @@ const UI_DOCUMENT_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(3);
 const UI_FIELD_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(15);
 /// The first protocol version that also carries canonical local menu shortcuts.
 const UI_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(24);
+/// The first protocol version whose general event reader accepts tray actions.
+const UI_EVENTS_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(33);
 /// The first protocol version with host-owned semantic context menus.
 const UI_CONTEXT_MENU_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(32);
 /// The first protocol version with bounded session-owned secondary views.
@@ -158,11 +160,11 @@ where
     /// Drains one bounded batch of every currently documented semantic event.
     ///
     /// Unlike [`Self::read_actions`], this method accepts both document and
-    /// native-menu events and therefore requires a host compatible with
-    /// Protocol 1.24.
+    /// native popup events and therefore requires a host compatible with
+    /// Protocol 1.33.
     pub fn read_events(&mut self) -> Result<UiEventBatch, UiClientError> {
         self.request(
-            UI_MENU_PROTOCOL,
+            UI_EVENTS_PROTOCOL,
             "ui.events.read",
             JsonValue::Object(Default::default()),
         )

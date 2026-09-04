@@ -1,6 +1,8 @@
 # Native tray menus
 
-**Status:** Protocol contract for the Windows implementation.
+**Status:** Protocol 1.33, its portable core boundary, and the typed Rust
+facade are implemented. The direct Windows notification-area adapter remains
+the next implementation section.
 
 ## Purpose
 

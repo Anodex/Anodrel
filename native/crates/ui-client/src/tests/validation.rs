@@ -66,6 +66,21 @@ fn invalid_context_menus_fail_before_they_can_create_a_protocol_request() {
 }
 
 #[test]
+fn invalid_tray_menus_fail_before_they_can_create_a_protocol_request() {
+    let (mut session, written) = session_with_responses([]);
+
+    assert_eq!(
+        session.replace_tray_v1(r#"{"items":[]}"#),
+        Err(UiClientError::TrayInvalid)
+    );
+    assert_eq!(
+        messages(&written).len(),
+        1,
+        "only authentication was written"
+    );
+}
+
+#[test]
 fn invalid_multi_window_title_or_identity_fails_closed() {
     let (mut session, written) = session_with_responses([]);
     assert_eq!(
@@ -105,6 +120,17 @@ fn context_menu_events_require_their_own_schema_and_revision_fields() {
 
     assert_eq!(
         session.read_context_menu_actions(),
+        Err(UiClientError::ResponseInvalid)
+    );
+}
+
+#[test]
+fn tray_events_require_their_own_schema_and_revision_fields() {
+    let malformed = r#"{"events":[{"kind":"event","eventName":"tray.action.invoked","source":"native.tray","protocolVersion":{"major":1,"minor":33},"schemaVersion":{"major":1,"minor":33},"payload":{"contextMenuRevision":"1","action":"template.tray.open"}}],"dropped":0,"discarded":0}"#;
+    let (mut session, _) = session_with_responses([response("anodrel-ui-1", malformed)]);
+
+    assert_eq!(
+        session.read_tray_actions(),
         Err(UiClientError::ResponseInvalid)
     );
 }

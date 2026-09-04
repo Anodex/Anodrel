@@ -16,8 +16,12 @@ mod events;
 mod fields;
 mod menu_model;
 mod menu_revision;
+mod popup_events;
 mod revision;
 mod session;
+mod tray;
+mod tray_model;
+mod tray_revision;
 mod window_controls;
 mod window_id;
 
@@ -25,14 +29,17 @@ pub use anodrel_window::{WindowFullscreenMode, WindowSize, WindowState};
 pub use context_menu_revision::ContextMenuRevision;
 pub use error::UiClientError;
 pub use events::{
-    MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, UiAction, UiActionBatch,
-    UiContextMenuAction, UiContextMenuActionBatch, UiEvent, UiEventBatch, UiMenuAction,
-    WindowUiAction, WindowUiActionBatch,
+    MAX_ACTIONS_PER_BATCH, MAX_WINDOW_ACTIONS_PER_BATCH, UiAction, UiActionBatch, UiEvent,
+    UiEventBatch, UiMenuAction, WindowUiAction, WindowUiActionBatch,
 };
 pub use fields::{UiFieldSnapshot, UiFieldValue};
 pub use menu_revision::MenuRevision;
+pub use popup_events::{
+    UiContextMenuAction, UiContextMenuActionBatch, UiTrayAction, UiTrayActionBatch,
+};
 pub use revision::DocumentRevision;
 pub use session::UiSession;
+pub use tray_revision::TrayRevision;
 pub use window_id::{SecondaryWindowId, SessionWindowId};
 
 #[cfg(test)]

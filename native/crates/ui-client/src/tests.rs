@@ -15,6 +15,7 @@ use crate::{
 };
 
 mod foundation;
+mod tray;
 mod validation;
 mod window_controls;
 
@@ -115,7 +116,7 @@ fn malformed_or_out_of_order_field_snapshots_fail_closed() {
 }
 
 #[test]
-fn native_menu_session_uses_the_fixed_protocol_1_24_surface() {
+fn native_menu_session_keeps_v1_24_replacement_and_uses_the_current_event_reader() {
     let (mut session, written) = session_with_responses([
         response("anodrel-ui-1", r#"{"revision":"1"}"#),
         response("anodrel-ui-2", r#"{"revision":"1"}"#),
@@ -156,7 +157,7 @@ fn native_menu_session_uses_the_fixed_protocol_1_24_surface() {
         .skip(1)
         .map(|message| request_protocol_minor(message))
         .collect::<Vec<_>>();
-    assert_eq!(minors, [Some(3), Some(24), Some(24), Some(3)]);
+    assert_eq!(minors, [Some(3), Some(24), Some(33), Some(3)]);
     let menu_request = JsonValue::parse(&messages[2]).expect("menu request is JSON");
     assert_eq!(
         menu_request

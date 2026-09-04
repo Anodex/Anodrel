@@ -50,11 +50,12 @@ URL, network connection, or native resource.
 | Method | Input | Typed result | Protocol | Required grant |
 | --- | --- | --- | --- | --- |
 | `replace_menu_v1` | one strict complete menu-model JSON string | `MenuRevision` | 1.24 | `menu.write` |
-| `read_events` | none | `UiEventBatch` | 1.24 | `ui.events.read` |
+| `read_events` | none | `UiEventBatch` | 1.33 | `ui.events.read` |
 
 `MenuRevision` parses only a canonical nonzero decimal string. `UiEventBatch`
-contains no more than 32 events and the existing bounded `dropped` and
-`discarded` counters. Its event variants will be:
+uses Protocol 1.33 so it can parse every currently documented event surface;
+it contains no more than 32 events and the existing bounded `dropped` and
+`discarded` counters. This template can produce only:
 
 - `DocumentAction(UiAction)`, the existing revision-bound document action; or
 - `MenuAction(UiMenuAction)`, carrying only a menu revision and semantic action

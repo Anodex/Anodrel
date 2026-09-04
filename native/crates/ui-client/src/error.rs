@@ -17,6 +17,8 @@ pub enum UiClientError {
     MenuInvalid,
     /// The supplied context menu was not one strict bounded complete model.
     ContextMenuInvalid,
+    /// The supplied tray menu was not one strict bounded complete model.
+    TrayInvalid,
     /// The supplied secondary-window title failed its fixed portable rules.
     WindowTitleInvalid,
     /// The authenticated underlying conversation could not continue.
@@ -33,6 +35,7 @@ impl fmt::Display for UiClientError {
             Self::DocumentInvalid => "the UI document was invalid",
             Self::MenuInvalid => "the native menu model was invalid",
             Self::ContextMenuInvalid => "the native context-menu model was invalid",
+            Self::TrayInvalid => "the native tray model was invalid",
             Self::WindowTitleInvalid => "the window title was invalid",
             Self::Conversation(_) => "the authenticated UI conversation could not continue",
             Self::ResponseInvalid => "the host returned an invalid UI response",

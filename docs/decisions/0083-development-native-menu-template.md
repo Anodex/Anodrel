@@ -49,8 +49,8 @@ Extend the preview `anodrel-ui-client` facade with a closed menu surface:
 - `replace_menu_v1` accepts one exact bounded menu-model JSON value, validates
   it locally, sends only `menu.replace` at Protocol 1.24, and returns a
   validated nonzero `MenuRevision`;
-- `read_events` sends only `ui.events.read` at Protocol 1.24 and returns a
-  bounded ordered batch of typed document actions and typed menu actions; and
+- `read_events` sends only `ui.events.read` at Protocol 1.33 and returns a
+  bounded ordered batch of all currently documented typed event actions; and
 - the existing `read_actions` stays document-only and fails closed if a menu
   event appears, so an older client cannot silently discard a menu action.
 
