@@ -8,6 +8,7 @@ mod live_status;
 mod menu;
 mod multi_window;
 mod scroll_window;
+mod tray;
 mod window_controls;
 
 pub struct TemplateContext {
@@ -68,6 +69,14 @@ pub fn menu_readme(context: &TemplateContext) -> String {
 
 pub fn context_menu_readme(context: &TemplateContext) -> String {
     context_menu::readme(context)
+}
+
+pub fn tray_main_source(display_label: &str) -> String {
+    tray::main_source(display_label)
+}
+
+pub fn tray_readme(context: &TemplateContext) -> String {
+    tray::readme(context)
 }
 
 pub fn multi_window_main_source(display_label: &str) -> String {
@@ -244,7 +253,7 @@ mod tests {
     use super::{
         TemplateContext, cargo_toml, context_menu_main_source, document_json, form_main_source,
         live_status_main_source, main_source, menu_main_source, multi_window_main_source,
-        scroll_window_main_source, window_controls_main_source,
+        scroll_window_main_source, tray_main_source, window_controls_main_source,
     };
 
     #[test]
@@ -291,6 +300,16 @@ mod tests {
         assert!(source.contains("replace_context_menu_v1"));
         assert!(source.contains("read_context_menu_actions"));
         assert!(source.contains("template.context.complete"));
+        assert!(!source.contains("replace_menu_v1"));
+    }
+
+    #[test]
+    fn tray_source_uses_the_distinct_typed_notification_area_surface() {
+        let source = tray_main_source("Tray \"Template\"");
+        assert!(source.contains("replace_tray_v1"));
+        assert!(source.contains("read_tray_actions"));
+        assert!(source.contains("template.tray.complete"));
+        assert!(!source.contains("replace_context_menu_v1"));
         assert!(!source.contains("replace_menu_v1"));
     }
 

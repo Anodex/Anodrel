@@ -9,6 +9,7 @@ pub enum TemplateKind {
     LiveStatus,
     Menu,
     ContextMenu,
+    Tray,
     MultiWindow,
     ScrollWindow,
     WindowControls,
@@ -30,6 +31,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
         Some("init-live-status") => TemplateKind::LiveStatus,
         Some("init-menu") => TemplateKind::Menu,
         Some("init-context-menu") => TemplateKind::ContextMenu,
+        Some("init-tray") => TemplateKind::Tray,
         Some("init-multi-window") => TemplateKind::MultiWindow,
         Some("init-scroll-window") => TemplateKind::ScrollWindow,
         Some("init-window-controls") => TemplateKind::WindowControls,
@@ -90,6 +92,15 @@ mod tests {
                 destination: PathBuf::from("out/live-status"),
                 project_slug: "live-status-app".to_owned(),
                 display_label: "Live Status App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(["init-tray", "out/tray", "tray-app", "Tray App"].map(String::from)),
+            Ok(InitCommand {
+                template_kind: TemplateKind::Tray,
+                destination: PathBuf::from("out/tray"),
+                project_slug: "tray-app".to_owned(),
+                display_label: "Tray App".to_owned(),
             })
         );
         assert_eq!(

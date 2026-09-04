@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0192: Development native tray templates stay explicit.
+
 - 0191: Tray menus stay semantic and share the notification area.
 
 - 0190: Notification-area lifetime is separate from notification text.

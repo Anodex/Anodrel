@@ -135,11 +135,12 @@ callback returns. A local left-button release makes only a best-effort Windows
 foreground request for the same session's main window.
 
 The host's focused tests cover command isolation, callback filtering, mailbox
-handover, and the shared-entry lifetime. The remaining desktop proof is to use
-an invited session that publishes a tray model, right-click its visible Anodrel
-notification-area icon, choose the enabled command, and verify the child reads
-the matching `tray.action.invoked` event before it closes its own session. No
-synthetic input test is presented as that user interaction proof.
+handover, and the shared-entry lifetime. The first-party tray template adds an
+isolated generated-child pipe test; its [desktop helper](../start-tray-template.bat)
+is ready for the remaining real notification-area proof. Right-click Anodrel's
+visible icon, choose the enabled command, and verify the child reads the
+matching `tray.action.invoked` event before it closes. No synthetic input test
+is presented as that user interaction proof.
 
 ## Security and privacy
 

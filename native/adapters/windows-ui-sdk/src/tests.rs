@@ -9,8 +9,9 @@ use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_wire::{FrameDecoder, encode_json};
 
 use super::{
-    ContextMenuRevision, UiClientError, UiContextMenuActionBatch, WindowFullscreenMode, WindowSize,
-    WindowState, WindowsUiConnectionError, WindowsUiSession, establish_session,
+    ContextMenuRevision, TrayRevision, UiClientError, UiContextMenuActionBatch, UiTrayActionBatch,
+    WindowFullscreenMode, WindowSize, WindowState, WindowsUiConnectionError, WindowsUiSession,
+    establish_session,
 };
 
 const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.windows-sdk-test";
@@ -136,4 +137,8 @@ fn facade_exposes_only_typed_targetless_window_controls() {
         &mut WindowsUiSession,
     ) -> Result<UiContextMenuActionBatch, UiClientError> =
         WindowsUiSession::read_context_menu_actions;
+    let _replace_tray: fn(&mut WindowsUiSession, &str) -> Result<TrayRevision, UiClientError> =
+        WindowsUiSession::replace_tray_v1;
+    let _read_tray_actions: fn(&mut WindowsUiSession) -> Result<UiTrayActionBatch, UiClientError> =
+        WindowsUiSession::read_tray_actions;
 }

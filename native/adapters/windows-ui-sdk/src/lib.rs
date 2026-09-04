@@ -17,9 +17,10 @@ use anodrel_windows_client::WindowsClientStream;
 pub use anodrel_client::InteractivePollSchedule;
 pub use anodrel_ui_client::{
     ContextMenuRevision, DocumentRevision, MenuRevision, SecondaryWindowId, SessionWindowId,
-    UiAction, UiActionBatch, UiClientError, UiContextMenuAction, UiContextMenuActionBatch, UiEvent,
-    UiEventBatch, UiFieldSnapshot, UiFieldValue, WindowFullscreenMode, WindowSize, WindowState,
-    WindowUiAction, WindowUiActionBatch,
+    TrayRevision, UiAction, UiActionBatch, UiClientError, UiContextMenuAction,
+    UiContextMenuActionBatch, UiEvent, UiEventBatch, UiFieldSnapshot, UiFieldValue, UiTrayAction,
+    UiTrayActionBatch, WindowFullscreenMode, WindowSize, WindowState, WindowUiAction,
+    WindowUiActionBatch,
 };
 
 /// Closed outcomes while establishing one invited Windows UI session.
@@ -117,6 +118,16 @@ impl WindowsUiSession {
     /// Drains one batch containing only local context-menu semantic actions.
     pub fn read_context_menu_actions(&mut self) -> Result<UiContextMenuActionBatch, UiClientError> {
         self.session.read_context_menu_actions()
+    }
+
+    /// Replaces this session's complete host-owned notification-area tray model.
+    pub fn replace_tray_v1(&mut self, menu: &str) -> Result<TrayRevision, UiClientError> {
+        self.session.replace_tray_v1(menu)
+    }
+
+    /// Drains one batch containing only notification-area tray actions.
+    pub fn read_tray_actions(&mut self) -> Result<UiTrayActionBatch, UiClientError> {
+        self.session.read_tray_actions()
     }
 
     /// Proposes a title for this session's own host window.
