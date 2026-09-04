@@ -334,12 +334,12 @@ elevation; `verify` is read-only. All commands select the embedded identity
 only. They do not accept an arbitrary executable, package root, registry path,
 policy, capability, certificate, or network URL.
 
-`install`, `update`, `rollback`, and `uninstall` need elevation; the installer
-does not trigger a UAC prompt or relaunch itself. An operator explicitly starts
-the signed executable from an elevated shell. `verify` is read-only and can
-show that the current signed embedded release was accepted without writing
-machine state. The development-only `validate-manifest <path>` command still
-validates one sidecar manifest and cannot write machine state.
+The named `install`, `update`, `rollback`, and `uninstall` commands need an
+already elevated shell; they do not trigger a UAC prompt or relaunch
+themselves. `verify` is read-only and can show that the current signed embedded
+release was accepted without writing machine state. The development-only
+`validate-manifest <path>` command still validates one sidecar manifest and
+cannot write machine state.
 
 The installer exposes an opaque initial-install preflight and matching
 postcondition proof; its no-argument route composes them with a direct native,

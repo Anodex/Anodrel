@@ -1,15 +1,16 @@
 # Windows update catalogue contract
 
-**Status:** Implemented portable validation and direct Windows attached-CMS
-signature foundation. A catalogue is not yet retrieved, written to disk, run,
-elevated, or installed.
+**Status:** Implemented portable validation, direct Windows attached-CMS
+verification, signed-catalogue discovery, and private installer-image staging.
+A catalogue is never written to disk, run, elevated, installed, or exposed to
+an application.
 
 ## Purpose
 
-`anodrel.update-catalogue.v1` describes one future signed Windows installer
-candidate. It gives the later updater an exact application identity, publisher,
-release version, HTTPS origin, request path, and installer-byte descriptor to
-check before it can hand an image to the existing installer gates.
+`anodrel.update-catalogue.v1` describes one signed Windows installer candidate.
+It gives the native updater an exact application identity, publisher, release
+version, HTTPS origin, request path, and installer-byte descriptor to check
+before it can hand an image to the existing installer gates.
 
 The catalogue parser is owned, portable Anodrel code. It performs no file,
 network, certificate, registry, process, window, or elevation operation.
