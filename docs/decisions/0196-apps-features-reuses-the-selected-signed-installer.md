@@ -47,8 +47,10 @@ The writer may use only signed product display metadata, the release version,
 and the fixed installed image. Its uninstall command will contain one quoted
 fixed image path and a fixed Anodrel-owned uninstall route; it accepts no
 application, registry, product, network, or caller-controlled argument. The
-same selected-policy proof will remove the key before package cleanup. Update
-and rollback will refresh it only after their machine-policy transition.
+same selected-policy proof will remove the key before package cleanup.
+Decision 0197 defines the necessary exception for the executing image and its
+ordered delayed self-cleanup. Update and rollback will refresh registration
+only after their machine-policy transition.
 
 The fixed installed image must prove that it belongs to the selected package
 version as well as the selected application identity and publisher. An older

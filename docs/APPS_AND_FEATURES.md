@@ -62,8 +62,11 @@ Install, update, and rollback register only after their policy publication
 succeeds. If registration fails, the selected record remains authoritative and
 the operation reports incomplete product registration; it does not roll policy
 back. Uninstall removes the verified Apps & features key and Start-menu link
-before it removes policy and then the package tree. A missing registration key
-is harmless. An unsafe or undeletable key leaves selected policy untouched.
+before it removes policy and then every other package file. It retains only its
+executing fixed image and ancestor directory, then uses direct Windows delayed
+removal to delete that image, the empty directory, and the empty package root
+at the next restart. A missing registration key is harmless. An unsafe or
+undeletable key leaves selected policy untouched.
 
 Apps & features invokes the installed image's fixed interactive uninstall
 route. That route will obtain new native consent and a fixed UAC handoff before
@@ -78,4 +81,4 @@ an installation date, custom icons, a desktop shortcut, telemetry, or
 application access to registration.
 
 See [product registration](PRODUCT_REGISTRATION.md), [Windows installer](WINDOWS_INSTALLER.md),
-[Windows release readiness](WINDOWS_RELEASE.md), and Decision 0196.
+[Windows release readiness](WINDOWS_RELEASE.md), and Decisions 0196 and 0197.

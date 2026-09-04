@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0197: The installed uninstaller cleans itself at restart.
+
 - 0196: Apps & features reuses the selected signed installer.
 
 - 0195: Development native binary-write templates keep binary output retained.
