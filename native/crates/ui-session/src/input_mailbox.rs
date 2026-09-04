@@ -102,13 +102,13 @@ fn lock(value: &Mutex<UiInputMailboxState>) -> MutexGuard<'_, UiInputMailboxStat
 
 #[cfg(test)]
 mod tests {
-    use anodrel_menu::{ContextMenuRevision, MenuActionId, MenuRevision};
+    use anodrel_menu::{ContextMenuRevision, MenuActionId, MenuRevision, TrayRevision};
     use anodrel_ui::{ElementId, UiEvent};
 
     use super::{UI_INPUT_QUEUE_CAPACITY, UiInputMailbox};
     use crate::{
         ContextMenuInputCandidate, MenuInputCandidate, SessionInteractionCandidate,
-        UiDocumentRevision, UiInputCandidate,
+        TrayInputCandidate, UiDocumentRevision, UiInputCandidate,
     };
 
     fn candidate() -> UiInputCandidate {
@@ -145,6 +145,9 @@ mod tests {
         let context_menu_revision = ContextMenuRevision::INITIAL
             .next()
             .expect("the first context-menu revision exists");
+        let tray_revision = TrayRevision::INITIAL
+            .next()
+            .expect("the first tray revision exists");
         mailbox.push(UiInputCandidate::new(
             document_revision,
             UiEvent::ActionInvoked(ElementId::new("document.action").expect("test ID is valid")),
@@ -157,9 +160,13 @@ mod tests {
             context_menu_revision,
             MenuActionId::new("context-menu.action").expect("test ID is valid"),
         ));
+        mailbox.push(TrayInputCandidate::new(
+            tray_revision,
+            MenuActionId::new("tray.action").expect("test ID is valid"),
+        ));
 
         let candidates = mailbox.drain().into_candidates();
-        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates.len(), 4);
         let SessionInteractionCandidate::Ui(document) = &candidates[0] else {
             panic!("the first candidate is a document action");
         };
@@ -180,5 +187,11 @@ mod tests {
         let (revision, action) = context_menu.clone().into_parts();
         assert_eq!(revision, context_menu_revision);
         assert_eq!(action.as_str(), "context-menu.action");
+        let SessionInteractionCandidate::Tray(tray) = &candidates[3] else {
+            panic!("the fourth candidate is a tray action");
+        };
+        let (revision, action) = tray.clone().into_parts();
+        assert_eq!(revision, tray_revision);
+        assert_eq!(action.as_str(), "tray.action");
     }
 }

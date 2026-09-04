@@ -10,6 +10,7 @@ mod menu;
 mod notifications;
 mod persistence;
 mod support;
+mod tray;
 mod ui_documents;
 mod ui_fields;
 mod ui_interactions;

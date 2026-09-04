@@ -27,6 +27,7 @@ pub struct HostServices {
     pub(super) window_size: Box<dyn WindowSizeService>,
     pub(super) menu: Box<dyn MenuService>,
     pub(super) context_menu: Box<dyn ContextMenuService>,
+    pub(super) tray: Box<dyn TrayService>,
     pub(super) ui_fields: Box<dyn UiFieldReader>,
     pub(super) file_dialogs: Box<dyn FileDialogService>,
     pub(super) folder_selections: Box<dyn FolderSelectionService>,
@@ -237,6 +238,7 @@ impl HostServices {
             window_size: Box::new(UnavailableWindowSize),
             menu: Box::new(UnavailableMenuService),
             context_menu: Box::new(UnavailableContextMenuService),
+            tray: Box::new(UnavailableTrayService),
             ui_fields: Box::new(UnavailableUiFields),
             file_dialogs: Box::new(UnavailableFileDialogs),
             folder_selections: Box::new(UnavailableFolderSelectionService),
@@ -406,6 +408,18 @@ impl HostServices {
     #[must_use]
     pub fn with_context_menu(mut self, service: impl ContextMenuService + 'static) -> Self {
         self.context_menu = Box::new(service);
+        self
+    }
+
+    /// Replaces the session's host-routed notification-area tray service.
+    ///
+    /// The supplied service receives one validated semantic menu and revision.
+    /// It owns the notification-area icon, native command IDs, local popup
+    /// placement, and callback routing; applications never receive those
+    /// values. See `docs/TRAY.md`.
+    #[must_use]
+    pub fn with_tray(mut self, service: impl TrayService + 'static) -> Self {
+        self.tray = Box::new(service);
         self
     }
 

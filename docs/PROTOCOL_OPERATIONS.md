@@ -171,12 +171,13 @@ diagnostic's remaining checks are a real desktop menu click and local shortcut.
 `docs/MENUS.md` defines the exact model, menu-action event, and Windows
 ownership rule.
 
-## Native context menus
+## Native context and tray menus
 
-Protocol 1.32 defines `menu.context.replace` behind its distinct
-`menu.context.write` grant. The exact model, safe failure behavior,
-revision-checked event, and direct Windows User32 popup bridge are defined in
+Protocol 1.32 defines `menu.context.replace` behind its distinct `menu.context.write` grant. Its exact model, safe failure behavior,
+revision-checked event, and direct Windows User32 popup bridge are in
 `docs/CONTEXT_MENUS.md` and Decision 0120.
+Protocol 1.33 defines `tray.replace` behind its distinct `tray.write` grant.
+Its semantic model, host-owned icon, and revision-checked pull event are in `docs/TRAY.md` and Decision 0191.
 
 ## Diagnostic entries
 
@@ -493,7 +494,9 @@ defines `menu.action.invoked` with `source: "native.menu"`,
 `{ "menuRevision": string, "action": string }` as its payload. Protocol 1.32
 adds `menu.context.action.invoked` with source `native.context_menu`, schema
 version 1.32, and exactly `{ "contextMenuRevision": string, "action": string
-}`. All are carried in the read result because Wire 1.0 has request/response
+}`. Protocol 1.33 adds `tray.action.invoked` with source `native.tray`, schema
+version 1.33, and exactly `{ "trayRevision": string, "action": string }`.
+All are carried in the read result because Wire 1.0 has request/response
 framing; they are not unsolicited pipe writes.
 
 ~~~json

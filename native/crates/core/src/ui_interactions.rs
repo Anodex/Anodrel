@@ -7,6 +7,8 @@
 use super::*;
 
 mod context_menu;
+mod semantic_menu;
+mod tray;
 
 const MENU_ACTION_EVENT_SCHEMA_VERSION: ProtocolVersion = ProtocolVersion {
     major: 1,
@@ -150,6 +152,13 @@ impl CoreHost {
                         Err(_) => discarded = discarded.saturating_add(1),
                     }
                 }
+                SessionInteractionCandidate::Tray(candidate) => {
+                    let (revision, action) = candidate.into_parts();
+                    match self.tray_session.borrow().accept_action(revision, action) {
+                        Ok(event) => events.push(tray::action_event(event)),
+                        Err(_) => discarded = discarded.saturating_add(1),
+                    }
+                }
             }
         }
         ResponseEnvelope::success(
@@ -232,6 +241,19 @@ impl CoreHost {
                     SessionInteractionCandidate::ContextMenu(_) => {
                         // Context menus are intentionally primary-view-only.
                         // A malformed host route cannot widen that boundary.
+                        discarded = discarded.saturating_add(1);
+                    }
+                    SessionInteractionCandidate::Tray(candidate) if id.is_primary() => {
+                        let (revision, action) = candidate.into_parts();
+                        match self.tray_session.borrow().accept_action(revision, action) {
+                            Ok(event) => events.push(tray::window_action_event(&id, event)),
+                            Err(_) => discarded = discarded.saturating_add(1),
+                        }
+                    }
+                    SessionInteractionCandidate::Tray(_) => {
+                        // The session-level notification area belongs to the
+                        // primary view. A malformed secondary route cannot
+                        // deliver an action from it.
                         discarded = discarded.saturating_add(1);
                     }
                 }

@@ -6,6 +6,7 @@ mod context_menu;
 mod folder;
 mod folder_access;
 mod network;
+mod tray;
 mod window_state_changes;
 mod window_state_read;
 

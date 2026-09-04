@@ -51,6 +51,7 @@ pub(super) enum RecordVersion {
     V1_21,
     V1_22,
     V1_23,
+    V1_24,
 }
 
 impl RecordVersion {
@@ -364,6 +365,7 @@ fn capability_for_record_version(
         "menu.context.write" if version.accepts(RecordVersion::V1_19) => {
             Some(Capability::ContextMenuWrite)
         }
+        "tray.write" if version.accepts(RecordVersion::V1_24) => Some(Capability::TrayWrite),
         _ => None,
     }
 }

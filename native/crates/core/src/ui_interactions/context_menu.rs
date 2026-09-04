@@ -9,7 +9,10 @@ const CONTEXT_MENU_ACTION_EVENT_SCHEMA_VERSION: ProtocolVersion = ProtocolVersio
 
 impl CoreHost {
     pub(crate) fn handle_context_menu_replace(&self, request: RequestEnvelope) -> JsonValue {
-        let Some(model) = context_menu_replace_payload(&request.payload) else {
+        let Some(model) = semantic_menu::replace_payload(
+            &request.payload,
+            MAX_CONTEXT_MENU_REPLACE_REQUEST_BYTES,
+        ) else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
@@ -121,33 +124,4 @@ fn context_menu_unavailable(host: &CoreHost, request_id: String) -> JsonValue {
         "the session context menu is unavailable.",
         None,
     )
-}
-
-fn context_menu_replace_payload(value: &JsonValue) -> Option<ContextMenuModel> {
-    if value.to_json().len() > MAX_CONTEXT_MENU_REPLACE_REQUEST_BYTES {
-        return None;
-    }
-    let fields = value.as_object()?;
-    if fields.len() != 1 {
-        return None;
-    }
-    let JsonValue::Array(items) = fields.get("items")? else {
-        return None;
-    };
-    let items = items
-        .iter()
-        .map(|item| {
-            let fields = item.as_object()?;
-            if fields.len() != 3 {
-                return None;
-            }
-            let id = MenuActionId::new(fields.get("id")?.as_string()?.to_owned()).ok()?;
-            let label = MenuText::new(fields.get("label")?.as_string()?.to_owned()).ok()?;
-            let JsonValue::Bool(enabled) = fields.get("enabled")? else {
-                return None;
-            };
-            Some(MenuAction::new(id, label, *enabled))
-        })
-        .collect::<Option<Vec<_>>>()?;
-    ContextMenuModel::new(items).ok()
 }

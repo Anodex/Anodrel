@@ -170,6 +170,12 @@ pub enum Capability {
     /// owns local trigger handling, placement, native popup construction, and
     /// command routing; see `docs/CONTEXT_MENUS.md`.
     ContextMenuWrite,
+    /// Replace the complete host-owned tray menu for this session.
+    ///
+    /// The application supplies only a bounded semantic action model. The host
+    /// retains the notification-area icon, popup placement, native command
+    /// identifiers, and every local click route; see `docs/TRAY.md`.
+    TrayWrite,
 }
 
 impl Capability {
@@ -211,6 +217,7 @@ impl Capability {
             Self::UiFieldsRead => "ui.fields.read",
             Self::MenuWrite => "menu.write",
             Self::ContextMenuWrite => "menu.context.write",
+            Self::TrayWrite => "tray.write",
         }
     }
 }
@@ -299,6 +306,13 @@ pub enum ProtocolErrorCode {
     /// This intentionally does not distinguish absent UI state, a busy UI
     /// thread, or an operating-system failure.
     MenuUnavailable,
+    /// The session has no host-owned notification-area tray surface, or that
+    /// surface could not apply its bounded semantic model.
+    ///
+    /// This does not distinguish a missing session window, a busy host UI
+    /// thread, or an operating-system rejection because those distinctions
+    /// would expose host state to the application.
+    TrayUnavailable,
 }
 
 impl ProtocolErrorCode {
@@ -339,6 +353,7 @@ impl ProtocolErrorCode {
             Self::WindowTitleInvalid => "window.title_invalid",
             Self::UiFieldsUnavailable => "ui.fields.unavailable",
             Self::MenuUnavailable => "menu.unavailable",
+            Self::TrayUnavailable => "tray.unavailable",
         }
     }
 }

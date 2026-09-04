@@ -1,8 +1,8 @@
 # Anodrel Protocol v1
 
-**Status:** Implemented through version 1.32, including a distinct bounded
-semantic context-menu core boundary, direct Windows popup adapter, and
-revision-checked event delivery.
+**Status:** Implemented through version 1.33, including a distinct bounded
+semantic tray core boundary and revision-checked event delivery. The planned
+Windows tray adapter follows [Native tray menus](TRAY.md).
 
 This document defines the public, transport-neutral boundary between a Platform
 application SDK and a host. Its operations are deliberately bounded and carry
@@ -30,8 +30,8 @@ of this protocol.
 
 `protocolVersion` is an object with numeric `major` and `minor` fields. A host
 accepts requests with its own major version and a minor version no greater than
-the host's. Version 1.32 accepts `{"major": 1, "minor": 0}` through
-`{"major": 1, "minor": 32}`.
+the host's. Version 1.33 accepts `{"major": 1, "minor": 0}` through
+`{"major": 1, "minor": 33}`.
 
 - Additive fields and operations increase the minor version. Receivers ignore
   unknown additive object fields.
@@ -81,6 +81,7 @@ The implemented operations are:
 | `window.close` | `{ "windowId": string }` | `{ "status": "requested" }` | `window.close` |
 | `menu.replace` | `{ "menus": [{ "label": string, "items": [{ "id": string, "label": string, "enabled": boolean, "shortcut"?: "Ctrl+<A-Z0-9>" \| "Ctrl+Shift+<A-Z0-9>" }] }] }` | current menu revision | `menu.write` |
 | `menu.context.replace` | `{ "items": [{ "id": string, "label": string, "enabled": boolean }] }` | current context-menu revision | `menu.context.write` |
+| `tray.replace` | `{ "items": [{ "id": string, "label": string, "enabled": boolean }] }` | current tray revision | `tray.write` |
 | `ui.document.replace` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v2` | `{ "document": string }` | accepted document revision | `ui.document.write` |
 | `ui.document.replace.v3` | `{ "document": string }` | accepted document revision | `ui.document.write` |
@@ -176,6 +177,8 @@ Protocol 1.31 adds no error code; its coalesced pull-only session state-change
 read reuses `window.unavailable`.
 Protocol 1.32 reuses `menu.unavailable` for an unattached or failed context-menu
 surface; malformed models reuse `request.payload_invalid`.
+Protocol 1.33 adds `tray.unavailable` for an unavailable or failed host-owned
+tray surface; malformed models reuse `request.payload_invalid`.
 Protocol 1.24 adds no error code; malformed, duplicate, or premature menu
 shortcuts reuse `request.payload_invalid`.
 Protocol 1.22 adds `file.binary_too_large`; malformed binary encodings reuse
@@ -202,6 +205,9 @@ revision and semantic action ID.
 Protocol 1.32 adds `menu.context.action.invoked` to that same pull result. It
 carries only a host-validated context-menu revision and semantic action ID;
 the route reports no pointer, popup, selection, target, or native-menu fact.
+Protocol 1.33 adds `tray.action.invoked` to that same result. It carries only a
+host-validated tray revision and semantic action ID; no click, focus, popup,
+placement, icon, callback, or native-menu fact crosses the boundary.
 
 ## Security rules
 
