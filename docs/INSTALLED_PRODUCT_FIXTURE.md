@@ -99,15 +99,21 @@ release candidate rather than treating successful preparation as acceptance.
 
 ## Removal
 
-First, remove the installed fixture from an **elevated** PowerShell session:
+First, remove the installed fixture from an **elevated** PowerShell session.
+The installed fixed signed image, not the original download, is the only
+accepted removal command:
 
 ~~~powershell
-& "$env:LOCALAPPDATA\Anodrel\InstalledProductFixture\AnodrelDevelopmentProductFixtureInstaller.exe" uninstall
+$programFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
+$uninstaller = Join-Path $programFiles 'Anodrel\Applications\org.anodrel.product-fixture\0.1.0\uninstaller\anodrel-windows-installer.exe'
+& $uninstaller uninstall
 ~~~
 
-That command revalidates the selected release and publisher before removing the
-fixed policy, Program Files package, and derived Start-menu entry. It accepts
-no application identity, package path, registry path, or cleanup target.
+That command revalidates the selected release, package version, and publisher
+before removing the fixed policy, ordinary Program Files package content, and
+derived Start-menu entry. The running signed image and its empty directories
+are queued for deletion at the next restart. It accepts no application
+identity, package path, registry path, or cleanup target.
 
 After that command succeeds, remove the generated development material from an
 elevated PowerShell session:

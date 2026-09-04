@@ -1,11 +1,17 @@
 //! Signed identity preflight for a later owned uninstall transaction.
 
-use std::{fmt, path::PathBuf};
+use std::{
+    fmt, fs,
+    path::{Path, PathBuf},
+};
 
 use anodrel_windows_policy::{PolicyStoreError, load_installed_application};
 use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 
-use crate::{SignedReleaseError, verify_current_signed_release};
+use crate::{
+    PackageVersion, SignedReleaseError, installed_uninstaller::installed_uninstaller_path,
+    verify_current_signed_release,
+};
 
 /// A signed, policy-selected application eligible for later uninstall work.
 pub struct VerifiedUninstallTarget {
@@ -71,6 +77,10 @@ pub enum UninstallPreflightError {
     InstalledPublisherMismatch,
     /// The installed signer differed from the signed uninstaller publisher.
     InstallerPublisherMismatch,
+    /// The selected package root did not use the signed release version name.
+    SelectedVersionInvalid,
+    /// The current signed image was not the selected fixed installed uninstaller.
+    CurrentImageNotSelected,
 }
 
 /// A fixed policy record could not be removed after verified preflight.
@@ -125,6 +135,12 @@ impl fmt::Display for UninstallPreflightError {
             Self::InstallerPublisherMismatch => {
                 "the installer publisher does not match the installed application"
             }
+            Self::SelectedVersionInvalid => {
+                "the selected package version does not match the installer release"
+            }
+            Self::CurrentImageNotSelected => {
+                "the current installer is not the selected installed uninstaller"
+            }
         };
         formatter.write_str(message)
     }
@@ -136,7 +152,10 @@ impl std::error::Error for UninstallPreflightError {
             Self::InstallerInvalid(error) => Some(error),
             Self::InstalledPolicyInvalid(error) => Some(error),
             Self::InstalledSignatureInvalid(error) => Some(error),
-            Self::InstalledPublisherMismatch | Self::InstallerPublisherMismatch => None,
+            Self::InstalledPublisherMismatch
+            | Self::InstallerPublisherMismatch
+            | Self::SelectedVersionInvalid
+            | Self::CurrentImageNotSelected => None,
         }
     }
 }
@@ -160,10 +179,44 @@ pub fn verify_current_uninstall_target() -> Result<VerifiedUninstallTarget, Unin
     if !manifest.matches_publisher_fingerprint(signer.as_bytes()) {
         return Err(UninstallPreflightError::InstallerPublisherMismatch);
     }
+    selected_version(installed.package_root())
+        .is_some_and(|version| version == manifest.package_version())
+        .then_some(())
+        .ok_or(UninstallPreflightError::SelectedVersionInvalid)?;
+    current_image_is_selected_uninstaller(installed.package_root())?;
     Ok(VerifiedUninstallTarget {
         application_id: manifest.application_id().to_owned(),
         package_root: installed.package_root().to_path_buf(),
     })
+}
+
+fn selected_version(package_root: &Path) -> Option<PackageVersion> {
+    package_root
+        .file_name()?
+        .to_str()
+        .and_then(PackageVersion::from_canonical_directory_name)
+}
+
+fn current_image_is_selected_uninstaller(
+    package_root: &Path,
+) -> Result<(), UninstallPreflightError> {
+    let expected = installed_uninstaller_path(package_root);
+    let expected_metadata = fs::symlink_metadata(&expected)
+        .map_err(|_| UninstallPreflightError::CurrentImageNotSelected)?;
+    if expected_metadata.file_type().is_symlink() || !expected_metadata.is_file() {
+        return Err(UninstallPreflightError::CurrentImageNotSelected);
+    }
+    let expected =
+        fs::canonicalize(expected).map_err(|_| UninstallPreflightError::CurrentImageNotSelected)?;
+    if !expected.starts_with(package_root) {
+        return Err(UninstallPreflightError::CurrentImageNotSelected);
+    }
+    let current = std::env::current_exe()
+        .and_then(fs::canonicalize)
+        .map_err(|_| UninstallPreflightError::CurrentImageNotSelected)?;
+    (current == expected)
+        .then_some(())
+        .ok_or(UninstallPreflightError::CurrentImageNotSelected)
 }
 
 /// Removes only the fixed machine `record` value for a verified target.
@@ -178,13 +231,26 @@ pub fn remove_verified_uninstall_policy(
 pub fn remove_policy_removed_package(
     target: PolicyRemovedUninstallTarget,
 ) -> Result<(), UninstallPackageRemovalError> {
-    crate::recovery::raw::remove_normal_tree(target.package_root()).map_err(|error| match error {
-        crate::RecoveryCleanupError::ReparsePointRefused => {
-            UninstallPackageRemovalError::ReparsePointRefused
-        }
-        crate::RecoveryCleanupError::DiscoveryFailed(_)
-        | crate::RecoveryCleanupError::RemovalFailed => {
-            UninstallPackageRemovalError::PackageRemovalFailed
+    crate::recovery::raw::remove_normal_tree_except_installer(target.package_root()).map_err(
+        |error| match error {
+            crate::RecoveryCleanupError::ReparsePointRefused => {
+                UninstallPackageRemovalError::ReparsePointRefused
+            }
+            crate::RecoveryCleanupError::DiscoveryFailed(_)
+            | crate::RecoveryCleanupError::RemovalFailed => {
+                UninstallPackageRemovalError::PackageRemovalFailed
+            }
+        },
+    )?;
+    crate::recovery::raw::schedule_installer_tree_removal(target.package_root()).map_err(|error| {
+        match error {
+            crate::RecoveryCleanupError::ReparsePointRefused => {
+                UninstallPackageRemovalError::ReparsePointRefused
+            }
+            crate::RecoveryCleanupError::DiscoveryFailed(_)
+            | crate::RecoveryCleanupError::RemovalFailed => {
+                UninstallPackageRemovalError::PackageRemovalFailed
+            }
         }
     })
 }
@@ -255,7 +321,7 @@ mod raw {
 mod tests {
     use anodrel_windows_signature::SignatureError;
 
-    use super::{UninstallPreflightError, verify_current_uninstall_target};
+    use super::{UninstallPreflightError, selected_version, verify_current_uninstall_target};
     use crate::SignedReleaseError;
 
     #[test]
@@ -266,5 +332,14 @@ mod tests {
                 SignedReleaseError::SignatureInvalid(SignatureError::TrustRejected)
             ))
         ));
+    }
+
+    #[test]
+    fn selected_uninstaller_version_uses_only_a_canonical_package_directory() {
+        assert_eq!(
+            selected_version(std::path::Path::new("C:\\Program Files\\Anodrel\\1.2.3")),
+            Some(crate::PackageVersion::new(1, 2, 3))
+        );
+        assert!(selected_version(std::path::Path::new("C:\\Anodrel\\1.02.3")).is_none());
     }
 }

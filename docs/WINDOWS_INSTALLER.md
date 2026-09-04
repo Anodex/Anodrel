@@ -202,20 +202,26 @@ unselected and may be retried.
 
 ## Uninstall preflight contract
 
-Uninstall starts with the current signed installer release, then loads only its
-fixed machine record and requires the installed executable's accepted signer to
-match both that record and the release publisher. It accepts no identity, root,
-registry, or executable argument and deletes nothing. Later record removal and
-tree cleanup consume only this opaque verified result.
+Uninstall starts only from the selected release's fixed installed signed image
+at `uninstaller\anodrel-windows-installer.exe`. It loads only its fixed machine
+record and requires the installed executable's accepted signer to match both
+that record and the release publisher. The image's embedded package version
+must equal the selected canonical version directory, so an older signed image
+cannot remove a newer selected release. It accepts no identity, root, registry,
+or executable argument and deletes nothing. Later record removal and tree
+cleanup consume only this opaque verified result.
 
 The next owned step removes only the fixed `record` value from that application's
 64-bit machine key. It neither deletes the key nor any package file. The later
 tree cleanup receives only its opaque policy-removed result.
 
-Package cleanup consumes only that policy-removed result. It uses the same
-direct normal-tree remover as private-stage recovery and refuses reparse points.
-It does not remove application data or credentials; an incomplete cleanup stays
-unselected for a later recovery route.
+Package cleanup consumes only that policy-removed result. It removes all normal
+package content other than the still-running fixed uninstaller image and its
+ancestor directory, and refuses every reparse point. Direct `MoveFileExW`
+operations then register the image, empty directory, and empty package root in
+that order for deletion at the next restart. It does not remove application
+data or credentials; a failure to register that final cleanup is reported
+instead of being presented as completed removal.
 
 ## Update-candidate preflight contract
 

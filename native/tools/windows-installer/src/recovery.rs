@@ -136,6 +136,8 @@ mod tests {
 
     #[cfg(windows)]
     use super::cleanup_private_stages;
+    #[cfg(windows)]
+    use super::raw;
 
     #[test]
     fn discovery_returns_only_exact_normal_private_stage_directories() {
@@ -181,6 +183,41 @@ mod tests {
             version.is_dir(),
             "version directories are never cleanup targets"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn uninstall_cleanup_retains_only_the_fixed_running_image() {
+        let root = TemporaryDirectory::new();
+        let package = root.path().join("1.2.3");
+        let installer = package
+            .join("uninstaller")
+            .join("anodrel-windows-installer.exe");
+        std::fs::create_dir_all(installer.parent().expect("installer has parent"))
+            .expect("installer directory is created");
+        std::fs::write(&installer, b"running installer").expect("installer image is written");
+        std::fs::create_dir_all(package.join("content")).expect("content directory is created");
+        std::fs::write(
+            package.join("content").join("main.txt"),
+            b"application content",
+        )
+        .expect("content is written");
+        std::fs::write(
+            package.join("anodrel.application.json"),
+            b"package manifest",
+        )
+        .expect("manifest is written");
+        std::fs::write(package.join("uninstaller").join("stale.txt"), b"stale data")
+            .expect("stale uninstaller data is written");
+
+        raw::remove_normal_tree_except_installer(&package)
+            .expect("only the running installer is retained");
+
+        assert!(installer.is_file());
+        assert!(package.join("uninstaller").is_dir());
+        assert!(!package.join("content").exists());
+        assert!(!package.join("anodrel.application.json").exists());
+        assert!(!package.join("uninstaller").join("stale.txt").exists());
     }
 
     struct TemporaryDirectory(PathBuf);
