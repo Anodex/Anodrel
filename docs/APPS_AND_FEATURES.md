@@ -3,8 +3,8 @@
 **Status:** The signed product metadata, selected-policy Start-menu route, and
 bounded uninstall transaction are implemented. The Apps & features
 selected-policy preflight and fixed registry writer are implemented but are not
-yet composed into installation or removal while the fixed native consent and
-UAC route remains separate work.
+yet composed into installation or removal. The fixed native consent and UAC
+route is implemented separately and awaits that composition.
 
 ## Purpose
 

@@ -129,14 +129,15 @@ writes only its already validated record to the fixed 64-bit machine-policy
 location; it is unit-tested for exact key/value and UTF-16 representation, but
 its elevated signed-fixture path remains an operator check.
 
-The installer core exposes only fixed `verify`, `install`, `update`, and
-`uninstall` operations through its thin first-party `windows-installer-shell`.
-Each machine-changing operation first asks Windows
+The installer core exposes only fixed `verify`, `install`, `update`, `rollback`,
+and `uninstall` operations through its thin first-party
+`windows-installer-shell`. Each named machine-changing operation first asks Windows
 whether its current process token is elevated and fails closed without trying
 to self-elevate. It accepts no target, root, record, publisher, certificate,
-or network argument. The separately reviewable staging, signer, promotion,
-publication, recovery, uninstall, and update boundaries remain behind those
-fixed commands.
+or network argument. Its separate fixed `remove` route performs native consent
+and a direct UAC handoff only to that image's internal `uninstall` command.
+The separately reviewable staging, signer, promotion, publication, recovery,
+uninstall, and update boundaries remain behind those fixed commands.
 
 ## Staged extraction contract
 

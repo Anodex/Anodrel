@@ -3,6 +3,7 @@
 mod command;
 mod elevation;
 mod initial_install;
+mod registered_uninstall;
 
 use std::{env, process::ExitCode};
 

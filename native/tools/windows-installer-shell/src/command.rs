@@ -9,6 +9,7 @@ use anodrel_windows_installer::{
     update_current_signed_release, verify_current_signed_release, verify_current_uninstall_target,
 };
 
+use crate::registered_uninstall;
 use crate::{elevation::require_elevation, initial_install};
 
 const USAGE: &str = concat!(
@@ -18,12 +19,14 @@ const USAGE: &str = concat!(
     "  anodrel-windows-installer install\n",
     "  anodrel-windows-installer update\n",
     "  anodrel-windows-installer rollback\n",
+    "  anodrel-windows-installer remove\n",
     "  anodrel-windows-installer uninstall\n",
     "  anodrel-windows-installer validate-manifest <release-manifest.json>\n",
     "\n",
     "No-argument invocation starts the fixed signed initial-install flow. Named install,\n",
     "update, rollback, and uninstall commands require an elevated shell and accept no\n",
-    "target or policy arguments. validate-manifest is development-only and does not install anything.",
+    "target or policy arguments. remove is the fixed native Apps & features route.\n",
+    "validate-manifest is development-only and does not install anything.",
 );
 
 /// One fixed command accepted by the installer executable.
@@ -34,6 +37,7 @@ pub(super) enum Command {
     Install,
     Update,
     Rollback,
+    Remove,
     Uninstall,
     ValidateManifest(String),
 }
@@ -46,6 +50,7 @@ pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
         [command] if command == "install" => Ok(Command::Install),
         [command] if command == "update" => Ok(Command::Update),
         [command] if command == "rollback" => Ok(Command::Rollback),
+        [command] if command == "remove" => Ok(Command::Remove),
         [command] if command == "uninstall" => Ok(Command::Uninstall),
         [command, path] if command == "validate-manifest" => {
             Ok(Command::ValidateManifest(path.clone()))
@@ -62,6 +67,7 @@ pub(super) fn execute(command: Command) -> Result<String, String> {
         Command::Install => elevated(install),
         Command::Update => elevated(update),
         Command::Rollback => elevated(rollback),
+        Command::Remove => registered_uninstall::run(),
         Command::Uninstall => elevated(uninstall),
         Command::ValidateManifest(path) => validate_manifest(&path),
     }
@@ -141,6 +147,7 @@ mod tests {
         assert_eq!(parse(&arguments(&["install"])), Ok(Command::Install));
         assert_eq!(parse(&arguments(&["update"])), Ok(Command::Update));
         assert_eq!(parse(&arguments(&["rollback"])), Ok(Command::Rollback));
+        assert_eq!(parse(&arguments(&["remove"])), Ok(Command::Remove));
         assert_eq!(parse(&arguments(&["uninstall"])), Ok(Command::Uninstall));
         assert_eq!(
             parse(&arguments(&["validate-manifest", "release.json"])),

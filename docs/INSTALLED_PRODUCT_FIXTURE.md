@@ -99,14 +99,14 @@ release candidate rather than treating successful preparation as acceptance.
 
 ## Removal
 
-First, remove the installed fixture from an **elevated** PowerShell session.
-The installed fixed signed image, not the original download, is the only
-accepted removal command:
+First, remove the installed fixture from a normal PowerShell session. The
+installed fixed signed image, not the original download, is the only accepted
+removal command. It will show native confirmation and then Windows' UAC prompt:
 
 ~~~powershell
 $programFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
 $uninstaller = Join-Path $programFiles 'Anodrel\Applications\org.anodrel.product-fixture\0.1.0\uninstaller\anodrel-windows-installer.exe'
-& $uninstaller uninstall
+& $uninstaller remove
 ~~~
 
 That command revalidates the selected release, package version, and publisher

@@ -1,6 +1,8 @@
 # Windows Apps & features removal flow
 
-**Status:** Contract accepted; implementation pending.
+**Status:** The fixed native consent, UAC handoff, repeated elevated preflight,
+and policy-absence proof are implemented in the installer shell. Apps &
+features registration has not yet been composed to invoke the route.
 
 ## Purpose
 

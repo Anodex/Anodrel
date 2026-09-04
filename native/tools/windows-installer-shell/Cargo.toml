@@ -12,3 +12,4 @@ path = "src/main.rs"
 anodrel-windows-install-consent = { path = "../../adapters/windows-install-consent" }
 anodrel-windows-install-handoff = { path = "../../adapters/windows-install-handoff" }
 anodrel-windows-installer = { path = "../windows-installer" }
+anodrel-windows-policy = { path = "../../adapters/windows-policy" }
