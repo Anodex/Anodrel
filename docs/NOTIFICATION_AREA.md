@@ -35,8 +35,11 @@ rejected; host text is never silently truncated.
 The entry currently supports the bounded silent information balloons required
 by [notifications](NOTIFICATIONS.md). The title and body limits remain owned by
 `anodrel-notifications`, which validates values before this lower-level adapter
-receives them. Shell32 operations run only on the UI thread. Dropping the entry
-calls `NIM_DELETE` best-effort so a session cannot leave a stale icon behind.
+receives them. A Windows host may later add one of its own private callback
+messages to an existing entry; that safe adapter method does not dispatch,
+report, or expose callbacks. Shell32 operations run only on the UI thread.
+Dropping the entry calls `NIM_DELETE` best-effort so a session cannot leave a
+stale icon behind.
 
 The direct Windows structs, fixed fields, and FFI calls are contained in one
 `raw` module. Its tests pin the real structure size and UTF-16 behavior;
@@ -45,10 +48,10 @@ out of debug output.
 
 ## Deliberately absent
 
-There is no tray protocol operation, capability, model, callback, click event,
-context menu, icon selection, tooltip selection, window toggle, or user
-attention readback yet. The existing `notification.show` path stays a one-way
-announce with no action or delivery result.
+There is no tray protocol operation, capability, model, callback delivery,
+click event, context menu, icon selection, tooltip selection, window toggle,
+or user-attention readback in this adapter. The existing `notification.show`
+path stays a one-way announce with no action or delivery result.
 
 A later tray model must be versioned and semantic. It must use this entry
 rather than create a second icon, keep native command numbers private, and

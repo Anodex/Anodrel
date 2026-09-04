@@ -7,7 +7,7 @@
 //! no sound, accepts no application artwork, and returns no native status. See
 //! `docs/NOTIFICATIONS.md` and Decision 0062.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use anodrel_notifications::{Notification, NotificationService, NotificationServiceError};
 use anodrel_windows_notification_area::{NotificationArea, NotificationAreaError};
@@ -16,7 +16,7 @@ use anodrel_windows_notification_area::{NotificationArea, NotificationAreaError}
 ///
 /// This is host-owned and fixed. An application cannot supply, read, or change
 /// it, so the entry cannot be made to name or impersonate anything.
-const ENTRY_TIP: &str = "Anodrel";
+pub const ENTRY_TIP: &str = "Anodrel";
 
 /// One host-owned notification-area entry, removed when this value is dropped.
 ///
@@ -25,7 +25,7 @@ const ENTRY_TIP: &str = "Anodrel";
 /// also dismiss the balloon that was just requested, so the entry's lifetime is
 /// the session's, not the message's.
 pub struct WindowsNotifications {
-    area: NotificationArea,
+    area: Arc<NotificationArea>,
 }
 
 impl WindowsNotifications {
@@ -42,7 +42,19 @@ impl WindowsNotifications {
             return Err(NotificationSetupError::NoWindow);
         }
         let area = NotificationArea::create(window, icon, ENTRY_TIP).map_err(map_setup_error)?;
-        Ok(Self { area })
+        Ok(Self {
+            area: Arc::new(area),
+        })
+    }
+
+    /// Reuses one host-created notification-area entry.
+    ///
+    /// The caller retains the native resource's host-only lifetime. This thin
+    /// portable adapter adds only bounded notification text; it cannot create
+    /// a second icon, change the tooltip, or configure local callbacks.
+    #[must_use]
+    pub fn from_notification_area(area: Arc<NotificationArea>) -> Self {
+        Self { area }
     }
 }
 
@@ -70,6 +82,8 @@ pub enum NotificationSetupError {
     NoWindow,
     /// The adapter's fixed host tooltip did not fit the Shell32 field rules.
     TooltipInvalid,
+    /// A host callback message was invalid while configuring the shared entry.
+    CallbackInvalid,
     /// Windows refused to create the notification-area entry.
     Io(std::io::Error),
 }
@@ -78,6 +92,7 @@ fn map_setup_error(error: NotificationAreaError) -> NotificationSetupError {
     match error {
         NotificationAreaError::NoWindow => NotificationSetupError::NoWindow,
         NotificationAreaError::TooltipInvalid => NotificationSetupError::TooltipInvalid,
+        NotificationAreaError::CallbackInvalid => NotificationSetupError::CallbackInvalid,
         NotificationAreaError::Io(error) => NotificationSetupError::Io(error),
     }
 }
@@ -87,6 +102,7 @@ impl fmt::Display for NotificationSetupError {
         let message = match self {
             Self::NoWindow => "notifications need a host window",
             Self::TooltipInvalid => "notifications need a valid host tooltip",
+            Self::CallbackInvalid => "notifications need a valid host callback",
             Self::Io(_) => "the notification area is unavailable",
         };
         formatter.write_str(message)
@@ -97,7 +113,7 @@ impl std::error::Error for NotificationSetupError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
-            Self::NoWindow | Self::TooltipInvalid => None,
+            Self::NoWindow | Self::TooltipInvalid | Self::CallbackInvalid => None,
         }
     }
 }

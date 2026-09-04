@@ -22,6 +22,7 @@ const NIM_DELETE: Dword = 0x0000_0002;
 const NIF_ICON: Dword = 0x0000_0002;
 const NIF_TIP: Dword = 0x0000_0004;
 const NIF_INFO: Dword = 0x0000_0010;
+const NIF_MESSAGE: Dword = 0x0000_0001;
 
 const NIIF_NONE: Dword = 0x0000_0000;
 const NIIF_NOSOUND: Dword = 0x0000_0010;
@@ -113,6 +114,18 @@ pub fn show_balloon(window: Handle, title: &str, body: &str) -> io::Result<()> {
     data.dwInfoFlags = NIIF_NONE | NIIF_NOSOUND;
     write_field(&mut data.szInfoTitle, title);
     write_field(&mut data.szInfo, body);
+    send(NIM_MODIFY, &data)
+}
+
+/// Adds one host-private callback message to an already-created entry.
+///
+/// Shell32 receives only the host window and a private message number. The
+/// application never supplies either value, and this low-level binding never
+/// dispatches the callback itself.
+pub fn set_callback_message(window: Handle, message: Dword) -> io::Result<()> {
+    let mut data = NotifyIconDataW::new(window);
+    data.uFlags = NIF_MESSAGE;
+    data.uCallbackMessage = message;
     send(NIM_MODIFY, &data)
 }
 

@@ -56,6 +56,20 @@ impl NotificationArea {
     pub fn show_information(&self, title: &str, body: &str) -> io::Result<()> {
         raw::show_balloon(self.window, title, body)
     }
+
+    /// Enables one private host callback message for this existing entry.
+    ///
+    /// The value stays entirely on the native side: callers must reserve it
+    /// from their own private window-message range, and this adapter exposes
+    /// neither callback delivery nor a native handle. A later tray host uses
+    /// this only when it needs local interaction; notification-only sessions
+    /// never need to configure it.
+    pub fn set_callback_message(&self, message: u32) -> Result<(), NotificationAreaError> {
+        if message == 0 {
+            return Err(NotificationAreaError::CallbackInvalid);
+        }
+        raw::set_callback_message(self.window, message).map_err(NotificationAreaError::Io)
+    }
 }
 
 impl Drop for NotificationArea {
@@ -79,6 +93,8 @@ pub enum NotificationAreaError {
     NoWindow,
     /// The host-owned tooltip does not fit the Shell32 field exactly.
     TooltipInvalid,
+    /// The host supplied no private message for local callback routing.
+    CallbackInvalid,
     /// Windows refused to create the entry.
     Io(io::Error),
 }
@@ -88,6 +104,7 @@ impl fmt::Display for NotificationAreaError {
         formatter.write_str(match self {
             Self::NoWindow => "the notification area needs a host window",
             Self::TooltipInvalid => "the notification-area tooltip is invalid",
+            Self::CallbackInvalid => "the notification-area callback is invalid",
             Self::Io(_) => "the notification area is unavailable",
         })
     }
@@ -97,7 +114,7 @@ impl std::error::Error for NotificationAreaError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
-            Self::NoWindow | Self::TooltipInvalid => None,
+            Self::NoWindow | Self::TooltipInvalid | Self::CallbackInvalid => None,
         }
     }
 }
@@ -135,6 +152,16 @@ mod tests {
     fn debug_output_hides_native_window_material() {
         let entry = NotificationArea { window: -1 };
         assert_eq!(format!("{entry:?}"), "NotificationArea(..)");
+        drop(entry);
+    }
+
+    #[test]
+    fn refuses_an_absent_private_callback_message() {
+        let entry = NotificationArea { window: -1 };
+        assert!(matches!(
+            entry.set_callback_message(0),
+            Err(NotificationAreaError::CallbackInvalid)
+        ));
         drop(entry);
     }
 }
