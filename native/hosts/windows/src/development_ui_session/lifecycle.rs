@@ -95,6 +95,17 @@ where
                 HostServices::unavailable().with_tray(ui.tray.clone()),
             )?;
         (server, invitation, None)
+    } else if config.supports_notification() {
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                HostServices::unavailable().with_notifications(ui.notifications.clone()),
+            )?;
+        (server, invitation, None)
     } else if config.supports_fields() {
         let (server, invitation) =
             WindowsPipeServer::create_with_session_components_and_service_bundle(

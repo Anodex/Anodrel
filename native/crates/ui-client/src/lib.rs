@@ -16,6 +16,7 @@ mod events;
 mod fields;
 mod menu_model;
 mod menu_revision;
+mod notification;
 mod popup_events;
 mod revision;
 mod session;

@@ -31,6 +31,11 @@ pub(super) const TRAY_GRANTS: [Capability; 4] = [
     Capability::TrayWrite,
     Capability::SessionClose,
 ];
+pub(super) const NOTIFICATION_GRANTS: [Capability; 3] = [
+    Capability::UiDocumentWrite,
+    Capability::NotificationShow,
+    Capability::SessionClose,
+];
 pub(super) const MULTI_WINDOW_GRANTS: [Capability; 5] = [
     Capability::UiDocumentWrite,
     Capability::UiEventsRead,
@@ -56,6 +61,7 @@ enum DevelopmentUiSessionKind {
     Menu,
     ContextMenu,
     Tray,
+    Notification,
     MultiWindow,
     WindowControls,
 }
@@ -156,6 +162,23 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration whose only additional permission is one
+    /// bounded one-way native notification.
+    pub(crate) const fn with_notification(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::Notification,
+        }
+    }
+
     /// Creates a configuration for the explicit bounded multi-window route.
     ///
     /// Window creation and secondary close are additional fixed grants on this
@@ -199,6 +222,7 @@ impl DevelopmentUiSessionConfig {
             DevelopmentUiSessionKind::Menu => &MENU_GRANTS,
             DevelopmentUiSessionKind::ContextMenu => &CONTEXT_MENU_GRANTS,
             DevelopmentUiSessionKind::Tray => &TRAY_GRANTS,
+            DevelopmentUiSessionKind::Notification => &NOTIFICATION_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
             DevelopmentUiSessionKind::WindowControls => &WINDOW_CONTROLS_GRANTS,
         }
@@ -214,6 +238,10 @@ impl DevelopmentUiSessionConfig {
 
     pub(super) const fn supports_tray(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::Tray)
+    }
+
+    pub(super) const fn supports_notification(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::Notification)
     }
 
     pub(super) const fn supports_fields(self) -> bool {
@@ -235,7 +263,7 @@ mod tests {
 
     use super::{
         CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FORM_GRANTS, MENU_GRANTS,
-        MULTI_WINDOW_GRANTS, TRAY_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
+        MULTI_WINDOW_GRANTS, NOTIFICATION_GRANTS, TRAY_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
     };
 
     #[test]
@@ -270,6 +298,12 @@ mod tests {
             "Anodrel Tray Test",
             "completed tray",
         );
+        let notification = DevelopmentUiSessionConfig::with_notification(
+            "anodrel.test-notification",
+            "test-notification-session",
+            "Anodrel Notification Test",
+            "completed notification",
+        );
         let multi_window = DevelopmentUiSessionConfig::with_multi_window(
             "anodrel.test-multi-window",
             "test-multi-window-session",
@@ -301,6 +335,9 @@ mod tests {
         assert!(tray.supports_tray());
         assert!(!tray.supports_menu());
         assert!(!tray.supports_context_menu());
+        assert_eq!(notification.grants(), NOTIFICATION_GRANTS);
+        assert!(notification.supports_notification());
+        assert!(!notification.supports_tray());
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
         assert!(!multi_window.supports_menu());
         assert!(multi_window.supports_multi_window());
@@ -341,6 +378,14 @@ mod tests {
                 Capability::UiDocumentWrite,
                 Capability::UiEventsRead,
                 Capability::ContextMenuWrite,
+                Capability::SessionClose,
+            ]
+        );
+        assert_eq!(
+            NOTIFICATION_GRANTS,
+            [
+                Capability::UiDocumentWrite,
+                Capability::NotificationShow,
                 Capability::SessionClose,
             ]
         );

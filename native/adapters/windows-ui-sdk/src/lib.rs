@@ -130,6 +130,14 @@ impl WindowsUiSession {
         self.session.read_tray_actions()
     }
 
+    /// Asks the host to hand one bounded notification to its native surface.
+    ///
+    /// Acceptance does not reveal whether a person saw, dismissed, or acted on
+    /// the notification. The host alone owns its Shell32 entry and artwork.
+    pub fn show_notification(&mut self, title: &str, body: &str) -> Result<(), UiClientError> {
+        self.session.show_notification(title, body)
+    }
+
     /// Proposes a title for this session's own host window.
     pub fn set_window_title(&mut self, title: &str) -> Result<(), UiClientError> {
         self.session.set_window_title(title)

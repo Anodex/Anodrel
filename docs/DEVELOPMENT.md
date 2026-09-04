@@ -209,6 +209,15 @@ assertive result**, and **Complete status session** in order. The application
 cannot learn whether a status was announced. It creates no certificate,
 package, installer, or machine policy. See `docs/NATIVE_LIVE_STATUS_TEMPLATE.md`.
 
+To exercise one first-party native notification, double-click
+`start-notification-template.bat` in the repository root. It generates and
+builds a disposable Rust executable, then opens it through the fixed three-grant
+development route. Watch for the fixed notification while its window stays open
+for five seconds. A successful run means the host accepted the request, not
+that the process knows a person saw it. The helper creates no certificate,
+package, installer, or machine policy. See
+`docs/NATIVE_NOTIFICATION_TEMPLATE.md`.
+
 `start.bat` builds in release. The Startup Lab composes every frame in software,
 and an unoptimised build is roughly ten times slower — far too slow to hold the
 reveal's frame rate. When running the host by hand for a visual check, pass

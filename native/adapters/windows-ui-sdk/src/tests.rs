@@ -141,4 +141,6 @@ fn facade_exposes_only_typed_targetless_window_controls() {
         WindowsUiSession::replace_tray_v1;
     let _read_tray_actions: fn(&mut WindowsUiSession) -> Result<UiTrayActionBatch, UiClientError> =
         WindowsUiSession::read_tray_actions;
+    let _show_notification: fn(&mut WindowsUiSession, &str, &str) -> Result<(), UiClientError> =
+        WindowsUiSession::show_notification;
 }

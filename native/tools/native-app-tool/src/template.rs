@@ -7,6 +7,7 @@ mod form;
 mod live_status;
 mod menu;
 mod multi_window;
+mod notification;
 mod scroll_window;
 mod tray;
 mod window_controls;
@@ -77,6 +78,14 @@ pub fn tray_main_source(display_label: &str) -> String {
 
 pub fn tray_readme(context: &TemplateContext) -> String {
     tray::readme(context)
+}
+
+pub fn notification_main_source(display_label: &str) -> String {
+    notification::main_source(display_label)
+}
+
+pub fn notification_readme(context: &TemplateContext) -> String {
+    notification::readme(context)
 }
 
 pub fn multi_window_main_source(display_label: &str) -> String {

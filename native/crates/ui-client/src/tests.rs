@@ -15,6 +15,7 @@ use crate::{
 };
 
 mod foundation;
+mod notification;
 mod tray;
 mod validation;
 mod window_controls;

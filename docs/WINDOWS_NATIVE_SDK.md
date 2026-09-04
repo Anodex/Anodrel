@@ -30,7 +30,7 @@ pipe names, tokens, raw Windows errors, raw host responses, or host diagnostics.
 The facade preserves the documented typed operations from `anodrel-ui-client`:
 strict v1/v2/v3 document replacement, bounded semantic-event reads,
 whole-surface field snapshots, complete menu and tray replacement, opaque
-secondary-view operations, and group close. It also exposes targetless controls
+secondary-view operations, one-way notification delivery, and group close. It also exposes targetless controls
 for the authenticated session's own host window:
 
 | Method | Existing operation | Result |
@@ -42,6 +42,7 @@ for the authenticated session's own host window:
 | `set_window_size` | `window.size.set` | accepted bounded logical client-size request |
 | `replace_tray_v1` | `tray.replace` | opaque semantic tray revision |
 | `read_tray_actions` | `ui.events.read` | revision-bound tray action batch |
+| `show_notification` | `notification.show` | accepted one-way host handover |
 
 `WindowState`, `WindowFullscreenMode`, and `WindowSize` are re-exported by the
 facade, so an application does not import an implementation crate. The methods
@@ -61,7 +62,7 @@ need public documentation and generated-template compatibility coverage. A
 removal or incompatible type change requires a new decision and a new `0.2`
 minor line. Registry publication is intentionally separate work.
 
-The generated UI, menu, context-menu, tray, form, live-status, multi-window,
+The generated UI, menu, context-menu, tray, notification, form, live-status, multi-window,
 scroll-window, and window-controls projects are the real consumers. Their isolated release builds
 and authenticated Windows-pipe sessions prove that the SDK has no hidden
 host-source dependency. The window-controls project specifically covers every

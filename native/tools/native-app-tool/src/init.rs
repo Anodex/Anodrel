@@ -8,9 +8,10 @@ use crate::{
     template::{
         TemplateContext, cargo_toml, context_menu_main_source, context_menu_readme,
         form_main_source, form_readme, live_status_main_source, live_status_readme, main_source,
-        menu_main_source, menu_readme, multi_window_main_source, multi_window_readme, readme,
-        scroll_window_main_source, scroll_window_readme, tray_main_source, tray_readme,
-        window_controls_main_source, window_controls_readme,
+        menu_main_source, menu_readme, multi_window_main_source, multi_window_readme,
+        notification_main_source, notification_readme, readme, scroll_window_main_source,
+        scroll_window_readme, tray_main_source, tray_readme, window_controls_main_source,
+        window_controls_readme,
     },
     validation::{validate_display_label, validate_project_slug},
 };
@@ -88,6 +89,19 @@ pub fn initialize_tray(
     display_label: &str,
 ) -> Result<(), InitError> {
     initialize_template(TemplateKind::Tray, destination, project_slug, display_label)
+}
+
+pub fn initialize_notification(
+    destination: &Path,
+    project_slug: &str,
+    display_label: &str,
+) -> Result<(), InitError> {
+    initialize_template(
+        TemplateKind::Notification,
+        destination,
+        project_slug,
+        display_label,
+    )
 }
 
 pub fn initialize_multi_window(
@@ -172,6 +186,11 @@ fn initialize_template(
             tray_readme(&context),
             "Created Anodrel native tray project.",
         ),
+        TemplateKind::Notification => (
+            notification_main_source(display_label),
+            notification_readme(&context),
+            "Created Anodrel native notification project.",
+        ),
         TemplateKind::MultiWindow => (
             multi_window_main_source(display_label),
             multi_window_readme(&context),
@@ -227,8 +246,8 @@ mod tests {
 
     use super::{
         initialize, initialize_context_menu, initialize_form, initialize_live_status,
-        initialize_menu, initialize_multi_window, initialize_scroll_window, initialize_tray,
-        initialize_window_controls,
+        initialize_menu, initialize_multi_window, initialize_notification,
+        initialize_scroll_window, initialize_tray, initialize_window_controls,
     };
 
     static NEXT_TEST_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
@@ -371,6 +390,28 @@ mod tests {
         assert!(source.contains("replace_tray_v1"));
         assert!(source.contains("read_tray_actions"));
         assert!(!source.contains("replace_context_menu_v1"));
+    }
+
+    #[test]
+    fn notification_project_is_separate_from_event_and_popup_templates() {
+        let temporary = TestDirectory::new();
+        let destination = temporary.path.join("generated-notification-app");
+        initialize_notification(
+            &destination,
+            "generated-notification-app",
+            "Generated Notification App",
+        )
+        .expect("generate a native notification project");
+
+        let readme = fs::read_to_string(destination.join("README.md"))
+            .expect("read generated notification instructions");
+        let source = fs::read_to_string(destination.join("src/main.rs"))
+            .expect("read generated notification source");
+        assert!(readme.contains("--native-notification-template-client"));
+        assert!(source.contains("show_notification"));
+        assert!(source.contains("Duration::from_secs(5)"));
+        assert!(!source.contains("read_actions"));
+        assert!(!source.contains("replace_tray_v1"));
     }
 
     #[test]

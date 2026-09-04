@@ -474,11 +474,11 @@ Status: **First starter-package slice in progress**
   template. A generated child has completed the full authenticated
   shortcut-bearing menu sequence in a real pipe test; manual activation by
   both menu click and keyboard shortcut remains the explicit desktop acceptance
-  check. Decision 0121 now adds a separately selected native context-menu
-  template: its `init-context-menu` generator and fixed four-grant Windows
+  check. Decision 0121 adds a separately selected native context-menu template: its `init-context-menu` generator and fixed four-grant Windows
   host route exercise Protocol 1.32 without broadening any earlier template.
   A generated child completed its real-pipe context-menu session; its real User32 right-click remains the acceptance check.
   Protocol 1.33's semantic tray has an implemented Windows bridge; real notification-area interaction remains manual. See `docs/TRAY.md`.
+  Decision 0193 adds an explicit native notification template with only document write, one-way notification show, and self-close; its generated child completed a real invited-pipe handover, while seeing the Shell32 notification remains manual.
   Decision 0094 now adds a third,
   separately selected native template:
   its `init-multi-window` generator and fixed five-grant Windows host route

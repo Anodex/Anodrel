@@ -238,6 +238,7 @@ version = "0.1.0"
 dependencies = [
  "anodrel-core",
  "anodrel-menu",
+ "anodrel-notifications",
  "anodrel-protocol",
  "anodrel-ui",
  "anodrel-ui-document",
@@ -501,6 +502,7 @@ dependencies = [
  "anodrel-client",
  "anodrel-json",
  "anodrel-menu",
+ "anodrel-notifications",
  "anodrel-ui",
  "anodrel-ui-document",
  "anodrel-ui-session",

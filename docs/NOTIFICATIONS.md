@@ -4,7 +4,8 @@
 `anodrel-notifications`, the direct Windows adapter in
 `anodrel-windows-notifications`, the Protocol 1.13 operation, installed record
 version 1.3, host wiring that services the mailbox from the owning UI thread,
-the SDK method, the mock host, and a development client that calls it.
+the SDK method, the mock host, a development client that calls it, and one
+first-party generated native notification template.
 
 The path has been run and the notification has been **seen** on Windows 11: the
 development diagnostic delivered its document, called `notification.show`, and a
@@ -251,6 +252,11 @@ window.
 What those tests cannot cover is the notification actually appearing. Shell32
 behaviour needs a real desktop session, so a manual check belongs in
 `docs/DEVELOPMENT_DIAGNOSTICS.md` once host wiring exists.
+
+The explicit native notification template is also covered by an isolated
+release build and a real invited-pipe test. It proves only the fixed title and
+body reached the host mailbox and that its child self-closes; it does not claim
+that Shell32 displayed anything. See `docs/NATIVE_NOTIFICATION_TEMPLATE.md`.
 
 Core tests cover the operation: the independent grant check, the refusal of a
 client asking below Protocol 1.13, the exact two-field payload including a

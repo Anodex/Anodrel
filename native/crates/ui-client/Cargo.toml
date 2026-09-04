@@ -8,6 +8,7 @@ license.workspace = true
 anodrel-client = { path = "../client" }
 anodrel-json = { path = "../json" }
 anodrel-menu = { path = "../menu" }
+anodrel-notifications = { path = "../notifications" }
 anodrel-ui = { path = "../ui" }
 anodrel-ui-document = { path = "../ui-document" }
 anodrel-ui-session = { path = "../ui-session" }
