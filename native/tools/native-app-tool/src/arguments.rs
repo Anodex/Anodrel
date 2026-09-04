@@ -12,6 +12,7 @@ pub enum TemplateKind {
     Tray,
     Notification,
     FileWrite,
+    FileBinaryWrite,
     MultiWindow,
     ScrollWindow,
     WindowControls,
@@ -36,6 +37,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<InitCommand,
         Some("init-tray") => TemplateKind::Tray,
         Some("init-notification") => TemplateKind::Notification,
         Some("init-file-write") => TemplateKind::FileWrite,
+        Some("init-file-binary-write") => TemplateKind::FileBinaryWrite,
         Some("init-multi-window") => TemplateKind::MultiWindow,
         Some("init-scroll-window") => TemplateKind::ScrollWindow,
         Some("init-window-controls") => TemplateKind::WindowControls,
@@ -96,6 +98,23 @@ mod tests {
                 destination: PathBuf::from("out/live-status"),
                 project_slug: "live-status-app".to_owned(),
                 display_label: "Live Status App".to_owned(),
+            })
+        );
+        assert_eq!(
+            parse(
+                [
+                    "init-file-binary-write",
+                    "out/file-binary-write",
+                    "file-binary-write-app",
+                    "File Binary Write App",
+                ]
+                .map(String::from)
+            ),
+            Ok(InitCommand {
+                template_kind: TemplateKind::FileBinaryWrite,
+                destination: PathBuf::from("out/file-binary-write"),
+                project_slug: "file-binary-write-app".to_owned(),
+                display_label: "File Binary Write App".to_owned(),
             })
         );
         assert_eq!(

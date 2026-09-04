@@ -9,9 +9,9 @@ use anodrel_bootstrap::BootstrapInvitation;
 use anodrel_wire::{FrameDecoder, encode_json};
 
 use super::{
-    ContextMenuRevision, FileDialogFilter, SaveReference, SaveSelectionResult, TrayRevision,
-    UiClientError, UiContextMenuActionBatch, UiTrayActionBatch, WindowFullscreenMode, WindowSize,
-    WindowState, WindowsUiConnectionError, WindowsUiSession, establish_session,
+    ContextMenuRevision, FileBinaryData, FileDialogFilter, SaveReference, SaveSelectionResult,
+    TrayRevision, UiClientError, UiContextMenuActionBatch, UiTrayActionBatch, WindowFullscreenMode,
+    WindowSize, WindowState, WindowsUiConnectionError, WindowsUiSession, establish_session,
 };
 
 const PIPE_NAME: &str = r"\\.\pipe\anodrel.v1.windows-sdk-test";
@@ -152,4 +152,9 @@ fn facade_exposes_only_typed_targetless_window_controls() {
         &SaveReference,
         &str,
     ) -> Result<(), UiClientError> = WindowsUiSession::write_selected_text;
+    let _write_selected_binary: fn(
+        &mut WindowsUiSession,
+        &SaveReference,
+        &FileBinaryData,
+    ) -> Result<(), UiClientError> = WindowsUiSession::write_selected_binary;
 }

@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 
 use anodrel_client::ProtocolVersion;
 use anodrel_file_access::{
-    MAX_FILE_TEXT_WRITE_BYTES, SaveReference, SaveSelection, SaveSelectionResult,
+    FileBinaryData, MAX_FILE_TEXT_WRITE_BYTES, SaveReference, SaveSelection, SaveSelectionResult,
 };
 use anodrel_file_dialog::{FileDialogFilter, MAX_FILE_DIALOG_FILTERS, SaveFilePath};
 use anodrel_json::JsonValue;
@@ -13,6 +13,8 @@ use crate::{UiClientError, UiSession};
 
 /// The first protocol version with selected-output capture and text writing.
 const FILE_WRITE_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(17);
+/// The first protocol version with canonical retained binary output.
+const FILE_BINARY_WRITE_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(22);
 
 impl<Stream> UiSession<Stream>
 where
@@ -58,6 +60,37 @@ where
                         JsonValue::String(reference.as_str().to_owned()),
                     ),
                     ("text".to_owned(), JsonValue::String(text.to_owned())),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        )?;
+        exact_status(&result, "written")
+    }
+
+    /// Writes one bounded binary value through a host-retained output object.
+    ///
+    /// The typed data value supplies one canonical base64url representation.
+    /// This method never accepts a path, native handle, MIME type, offset,
+    /// append flag, durable mode, or atomicity option.
+    pub fn write_selected_binary(
+        &mut self,
+        reference: &SaveReference,
+        data: &FileBinaryData,
+    ) -> Result<(), UiClientError> {
+        let result = self.request(
+            FILE_BINARY_WRITE_PROTOCOL,
+            "file.write_binary",
+            JsonValue::Object(
+                [
+                    (
+                        "saveReference".to_owned(),
+                        JsonValue::String(reference.as_str().to_owned()),
+                    ),
+                    (
+                        "bytesBase64Url".to_owned(),
+                        JsonValue::String(data.to_base64url()),
+                    ),
                 ]
                 .into_iter()
                 .collect(),

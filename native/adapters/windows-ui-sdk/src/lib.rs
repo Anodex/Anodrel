@@ -16,11 +16,12 @@ use anodrel_windows_client::WindowsClientStream;
 
 pub use anodrel_client::InteractivePollSchedule;
 pub use anodrel_ui_client::{
-    ContextMenuRevision, DocumentRevision, FileDialogFilter, MenuRevision, SaveReference,
-    SaveSelection, SaveSelectionResult, SecondaryWindowId, SessionWindowId, TrayRevision, UiAction,
-    UiActionBatch, UiClientError, UiContextMenuAction, UiContextMenuActionBatch, UiEvent,
-    UiEventBatch, UiFieldSnapshot, UiFieldValue, UiTrayAction, UiTrayActionBatch,
-    WindowFullscreenMode, WindowSize, WindowState, WindowUiAction, WindowUiActionBatch,
+    ContextMenuRevision, DocumentRevision, FileBinaryData, FileDialogFilter, MenuRevision,
+    SaveReference, SaveSelection, SaveSelectionResult, SecondaryWindowId, SessionWindowId,
+    TrayRevision, UiAction, UiActionBatch, UiClientError, UiContextMenuAction,
+    UiContextMenuActionBatch, UiEvent, UiEventBatch, UiFieldSnapshot, UiFieldValue, UiTrayAction,
+    UiTrayActionBatch, WindowFullscreenMode, WindowSize, WindowState, WindowUiAction,
+    WindowUiActionBatch,
 };
 
 /// Closed outcomes while establishing one invited Windows UI session.
@@ -159,6 +160,19 @@ impl WindowsUiSession {
         text: &str,
     ) -> Result<(), UiClientError> {
         self.session.write_selected_text(reference, text)
+    }
+
+    /// Writes one bounded binary value through a retained selected output.
+    ///
+    /// The typed data value carries one canonical base64url spelling. This
+    /// method does not accept a path, native handle, MIME type, offset, append
+    /// flag, stream, or a durable/atomicity option.
+    pub fn write_selected_binary(
+        &mut self,
+        reference: &SaveReference,
+        data: &FileBinaryData,
+    ) -> Result<(), UiClientError> {
+        self.session.write_selected_binary(reference, data)
     }
 
     /// Proposes a title for this session's own host window.

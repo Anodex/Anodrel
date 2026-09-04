@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anodrel_file_access::{MAX_FILE_TEXT_WRITE_BYTES, SaveSelectionResult};
+use anodrel_file_access::{FileBinaryData, MAX_FILE_TEXT_WRITE_BYTES, SaveSelectionResult};
 use anodrel_file_dialog::FileDialogFilter;
 use anodrel_json::JsonValue;
 
@@ -117,5 +117,46 @@ fn invalid_filters_and_oversized_text_stop_before_a_public_request() {
         messages(&written).len(),
         1,
         "only authentication was written"
+    );
+}
+
+#[test]
+fn binary_write_uses_protocol_1_22_and_canonical_base64url() {
+    let (mut session, written) = session_with_responses([
+        response(
+            "anodrel-ui-1",
+            r#"{"status":"selected","path":"C:\\Anodrel\\output.bin","saveReference":"AbCdEfGhIjKlMnOpQrStUv"}"#,
+        ),
+        response("anodrel-ui-2", r#"{"status":"written"}"#),
+    ]);
+    let filter = FileDialogFilter::new("Binary files", vec!["bin".to_owned()])
+        .expect("fixed filter is valid");
+    let SaveSelectionResult::Selected(selection) = session
+        .select_save_file_v2(&[filter])
+        .expect("host selected an output")
+    else {
+        panic!("the fixed response selects one output");
+    };
+    let data = FileBinaryData::from_bytes(vec![0, 1, 2, 255]).expect("fixed bytes are bounded");
+    session
+        .write_selected_binary(selection.reference(), &data)
+        .expect("host wrote retained binary output");
+
+    let messages = messages(&written);
+    assert_eq!(request_protocol_minor(&messages[1]), Some(17));
+    assert_eq!(request_protocol_minor(&messages[2]), Some(22));
+    assert_eq!(
+        request_field(&messages[2], "operation"),
+        Some("file.write_binary".to_owned())
+    );
+    let write = JsonValue::parse(&messages[2]).expect("binary write request is JSON");
+    assert_eq!(
+        write.as_object().and_then(|fields| fields.get("payload")),
+        Some(
+            &JsonValue::parse(
+                r#"{"saveReference":"AbCdEfGhIjKlMnOpQrStUv","bytesBase64Url":"AAEC_w"}"#,
+            )
+            .expect("expected binary payload is JSON"),
+        )
     );
 }

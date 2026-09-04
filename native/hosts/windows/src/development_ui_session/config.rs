@@ -42,6 +42,12 @@ pub(super) const FILE_WRITE_GRANTS: [Capability; 4] = [
     Capability::FileWriteText,
     Capability::SessionClose,
 ];
+pub(super) const FILE_BINARY_WRITE_GRANTS: [Capability; 4] = [
+    Capability::UiDocumentWrite,
+    Capability::DialogSaveFile,
+    Capability::FileWriteBinary,
+    Capability::SessionClose,
+];
 pub(super) const MULTI_WINDOW_GRANTS: [Capability; 5] = [
     Capability::UiDocumentWrite,
     Capability::UiEventsRead,
@@ -69,6 +75,7 @@ enum DevelopmentUiSessionKind {
     Tray,
     Notification,
     FileWrite,
+    FileBinaryWrite,
     MultiWindow,
     WindowControls,
 }
@@ -205,6 +212,25 @@ impl DevelopmentUiSessionConfig {
         }
     }
 
+    /// Creates a configuration for one retained selected-output binary write.
+    ///
+    /// The host retains the selected native object. This route does not grant
+    /// a path-based filesystem operation, input events, or output readback.
+    pub(crate) const fn with_file_binary_write(
+        application_id: &'static str,
+        session_id: &'static str,
+        display_name: &'static str,
+        completion_message: &'static str,
+    ) -> Self {
+        Self {
+            application_id,
+            session_id,
+            display_name,
+            completion_message,
+            kind: DevelopmentUiSessionKind::FileBinaryWrite,
+        }
+    }
+
     /// Creates a configuration for the explicit bounded multi-window route.
     ///
     /// Window creation and secondary close are additional fixed grants on this
@@ -250,6 +276,7 @@ impl DevelopmentUiSessionConfig {
             DevelopmentUiSessionKind::Tray => &TRAY_GRANTS,
             DevelopmentUiSessionKind::Notification => &NOTIFICATION_GRANTS,
             DevelopmentUiSessionKind::FileWrite => &FILE_WRITE_GRANTS,
+            DevelopmentUiSessionKind::FileBinaryWrite => &FILE_BINARY_WRITE_GRANTS,
             DevelopmentUiSessionKind::MultiWindow => &MULTI_WINDOW_GRANTS,
             DevelopmentUiSessionKind::WindowControls => &WINDOW_CONTROLS_GRANTS,
         }
@@ -275,6 +302,10 @@ impl DevelopmentUiSessionConfig {
         matches!(self.kind, DevelopmentUiSessionKind::FileWrite)
     }
 
+    pub(super) const fn supports_file_binary_write(self) -> bool {
+        matches!(self.kind, DevelopmentUiSessionKind::FileBinaryWrite)
+    }
+
     pub(super) const fn supports_fields(self) -> bool {
         matches!(self.kind, DevelopmentUiSessionKind::Form)
     }
@@ -293,9 +324,9 @@ mod tests {
     use anodrel_protocol::Capability;
 
     use super::{
-        CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FILE_WRITE_GRANTS, FORM_GRANTS,
-        MENU_GRANTS, MULTI_WINDOW_GRANTS, NOTIFICATION_GRANTS, TRAY_GRANTS, UI_GRANTS,
-        WINDOW_CONTROLS_GRANTS,
+        CONTEXT_MENU_GRANTS, DevelopmentUiSessionConfig, FILE_BINARY_WRITE_GRANTS,
+        FILE_WRITE_GRANTS, FORM_GRANTS, MENU_GRANTS, MULTI_WINDOW_GRANTS, NOTIFICATION_GRANTS,
+        TRAY_GRANTS, UI_GRANTS, WINDOW_CONTROLS_GRANTS,
     };
 
     #[test]
@@ -342,6 +373,12 @@ mod tests {
             "Anodrel File Write Test",
             "completed file write",
         );
+        let file_binary_write = DevelopmentUiSessionConfig::with_file_binary_write(
+            "anodrel.test-file-binary-write",
+            "test-file-binary-write-session",
+            "Anodrel File Binary Write Test",
+            "completed file binary write",
+        );
         let multi_window = DevelopmentUiSessionConfig::with_multi_window(
             "anodrel.test-multi-window",
             "test-multi-window-session",
@@ -381,6 +418,11 @@ mod tests {
         assert!(!file_write.supports_notification());
         assert!(!file_write.supports_fields());
         assert!(!file_write.supports_menu());
+        assert_eq!(file_binary_write.grants(), FILE_BINARY_WRITE_GRANTS);
+        assert!(file_binary_write.supports_file_binary_write());
+        assert!(!file_binary_write.supports_file_write());
+        assert!(!file_binary_write.supports_notification());
+        assert!(!file_binary_write.supports_menu());
         assert_eq!(multi_window.grants(), MULTI_WINDOW_GRANTS);
         assert!(!multi_window.supports_menu());
         assert!(multi_window.supports_multi_window());

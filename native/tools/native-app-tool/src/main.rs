@@ -15,9 +15,9 @@ use std::env;
 
 use arguments::{TemplateKind, parse};
 use init::{
-    initialize, initialize_context_menu, initialize_file_write, initialize_form,
-    initialize_live_status, initialize_menu, initialize_multi_window, initialize_notification,
-    initialize_scroll_window, initialize_tray, initialize_window_controls,
+    initialize, initialize_context_menu, initialize_file_binary_write, initialize_file_write,
+    initialize_form, initialize_live_status, initialize_menu, initialize_multi_window,
+    initialize_notification, initialize_scroll_window, initialize_tray, initialize_window_controls,
 };
 
 const USAGE: &str = concat!(
@@ -30,6 +30,7 @@ const USAGE: &str = concat!(
     "  anodrel-native-app-tool init-tray <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-notification <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-file-write <destination> <project-slug> <display-label>\n",
+    "  anodrel-native-app-tool init-file-binary-write <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-multi-window <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-scroll-window <destination> <project-slug> <display-label>\n",
     "  anodrel-native-app-tool init-window-controls <destination> <project-slug> <display-label>"
@@ -74,6 +75,11 @@ fn main() {
                 &command.display_label,
             ),
             TemplateKind::FileWrite => initialize_file_write(
+                &command.destination,
+                &command.project_slug,
+                &command.display_label,
+            ),
+            TemplateKind::FileBinaryWrite => initialize_file_binary_write(
                 &command.destination,
                 &command.project_slug,
                 &command.display_label,

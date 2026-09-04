@@ -28,7 +28,8 @@ mod window_controls;
 mod window_id;
 
 pub use anodrel_file_access::{
-    MAX_FILE_TEXT_WRITE_BYTES, SaveReference, SaveSelection, SaveSelectionResult,
+    FileBinaryData, MAX_FILE_BINARY_WRITE_BYTES, MAX_FILE_TEXT_WRITE_BYTES, SaveReference,
+    SaveSelection, SaveSelectionResult,
 };
 pub use anodrel_file_dialog::{FileDialogFilter, MAX_FILE_DIALOG_FILTERS};
 pub use anodrel_window::{WindowFullscreenMode, WindowSize, WindowState};

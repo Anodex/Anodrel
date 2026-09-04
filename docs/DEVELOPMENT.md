@@ -226,6 +226,14 @@ it contains the one documented fixed line; run it again and cancel to confirm
 cleanup. The helper creates no certificate, package, installer, or machine
 policy. See `docs/NATIVE_FILE_WRITE_TEMPLATE.md`.
 
+To exercise retained selected-output binary writing, double-click
+`start-file-binary-write-template.bat` in the repository root. It generates
+and builds a disposable first-party Rust executable, then opens it through the
+fixed four-grant development route. Choose a fresh `.bin` file and inspect the
+documented fixed bytes; run it again and cancel to confirm cleanup. The helper
+creates no certificate, package, installer, or machine policy. See
+`docs/NATIVE_FILE_BINARY_WRITE_TEMPLATE.md`.
+
 `start.bat` builds in release. The Startup Lab composes every frame in software,
 and an unoptimised build is roughly ten times slower — far too slow to hold the
 reveal's frame rate. When running the host by hand for a visual check, pass

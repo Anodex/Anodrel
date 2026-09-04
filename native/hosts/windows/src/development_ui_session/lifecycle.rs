@@ -122,6 +122,22 @@ where
                 services,
             )?;
         (server, invitation, None)
+    } else if config.supports_file_binary_write() {
+        let services = HostServices::unavailable()
+            .with_file_save_selections(anodrel_file_access::SaveFileDialogMailbox::new(
+                ui.file_dialog.clone(),
+            ))
+            .with_file_binary_write(ui.file_text.binary_write_service());
+        let (server, invitation) =
+            WindowsPipeServer::create_with_session_components_and_service_bundle(
+                policy,
+                config.session_id,
+                ui.document.clone(),
+                ui.input.clone(),
+                ui.close.clone(),
+                services,
+            )?;
+        (server, invitation, None)
     } else if config.supports_fields() {
         let (server, invitation) =
             WindowsPipeServer::create_with_session_components_and_service_bundle(

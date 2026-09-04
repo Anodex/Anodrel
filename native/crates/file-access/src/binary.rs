@@ -90,6 +90,53 @@ impl FileBinaryData {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    /// Encodes these bounded bytes as exact unpadded canonical base64url.
+    ///
+    /// The protocol carries binary data as JSON text. Keeping the encoder next
+    /// to the validating decoder lets typed clients use one representation
+    /// without a third-party codec or a second wire format.
+    #[must_use]
+    pub fn to_base64url(&self) -> String {
+        const ALPHABET: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+        let mut encoded = String::with_capacity((self.0.len() * 4).div_ceil(3));
+        let mut index = 0;
+        while index + 3 <= self.0.len() {
+            let first = self.0[index];
+            let second = self.0[index + 1];
+            let third = self.0[index + 2];
+            encoded.push(char::from(ALPHABET[usize::from(first >> 2)]));
+            encoded.push(char::from(
+                ALPHABET[usize::from((first & 0b11) << 4 | second >> 4)],
+            ));
+            encoded.push(char::from(
+                ALPHABET[usize::from((second & 0b1111) << 2 | third >> 6)],
+            ));
+            encoded.push(char::from(ALPHABET[usize::from(third & 0b11_1111)]));
+            index += 3;
+        }
+        match self.0.len() - index {
+            0 => {}
+            1 => {
+                let first = self.0[index];
+                encoded.push(char::from(ALPHABET[usize::from(first >> 2)]));
+                encoded.push(char::from(ALPHABET[usize::from((first & 0b11) << 4)]));
+            }
+            2 => {
+                let first = self.0[index];
+                let second = self.0[index + 1];
+                encoded.push(char::from(ALPHABET[usize::from(first >> 2)]));
+                encoded.push(char::from(
+                    ALPHABET[usize::from((first & 0b11) << 4 | second >> 4)],
+                ));
+                encoded.push(char::from(ALPHABET[usize::from((second & 0b1111) << 2)]));
+            }
+            _ => unreachable!("the loop retains at most two source bytes"),
+        }
+        encoded
+    }
 }
 
 impl fmt::Debug for FileBinaryData {
@@ -149,6 +196,20 @@ mod tests {
                 .as_bytes(),
             [0, 1, 2, 255]
         );
+    }
+
+    #[test]
+    fn encodes_one_canonical_base64url_spelling_for_each_value() {
+        for bytes in [vec![], vec![0], vec![0, 1], vec![0, 1, 2, 255]] {
+            let data = FileBinaryData::from_bytes(bytes.clone()).expect("fixed bytes are bounded");
+            let encoded = data.to_base64url();
+            assert_eq!(
+                FileBinaryData::decode_base64url(&encoded)
+                    .expect("the produced spelling is canonical")
+                    .as_bytes(),
+                bytes
+            );
+        }
     }
 
     #[test]

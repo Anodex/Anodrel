@@ -1,7 +1,9 @@
 # Selection-scoped binary file writing
 
 **Status:** Implemented for the direct Windows UI-session host in Protocol
-1.22. The picker diagnostic remains a manual desktop verification.
+1.22. The first-party native binary-write template and real invited-pipe test
+now cover the typed route; the interactive picker and created-byte check remain
+a manual desktop verification.
 
 Anodrel's existing text writer deliberately treats output as UTF-8 text. This
 document defines the separate, bounded binary replacement boundary. It does
@@ -95,6 +97,10 @@ Choose a new temporary `.bin` filename. After the session closes, inspect the
 file and confirm that exact sequence. Cancelling must leave no new file behind.
 This is a diagnostic session path, not a product file permission or a general
 filesystem bridge. This manual check is not yet recorded as passed.
+
+The separate `init-file-binary-write` native template exercises the same path
+without Node.js, with a fixed `.bin` filter and fixed bytes. See
+`docs/NATIVE_FILE_BINARY_WRITE_TEMPLATE.md`.
 
 ## Security and lifecycle invariants
 

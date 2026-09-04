@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 mod context_menu;
+mod file_binary_write;
 mod file_write;
 mod form;
 mod live_status;
@@ -95,6 +96,14 @@ pub fn file_write_main_source(display_label: &str) -> String {
 
 pub fn file_write_readme(context: &TemplateContext) -> String {
     file_write::readme(context)
+}
+
+pub fn file_binary_write_main_source(display_label: &str) -> String {
+    file_binary_write::main_source(display_label)
+}
+
+pub fn file_binary_write_readme(context: &TemplateContext) -> String {
+    file_binary_write::readme(context)
 }
 
 pub fn multi_window_main_source(display_label: &str) -> String {
