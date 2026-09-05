@@ -84,8 +84,10 @@ behaviour requires a separate contract rather than silently widening this one.
 Synthetic in-memory TrueType faces prove source order, exact pen advances,
 empty runs, unavailable glyph and metric outcomes, scalar and signed-position
 limits, rejection of a character map that points outside its metric source, and
-pair adjustment placement. No test opens a machine font or calls an
-operating-system API.
+pair adjustment placement. A separate Windows-host probe uses its fixed selected
+face for `ANODREL` and composes the resulting run twice through the owned glyph
+cache; it is an internal integration check, not a general text API. The portable
+crate's own tests open no machine font or call an operating-system API.
 
 ## Related material
 

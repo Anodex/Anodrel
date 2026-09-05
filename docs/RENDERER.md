@@ -371,7 +371,10 @@ graphics. The first-party font, glyph, and text-run foundations are not yet
 connected to this painter, so they are not presented as a replacement for it.
 The host can now obtain one bounded private copy of that same fixed selected
 face through GDI for an owned future path, but that source changes neither the
-current painter nor its shaping and hinting quality (Decision 0211).
+current painter nor its shaping and hinting quality. A fixed, non-windowed
+`ANODREL` probe exercises the selected source, owned run, glyph cache, and
+offset compositor twice; it is deliberately not a visible-painter replacement
+(Decisions 0211 and 0212).
 
 **3. Density.** Opt into per-monitor DPI awareness before creating a window. A
 renderer that produces its own antialiasing must not then be scaled by the

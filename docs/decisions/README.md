@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0212: Windows owned-text probe stays fixed and internal.
+
 - 0211: Windows selected-font data stays private and bounded.
 
 - 0210: Windows text coverage stays pixel-bounded.

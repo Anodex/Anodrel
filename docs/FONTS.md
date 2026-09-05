@@ -26,9 +26,11 @@ GDI for the bytes of the same fixed `Segoe UI` face that first-party surfaces
 select, first validates the reported size against an 8 MiB maximum, then reads
 one exact process-private copy. It does not read a font path, enumerate a
 directory, persist or package a typeface, select a fallback, or expose any
-font choice through the protocol. Its Windows-only test gives those bytes to
-`FontFace::parse`; the visible painter remains the separately bounded GDI
-route. See [Decision 0211](decisions/0211-windows-selected-font-data-stays-private-and-bounded.md).
+font choice through the protocol. Its Windows-only probe gives those bytes to
+`FontFace::parse`, then exercises the fixed `ANODREL` value through an owned
+run, glyph-mask cache, and canvas composition twice. The visible painter remains
+the separately bounded GDI route. See [Decision 0211](decisions/0211-windows-selected-font-data-stays-private-and-bounded.md)
+and [Decision 0212](decisions/0212-windows-owned-text-probe-stays-fixed-and-internal.md).
 
 The public surface is deliberately small:
 

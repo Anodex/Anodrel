@@ -8,6 +8,8 @@
 //! screen, [`text`] turns GDI glyphs into canvas coverage, [`appicon`] builds
 //! the window icon from brand geometry, and [`selected_font`] owns the fixed
 //! GDI-selected face source for a later first-party text painter.
+//! [`owned_text_probe`] composes that source through the current owned text
+//! layers without changing a visible host surface.
 //! [`startup_lab`], [`document`],
 //! [`ui_lab`], and [`window_group_lab`] own the host diagnostic surfaces.
 //! [`messages`] contains the contained Win32 callback and its routing rules.
@@ -30,6 +32,7 @@ mod input;
 mod launch;
 mod menu;
 mod messages;
+mod owned_text_probe;
 mod present;
 mod product_tile;
 mod registry;

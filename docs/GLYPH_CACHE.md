@@ -57,10 +57,12 @@ it never receives face bytes, paths, a cache key, or a native object.
 - cache sizing knobs, eviction callbacks, cache readback, or a background
   cleanup task.
 
-The cache does not replace the current Windows GDI text route. A later host
-integration must define its fixed face source, run-to-glyph placement, clipping,
-canvas compositing, invalidation, and accessibility agreement before it can make
-that claim.
+The cache does not replace the current Windows GDI text route. One fixed,
+non-windowed Windows probe now proves selected-face source, run-to-glyph
+placement, and offset composition twice without a copy. A later visible host
+integration must still define retained source ownership, clipping, invalidation,
+quality/performance parity, and accessibility agreement before it can make that
+claim.
 
 ## Verification
 

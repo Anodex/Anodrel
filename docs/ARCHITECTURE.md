@@ -116,7 +116,9 @@ it maps Unicode to a glyph ID, reads bounded simple contours from already-owned
 memory, validates bounded horizontal metrics, and converts contours to exact
 quadratic paths, but does not load or draw a font. The Windows host has one
 private, bounded GDI-selected face source that proves those owned bytes parse;
-it does not replace the current GDI painter. `anodrel-glyph` is the equally portable, separate adapter that converts
+one fixed internal probe now also takes that source through the owned run, glyph
+cache, and canvas compositor twice. Neither replaces the current GDI painter.
+`anodrel-glyph` is the equally portable, separate adapter that converts
 one such path through an explicit device transform into a bounded canvas
 polygon and then one bounded coverage mask; it does not parse or draw a font.
 `anodrel-text` supplies the preceding bounded, source-ordered single-line glyph
@@ -126,7 +128,7 @@ face-local bounded coverage cache. A future host therefore still supplies a face
 source, a blit, and a display-density signal. See `docs/RENDERER.md`,
 `docs/FONTS.md`, `docs/TEXT_RUNS.md`, `docs/GLYPH_RENDERING.md`, and
 `docs/GLYPH_CACHE.md`, Decisions 0013, 0133 through 0138, and 0204 through
-0211.
+0212.
 
 The Windows host also has an Anodrel Startup Lab. It validates a supplied
 application package and performs its internal protocol health check before

@@ -15,6 +15,8 @@ anodrel-diagnostics = { path = "../../crates/diagnostics" }
 anodrel-file-access = { path = "../../crates/file-access" }
 anodrel-file-dialog = { path = "../../crates/file-dialog" }
 anodrel-folder-access = { path = "../../crates/folder-access" }
+anodrel-font = { path = "../../crates/font" }
+anodrel-glyph = { path = "../../crates/glyph" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-menu = { path = "../../crates/menu" }
 anodrel-network = { path = "../../crates/network" }
@@ -22,6 +24,7 @@ anodrel-protocol = { path = "../../crates/protocol" }
 anodrel-ui = { path = "../../crates/ui" }
 anodrel-ui-document = { path = "../../crates/ui-document" }
 anodrel-ui-session = { path = "../../crates/ui-session" }
+anodrel-text = { path = "../../crates/text" }
 anodrel-wire = { path = "../../crates/wire" }
 anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
 anodrel-windows-instance = { path = "../../adapters/windows-instance" }
@@ -48,6 +51,3 @@ anodrel-windows-network = { path = "../../adapters/windows-network" }
 anodrel-windows-uia = { path = "../../adapters/windows-uia" }
 anodrel-windows-uia-client = { path = "../../adapters/windows-uia-client" }
 anodrel-windows-accessibility = { path = "../../adapters/windows-accessibility" }
-
-[dev-dependencies]
-anodrel-font = { path = "../../crates/font" }
