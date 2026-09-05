@@ -58,6 +58,7 @@ members = [
   "adapters/windows-install-handoff",
   "adapters/windows-update-handoff",
   "adapters/windows-updater",
+  "adapters/windows-product-update",
   "adapters/windows-policy",
   "adapters/windows-registered-session",
   "adapters/windows-product-session",

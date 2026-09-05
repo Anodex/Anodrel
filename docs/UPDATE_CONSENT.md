@@ -1,8 +1,9 @@
 # Windows update consent
 
-**Status:** The host-owned native confirmation is implemented. Progress,
-restart, scheduling, suppression preferences, a host action, and application
-protocol exposure remain separate work.
+**Status:** The host-owned native confirmation and its product-window system
+menu action are implemented. Byte-level progress, automatic restart,
+scheduling, suppression preferences, and application protocol exposure remain
+separate work.
 
 ## Purpose
 
@@ -24,10 +25,10 @@ installer detail is displayed.
 ## Native behavior
 
 The adapter calls the direct Windows `MessageBoxW` API with only an information
-icon, `Yes` and `No` buttons, and `No` as the default focused button. It has no
-owner window in this first slice, so the calling native host must invoke it on
-its UI thread and only from an explicit update action. `Yes` returns the same
-opaque offer for the later download stage. `No` returns an ordinary decline.
+icon, `Yes` and `No` buttons, and `No` as the default focused button. The
+calling native host invokes it on its UI thread only after a local click on the
+fixed product system-menu action. `Yes` returns the same opaque offer for the
+later download stage. `No` returns an ordinary decline.
 
 The adapter never remembers, suppresses, retries, reports, schedules, or
 initiates a decision. It performs no network, cache, file, signature, UAC,
@@ -37,8 +38,8 @@ process, registry, or installation operation.
 
 This is not an application-controlled dialog, a protocol operation, a release
 notes viewer, a background update prompt, a settings preference, an automatic
-check, or a replacement for Windows UAC. A later host integration will provide
-the user-visible update action and keep all blocking work off its UI thread.
+check, or a replacement for Windows UAC. The product system-menu integration
+keeps all blocking work off its UI thread.
 
 See [update flow](UPDATE_FLOW.md), [update acceptance](UPDATE_ACCEPTANCE.md),
-and [Windows update delivery](UPDATE_DELIVERY.md).
+and [Windows update delivery](UPDATE_DELIVERY.md), and [product updates](PRODUCT_UPDATES.md).

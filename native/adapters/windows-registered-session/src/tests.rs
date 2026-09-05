@@ -43,6 +43,19 @@ fn interactive_ui_resources_keep_their_close_signal_session_local() {
 }
 
 #[test]
+fn update_action_identity_exists_only_when_signed_policy_selected_a_catalogue() {
+    let without_catalogue = RegisteredSessionUi::new("No Catalogue");
+    let with_catalogue =
+        RegisteredSessionUi::with_update_action("Catalogue Product", Some("org.anodrel.sample"));
+
+    assert_eq!(without_catalogue.update_application_id(), None);
+    assert_eq!(
+        with_catalogue.update_application_id(),
+        Some("org.anodrel.sample")
+    );
+}
+
+#[test]
 fn each_registered_session_owns_one_isolated_primary_view_group() {
     let first = RegisteredSessionUi::new("First Application");
     let second = RegisteredSessionUi::new("Second Application");

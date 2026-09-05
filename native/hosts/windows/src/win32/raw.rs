@@ -34,6 +34,7 @@ pub(super) const WM_GETMINMAXINFO: Uint = 0x0024;
 pub(super) const WM_CONTEXTMENU: Uint = 0x007B;
 pub(super) const WM_SETICON: Uint = 0x0080;
 pub(super) const WM_COMMAND: Uint = 0x0111;
+pub(super) const WM_SYSCOMMAND: Uint = 0x0112;
 pub(super) const WM_SETCURSOR: Uint = 0x0020;
 pub(super) const WM_GETOBJECT: Uint = 0x003D;
 pub(super) const WM_KEYDOWN: Uint = 0x0100;
@@ -258,6 +259,7 @@ unsafe extern "system" {
     pub(super) fn UpdateWindow(window: Hwnd) -> Bool;
     pub(super) fn SetForegroundWindow(window: Hwnd) -> Bool;
     pub(super) fn DestroyWindow(window: Hwnd) -> Bool;
+    pub(super) fn GetSystemMenu(window: Hwnd, revert: Bool) -> Hmenu;
     pub(super) fn CreateMenu() -> Hmenu;
     pub(super) fn CreatePopupMenu() -> Hmenu;
     pub(super) fn AppendMenuW(menu: Hmenu, flags: Uint, new_item: usize, text: *const u16) -> Bool;
@@ -272,8 +274,15 @@ unsafe extern "system" {
     ) -> Uint;
     pub(super) fn SetMenu(window: Hwnd, menu: Hmenu) -> Bool;
     pub(super) fn DrawMenuBar(window: Hwnd) -> Bool;
+    pub(super) fn EnableMenuItem(menu: Hmenu, item: Uint, flags: Uint) -> Uint;
     pub(super) fn DestroyMenu(menu: Hmenu) -> Bool;
     pub(super) fn SetWindowTextW(window: Hwnd, text: *const u16) -> Bool;
+    pub(super) fn MessageBoxW(
+        owner: Hwnd,
+        text: *const u16,
+        caption: *const u16,
+        style: Uint,
+    ) -> i32;
     pub(super) fn GetMessageW(
         message: *mut Msg,
         window: Hwnd,

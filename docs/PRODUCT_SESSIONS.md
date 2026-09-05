@@ -66,6 +66,18 @@ the selected record. It is generated only by the Start-menu writer; it accepts
 no child path, record path, capability, or application-defined argument. See
 `docs/PRODUCT_LAUNCHER.md` and Decision 0187.
 
+## Native update action
+
+When the selected signed record contains an update-catalogue location, the
+primary product window alone adds **Check for Anodrel updates** to its Windows
+system menu. A local action starts the existing owned updater on a worker,
+leaving candidate consent on the UI thread and every network, download, UAC
+wait, and postcondition step off it. The action is not an application menu,
+protocol method, capability, tray item, startup check, or background service.
+Only after machine policy proves the selected candidate does the host show a
+fixed message that the application needs restart; it never restarts or closes
+the application. See [product updates](PRODUCT_UPDATES.md) and Decision 0199.
+
 The Startup Lab tile takes a different ownership route because its message loop
 is already running. A click starts the coordinator on a worker; the worker posts
 one private window message; the UI thread then creates the product window and
@@ -85,8 +97,7 @@ lifecycle exists to prevent.
 
 ## What it still does not do
 
-The current coordinator has no restart, background mode, application-driven
-graceful-exit protocol, output capture, public window API, or multi-window
-policy. It is not a packaging, installation, or update mechanism, and it makes
-no claim of parity with a framework runtime. See Decisions 0020, 0058, 0059,
-0060, and 0061.
+The current coordinator has no automatic restart, background mode,
+application-driven graceful-exit protocol, output capture, public window API,
+or application-controlled update mechanism. It makes no claim of parity with a
+framework runtime. See Decisions 0020, 0058, 0059, 0060, 0061, and 0199.

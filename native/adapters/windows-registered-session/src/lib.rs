@@ -68,10 +68,25 @@ pub struct RegisteredSessionUi {
     /// time. Carrying it here is what lets the UI thread compose a caption an
     /// application cannot forge. See `docs/WINDOW_TITLE.md`.
     display_name: String,
+    /// The machine-validated application identity eligible for the one native
+    /// product-update action, when signed policy selected an update catalogue.
+    ///
+    /// This private host value is never placed in a protocol response or an
+    /// application menu. The Windows window uses it only after a local click
+    /// on its fixed system-menu command.
+    update_application_id: Option<String>,
 }
 
 impl RegisteredSessionUi {
+    #[cfg(test)]
     fn new(display_name: impl Into<String>) -> Self {
+        Self::with_update_action(display_name, None)
+    }
+
+    fn with_update_action(
+        display_name: impl Into<String>,
+        update_application_id: Option<&str>,
+    ) -> Self {
         let document_mailbox = UiDocumentMailbox::new();
         let input_mailbox = UiInputMailbox::new();
         Self {
@@ -93,6 +108,7 @@ impl RegisteredSessionUi {
             window_size_mailbox: WindowSizeMailbox::new(),
             field_mailbox: UiFieldMailbox::new(),
             display_name: display_name.into(),
+            update_application_id: update_application_id.map(str::to_owned),
         }
     }
 
@@ -253,6 +269,16 @@ impl RegisteredSessionUi {
         &self.display_name
     }
 
+    /// Returns the host-held identity for the fixed native update action.
+    ///
+    /// `None` means the signed selected record has no update catalogue, so the
+    /// product window must not add an update action at all. This identity is
+    /// for internal Windows host composition only and never reaches the pipe.
+    #[must_use]
+    pub fn update_application_id(&self) -> Option<&str> {
+        self.update_application_id.as_deref()
+    }
+
     fn primary_resources(&self) -> anodrel_ui_session::UiWindowResources {
         self.window_group
             .resources(&UiWindowId::primary())
@@ -321,7 +347,12 @@ pub fn create_registered_ui_session(
         load_installed_application(application_id).map_err(RegisteredSessionError::Policy)?;
     let policy = host_policy_for_installed_application(&application, host_name)
         .map_err(|_| RegisteredSessionError::InvalidHostName)?;
-    let ui = RegisteredSessionUi::new(application.identity().display_name());
+    let ui = RegisteredSessionUi::with_update_action(
+        application.identity().display_name(),
+        application
+            .update_catalogue_location()
+            .map(|_| application.identity().application_id()),
+    );
     let services = registered_interactive_services(&application, &ui)?;
     let (server, invitation) =
         WindowsPipeServer::create_with_session_window_group_and_service_bundle(

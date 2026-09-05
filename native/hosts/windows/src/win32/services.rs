@@ -7,9 +7,14 @@
 
 use super::*;
 mod notification_area;
+mod product_update;
 mod window_presentation;
 
 pub(super) use notification_area::{service_notification, service_tray};
+pub(super) use product_update::{
+    install_product_update_action, is_product_update_command, service_product_update,
+    start_product_update,
+};
 #[cfg(test)]
 pub(super) use window_presentation::{observed_presentation_state, presentation_command};
 pub(super) use window_presentation::{
@@ -82,6 +87,9 @@ pub(super) fn open_product_session_window(
             "product session window could not join its native view group",
         ));
     }
+    // This is a host-owned system-menu command, not an application menu item.
+    // Failure leaves the app usable but does not create a second update route.
+    let _ = install_product_update_action(window);
     product_tile::note_window(window);
     apply_icons(window);
     // SAFETY: the window was just created on this thread's message queue and

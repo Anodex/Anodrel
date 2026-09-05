@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0199: Product updates start from a native system-menu action.
+
 - 0198: Apps & features removal uses fixed native consent.
 
 - 0197: The installed uninstaller cleans itself at restart.

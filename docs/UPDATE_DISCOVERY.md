@@ -1,8 +1,8 @@
 # Windows update catalogue discovery
 
 **Status:** The signed installed-policy contract now composes with the native
-cache, consent, handoff, and postcondition boundaries. A user-visible host
-action and a signed end-to-end acceptance run remain separate work.
+cache, consent, handoff, postcondition, and one fixed product system-menu
+action. A signed end-to-end acceptance run remains separate work.
 
 ## Purpose
 

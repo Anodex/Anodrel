@@ -18,6 +18,9 @@ use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 use anodrel_menu::{ContextMenuRequest, MenuRequest};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_folder_access::WindowsFolderEntryService;
+use anodrel_windows_product_update::{
+    ProductUpdateController, ProductUpdatePoll, ProductUpdateStartError, UpdateConsent,
+};
 
 mod accessibility;
 mod session;
@@ -45,6 +48,10 @@ pub(super) use window_commands::{
 };
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
+/// Native update controllers are deliberately separate from `View`: painting
+/// clones a view snapshot, while a worker-owning controller has one UI-thread
+/// owner and must never be cloned into a paint path.
+static PRODUCT_UPDATES: OnceLock<Mutex<BTreeMap<Hwnd, ProductUpdateController>>> = OnceLock::new();
 
 /// The immutable accessibility data published for one window-message query.
 ///
@@ -65,14 +72,70 @@ pub(super) struct AccessibilityPublication {
 }
 
 pub(super) fn insert(window: Hwnd, view: View) -> io::Result<()> {
+    let product_update = match &view {
+        View::UiSession(session) => session
+            .product_update_application_id()
+            .map(ProductUpdateController::new)
+            .transpose()
+            .map_err(product_update_start_error)?,
+        _ => None,
+    };
+    let mut updates = lock_product_updates()?;
     let mut views = lock_views()?;
-    if views.insert(window, view).is_some() {
+    if views.contains_key(&window) || updates.contains_key(&window) {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "window view was already registered",
         ));
     }
+    if let Some(controller) = product_update {
+        updates.insert(window, controller);
+    }
+    views.insert(window, view);
     Ok(())
+}
+
+/// Returns whether one exact product window has a signed-policy update action.
+pub(super) fn has_product_update_action(window: Hwnd) -> io::Result<bool> {
+    Ok(lock_product_updates()?.contains_key(&window))
+}
+
+/// Starts one user-chosen native product update without holding a view lock.
+pub(super) fn begin_product_update(window: Hwnd) -> io::Result<Option<bool>> {
+    let mut updates = lock_product_updates()?;
+    let Some(controller) = updates.get_mut(&window) else {
+        return Ok(None);
+    };
+    controller
+        .begin()
+        .map(Some)
+        .map_err(product_update_start_error)
+}
+
+/// Polls one product update worker without issuing a native prompt or holding
+/// the view registry lock.
+pub(super) fn poll_product_update(window: Hwnd) -> io::Result<Option<ProductUpdatePoll>> {
+    let mut updates = lock_product_updates()?;
+    Ok(updates.get_mut(&window).map(ProductUpdateController::poll))
+}
+
+/// Submits the direct UI-thread consent decision to its same-window controller.
+pub(super) fn submit_product_update_consent(
+    window: Hwnd,
+    consent: UpdateConsent,
+) -> io::Result<Option<ProductUpdatePoll>> {
+    let mut updates = lock_product_updates()?;
+    updates
+        .get_mut(&window)
+        .map(|controller| controller.submit_consent(consent))
+        .transpose()
+        .map_err(product_update_start_error)
+}
+
+/// Returns whether a window's native product update still owns a worker.
+pub(super) fn product_update_is_active(window: Hwnd) -> io::Result<Option<bool>> {
+    let updates = lock_product_updates()?;
+    Ok(updates.get(&window).map(ProductUpdateController::is_active))
 }
 
 pub(super) fn view_for(window: Hwnd) -> io::Result<Option<View>> {
@@ -170,6 +233,10 @@ pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
         let removed = views.remove(&window);
         (removed, views.len())
     };
+    // The controller may own a worker handle. Remove it only after the view
+    // lock is released, just like the product session, so cleanup cannot block
+    // unrelated native messages behind the process-wide registry.
+    let product_update = lock_product_updates()?.remove(&window);
     // A group member must learn about native destruction before its final
     // view drops, but after the registry lock is free. A product group may then
     // release its child and join workers without blocking unrelated messages.
@@ -177,6 +244,7 @@ pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
         session.on_native_destroy(window);
     }
     drop(removed);
+    drop(product_update);
     Ok(remaining)
 }
 
@@ -195,6 +263,10 @@ pub(super) fn clear() -> io::Result<usize> {
         let mut views = lock_views()?;
         std::mem::take(&mut *views)
     };
+    let product_updates = {
+        let mut updates = lock_product_updates()?;
+        std::mem::take(&mut *updates)
+    };
     let count = remaining.len();
     for (window, view) in &remaining {
         if let View::UiSession(session) = view {
@@ -202,6 +274,7 @@ pub(super) fn clear() -> io::Result<usize> {
         }
     }
     drop(remaining);
+    drop(product_updates);
     Ok(count)
 }
 
@@ -210,6 +283,19 @@ fn lock_views() -> io::Result<std::sync::MutexGuard<'static, BTreeMap<Hwnd, View
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
         .map_err(|_| io::Error::other("window registry is unavailable"))
+}
+
+fn lock_product_updates()
+-> io::Result<std::sync::MutexGuard<'static, BTreeMap<Hwnd, ProductUpdateController>>> {
+    PRODUCT_UPDATES
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .map_err(|_| io::Error::other("product update registry is unavailable"))
+}
+
+fn product_update_start_error(error: ProductUpdateStartError) -> io::Error {
+    let _ = error;
+    io::Error::other("product update action is unavailable")
 }
 
 /// The registry is process-global, so tests that assert on the remaining window

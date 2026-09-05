@@ -118,6 +118,12 @@ pub(super) struct UiSessionView {
     /// from the installed record, not from the application, and keeping it on
     /// this side is what makes the suffix impossible to influence.
     display_name: Option<String>,
+    /// The machine-validated application identity that may expose the fixed
+    /// native update system-menu action.
+    ///
+    /// It is copied only into private registry metadata, never to an
+    /// application, UI document, protocol message, menu model, or renderer.
+    product_update_application_id: Option<String>,
     /// This session's field-read bridge, when it has one.
     ///
     /// A diagnostic session view holds `None` and answers every read as
@@ -185,6 +191,7 @@ impl UiSessionView {
             window_size: None,
             fullscreen_restore: None,
             display_name: None,
+            product_update_application_id: None,
             field_reads: None,
             revision: UiDocumentRevision::INITIAL,
             last_status: None,
@@ -218,6 +225,7 @@ impl UiSessionView {
             window_fullscreen,
             window_size,
             field_reads,
+            product_update_application_id,
         ) = {
             let ui = session.ui();
             (
@@ -240,6 +248,7 @@ impl UiSessionView {
                 ui.window_fullscreen_mailbox(),
                 ui.window_size_mailbox(),
                 ui.field_mailbox(),
+                ui.update_application_id().map(str::to_owned),
             )
         };
         let group = super::session_window_group::SessionWindowGroup::for_product_session(session);
@@ -263,6 +272,7 @@ impl UiSessionView {
         .with_window_fullscreen(window_fullscreen)
         .with_window_size(window_size)
         .with_field_reads(field_reads)
+        .with_product_update_application_id(product_update_application_id)
         .with_session_window(group.member(UiWindowId::primary()))
     }
 
@@ -313,6 +323,21 @@ impl UiSessionView {
     fn with_session_window(mut self, session_window: SessionWindowMember) -> Self {
         self.session_window = Some(session_window);
         self
+    }
+
+    /// Keeps one signed-policy-derived update identity in this product view's
+    /// private registry metadata. `None` is the ordinary no-catalogue case and
+    /// must not create a native update action.
+    #[must_use]
+    fn with_product_update_application_id(mut self, application_id: Option<String>) -> Self {
+        self.product_update_application_id = application_id;
+        self
+    }
+
+    /// Returns the registry-only product-update identity, when signed policy
+    /// selected a catalogue for this exact authenticated product session.
+    pub(in crate::win32) fn product_update_application_id(&self) -> Option<&str> {
+        self.product_update_application_id.as_deref()
     }
 
     /// Connects this view to its same-session retained-folder registry.

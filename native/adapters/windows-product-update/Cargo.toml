@@ -1,0 +1,11 @@
+[package]
+name = "anodrel-windows-product-update"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anodrel-application = { path = "../../crates/application" }
+anodrel-windows-update-consent = { path = "../windows-update-consent" }
+anodrel-windows-update-handoff = { path = "../windows-update-handoff" }
+anodrel-windows-updater = { path = "../windows-updater" }

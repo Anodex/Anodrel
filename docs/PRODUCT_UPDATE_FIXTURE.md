@@ -13,9 +13,10 @@ from the command line, environment, or a rendered surface. The installed signed
 policy remains the only source of update location and release facts.
 
 It is an operator-only development diagnostic, not a product host, a Startup
-Lab action, an application capability, or an update SDK. A normal application
-host must keep discovery, transfer, waiting, and restart presentation behind its
-own explicit UI-thread and worker boundaries.
+Lab action, an application capability, or an update SDK. The normal product
+host now keeps discovery, transfer, waiting, and restart-needed presentation
+behind its explicit native UI-thread and worker boundaries; see
+[product updates](PRODUCT_UPDATES.md).
 
 ## Fixed sequence
 

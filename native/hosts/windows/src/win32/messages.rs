@@ -76,6 +76,10 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
     if message == WM_ANODREL_NOTIFICATION_AREA && tray::handle_callback(window, lparam) {
         return 0;
     }
+    if message == WM_SYSCOMMAND && is_product_update_command(wparam) {
+        start_product_update(window);
+        return 0;
+    }
     if let Some(result) = super::input::handle_input_message(window, message, wparam, lparam) {
         return result;
     }
@@ -199,6 +203,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             service_window_fullscreen(window);
             service_window_size(window);
             service_field_read(window);
+            service_product_update(window);
             if let Ok(Some(request)) = registry::take_file_dialog_request(window) {
                 let selection = match request.kind() {
                     FileDialogRequestKind::OpenFolder => {
