@@ -17,9 +17,10 @@ const MENU_ACTION_EVENT_SCHEMA_VERSION: ProtocolVersion = ProtocolVersion {
 
 impl CoreHost {
     pub(super) fn handle_menu_replace(&self, request: RequestEnvelope) -> JsonValue {
-        let Some(model) =
-            menu_replace_payload(&request.payload, request.protocol_version.minor >= 24)
-        else {
+        let Some(model) = semantic_menu::menu_replace_payload(
+            &request.payload,
+            request.protocol_version.minor >= 24,
+        ) else {
             return self.failure(
                 request.request_id,
                 ProtocolErrorCode::RequestPayloadInvalid,
@@ -467,56 +468,4 @@ fn window_menu_action_event(id: &UiWindowId, event: anodrel_menu::MenuActionEven
             ]),
         ),
     ])
-}
-
-fn menu_replace_payload(value: &JsonValue, shortcuts_allowed: bool) -> Option<MenuModel> {
-    if value.to_json().len() > MAX_MENU_REPLACE_REQUEST_BYTES {
-        return None;
-    }
-    let fields = value.as_object()?;
-    if fields.len() != 1 {
-        return None;
-    }
-    let JsonValue::Array(menus) = fields.get("menus")? else {
-        return None;
-    };
-    let menus = menus
-        .iter()
-        .map(|menu| {
-            let fields = menu.as_object()?;
-            if fields.len() != 2 {
-                return None;
-            }
-            let label = MenuText::new(fields.get("label")?.as_string()?.to_owned()).ok()?;
-            let JsonValue::Array(items) = fields.get("items")? else {
-                return None;
-            };
-            let items = items
-                .iter()
-                .map(|item| {
-                    let fields = item.as_object()?;
-                    let shortcut = fields.get("shortcut");
-                    if fields.len() != 3 + usize::from(shortcut.is_some())
-                        || (!shortcuts_allowed && shortcut.is_some())
-                    {
-                        return None;
-                    }
-                    let id = MenuActionId::new(fields.get("id")?.as_string()?.to_owned()).ok()?;
-                    let label = MenuText::new(fields.get("label")?.as_string()?.to_owned()).ok()?;
-                    let JsonValue::Bool(enabled) = fields.get("enabled")? else {
-                        return None;
-                    };
-                    let action = MenuAction::new(id, label, *enabled);
-                    match shortcut {
-                        Some(shortcut) => Some(
-                            action.with_shortcut(MenuShortcut::parse(shortcut.as_string()?).ok()?),
-                        ),
-                        None => Some(action),
-                    }
-                })
-                .collect::<Option<Vec<_>>>()?;
-            Menu::new(label, items).ok()
-        })
-        .collect::<Option<Vec<_>>>()?;
-    MenuModel::new(menus).ok()
 }
