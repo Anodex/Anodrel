@@ -540,3 +540,8 @@ For the separate signed installer, Program Files, and Start-menu route, follow
 prepares the image but leaves consent, UAC, launch, and removal visible
 operator checks.
 
+## Windows taskbar-progress diagnostic
+
+Run the fixed no-trust-change diagnostic described in
+[Windows product-update progress](PRODUCT_UPDATE_PROGRESS.md).
+

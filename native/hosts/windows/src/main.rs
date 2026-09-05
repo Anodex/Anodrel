@@ -46,6 +46,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // display's real pixel density instead of being scaled up by the system.
     win32::enable_dpi_awareness();
     let arguments = env::args().skip(1).collect::<Vec<_>>();
+    if arguments.as_slice() == ["--taskbar-progress-probe"] {
+        return win32::run_taskbar_progress_probe().map_err(Into::into);
+    }
     if let [command, client_path] = arguments.as_slice()
         && command == "--native-sample-client"
     {

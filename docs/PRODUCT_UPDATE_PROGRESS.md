@@ -54,3 +54,17 @@ clear any taskbar progress and restore the ordinary validated window caption.
 The feature has no pause, cancellation, retry, bandwidth control, background
 transfer, scheduling, automatic restart, or settings route. See Decision 0200
 and [product updates](PRODUCT_UPDATES.md).
+
+## Direct Windows diagnostic
+
+Run the fixed host-only taskbar check without a product fixture:
+
+~~~powershell
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --taskbar-progress-probe
+~~~
+
+The window waits for Windows to create its taskbar button, displays fixed
+activity and 0–100% progress, clears it, closes, and prints a fixed success
+line. It changes no certificate trust, policy, installation, cache, network,
+or product state. It proves only the direct taskbar adapter and message
+ordering; it does not prove an installed product update. See Decision 0201.

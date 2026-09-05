@@ -81,6 +81,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         .is_some_and(|expected| *expected == message)
     {
         taskbar_button_created(window);
+        taskbar_progress_probe::taskbar_button_created(window);
         return 0;
     }
     if TASKBAR_RESTARTED
@@ -88,6 +89,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         .is_some_and(|expected| *expected == message)
     {
         taskbar_restarted(window);
+        taskbar_progress_probe::taskbar_restarted(window);
         return 0;
     }
     if message == WM_SYSCOMMAND && is_product_update_command(wparam) {
@@ -148,6 +150,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             }
             0
         }
+        WM_TIMER if taskbar_progress_probe::service_timer(window, wparam) => 0,
         WM_TIMER if wparam == REVEAL_TIMER => {
             let state = registry::with_startup_lab(window, |lab| {
                 let elapsed = lab.revealed_at.elapsed().as_millis() as u64;
@@ -430,6 +433,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         }
         WM_DESTROY => {
             clear_product_update_taskbar(window);
+            taskbar_progress_probe::remove(window);
             // SAFETY: killing a timer for a window that has no session poll is
             // a no-op, and this window is being destroyed by the current UI
             // thread.

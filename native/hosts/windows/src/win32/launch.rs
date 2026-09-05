@@ -374,6 +374,20 @@ pub(super) fn run_windows(
     run_windows_after_shown(definitions, primary_instance, |_| Ok(()))
 }
 
+/// Builds fixed windows and runs one host-selected setup before they are
+/// shown, so setup that waits for a shell-created window resource cannot miss
+/// its first notification.
+pub(super) fn run_windows_after_created<F>(
+    definitions: Vec<WindowDefinition>,
+    primary_instance: Option<&PrimaryInstance>,
+    after_created: F,
+) -> io::Result<()>
+where
+    F: FnOnce(&[Hwnd]) -> io::Result<()>,
+{
+    run_windows_with_hooks(definitions, primary_instance, after_created, |_| Ok(()))
+}
+
 /// Builds the host's fixed windows, shows each one, and starts one
 /// host-selected follow-up only after they are available to Windows clients.
 ///
@@ -386,6 +400,19 @@ pub(super) fn run_windows_after_shown<F>(
 ) -> io::Result<()>
 where
     F: FnOnce(&[Hwnd]) -> io::Result<()>,
+{
+    run_windows_with_hooks(definitions, primary_instance, |_| Ok(()), after_shown)
+}
+
+fn run_windows_with_hooks<BeforeShown, AfterShown>(
+    definitions: Vec<WindowDefinition>,
+    primary_instance: Option<&PrimaryInstance>,
+    before_shown: BeforeShown,
+    after_shown: AfterShown,
+) -> io::Result<()>
+where
+    BeforeShown: FnOnce(&[Hwnd]) -> io::Result<()>,
+    AfterShown: FnOnce(&[Hwnd]) -> io::Result<()>,
 {
     if definitions.is_empty() {
         return Err(io::Error::new(
@@ -453,6 +480,10 @@ where
             }
         }
         windows.push(window);
+    }
+    if let Err(error) = before_shown(&windows) {
+        destroy_windows(&windows);
+        return Err(error);
     }
     if let Some(primary_instance) = primary_instance
         && let Err(error) = primary_instance.mark_ready()

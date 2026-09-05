@@ -38,6 +38,7 @@ mod size;
 mod startup_lab;
 mod startup_views;
 mod stats;
+mod taskbar_progress_probe;
 mod text;
 mod tray;
 mod ui_lab;
@@ -90,6 +91,7 @@ pub use launch::{
 pub use product_tile::FIXTURE_APPLICATION_ID;
 pub(crate) use session_launch::run_ui_session_after_shown;
 pub use session_launch::{run_authenticated_ui_session, run_ui_session};
+pub(crate) use taskbar_progress_probe::run as run_taskbar_progress_probe;
 pub use uia_focus_event_probe::run as run_uia_focus_event_probe;
 pub use uia_focus_probe::run as run_uia_focus_probe;
 

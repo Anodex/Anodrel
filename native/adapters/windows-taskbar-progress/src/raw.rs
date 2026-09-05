@@ -26,7 +26,7 @@ const IID_TASKBAR_LIST_3: Guid = Guid::new(
     0xEA1AFB91,
     0x9E28,
     0x4B86,
-    [0x90, 0xE9, 0x9E, 0x9F, 0x8A, 0x5E, 0xEA, 0x84],
+    [0x90, 0xE9, 0x9E, 0x9F, 0x8A, 0x5E, 0xEF, 0xAF],
 );
 
 #[repr(C)]
@@ -199,5 +199,11 @@ mod tests {
             11 * size_of::<usize>()
         );
         assert_eq!(IID_TASKBAR_LIST_3.data1, 0xEA1AFB91);
+        assert_eq!(IID_TASKBAR_LIST_3.data2, 0x9E28);
+        assert_eq!(IID_TASKBAR_LIST_3.data3, 0x4B86);
+        assert_eq!(
+            IID_TASKBAR_LIST_3.data4,
+            [0x90, 0xE9, 0x9E, 0x9F, 0x8A, 0x5E, 0xEF, 0xAF]
+        );
     }
 }
