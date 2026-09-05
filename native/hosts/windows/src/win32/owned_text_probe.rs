@@ -20,6 +20,8 @@ const PROBE_WIDTH: u32 = 512;
 const PROBE_HEIGHT: u32 = 144;
 const PROBE_LEFT: f32 = 24.0;
 const PROBE_BASELINES: [f32; 2] = [48.0, 112.0];
+#[cfg(test)]
+const MAX_FIXED_ADVANCE_DRIFT_MILLI_PIXELS: i128 = 1_000;
 
 /// Private closed outcomes from the fixed owned-text composition probe.
 #[derive(Debug)]
@@ -253,6 +255,16 @@ fn owned_advance_milli_pixels(
     Ok(milli_pixels.round() as i64)
 }
 
+/// Measures the fixed report's run-width difference without widening its schema.
+///
+/// GDI reports a whole-pixel width while the owned path reports thousandths of a
+/// pixel, so a one-pixel allowance covers that deliberate difference in units.
+#[cfg(test)]
+fn fixed_advance_drift_milli_pixels(report: &OwnedTextReport) -> i128 {
+    (i128::from(report.gdi_advance_pixels) * 1_000 - i128::from(report.owned_advance_milli_pixels))
+        .abs()
+}
+
 /// Reports whether a composition produced any non-background coverage.
 fn canvas_has_ink(canvas: &Canvas) -> bool {
     canvas
@@ -263,7 +275,10 @@ fn canvas_has_ink(canvas: &Canvas) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Color, OwnedTextReport, PROBE_TEXT, compose, format_report, inspect};
+    use super::{
+        Color, MAX_FIXED_ADVANCE_DRIFT_MILLI_PIXELS, OwnedTextReport, PROBE_TEXT, compose,
+        fixed_advance_drift_milli_pixels, format_report, inspect,
+    };
 
     #[test]
     fn selected_face_completes_the_owned_text_chain_and_reuses_coverage() {
@@ -292,6 +307,11 @@ mod tests {
         assert_eq!(report.glyph_count, PROBE_TEXT.chars().count());
         assert!(report.gdi_advance_pixels > 0);
         assert!(report.owned_advance_milli_pixels > 0);
+        assert!(
+            fixed_advance_drift_milli_pixels(&report) <= MAX_FIXED_ADVANCE_DRIFT_MILLI_PIXELS,
+            "fixed owned advance drifted by {} milli-pixels",
+            fixed_advance_drift_milli_pixels(&report)
+        );
         assert_eq!(report.retained_mask_count, report.glyph_count);
         assert!(report.retained_pixel_count > 0);
     }

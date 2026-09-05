@@ -34,6 +34,10 @@ and [Decision 0212](decisions/0212-windows-owned-text-probe-stays-fixed-and-inte
 The separate no-argument report records this fixed owned run's local advance
 beside the current GDI metric and reports retained coverage, without exposing a
 font choice or text input; see [Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md).
+The Windows-host test keeps that exact fixed report within one physical pixel of
+the GDI route's rounded advance. It is a scale-and-placement regression check,
+not a shaping, hinting, visual-quality, or release-performance comparison; see
+[Decision 0214](decisions/0214-fixed-owned-text-metric-check-stays-local.md).
 
 The public surface is deliberately small:
 

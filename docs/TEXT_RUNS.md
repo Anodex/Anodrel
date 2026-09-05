@@ -92,7 +92,9 @@ crate's own tests open no machine font or call an operating-system API.
 The separate fixed Windows owned-text report records this run's advance in
 thousandths of a pixel beside the current GDI metric for the same literal and
 fixed face. It accepts no caller text and is not a shaping, quality, or release
-performance comparison.
+performance comparison. Its Windows-host test permits no more than one physical
+pixel of drift from that fixed GDI metric, which is a narrow scale-and-placement
+check rather than text-quality evidence.
 
 ## Related material
 
@@ -102,3 +104,4 @@ performance comparison.
 - [Decision 0204](decisions/0204-first-party-text-runs-stay-unshaped-and-bounded.md)
 - [Decision 0208](decisions/0208-first-party-pair-kerning-stays-bounded.md)
 - [Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md)
+- [Decision 0214](decisions/0214-fixed-owned-text-metric-check-stays-local.md)

@@ -73,6 +73,10 @@ not a stable number for cross-machine comparisons or a Windows release gate.
 The current GDI painter remains the visible route while a future proposal earns
 separate shaping, hinting, visual, accessibility, and whole-frame evidence. See
 [Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md).
+The Windows-host test also keeps this single fixed report's owned advance within
+one physical pixel of GDI's rounded advance. That only detects a scale or
+placement regression in the diagnostic; it is not a quality or performance
+threshold. See [Decision 0214](decisions/0214-fixed-owned-text-metric-check-stays-local.md).
 
 ## Static-window idle report
 
