@@ -1,8 +1,8 @@
 # Windows native update flow
 
-**Status:** The opaque native flow and its fixed native product system-menu
-action are implemented. It has no application protocol, byte-level progress,
-automatic restart, or joined signed acceptance run.
+**Status:** The opaque native flow, its fixed native product system-menu
+action, and its bounded native progress presentation are implemented. It has
+no application protocol, automatic restart, or joined signed acceptance run.
 
 ## Purpose
 
@@ -45,7 +45,9 @@ proof.
 
 This intentionally does not create an application update API, automatic update
 path, background service, scheduler, notification, automatic restart, cache
-queue, byte-progress surface, or general network/file/process API.
+queue, pause, retry, speed or time estimate, or general network/file/process
+API. The host-owned caption and best-effort taskbar visual report only signed
+byte progress; see [product update progress](PRODUCT_UPDATE_PROGRESS.md).
 
 See [update discovery](UPDATE_DISCOVERY.md), [update cache](UPDATE_CACHE.md),
 [update delivery](UPDATE_DELIVERY.md), [update handoff](UPDATE_HANDOFF.md), and

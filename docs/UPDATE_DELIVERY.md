@@ -4,8 +4,8 @@
 recovery, locked image acceptance, direct UAC handoff, and opaque native
 coordination, native consent, and the post-handoff policy proof are implemented.
 The fixed product system-menu action and restart-needed completion presentation
-are implemented. Byte-level progress, a signed end-to-end acceptance run, and
-automatic scheduling remain separate work.
+and bounded native signed-byte progress are implemented. A signed end-to-end
+acceptance run and automatic scheduling remain separate work.
 
 ## Purpose
 

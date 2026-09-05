@@ -180,6 +180,10 @@ impl WindowDefinition {
 }
 
 static ACTIVATION_MESSAGE: OnceLock<Uint> = OnceLock::new();
+/// The system-selected message that confirms a window's taskbar button exists.
+static TASKBAR_BUTTON_CREATED: OnceLock<Uint> = OnceLock::new();
+/// The Shell broadcast that invalidates all previously presented taskbar state.
+static TASKBAR_RESTARTED: OnceLock<Uint> = OnceLock::new();
 static WINDOW_CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
 static ICONS: OnceLock<(Option<isize>, Option<isize>)> = OnceLock::new();
 
@@ -211,6 +215,26 @@ fn ensure_window_class(instance: Hinstance, class_name: &[u16]) -> io::Result<()
     } else {
         let _ = WINDOW_CLASS_REGISTERED.set(());
         Ok(())
+    }
+}
+
+/// Registers Shell message IDs once before any product window is shown.
+///
+/// A failure simply leaves the optional taskbar visual unavailable; the native
+/// product caption remains the progress presentation and update flow unchanged.
+fn register_taskbar_messages() {
+    let button_created = to_wide_null("TaskbarButtonCreated");
+    // SAFETY: both strings are NUL-terminated and remain live through their
+    // synchronous registrations. Windows owns the returned integer IDs.
+    let button_created_id = unsafe { RegisterWindowMessageW(button_created.as_ptr()) };
+    if button_created_id != 0 {
+        let _ = TASKBAR_BUTTON_CREATED.set(button_created_id);
+    }
+    let restarted = to_wide_null("TaskbarCreated");
+    // SAFETY: same fixed registration contract as the button-created message.
+    let restarted_id = unsafe { RegisterWindowMessageW(restarted.as_ptr()) };
+    if restarted_id != 0 {
+        let _ = TASKBAR_RESTARTED.set(restarted_id);
     }
 }
 

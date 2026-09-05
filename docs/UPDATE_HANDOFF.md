@@ -4,7 +4,8 @@
 implemented. The opaque native coordinator now composes the fixed cache,
 recovery, discovery, and image stages; the product system-menu action provides
 the user-initiated route and off-UI-thread wait around direct native consent
-and postcondition proof. Byte-level progress remains separate work.
+and postcondition proof. Its transfer progress is separately presented through
+the host-owned caption and taskbar surface.
 
 ## Purpose
 

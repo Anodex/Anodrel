@@ -54,12 +54,19 @@ product window's UI thread. The existing consent prompt is the one intentional
 modal UI step: it appears only after a signed candidate has been discovered and
 shows only its signed version. UAC remains a separate Windows decision.
 
+The host-owned native caption reports checking, downloading at a signed-byte
+whole percentage, and installation activity. When Windows has created its
+taskbar button, that button mirrors the activity or percentage best effort.
+It never reports a speed, remaining time, path, endpoint, certificate,
+installer output, or application-supplied value. See [product update
+progress](PRODUCT_UPDATE_PROGRESS.md).
+
 The final message says that the update was installed and that the application
 must be restarted to use it. It does **not** close, terminate, restart, or
-relaunch the application, apply data migration, report a percentage, expose
-installer output, or claim that the new process has started. A cancelled native
-consent or UAC prompt quietly ends the attempt. Any other failure shows only a
-fixed generic native message.
+relaunch the application, apply data migration, expose installer output, or
+claim that the new process has started. A cancelled native consent or UAC
+prompt quietly ends the attempt. Any other failure shows only a fixed generic
+native message.
 
 ## Lifecycle and verification
 

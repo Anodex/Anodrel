@@ -42,6 +42,8 @@ pub(crate) fn service_window_title(window: Hwnd) {
     let Ok(Some((request_id, caption))) = registry::take_window_title_request(window) else {
         return;
     };
+    let caption =
+        registry::compose_product_update_caption(window, caption.clone()).unwrap_or(caption);
     let caption = to_wide_null(&caption);
     // SAFETY: this runs on the thread that created the window, and `caption` is
     // a null-terminated UTF-16 buffer that outlives the call.

@@ -4,7 +4,7 @@ use std::{
     fmt, io,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering},
     },
     thread,
 };
@@ -24,6 +24,7 @@ use anodrel_windows_updater::{
 pub struct ProductUpdateController {
     application_id: String,
     attempt: Option<Attempt>,
+    transfer: Option<Arc<TransferProgress>>,
     cancelled: Arc<AtomicBool>,
 }
 
@@ -36,6 +37,74 @@ enum InstallResult {
     Installed,
     ElevationDeclined,
     CancelledBeforeElevation,
+}
+
+const TRANSFER_DOWNLOADING: u8 = 0;
+const TRANSFER_INSTALLING: u8 = 1;
+
+/// The current host-owned update activity for one product window.
+///
+/// It has no endpoint, filesystem, installer, identity, error, speed, or time
+/// information. Its byte pair comes only from the signed candidate and private
+/// completed writes; it is never sent to an application.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProductUpdateActivity {
+    /// No product-update action is currently live.
+    Idle,
+    /// The owned worker is recovering and discovering one signed candidate.
+    Discovering,
+    /// One selected update image is streaming to its private file.
+    Downloading {
+        /// Bytes successfully written to the private image file.
+        completed_bytes: u64,
+        /// The exact nonzero byte total from the signed candidate.
+        total_bytes: u64,
+    },
+    /// The checked image is being verified, elevated, observed, or proved.
+    Installing,
+}
+
+/// One worker-shared progress counter whose values never leave the native host.
+struct TransferProgress {
+    completed_bytes: AtomicU64,
+    total_bytes: u64,
+    phase: AtomicU8,
+}
+
+impl TransferProgress {
+    fn new(total_bytes: u64) -> Self {
+        debug_assert_ne!(total_bytes, 0);
+        Self {
+            completed_bytes: AtomicU64::new(0),
+            total_bytes,
+            phase: AtomicU8::new(TRANSFER_DOWNLOADING),
+        }
+    }
+
+    fn record_completed_write(&self, byte_count: u64) {
+        let previous = self.completed_bytes.fetch_add(byte_count, Ordering::AcqRel);
+        debug_assert!(
+            previous <= self.total_bytes && byte_count <= self.total_bytes - previous,
+            "the bounded downloader must never report beyond its signed total"
+        );
+    }
+
+    fn begin_installation(&self) {
+        self.phase.store(TRANSFER_INSTALLING, Ordering::Release);
+    }
+
+    fn activity(&self) -> ProductUpdateActivity {
+        if self.phase.load(Ordering::Acquire) == TRANSFER_INSTALLING {
+            return ProductUpdateActivity::Installing;
+        }
+        ProductUpdateActivity::Downloading {
+            completed_bytes: self
+                .completed_bytes
+                .load(Ordering::Acquire)
+                .min(self.total_bytes),
+            total_bytes: self.total_bytes,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -137,6 +206,7 @@ impl ProductUpdateController {
         Ok(Self {
             application_id: application_id.to_owned(),
             attempt: None,
+            transfer: None,
             cancelled: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -149,6 +219,7 @@ impl ProductUpdateController {
         if self.attempt.is_some() {
             return Ok(false);
         }
+        self.transfer = None;
         let application_id = self.application_id.clone();
         let worker = thread::Builder::new()
             .name("anodrel-product-update-discovery".to_owned())
@@ -162,6 +233,19 @@ impl ProductUpdateController {
     #[must_use]
     pub const fn is_active(&self) -> bool {
         self.attempt.is_some()
+    }
+
+    /// Returns the native-only activity a product window may present.
+    #[must_use]
+    pub fn activity(&self) -> ProductUpdateActivity {
+        match self.attempt {
+            None => ProductUpdateActivity::Idle,
+            Some(Attempt::Discovering(_)) => ProductUpdateActivity::Discovering,
+            Some(Attempt::Installing(_)) => self.transfer.as_deref().map_or(
+                ProductUpdateActivity::Installing,
+                TransferProgress::activity,
+            ),
+        }
     }
 
     /// Polls one owned worker without blocking the native UI thread.
@@ -180,23 +264,21 @@ impl ProductUpdateController {
             }
             Attempt::Discovering(worker) => match worker.join() {
                 Ok(Ok(offer)) => ProductUpdatePoll::ConsentRequired(offer),
-                Ok(Err(_)) | Err(_) => ProductUpdatePoll::Complete(ProductUpdateOutcome::Failed),
+                Ok(Err(_)) | Err(_) => self.complete(ProductUpdateOutcome::Failed),
             },
             Attempt::Installing(worker) if !worker.is_finished() => {
                 self.attempt = Some(Attempt::Installing(worker));
                 ProductUpdatePoll::Pending
             }
             Attempt::Installing(worker) => match worker.join() {
-                Ok(Ok(InstallResult::Installed)) => {
-                    ProductUpdatePoll::Complete(ProductUpdateOutcome::Installed)
-                }
+                Ok(Ok(InstallResult::Installed)) => self.complete(ProductUpdateOutcome::Installed),
                 Ok(Ok(InstallResult::ElevationDeclined)) => {
-                    ProductUpdatePoll::Complete(ProductUpdateOutcome::ElevationDeclined)
+                    self.complete(ProductUpdateOutcome::ElevationDeclined)
                 }
                 Ok(Ok(InstallResult::CancelledBeforeElevation)) => {
-                    ProductUpdatePoll::Complete(ProductUpdateOutcome::Failed)
+                    self.complete(ProductUpdateOutcome::Failed)
                 }
-                Ok(Err(_)) | Err(_) => ProductUpdatePoll::Complete(ProductUpdateOutcome::Failed),
+                Ok(Err(_)) | Err(_) => self.complete(ProductUpdateOutcome::Failed),
             },
         }
     }
@@ -210,19 +292,27 @@ impl ProductUpdateController {
         consent: UpdateConsent,
     ) -> Result<ProductUpdatePoll, ProductUpdateStartError> {
         match consent {
-            UpdateConsent::Declined => Ok(ProductUpdatePoll::Complete(
-                ProductUpdateOutcome::ConsentDeclined,
-            )),
+            UpdateConsent::Declined => Ok(self.complete(ProductUpdateOutcome::ConsentDeclined)),
             UpdateConsent::Approved(offer) => {
                 let cancelled = Arc::clone(&self.cancelled);
+                let transfer = Arc::new(TransferProgress::new(offer.candidate_byte_length()));
+                let worker_transfer = Arc::clone(&transfer);
                 let worker = thread::Builder::new()
                     .name("anodrel-product-update-install".to_owned())
-                    .spawn(move || install(offer, cancelled))
+                    .spawn(move || install(offer, cancelled, worker_transfer))
                     .map_err(ProductUpdateStartError::WorkerStart)?;
+                self.transfer = Some(transfer);
                 self.attempt = Some(Attempt::Installing(worker));
                 Ok(ProductUpdatePoll::Pending)
             }
         }
+    }
+}
+
+impl ProductUpdateController {
+    fn complete(&mut self, outcome: ProductUpdateOutcome) -> ProductUpdatePoll {
+        self.transfer = None;
+        ProductUpdatePoll::Complete(outcome)
     }
 }
 
@@ -248,11 +338,15 @@ impl Drop for ProductUpdateController {
 fn install(
     offer: AvailableUpdate,
     cancelled: Arc<AtomicBool>,
+    transfer: Arc<TransferProgress>,
 ) -> Result<InstallResult, InstallFailure> {
     if cancelled.load(Ordering::Acquire) {
         return Ok(InstallResult::CancelledBeforeElevation);
     }
-    let ready = offer.download().map_err(InstallFailure::Preparation)?;
+    let ready = offer
+        .download_with_progress(&mut |byte_count| transfer.record_completed_write(byte_count))
+        .map_err(InstallFailure::Preparation)?;
+    transfer.begin_installation();
     if cancelled.load(Ordering::Acquire) {
         return Ok(InstallResult::CancelledBeforeElevation);
     }
@@ -273,8 +367,8 @@ fn install(
 #[cfg(test)]
 mod tests {
     use super::{
-        Ordering, ProductUpdateController, ProductUpdateOutcome, ProductUpdatePoll,
-        ProductUpdateStartError,
+        Ordering, ProductUpdateActivity, ProductUpdateController, ProductUpdateOutcome,
+        ProductUpdatePoll, ProductUpdateStartError, TransferProgress,
     };
 
     #[test]
@@ -322,5 +416,27 @@ mod tests {
         let cancelled = controller.cancelled.clone();
         drop(controller);
         assert!(cancelled.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn progress_counts_only_completed_writes_and_then_becomes_installing() {
+        let transfer = TransferProgress::new(10);
+        assert_eq!(
+            transfer.activity(),
+            ProductUpdateActivity::Downloading {
+                completed_bytes: 0,
+                total_bytes: 10
+            }
+        );
+        transfer.record_completed_write(4);
+        assert_eq!(
+            transfer.activity(),
+            ProductUpdateActivity::Downloading {
+                completed_bytes: 4,
+                total_bytes: 10
+            }
+        );
+        transfer.begin_installation();
+        assert_eq!(transfer.activity(), ProductUpdateActivity::Installing);
     }
 }

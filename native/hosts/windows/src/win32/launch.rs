@@ -401,6 +401,7 @@ where
     let instance = module_handle()?;
     let class_name = to_wide_null("Anodrel.DirectWindowsHost");
     ensure_window_class(instance, &class_name)?;
+    register_taskbar_messages();
     let mut windows = Vec::with_capacity(definitions.len());
     for definition in definitions {
         let animated = matches!(definition.view, View::StartupLab(_));

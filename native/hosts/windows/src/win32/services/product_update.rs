@@ -5,6 +5,7 @@ use std::{ffi::OsStr, os::windows::ffi::OsStrExt};
 use anodrel_windows_product_update::{
     ProductUpdateOutcome, ProductUpdatePoll, request_update_consent,
 };
+use anodrel_windows_taskbar_progress::set_taskbar_progress;
 
 use super::super::{
     DrawMenuBar, EnableMenuItem, GetSystemMenu, Hwnd, MessageBoxW, Uint, Wparam, registry,
@@ -27,7 +28,7 @@ const FAILED_TEXT: &str = "Anodrel could not complete the update check.";
 /// Adds the one fixed host-owned update action when this exact window has a
 /// signed-policy update controller. No application model or normal menu bar is
 /// involved, so application menu replacement cannot remove or forge it.
-pub(in crate::win32) fn install_product_update_action(window: Hwnd) -> bool {
+pub(in crate::win32) fn install_product_update_action(window: Hwnd, base_caption: &str) -> bool {
     if !registry::has_product_update_action(window).unwrap_or(false) {
         return false;
     }
@@ -40,9 +41,10 @@ pub(in crate::win32) fn install_product_update_action(window: Hwnd) -> bool {
     let label = wide(MENU_LABEL);
     // SAFETY: the system-menu handle is valid while this window exists and the
     // UTF-16 label remains alive throughout the synchronous append call.
-    unsafe {
+    let appended = unsafe {
         super::super::AppendMenuW(menu, 0, SC_ANODREL_CHECK_UPDATES as usize, label.as_ptr()) != 0
-    }
+    };
+    appended && registry::prepare_product_update_presentation(window, base_caption).unwrap_or(false)
 }
 
 /// Returns whether this system command is Anodrel's one product-update action.
@@ -53,7 +55,10 @@ pub(in crate::win32) const fn is_product_update_command(wparam: Wparam) -> bool 
 /// Starts a native update discovery worker after the person's system-menu click.
 pub(in crate::win32) fn start_product_update(window: Hwnd) {
     match registry::begin_product_update(window) {
-        Ok(Some(true)) => set_action_enabled(window, false),
+        Ok(Some(true)) => {
+            set_action_enabled(window, false);
+            refresh_presentation(window);
+        }
         Ok(Some(false) | None) => {}
         Err(_) => show(window, FAILED_TEXT, MB_ICONWARNING),
     }
@@ -69,18 +74,15 @@ pub(in crate::win32) fn service_product_update(window: Hwnd) {
         Ok(Some(ProductUpdatePoll::Pending)) | Ok(None) => None,
         Ok(Some(ProductUpdatePoll::Complete(outcome))) => Some(outcome),
         Ok(Some(ProductUpdatePoll::ConsentRequired(offer))) => {
-            let consent = match request_update_consent(offer) {
-                Ok(consent) => consent,
-                Err(_) => {
-                    set_action_enabled(window, true);
-                    show(window, FAILED_TEXT, MB_ICONWARNING);
-                    return;
-                }
-            };
-            match registry::submit_product_update_consent(window, consent) {
-                Ok(Some(ProductUpdatePoll::Complete(outcome))) => Some(outcome),
-                Ok(Some(ProductUpdatePoll::Pending | ProductUpdatePoll::ConsentRequired(_)))
-                | Ok(None) => None,
+            match request_update_consent(offer) {
+                Ok(consent) => match registry::submit_product_update_consent(window, consent) {
+                    Ok(Some(ProductUpdatePoll::Complete(outcome))) => Some(outcome),
+                    Ok(Some(
+                        ProductUpdatePoll::Pending | ProductUpdatePoll::ConsentRequired(_),
+                    ))
+                    | Ok(None) => None,
+                    Err(_) => Some(ProductUpdateOutcome::Failed),
+                },
                 Err(_) => Some(ProductUpdateOutcome::Failed),
             }
         }
@@ -91,8 +93,58 @@ pub(in crate::win32) fn service_product_update(window: Hwnd) {
         .flatten()
         .unwrap_or(false);
     set_action_enabled(window, !active);
+    refresh_presentation(window);
     if let Some(outcome) = outcome {
         present_terminal_outcome(window, outcome);
+    }
+}
+
+/// Marks the product window taskbar available only after Windows sent the
+/// documented `TaskbarButtonCreated` message for this exact window.
+pub(in crate::win32) fn taskbar_button_created(window: Hwnd) {
+    let change = registry::product_update_taskbar_button_created(window)
+        .ok()
+        .flatten();
+    apply_presentation(window, change);
+}
+
+/// Drops optional taskbar readiness after the Shell recreated its taskbar.
+///
+/// The caption remains visible, and Windows will send a fresh button-created
+/// message before any taskbar API call can resume.
+pub(in crate::win32) fn taskbar_restarted(window: Hwnd) {
+    let _ = registry::product_update_taskbar_restarted(window);
+}
+
+/// Clears an optional taskbar indicator while the product window still exists.
+pub(in crate::win32) fn clear_product_update_taskbar(window: Hwnd) {
+    if let Ok(Some(progress)) = registry::clear_product_update_taskbar(window) {
+        let _ = set_taskbar_progress(window, progress);
+    }
+}
+
+/// Applies the latest host-owned state, after every registry lock is released.
+pub(in crate::win32) fn refresh_presentation(window: Hwnd) {
+    let change = registry::refresh_product_update_presentation(window)
+        .ok()
+        .flatten();
+    apply_presentation(window, change);
+}
+
+fn apply_presentation(window: Hwnd, change: Option<registry::ProductUpdatePresentationChange>) {
+    let Some(change) = change else {
+        return;
+    };
+    if let Some(caption) = change.caption {
+        let caption = wide(&caption);
+        // SAFETY: the caption is already host-composed and the UTF-16 buffer
+        // remains live through this direct UI-thread call.
+        unsafe {
+            let _ = super::super::SetWindowTextW(window, caption.as_ptr());
+        }
+    }
+    if let Some(progress) = change.taskbar {
+        let _ = set_taskbar_progress(window, progress);
     }
 }
 

@@ -59,6 +59,7 @@ members = [
   "adapters/windows-update-handoff",
   "adapters/windows-updater",
   "adapters/windows-product-update",
+  "adapters/windows-taskbar-progress",
   "adapters/windows-policy",
   "adapters/windows-registered-session",
   "adapters/windows-product-session",

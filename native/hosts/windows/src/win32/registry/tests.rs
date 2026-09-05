@@ -160,3 +160,30 @@ fn mutating_an_unknown_window_is_not_an_error() {
             .is_none()
     );
 }
+
+#[test]
+fn update_percentage_is_whole_monotonic_and_capped_to_signed_total() {
+    assert_eq!(whole_percent(0, 10), 0);
+    assert_eq!(whole_percent(9, 10), 90);
+    assert_eq!(whole_percent(10, 10), 100);
+    assert_eq!(whole_percent(99, 10), 100);
+}
+
+#[test]
+fn update_caption_keeps_the_validated_caption_as_its_suffix() {
+    let base = "Quarterly Report — Verified App";
+    assert_eq!(
+        update_caption(
+            base,
+            ProductUpdateActivity::Downloading {
+                completed_bytes: 51,
+                total_bytes: 100,
+            }
+        ),
+        "Downloading Anodrel update — 51% — Quarterly Report — Verified App"
+    );
+    assert_eq!(
+        update_caption(base, ProductUpdateActivity::Idle),
+        "Quarterly Report — Verified App"
+    );
+}

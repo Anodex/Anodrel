@@ -259,6 +259,7 @@ unsafe extern "system" {
     pub(super) fn UpdateWindow(window: Hwnd) -> Bool;
     pub(super) fn SetForegroundWindow(window: Hwnd) -> Bool;
     pub(super) fn DestroyWindow(window: Hwnd) -> Bool;
+    pub(super) fn RegisterWindowMessageW(text: *const u16) -> Uint;
     pub(super) fn GetSystemMenu(window: Hwnd, revert: Bool) -> Hmenu;
     pub(super) fn CreateMenu() -> Hmenu;
     pub(super) fn CreatePopupMenu() -> Hmenu;

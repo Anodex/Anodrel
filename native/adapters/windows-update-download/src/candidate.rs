@@ -26,6 +26,12 @@ impl PreparedUpdateDownload {
         self.catalogue.package_version()
     }
 
+    /// Returns the signed exact byte total for host-owned transfer progress.
+    #[must_use]
+    pub fn installer_byte_length(&self) -> u64 {
+        self.catalogue.installer().byte_length()
+    }
+
     pub(crate) fn matches_image(&self, image: &VerifiedInstallerImage) -> bool {
         self.catalogue.matches_release(image.manifest())
     }

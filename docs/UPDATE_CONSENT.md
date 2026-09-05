@@ -1,9 +1,10 @@
 # Windows update consent
 
 **Status:** The host-owned native confirmation and its product-window system
-menu action are implemented. Byte-level progress, automatic restart,
-scheduling, suppression preferences, and application protocol exposure remain
-separate work.
+menu action are implemented. The host represents signed-byte progress only
+through its caption/taskbar surface; automatic restart, scheduling,
+suppression preferences, and application protocol exposure remain separate
+work.
 
 ## Purpose
 

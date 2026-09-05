@@ -18,6 +18,20 @@ pub fn download_prepared_update(
     prepared: &PreparedUpdateDownload,
     cache_parent: &Path,
 ) -> Result<DownloadedInstaller, UpdateDownloadError> {
+    download_prepared_update_with_progress(prepared, cache_parent, &mut |_| {})
+}
+
+/// Streams one prepared update image while reporting only completed private
+/// writes to one caller-owned native progress sink.
+///
+/// The sink receives each successful chunk length, never an endpoint, path,
+/// digest, response header, or Windows failure. It is internal host plumbing,
+/// not an application protocol or SDK progress surface.
+pub fn download_prepared_update_with_progress(
+    prepared: &PreparedUpdateDownload,
+    cache_parent: &Path,
+    progress: &mut dyn FnMut(u64),
+) -> Result<DownloadedInstaller, UpdateDownloadError> {
     let installer = prepared.installer();
     let maximum_bytes =
         usize::try_from(installer.byte_length()).map_err(|_| UpdateDownloadError::ImageMismatch)?;
@@ -29,7 +43,10 @@ pub fn download_prepared_update(
         Some(200),
         maximum_bytes,
         &mut |chunk| match output.write_chunk(chunk) {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                progress(chunk.len() as u64);
+                Ok(())
+            }
             Err(error) => {
                 write_failure = Some(error);
                 Err(())

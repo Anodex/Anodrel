@@ -76,6 +76,20 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
     if message == WM_ANODREL_NOTIFICATION_AREA && tray::handle_callback(window, lparam) {
         return 0;
     }
+    if TASKBAR_BUTTON_CREATED
+        .get()
+        .is_some_and(|expected| *expected == message)
+    {
+        taskbar_button_created(window);
+        return 0;
+    }
+    if TASKBAR_RESTARTED
+        .get()
+        .is_some_and(|expected| *expected == message)
+    {
+        taskbar_restarted(window);
+        return 0;
+    }
     if message == WM_SYSCOMMAND && is_product_update_command(wparam) {
         start_product_update(window);
         return 0;
@@ -415,6 +429,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             0
         }
         WM_DESTROY => {
+            clear_product_update_taskbar(window);
             // SAFETY: killing a timer for a window that has no session poll is
             // a no-op, and this window is being destroyed by the current UI
             // thread.

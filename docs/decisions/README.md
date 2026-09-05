@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0200: Product-update progress stays native and bounded.
+
 - 0199: Product updates start from a native system-menu action.
 
 - 0198: Apps & features removal uses fixed native consent.

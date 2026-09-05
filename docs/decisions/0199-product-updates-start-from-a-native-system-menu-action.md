@@ -43,8 +43,8 @@ output, or application-provided text.
 
 There is no `update.*` protocol operation, capability grant, application menu
 item, tray command, timer, startup check, schedule, preference, notification,
-release-note view, progress percentage, or background update service in this
-slice.
+release-note view, application-visible progress percentage, or background
+update service in this slice.
 
 ## Consequences
 
@@ -63,3 +63,10 @@ Revisit for an owned restart coordinator, a bounded native progress surface,
 application-independent update settings, release notes, localization,
 multi-window ownership, a tray action, automatic scheduling, endpoint/key
 rotation, another platform, or production signed acceptance.
+
+## Later amendment
+
+Decision 0200 adds the bounded native progress surface anticipated here: a
+fixed host caption and, after Windows declares the taskbar button ready, a
+best-effort direct taskbar indicator. It remains outside every application
+surface and does not alter this action's explicit-user-intent boundary.

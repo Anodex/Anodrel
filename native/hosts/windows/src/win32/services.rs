@@ -12,8 +12,8 @@ mod window_presentation;
 
 pub(super) use notification_area::{service_notification, service_tray};
 pub(super) use product_update::{
-    install_product_update_action, is_product_update_command, service_product_update,
-    start_product_update,
+    clear_product_update_taskbar, install_product_update_action, is_product_update_command,
+    service_product_update, start_product_update, taskbar_button_created, taskbar_restarted,
 };
 #[cfg(test)]
 pub(super) use window_presentation::{observed_presentation_state, presentation_command};
@@ -65,6 +65,7 @@ pub(super) fn open_product_session_window(
             ui_session_view::UiSessionView::for_product_session(session),
         )),
     };
+    let product_caption = definition.title.clone();
     let window = create_window(instance, &class_name, &definition)?;
     if let Err(error) = registry::insert(window, definition.view) {
         destroy_window(window);
@@ -89,7 +90,7 @@ pub(super) fn open_product_session_window(
     }
     // This is a host-owned system-menu command, not an application menu item.
     // Failure leaves the app usable but does not create a second update route.
-    let _ = install_product_update_action(window);
+    let _ = install_product_update_action(window, &product_caption);
     product_tile::note_window(window);
     apply_icons(window);
     // SAFETY: the window was just created on this thread's message queue and

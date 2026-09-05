@@ -26,6 +26,6 @@ pub use completion::{
 };
 pub use discovery::retrieve_current_update_download;
 pub use discovery_error::UpdateCatalogueDiscoveryError;
-pub use download::download_prepared_update;
+pub use download::{download_prepared_update, download_prepared_update_with_progress};
 pub use error::UpdateDownloadError;
 pub use file::DownloadedInstaller;

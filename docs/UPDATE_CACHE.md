@@ -2,8 +2,7 @@
 
 **Status:** The fixed cache-root and private-image recovery contracts are
 implemented and compose with discovery, download, native consent, UAC handoff,
-and the product system-menu action. Byte-level progress remains intentionally
-absent.
+the product system-menu action, and bounded native signed-byte progress.
 
 ## Purpose
 

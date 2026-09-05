@@ -691,6 +691,7 @@ dependencies = [
  "anodrel-windows-product-session",
  "anodrel-windows-product-update",
  "anodrel-windows-storage",
+ "anodrel-windows-taskbar-progress",
  "anodrel-windows-uia",
  "anodrel-windows-uia-client",
  "anodrel-wire",
@@ -882,6 +883,10 @@ dependencies = [
  "anodrel-paths",
  "anodrel-storage",
 ]
+
+[[package]]
+name = "anodrel-windows-taskbar-progress"
+version = "0.1.0"
 
 [[package]]
 name = "anodrel-windows-ui-sdk"

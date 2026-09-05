@@ -5,7 +5,7 @@ use std::fmt;
 use anodrel_windows_installer::PackageVersion;
 use anodrel_windows_update_cache::{UpdateCache, open_current_update_cache, recover_update_cache};
 use anodrel_windows_update_download::{
-    PreparedUpdateDownload, VerifiedDownloadedInstaller, download_prepared_update,
+    PreparedUpdateDownload, VerifiedDownloadedInstaller, download_prepared_update_with_progress,
     retrieve_current_update_download, verify_downloaded_update_image,
 };
 use anodrel_windows_update_handoff::{ElevatedUpdateProcess, begin_elevated_update};
@@ -42,13 +42,36 @@ impl AvailableUpdate {
         self.candidate.candidate_version()
     }
 
+    /// Returns the signed exact image total for one native progress display.
+    #[must_use]
+    pub fn candidate_byte_length(&self) -> u64 {
+        self.candidate.installer_byte_length()
+    }
+
     /// Downloads and locks this exact discovered candidate into its fixed cache.
     ///
     /// A host must place this mutating transfer behind its own explicit user
     /// decision. This does not elevate, launch, restart, or install anything.
     pub fn download(self) -> Result<ReadyUpdate, UpdateImagePreparationError> {
-        let downloaded = download_prepared_update(&self.candidate, self.cache.directory())
-            .map_err(UpdateImagePreparationError::DownloadInvalid)?;
+        self.download_with_progress(&mut |_| {})
+    }
+
+    /// Downloads and locks this exact candidate while reporting completed
+    /// private writes to the caller's native progress sink.
+    ///
+    /// The sink receives only successful chunk lengths. It remains a
+    /// host-internal display seam and cannot select a candidate, source,
+    /// cache, file, or later elevation action.
+    pub fn download_with_progress(
+        self,
+        progress: &mut dyn FnMut(u64),
+    ) -> Result<ReadyUpdate, UpdateImagePreparationError> {
+        let downloaded = download_prepared_update_with_progress(
+            &self.candidate,
+            self.cache.directory(),
+            progress,
+        )
+        .map_err(UpdateImagePreparationError::DownloadInvalid)?;
         let image = verify_downloaded_update_image(&self.candidate, downloaded)
             .map_err(UpdateImagePreparationError::ImageInvalid)?;
         Ok(ReadyUpdate { image })

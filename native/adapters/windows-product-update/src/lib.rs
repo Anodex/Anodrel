@@ -13,5 +13,6 @@ mod controller;
 
 pub use anodrel_windows_update_consent::{UpdateConsent, request_update_consent};
 pub use controller::{
-    ProductUpdateController, ProductUpdateOutcome, ProductUpdatePoll, ProductUpdateStartError,
+    ProductUpdateActivity, ProductUpdateController, ProductUpdateOutcome, ProductUpdatePoll,
+    ProductUpdateStartError,
 };
