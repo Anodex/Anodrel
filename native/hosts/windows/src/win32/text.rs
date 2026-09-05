@@ -122,14 +122,13 @@ pub(super) enum Align {
 
 /// Glyph coverage lifted out of GDI, in `0.0..=1.0`.
 pub(super) struct GlyphMask {
-    width: u32,
-    height: u32,
+    /// Origin-zero reusable coverage from GDI's one rasterization pass.
+    mask: Mask,
     /// Distance from the mask's left edge to the run's first pixel.
     inset_x: i32,
     /// Distance from the mask's top edge to the run's first pixel.
     inset_y: i32,
     advance: i32,
-    coverage: Vec<f32>,
 }
 
 /// The advance and line height of a run, without its pixels.
@@ -217,16 +216,7 @@ pub(super) fn draw(canvas: &mut Canvas, spec: &TextSpec, at: Point, align: Align
     };
     let origin_x = (left.round() as i32) - glyphs.inset_x;
     let origin_y = (at.y.round() as i32) - glyphs.inset_y;
-    let Some(mask) = Mask::from_coverage(
-        origin_x,
-        origin_y,
-        glyphs.width,
-        glyphs.height,
-        glyphs.coverage.clone(),
-    ) else {
-        return;
-    };
-    canvas.fill_mask(&mask, paint);
+    canvas.fill_mask_offset(&glyphs.mask, origin_x, origin_y, paint);
 }
 
 /// Draws a run and returns the x position just past its last glyph.
@@ -384,13 +374,12 @@ unsafe fn lift_coverage(
         DeleteObject(bitmap);
     }
 
+    let mask = Mask::from_coverage(0, 0, width as u32, height as u32, coverage)?;
     Some(GlyphMask {
-        width: width as u32,
-        height: height as u32,
+        mask,
         inset_x: GLYPH_PADDING,
         inset_y: GLYPH_PADDING,
         advance: extent.cx,
-        coverage,
     })
 }
 

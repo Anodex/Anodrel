@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0209: Retained Windows text coverage composites by offset.
+
 - 0208: First-party pair kerning stays bounded.
 
 - 0207: First-party composite glyphs start with bounded translations.

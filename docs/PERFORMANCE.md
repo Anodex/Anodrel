@@ -14,6 +14,7 @@ Anodrel application is automatically faster.
 | Runtime ownership | No third-party shipped native runtime dependency. | Native dependency tree contains only Anodrel crates. |
 | Native work | Keep raw OS calls isolated behind small adapters. | Win32 calls live only under `native/hosts/windows/src/win32/`; the renderer and brand crates reach no OS API at all. |
 | Rendering | A frame must compose inside the animation timer's interval, or motion drops frames. | Measured and asserted by the `frame_budget` guards in a release build; see [Frame-cost guard](#frame-cost-guard). |
+| Retained text | Moving a cached text run must not clone its antialiased coverage. | The Windows host stores one origin-zero mask and composites it through a bounded integer offset. |
 | Message memory | Bound bytes before parsing and bound a single receive burst. | 64 KiB payload; four framed messages per receive. |
 | Startup | Do no application I/O, network work, or deferred-service initialization before the first window is responsive. | Current host performs only its internal health check. |
 | UI responsiveness | Never block the Windows message loop on stream I/O or expensive work. | Required by the transport contract; adapter work is not implemented yet. |

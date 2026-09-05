@@ -388,7 +388,9 @@ surface. Three belong to the host:
 - **Glyph runs**, keyed by their text and typographic settings. A reveal
   repaints the same strings many times per second while only their colour and
   position change, so rasterizing each run once is the difference between a
-  smooth reveal and a stuttering one.
+  smooth reveal and a stuttering one. The retained coverage stays origin-zero;
+  the host passes each integer placement to `fill_mask_offset`, so repainting a
+  run does not clone its coverage merely to move it (Decision 0209).
 - **The backdrop**, keyed by client size. It is a full-surface radial gradient —
   around a million paint samples — and is identical on every frame, so computing
   it once per size turns the per-frame cost into a copy.
