@@ -23,6 +23,7 @@ mod crash;
 mod document;
 mod dpi;
 mod fullscreen;
+mod idle_performance_probe;
 mod input;
 mod launch;
 mod menu;
@@ -81,6 +82,7 @@ use services::*;
 use startup_views::*;
 
 pub use dpi::enable_dpi_awareness;
+pub(crate) use idle_performance_probe::run as run_idle_performance_report;
 #[cfg(debug_assertions)]
 pub use launch::run_crash_selftest_panic;
 pub use launch::{

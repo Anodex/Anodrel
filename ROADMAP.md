@@ -300,8 +300,8 @@ Status: **Direct Windows host in progress**
   `--startup-report` route runs the same checks a Startup Lab surface waits for
   and prints elapsed time, working set, and private bytes as one JSON object. It
   stops before the window exists, which its scope states, so it is a floor for
-  cold start rather than time-to-first-frame. Idle CPU after 30 seconds and
-  application-level comparisons remain separate workloads.
+   cold start rather than time-to-first-frame. A separate static-window report
+   measures this process's idle CPU after 30 seconds; application comparisons remain separate.
 - Implement file dialogs, external links, clipboard, notifications, and paths.
   **Completed for the path and text-clipboard foundations:** host-only
   per-application `data`,

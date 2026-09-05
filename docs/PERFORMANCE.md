@@ -47,6 +47,32 @@ coalescing, authentication, and capability policy without timing-sensitive
 assertions. The Windows adapter integration test exercises a real local named
 pipe from connection through authenticated health response.
 
+## Static-window idle report
+
+The direct Windows host has one fixed release diagnostic for its own idle CPU
+and memory after a static native window is visible:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --idle-performance-report
+~~~
+
+Double-click `start-idle-performance-report.bat` from the repository root to
+build and run the same fixed route.
+
+It shows one fixed host-rendered document, starts measuring after the first
+paint, waits once for 30 seconds, prints one JSON record, and closes itself. Do
+not interact with the window while it runs. Its `cpuTimeMicroseconds` is this
+process's cumulative user-plus-kernel CPU time during the sample;
+`cpuPercent` is the same value divided by the elapsed wall time without using a
+floating-point estimate. `workingSetBytes` and `privateBytes` are the final
+readings after that static-window sample.
+
+The record's `scope` states that it excludes application sessions and process
+trees. It has no pass/fail CPU limit: power mode, desktop activity, drivers, and
+the scheduler all affect idle CPU. Retain the raw record with the operating
+system build, hardware, power mode, and equivalent workload before comparing it
+with another runtime. See Decision 0203.
+
 ## Frame-cost guard
 
 The Startup Lab's reveal is driven by a 16 ms timer, so a frame that takes

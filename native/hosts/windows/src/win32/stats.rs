@@ -9,6 +9,19 @@ use std::mem;
 use super::Dword;
 
 #[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct FileTime {
+    low_date_time: Dword,
+    high_date_time: Dword,
+}
+
+impl FileTime {
+    fn ticks_100ns(self) -> u64 {
+        (u64::from(self.high_date_time) << 32) | u64::from(self.low_date_time)
+    }
+}
+
+#[repr(C)]
 #[derive(Default)]
 struct ProcessMemoryCounters {
     cb: Dword,
@@ -26,6 +39,13 @@ struct ProcessMemoryCounters {
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetCurrentProcess() -> isize;
+    fn GetProcessTimes(
+        process: isize,
+        creation: *mut FileTime,
+        exit: *mut FileTime,
+        kernel: *mut FileTime,
+        user: *mut FileTime,
+    ) -> i32;
     fn K32GetProcessMemoryInfo(
         process: isize,
         counters: *mut ProcessMemoryCounters,
@@ -86,9 +106,35 @@ pub(super) fn working_set_bytes() -> u64 {
     memory_readings().working_set_bytes
 }
 
+/// Returns this process's cumulative user-plus-kernel time in 100-nanosecond units.
+///
+/// The value is useful only as the difference between two readings. It is kept
+/// inside the host's fixed idle-performance diagnostic and never crosses the
+/// protocol boundary.
+pub(super) fn process_cpu_time_100ns() -> Option<u64> {
+    let mut creation = FileTime::default();
+    let mut exit = FileTime::default();
+    let mut kernel = FileTime::default();
+    let mut user = FileTime::default();
+    // SAFETY: GetCurrentProcess returns this process's pseudo-handle and every
+    // FILETIME value is writable stack storage for the synchronous query.
+    let queried = unsafe {
+        GetProcessTimes(
+            GetCurrentProcess(),
+            &mut creation,
+            &mut exit,
+            &mut kernel,
+            &mut user,
+        )
+    };
+    (queried != 0)
+        .then(|| kernel.ticks_100ns().checked_add(user.ticks_100ns()))
+        .flatten()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{memory_readings, working_set_bytes};
+    use super::{memory_readings, process_cpu_time_100ns, working_set_bytes};
 
     #[test]
     fn the_working_set_is_a_plausible_size() {
@@ -111,5 +157,12 @@ mod tests {
             readings.private_bytes
         );
         assert!(readings.private_bytes < 8 * 1024 * 1024 * 1024);
+    }
+
+    #[test]
+    fn current_process_cpu_time_is_available_and_never_moves_backwards() {
+        let before = process_cpu_time_100ns().expect("Windows reports process time");
+        let after = process_cpu_time_100ns().expect("Windows continues to report process time");
+        assert!(after >= before);
     }
 }

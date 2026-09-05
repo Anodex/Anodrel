@@ -150,6 +150,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
             }
             0
         }
+        WM_TIMER if idle_performance_probe::service_timer(window, wparam) => 0,
         WM_TIMER if taskbar_progress_probe::service_timer(window, wparam) => 0,
         WM_TIMER if wparam == REVEAL_TIMER => {
             let state = registry::with_startup_lab(window, |lab| {
@@ -433,6 +434,7 @@ unsafe fn dispatch(window: Hwnd, message: Uint, wparam: Wparam, lparam: Lparam) 
         }
         WM_DESTROY => {
             clear_product_update_taskbar(window);
+            idle_performance_probe::remove(window);
             taskbar_progress_probe::remove(window);
             // SAFETY: killing a timer for a window that has no session poll is
             // a no-op, and this window is being destroyed by the current UI
