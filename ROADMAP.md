@@ -245,8 +245,8 @@ Status: **Direct Windows host in progress**
   live-status slice:** an authenticated v3 session document may contain one
   visible semantic status, which a later changed visible value maps to a
   one-way UI Automation live-region event with no listener, callback, or
-  delivery result (Decision 0100). Its manual Narrator and Inspect check
-  remains open. Invoke/property/value/text/selection events beyond that
+  delivery result (Decision 0100). Decision 0202's fixed MTA client proves one Windows callback without listener exposure; manual Narrator and Inspect stay open.
+  Invoke/property/value/text/selection events beyond that
   status slice, text patterns and ranges, labelled-by
   or described-by relations, and non-Windows adapters stay deferred. The
   published tree now preserves direct semantic parentage, including clipped groups, with
