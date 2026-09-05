@@ -59,6 +59,16 @@ cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host --
 Double-click `start-idle-performance-report.bat` from the repository root to
 build and run the same fixed route.
 
+For a release candidate, include the same measurement with the normal automated
+evidence set:
+
+~~~text
+.\scripts\verify-windows-release.ps1 -IncludeIdleReport
+~~~
+
+This opt-in takes at least 30 seconds and opens the fixed diagnostic window, so
+the default verifier remains free of desktop interaction for quick checks.
+
 It shows one fixed host-rendered document, starts measuring after the first
 paint, waits once for 30 seconds, prints one JSON record, and closes itself. Do
 not interact with the window while it runs. Its `cpuTimeMicroseconds` is this

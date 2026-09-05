@@ -4,9 +4,11 @@ Runs Anodrel's non-interactive Windows release evidence checks.
 
 .DESCRIPTION
 Runs formatting, source-size, documentation-link, complete native-workspace,
-release-frame-budget, and startup-report checks from one clean checkout. It
-prints evidence only and creates no certificate, trust entry, installer, machine
-policy, product shortcut, update request, or desktop window.
+release-frame-budget, and startup-report checks from one clean checkout. With
+-IncludeIdleReport, it also records the fixed 30-second static-window idle
+measurement. The default check prints evidence only and creates no certificate,
+trust entry, installer, machine policy, product shortcut, update request, or
+desktop window.
 
 It cannot prove native consent, UAC, Start-menu, Explorer, file-picker, menu,
 or screen-reader behaviour. Those remain explicit operator checks in
@@ -14,7 +16,11 @@ docs/WINDOWS_RELEASE.md.
 #>
 
 [CmdletBinding()]
-param()
+param(
+    # Opt in to the real desktop measurement required for release-candidate
+    # performance evidence. It shows a fixed host window for 30 seconds.
+    [switch] $IncludeIdleReport
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -73,6 +79,12 @@ try {
         'run', '--release', '--manifest-path', $nativeManifest, '-p', 'anodrel-windows-host',
         '--', '--startup-report', $sampleManifest
     )
+    if ($IncludeIdleReport) {
+        Invoke-NativeCheck -Label 'Release idle-window report' -FilePath 'cargo' -Arguments @(
+            'run', '--release', '--manifest-path', $nativeManifest, '-p', 'anodrel-windows-host',
+            '--', '--idle-performance-report'
+        )
+    }
 }
 finally {
     Pop-Location

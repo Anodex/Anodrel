@@ -3,13 +3,15 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::{InstalledApplication, InstalledApplicationError};
 use crate::sha256;
 
 const APPLICATION_ID: &str = "org.anodrel.sample";
+const FIXTURE_REMOVE_ATTEMPTS: u32 = 8;
 
 struct Fixture {
     root: PathBuf,
@@ -21,7 +23,22 @@ struct Fixture {
 
 impl Fixture {
     fn remove(self) {
-        fs::remove_dir_all(self.root).expect("fixture directory is removed");
+        for attempt in 1..=FIXTURE_REMOVE_ATTEMPTS {
+            match fs::remove_dir_all(&self.root) {
+                Ok(()) => return,
+                // Windows can briefly retain a just-read test file for a
+                // scanner. A bounded retry keeps that external race from
+                // making the suite flaky without masking a persistent leak.
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::PermissionDenied
+                        && attempt < FIXTURE_REMOVE_ATTEMPTS =>
+                {
+                    thread::sleep(Duration::from_millis(u64::from(attempt) * 10));
+                }
+                Err(error) => panic!("fixture directory is removed: {error}"),
+            }
+        }
+        unreachable!("fixture cleanup either succeeds or reports its final error");
     }
 }
 

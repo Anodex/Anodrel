@@ -71,9 +71,11 @@ cannot observe.
 
 `scripts/verify-windows-release.ps1` runs the repeatable non-interactive
 evidence set: formatting, source and documentation guards, the native workspace
-suite, release frame budget, and sample startup report. It performs no trust,
-installation, network, or desktop interaction and does not replace any manual
-item above.
+suite, release frame budget, and sample startup report. For a release candidate,
+run it with `-IncludeIdleReport` to add the fixed 30-second static-window idle
+measurement. That opt-in opens one diagnostic window but performs no trust,
+installation, network, or application interaction; it does not replace any
+manual item above.
 
 ## Windows-first sequence
 
