@@ -170,7 +170,7 @@ Status: **Direct Windows host in progress**
   software rasterizer and brand crate, single-blit presentation, glyph coverage
   lifted from the platform text engine, a run-time generated window icon, and
   per-monitor DPI awareness (Decision 0013). `anodrel-font` now provides bounded,
-  owned Unicode mapping, bounded horizontal metrics and conventional pair kerning, simple-outline extraction, exact quadratic paths, bounded device-explicit flattening, one bounded coverage mask, a bounded source-order glyph run, and a face-local bounded cache for a later Linux glyph source (Decisions 0133 through 0138 and 0204 through 0208). See `docs/RENDERER.md`, `docs/FONTS.md`, `docs/TEXT_RUNS.md`, `docs/GLYPH_RENDERING.md`, and `docs/GLYPH_CACHE.md`.
+  owned Unicode mapping, bounded horizontal metrics and conventional pair kerning, simple-outline extraction, exact quadratic paths, bounded device-explicit flattening, one bounded coverage mask, a bounded source-order glyph run, and a face-local bounded cache for a later Linux glyph source (Decisions 0133 through 0138 and 0204 through 0208). The Windows host can also read one bounded private copy of its fixed selected GDI face into that owned parser; the visible painter remains GDI until the owned route can match its quality (Decision 0211). See `docs/RENDERER.md`, `docs/FONTS.md`, `docs/TEXT_RUNS.md`, `docs/GLYPH_RENDERING.md`, and `docs/GLYPH_CACHE.md`.
 - Define an owned native application UI foundation. **In progress:** a portable
   declarative layout tree with semantic actions establishes the first reusable
   UI contract (Decision 0025), and the Windows UI Lab renders and hit-tests a

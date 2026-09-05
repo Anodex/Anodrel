@@ -16,22 +16,13 @@ use anodrel_canvas::{Canvas, Mask, Paint, Point};
 use super::present::BitmapInfo;
 use super::{Bool, Dword, Hdc, Uint};
 
-type Hgdiobj = isize;
 type Hbitmap = isize;
 
 const TRANSPARENT: i32 = 1;
-const DEFAULT_CHARSET: Dword = 1;
-const OUT_TT_PRECIS: Dword = 4;
-const CLIP_DEFAULT_PRECIS: Dword = 0;
-const ANTIALIASED_QUALITY: Dword = 4;
-const DEFAULT_PITCH: Dword = 0;
 const DIB_RGB_COLORS: Uint = 0;
 
 /// Padding around a rendered run so antialiased edges are never clipped.
 const GLYPH_PADDING: i32 = 3;
-
-/// The typeface every first-party surface uses.
-const FACE_NAME: &str = "Segoe UI";
 
 #[repr(C)]
 #[derive(Default)]
@@ -42,8 +33,6 @@ struct Size {
 
 #[link(name = "gdi32")]
 unsafe extern "system" {
-    fn CreateCompatibleDC(device_context: Hdc) -> Hdc;
-    fn DeleteDC(device_context: Hdc) -> Bool;
     fn CreateDIBSection(
         device_context: Hdc,
         bitmap_info: *const BitmapInfo,
@@ -52,24 +41,8 @@ unsafe extern "system" {
         section: isize,
         offset: Dword,
     ) -> Hbitmap;
-    fn CreateFontW(
-        height: i32,
-        width: i32,
-        escapement: i32,
-        orientation: i32,
-        weight: i32,
-        italic: Dword,
-        underline: Dword,
-        strike_out: Dword,
-        char_set: Dword,
-        output_precision: Dword,
-        clip_precision: Dword,
-        quality: Dword,
-        pitch_and_family: Dword,
-        face_name: *const u16,
-    ) -> Hgdiobj;
-    fn SelectObject(device_context: Hdc, object: Hgdiobj) -> Hgdiobj;
-    fn DeleteObject(object: Hgdiobj) -> Bool;
+    fn SelectObject(device_context: Hdc, object: isize) -> isize;
+    fn DeleteObject(object: isize) -> Bool;
     fn SetTextColor(device_context: Hdc, color: Dword) -> Dword;
     fn SetBkMode(device_context: Hdc, mode: i32) -> i32;
     fn SetTextCharacterExtra(device_context: Hdc, extra: i32) -> i32;
@@ -275,36 +248,7 @@ fn with_font<R>(spec: &TextSpec, work: impl FnOnce(Hdc, &Size) -> Option<R>) -> 
         return None;
     }
     let text: Vec<u16> = spec.text.encode_utf16().collect();
-    let face = wide_null(FACE_NAME);
-
-    // SAFETY: every handle created below is released before returning on all
-    // paths. The device context is memory-only and never touches the screen.
-    unsafe {
-        let device_context = CreateCompatibleDC(0);
-        if device_context == 0 {
-            return None;
-        }
-        let font = CreateFontW(
-            -spec.size,
-            0,
-            0,
-            0,
-            spec.weight,
-            0,
-            0,
-            0,
-            DEFAULT_CHARSET,
-            OUT_TT_PRECIS,
-            CLIP_DEFAULT_PRECIS,
-            ANTIALIASED_QUALITY,
-            DEFAULT_PITCH,
-            face.as_ptr(),
-        );
-        if font == 0 {
-            DeleteDC(device_context);
-            return None;
-        }
-        let previous_font = SelectObject(device_context, font);
+    super::selected_font::with_surface_font(spec.size, spec.weight, |device_context| unsafe {
         SetTextCharacterExtra(device_context, spec.tracking);
 
         let mut extent = Size::default();
@@ -314,17 +258,12 @@ fn with_font<R>(spec: &TextSpec, work: impl FnOnce(Hdc, &Size) -> Option<R>) -> 
             text.len() as i32,
             &mut extent,
         );
-        let result = if measured == 0 || extent.cx <= 0 || extent.cy <= 0 {
+        if measured == 0 || extent.cx <= 0 || extent.cy <= 0 {
             None
         } else {
             work(device_context, &extent)
-        };
-
-        SelectObject(device_context, previous_font);
-        DeleteObject(font);
-        DeleteDC(device_context);
-        result
-    }
+        }
+    })
 }
 
 /// Measures a run without allocating a bitmap or rasterizing a glyph.
@@ -440,10 +379,6 @@ fn glyph_dimensions(extent: &Size) -> Option<(i32, i32, u32, u32, usize)> {
     let height_u32 = u32::try_from(height).ok()?;
     let pixels = usize::try_from(u64::from(width_u32) * u64::from(height_u32)).ok()?;
     (pixels <= MAX_GLYPH_MASK_PIXELS).then_some((width, height, width_u32, height_u32, pixels))
-}
-
-fn wide_null(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 #[cfg(test)]

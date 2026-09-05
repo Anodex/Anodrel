@@ -1,7 +1,8 @@
 # Anodrel Font Faces
 
 **Status:** Portable character-map, horizontal-metric and pair-kerning,
-bounded-outline, and quadratic-path foundation.
+bounded-outline, quadratic-path foundation, and one private Windows selected
+face source.
 
 `anodrel-font` validates one already-owned TrueType face held in memory and
 looks up a Unicode scalar value in its character map. It can also extract one
@@ -19,6 +20,15 @@ path, enumerate installed fonts, read environment variables, cache global
 state, call an operating-system API, allocate while looking up a glyph, or
 choose a fallback font. A future host remains responsible for obtaining and
 owning a particular font before it constructs a face.
+
+The Windows host now has one private source for that future handoff. It asks
+GDI for the bytes of the same fixed `Segoe UI` face that first-party surfaces
+select, first validates the reported size against an 8 MiB maximum, then reads
+one exact process-private copy. It does not read a font path, enumerate a
+directory, persist or package a typeface, select a fallback, or expose any
+font choice through the protocol. Its Windows-only test gives those bytes to
+`FontFace::parse`; the visible painter remains the separately bounded GDI
+route. See [Decision 0211](decisions/0211-windows-selected-font-data-stays-private-and-bounded.md).
 
 The public surface is deliberately small:
 
@@ -189,7 +199,8 @@ application data are read during conversion.
 
 ## Deliberately absent
 
-- font discovery, paths, package policy, fallback, or a default family;
+- font discovery, paths, package policy, fallback, or a default family in the
+  portable parser;
 - OpenType layout beyond bounded conventional pair kerning: GPOS, shaping,
   ligatures, class kerning, variation selection, bidirectional text, script
   handling, line breaking, text measurement, and text sizing;

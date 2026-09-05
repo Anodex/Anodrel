@@ -686,6 +686,7 @@ dependencies = [
  "anodrel-file-access",
  "anodrel-file-dialog",
  "anodrel-folder-access",
+ "anodrel-font",
  "anodrel-json",
  "anodrel-menu",
  "anodrel-network",

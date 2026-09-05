@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0211: Windows selected-font data stays private and bounded.
+
 - 0210: Windows text coverage stays pixel-bounded.
 
 - 0209: Retained Windows text coverage composites by offset.

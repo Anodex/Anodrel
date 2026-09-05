@@ -6,7 +6,9 @@
 //!
 //! Submodules split that responsibility: [`present`] moves a canvas to the
 //! screen, [`text`] turns GDI glyphs into canvas coverage, [`appicon`] builds
-//! the window icon from brand geometry, and [`startup_lab`], [`document`],
+//! the window icon from brand geometry, and [`selected_font`] owns the fixed
+//! GDI-selected face source for a later first-party text painter.
+//! [`startup_lab`], [`document`],
 //! [`ui_lab`], and [`window_group_lab`] own the host diagnostic surfaces.
 //! [`messages`] contains the contained Win32 callback and its routing rules.
 //! [`services`] bridges session mailboxes to host-owned Windows operations.
@@ -32,6 +34,7 @@ mod present;
 mod product_tile;
 mod registry;
 mod scrollbar;
+mod selected_font;
 mod services;
 mod session_launch;
 mod session_window_group;

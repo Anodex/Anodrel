@@ -48,3 +48,6 @@ anodrel-windows-network = { path = "../../adapters/windows-network" }
 anodrel-windows-uia = { path = "../../adapters/windows-uia" }
 anodrel-windows-uia-client = { path = "../../adapters/windows-uia-client" }
 anodrel-windows-accessibility = { path = "../../adapters/windows-accessibility" }
+
+[dev-dependencies]
+anodrel-font = { path = "../../crates/font" }
