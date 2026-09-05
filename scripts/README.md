@@ -37,11 +37,12 @@ trust, installation, or desktop-UI change.
 ## verify-windows-release.ps1
 
 Runs the complete non-interactive Windows release evidence set: formatting,
-native ownership, source-size, documentation links, whitespace, the native
-workspace tests, the release-only frame budget, and the sample host startup
-report. It makes no trust, installation, network, or desktop-UI change. It
-cannot replace the separate manual native consent, UAC, Start-menu, file-picker,
-accessibility, and signed-fixture checks in `docs/WINDOWS_RELEASE.md`.
+native ownership, strict native lint, source-size, documentation links,
+whitespace, the native workspace tests, the release-only frame budget, and the
+sample host startup report. It makes no trust, installation, network, or
+desktop-UI change. It cannot replace the separate manual native consent, UAC,
+Start-menu, file-picker, accessibility, and signed-fixture checks in
+`docs/WINDOWS_RELEASE.md`.
 
 ~~~powershell
 .\scripts\verify-windows-release.ps1

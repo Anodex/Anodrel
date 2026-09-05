@@ -275,10 +275,11 @@ For one repeatable non-interactive Windows release-evidence pass, run:
 .\scripts\verify-windows-release.ps1
 ~~~
 
-It runs formatting, native ownership, source and documentation checks, the
-complete native workspace suite, the release frame budget, and the sample
-startup report. It does not create trust or installation state and cannot
-replace the documented native desktop and signed-fixture acceptance checks.
+It runs formatting, native ownership, strict native lint, source and
+documentation checks, the complete native workspace suite, the release frame
+budget, and the sample startup report. It does not create trust or installation
+state and cannot replace the documented native desktop and signed-fixture
+acceptance checks.
 
 
 ## Direct Linux Wayland lab
