@@ -372,4 +372,4 @@ Write-Host 'Start this signed installer normally to exercise native consent and 
 Write-Host "  & `"$SignedInstallerPath`""
 Write-Host ''
 Write-Host 'After installation, launch “Anodrel Product Fixture” from the Start menu, use its action, and confirm that it closes.'
-Write-Host 'To remove it, first run the same signed installer with “uninstall” from an elevated PowerShell session, then run this script with -Remove.'
+Write-Host 'To remove it, run the installed signed uninstaller with “remove” from a normal PowerShell session, then run this script with -Remove.'
