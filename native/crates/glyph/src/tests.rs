@@ -6,7 +6,10 @@ use anodrel_canvas::point;
 use anodrel_font::FontFace;
 
 use crate::flatten::{Quadratic, append_quadratic};
-use crate::{GlyphPlacement, GlyphRenderError, canvas_path, coverage_mask};
+use crate::{
+    GlyphCacheError, GlyphMaskCache, GlyphPlacement, GlyphRenderError, MAX_CACHED_GLYPH_MASKS,
+    canvas_path, coverage_mask,
+};
 
 #[test]
 fn placement_flips_the_font_vertical_axis_at_its_baseline() {
@@ -120,4 +123,72 @@ fn glyph_coverage_refuses_an_oversized_transformed_path() {
         coverage_mask(&outline.quadratic_path(), placement),
         Err(GlyphRenderError::TooComplex)
     ));
+}
+
+#[test]
+fn cache_reuses_matching_fractional_coverage_at_new_integer_positions() {
+    let bytes = fixture::simple_outline_face();
+    let face = FontFace::parse(&bytes).expect("synthetic face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let mut cache = GlyphMaskCache::new(&face);
+
+    let first = cache
+        .mask_at(glyph, point(10.25, 20.5), 1.0)
+        .expect("first glyph should rasterize");
+    let second = cache
+        .mask_at(glyph, point(42.25, 99.5), 1.0)
+        .expect("matching phase should reuse coverage");
+
+    assert_eq!(cache.retained_mask_count(), 1);
+    assert_eq!((first.offset_x(), first.offset_y()), (10, 20));
+    assert_eq!((second.offset_x(), second.offset_y()), (42, 99));
+    assert_eq!(first.mask().width(), second.mask().width());
+    assert_eq!(
+        first.mask().coverage_at(1, 1),
+        second.mask().coverage_at(1, 1)
+    );
+}
+
+#[test]
+fn cache_keys_fractional_phase_and_evicts_at_its_fixed_entry_bound() {
+    let bytes = fixture::simple_outline_face();
+    let face = FontFace::parse(&bytes).expect("synthetic face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let mut cache = GlyphMaskCache::new(&face);
+
+    cache
+        .mask_at(glyph, point(0.25, 0.5), 1.0)
+        .expect("first phase should rasterize");
+    cache
+        .mask_at(glyph, point(0.5, 0.5), 1.0)
+        .expect("second phase should rasterize separately");
+    assert_eq!(cache.retained_mask_count(), 2);
+
+    for phase in 0..=MAX_CACHED_GLYPH_MASKS {
+        let x = (phase as f32 + 0.125) / (MAX_CACHED_GLYPH_MASKS as f32 + 2.0);
+        cache
+            .mask_at(glyph, point(x, 0.0), 1.0)
+            .expect("small phase-specific glyph should rasterize");
+    }
+    assert_eq!(cache.retained_mask_count(), MAX_CACHED_GLYPH_MASKS);
+    assert!(cache.retained_pixel_count() > 0);
+}
+
+#[test]
+fn cache_rejects_invalid_or_too_complex_requests_without_retaining_them() {
+    let bytes = fixture::simple_outline_face();
+    let face = FontFace::parse(&bytes).expect("synthetic face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A");
+    let mut cache = GlyphMaskCache::new(&face);
+
+    assert!(matches!(
+        cache.mask_at(glyph, point(f32::NAN, 0.0), 1.0),
+        Err(GlyphCacheError::InvalidBaseline)
+    ));
+    assert_eq!(cache.retained_mask_count(), 0);
+    assert!(matches!(
+        cache.mask_at(glyph, point(0.0, 0.0), 64.0),
+        Err(GlyphCacheError::Render(GlyphRenderError::TooComplex))
+    ));
+    assert_eq!(cache.retained_mask_count(), 0);
 }

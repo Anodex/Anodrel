@@ -11,8 +11,9 @@ text, or paint pixels itself.
 ## Boundary
 
 The crate depends only on the two owned portable crates `anodrel-font` and
-`anodrel-canvas`. It has no operating-system calls, file access, global cache,
-third-party dependency, or unsafe code. `anodrel-font` remains responsible for
+`anodrel-canvas`. Its converter has no operating-system calls, file access,
+global cache, third-party dependency, or unsafe code. A separate face-local
+bounded cache is documented in `docs/GLYPH_CACHE.md`. `anodrel-font` remains responsible for
 validating source bytes and preserving exact design geometry; `anodrel-canvas`
 remains responsible for non-zero winding and coverage rasterization.
 
@@ -78,13 +79,13 @@ or report whether anything became visible.
 
 - font discovery, file formats, character maps, composite glyphs, metrics,
   hinting, kerning, shaping, fallback, line breaking, and text layout;
-- per-application font configuration, a protocol operation, cached glyph runs,
-  GPU work, drawing, or host presentation;
+- per-application font configuration, a protocol operation, GPU work, drawing,
+  or host presentation;
 - a Linux application surface, desktop input route, or accessibility tree.
 
-The next rendering step may retain a returned coverage mask only after it
-defines cache keys, clipping, and invalidation. It must not move source-font or
-layout authority into this adapter.
+The separate cache now defines fixed face-local keys and eviction. A host still
+must define clipping and paint invalidation without moving source-font or layout
+authority into this adapter.
 
 ## Verification
 

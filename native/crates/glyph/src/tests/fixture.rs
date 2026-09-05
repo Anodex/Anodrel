@@ -6,6 +6,8 @@ pub(super) fn simple_outline_face() -> Vec<u8> {
         (*b"cmap", character_map()),
         (*b"head", head()),
         (*b"maxp", maximum_profile()),
+        (*b"hhea", horizontal_header()),
+        (*b"hmtx", horizontal_metrics()),
         (*b"loca", locations(glyph.len())),
         (*b"glyf", glyph),
     ];
@@ -53,6 +55,7 @@ fn character_map() -> Vec<u8> {
 fn head() -> Vec<u8> {
     let mut head = vec![0; 54];
     head[12..16].copy_from_slice(&0x5F0F_3CF5_u32.to_be_bytes());
+    head[18..20].copy_from_slice(&1_024_u16.to_be_bytes());
     head
 }
 
@@ -61,6 +64,23 @@ fn maximum_profile() -> Vec<u8> {
     profile[0..4].copy_from_slice(&0x0001_0000_u32.to_be_bytes());
     profile[4..6].copy_from_slice(&2_u16.to_be_bytes());
     profile
+}
+
+fn horizontal_header() -> Vec<u8> {
+    let mut header = vec![0; 36];
+    header[0..4].copy_from_slice(&0x0001_0000_u32.to_be_bytes());
+    header[4..6].copy_from_slice(&800_i16.to_be_bytes());
+    header[6..8].copy_from_slice(&(-200_i16).to_be_bytes());
+    header[34..36].copy_from_slice(&2_u16.to_be_bytes());
+    header
+}
+
+fn horizontal_metrics() -> Vec<u8> {
+    [0_u16, 500]
+        .into_iter()
+        .flat_map(|advance| [advance.to_be_bytes(), 0_i16.to_be_bytes()])
+        .flatten()
+        .collect()
 }
 
 fn locations(glyph_length: usize) -> Vec<u8> {
