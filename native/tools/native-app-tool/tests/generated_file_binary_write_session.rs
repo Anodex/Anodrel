@@ -30,6 +30,9 @@ const DOCUMENT_WAIT: Duration = Duration::from_secs(20);
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 const REFERENCE: &str = "AbCdEfGhIjKlMnOpQrStUv";
 
+type RecordedWrite = (SaveReference, Vec<u8>);
+type WriteHistory = Arc<Mutex<Vec<RecordedWrite>>>;
+
 #[derive(Clone, Debug)]
 struct TestSaveSelectionService {
     selection: SaveSelection,
@@ -67,12 +70,12 @@ impl SaveSelectionService for TestSaveSelectionService {
 
 #[derive(Clone, Debug, Default)]
 struct TestBinaryWriteService {
-    writes: Arc<Mutex<Vec<(SaveReference, Vec<u8>)>>>,
+    writes: WriteHistory,
     discarded: Arc<Mutex<Vec<SaveReference>>>,
 }
 
 impl TestBinaryWriteService {
-    fn writes(&self) -> Vec<(SaveReference, Vec<u8>)> {
+    fn writes(&self) -> Vec<RecordedWrite> {
         self.writes
             .lock()
             .expect("test write history remains available")
