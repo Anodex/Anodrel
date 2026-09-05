@@ -1,7 +1,11 @@
 //! Rendering checks kept beside the text module's observable behavior.
 
-use super::{Align, TextSpec, draw, line_height, width};
-use anodrel_canvas::{Canvas, Color, Paint, point};
+use std::rc::Rc;
+
+use super::{
+    Align, GlyphCache, GlyphMask, Size, TextSpec, draw, glyph_dimensions, line_height, width,
+};
+use anodrel_canvas::{Canvas, Color, Mask, Paint, point};
 
 #[test]
 fn a_wider_run_measures_wider() {
@@ -134,4 +138,40 @@ fn a_gradient_paint_varies_across_a_run() {
         count(|color| color.red) > 0 && count(|color| color.blue) > 0,
         "gradient text should span both ends"
     );
+}
+
+#[test]
+fn coverage_dimensions_refuse_overflow_and_oversized_gdi_bitmaps_before_allocation() {
+    let accepted = glyph_dimensions(&Size { cx: 506, cy: 506 }).expect("exact pixel limit fits");
+    assert_eq!(accepted, (512, 512, 512, 512, 262_144));
+    assert!(glyph_dimensions(&Size { cx: 507, cy: 506 }).is_none());
+    assert!(
+        glyph_dimensions(&Size {
+            cx: i32::MAX,
+            cy: 1,
+        })
+        .is_none()
+    );
+}
+
+#[test]
+fn coverage_cache_clears_before_its_pixel_budget_can_grow() {
+    let mut cache = GlyphCache::default();
+    for index in 0..9 {
+        let spec = TextSpec::new(format!("run-{index}"), 12, 400);
+        assert!(
+            cache
+                .get_or_render(&spec, || {
+                    Some(Rc::new(GlyphMask {
+                        mask: Mask::new(0, 0, 512, 512),
+                        inset_x: 0,
+                        inset_y: 0,
+                        advance: 0,
+                    }))
+                })
+                .is_some()
+        );
+    }
+    assert_eq!(cache.entries.len(), 1);
+    assert_eq!(cache.coverage_pixels, 262_144);
 }

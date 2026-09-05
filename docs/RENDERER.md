@@ -390,7 +390,9 @@ surface. Three belong to the host:
   position change, so rasterizing each run once is the difference between a
   smooth reveal and a stuttering one. The retained coverage stays origin-zero;
   the host passes each integer placement to `fill_mask_offset`, so repainting a
-  run does not clone its coverage merely to move it (Decision 0209).
+  run does not clone its coverage merely to move it (Decision 0209). One GDI
+  run has a 262,144-pixel limit, while the thread-local cache holds at most 512
+  keys and 2,097,152 pixels (Decision 0210).
 - **The backdrop**, keyed by client size. It is a full-surface radial gradient —
   around a million paint samples — and is identical on every frame, so computing
   it once per size turns the per-frame cost into a copy.

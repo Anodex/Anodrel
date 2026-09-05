@@ -144,6 +144,44 @@ struct Metrics {
 /// so entries accumulate across a drag; clearing wholesale is the simplest
 /// bound that cannot leak, and the next frame repopulates what it needs.
 const MAX_CACHED_RUNS: usize = 512;
+/// Largest one GDI coverage buffer the host will allocate or retain.
+const MAX_GLYPH_MASK_PIXELS: usize = 262_144;
+/// Largest aggregate coverage area retained by the GDI text cache.
+const MAX_CACHED_GLYPH_PIXELS: usize = 2_097_152;
+
+/// One bounded cache of origin-zero GDI coverage masks.
+#[derive(Default)]
+struct GlyphCache {
+    entries: HashMap<TextSpec, Option<Rc<GlyphMask>>>,
+    coverage_pixels: usize,
+}
+
+impl GlyphCache {
+    /// Returns one retained result, rasterizing and admitting a bounded miss.
+    fn get_or_render(
+        &mut self,
+        spec: &TextSpec,
+        render: impl FnOnce() -> Option<Rc<GlyphMask>>,
+    ) -> Option<Rc<GlyphMask>> {
+        if let Some(existing) = self.entries.get(spec) {
+            return existing.clone();
+        }
+        let rendered = render();
+        let pixels = rendered.as_ref().map_or(0, |mask| mask.pixel_count());
+        if pixels > MAX_CACHED_GLYPH_PIXELS {
+            return None;
+        }
+        if self.entries.len() >= MAX_CACHED_RUNS
+            || self.coverage_pixels.saturating_add(pixels) > MAX_CACHED_GLYPH_PIXELS
+        {
+            self.entries.clear();
+            self.coverage_pixels = 0;
+        }
+        self.coverage_pixels += pixels;
+        self.entries.insert(spec.clone(), rendered.clone());
+        rendered
+    }
+}
 
 thread_local! {
     /// Rendered runs, keyed by their spec.
@@ -151,8 +189,7 @@ thread_local! {
     /// A reveal repaints the same strings many times per second while only
     /// their colour and position change, so rasterizing each run once is the
     /// difference between a smooth reveal and a stuttering one.
-    static GLYPHS: RefCell<HashMap<TextSpec, Option<Rc<GlyphMask>>>> =
-        RefCell::new(HashMap::new());
+    static GLYPHS: RefCell<GlyphCache> = RefCell::default();
 
     /// Measurements, kept separately from pixels.
     ///
@@ -182,7 +219,11 @@ where
 
 /// Returns the cached coverage for a run, rendering it on first use.
 fn glyph_mask(spec: &TextSpec) -> Option<Rc<GlyphMask>> {
-    GLYPHS.with(|cache| cached(cache, spec, || render(spec).map(Rc::new)))
+    GLYPHS.with(|cache| {
+        cache
+            .borrow_mut()
+            .get_or_render(spec, || render(spec).map(Rc::new))
+    })
 }
 
 /// Returns a run's metrics without rasterizing it.
@@ -320,8 +361,7 @@ unsafe fn lift_coverage(
     spec: &TextSpec,
     extent: &Size,
 ) -> Option<GlyphMask> {
-    let width = extent.cx + GLYPH_PADDING * 2;
-    let height = extent.cy + GLYPH_PADDING * 2;
+    let (width, height, width_u32, height_u32, pixel_count) = glyph_dimensions(extent)?;
     let info = BitmapInfo::top_down(width, height);
     let mut bits: *mut core::ffi::c_void = ptr::null_mut();
 
@@ -335,7 +375,6 @@ unsafe fn lift_coverage(
 
     // SAFETY: the section is owned here and released on every path below.
     let previous_bitmap = unsafe { SelectObject(device_context, bitmap) };
-    let pixel_count = (width as usize) * (height as usize);
     // SAFETY: CreateDIBSection guarantees `bits` addresses pixel_count 32-bit
     // pixels for as long as the bitmap is alive, which spans this block.
     let pixels = unsafe { std::slice::from_raw_parts_mut(bits.cast::<u32>(), pixel_count) };
@@ -374,13 +413,33 @@ unsafe fn lift_coverage(
         DeleteObject(bitmap);
     }
 
-    let mask = Mask::from_coverage(0, 0, width as u32, height as u32, coverage)?;
+    let mask = Mask::from_coverage(0, 0, width_u32, height_u32, coverage)?;
     Some(GlyphMask {
         mask,
         inset_x: GLYPH_PADDING,
         inset_y: GLYPH_PADDING,
         advance: extent.cx,
     })
+}
+
+impl GlyphMask {
+    /// Returns the bounded coverage area retained by this cached run.
+    fn pixel_count(&self) -> usize {
+        self.mask.width() as usize * self.mask.height() as usize
+    }
+}
+
+/// Validates one GDI bitmap's dimensions before it can allocate native memory.
+fn glyph_dimensions(extent: &Size) -> Option<(i32, i32, u32, u32, usize)> {
+    let width = extent.cx.checked_add(GLYPH_PADDING * 2)?;
+    let height = extent.cy.checked_add(GLYPH_PADDING * 2)?;
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+    let width_u32 = u32::try_from(width).ok()?;
+    let height_u32 = u32::try_from(height).ok()?;
+    let pixels = usize::try_from(u64::from(width_u32) * u64::from(height_u32)).ok()?;
+    (pixels <= MAX_GLYPH_MASK_PIXELS).then_some((width, height, width_u32, height_u32, pixels))
 }
 
 fn wide_null(value: &str) -> Vec<u16> {
