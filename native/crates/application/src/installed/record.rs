@@ -1,5 +1,7 @@
 //! Strict parsing of the host-selected installed-application record.
 
+use std::collections::BTreeMap;
+
 use anodrel_json::JsonValue;
 use anodrel_network::{NetworkOrigin, NetworkOriginPolicy};
 use anodrel_protocol::Capability;
@@ -8,7 +10,7 @@ use crate::{MAX_INSTALL_RECORD_BYTES, manifest, network_policy, sha256};
 
 use super::{
     InstalledApplicationError, ProductDisplayMetadata, StartMenuName, UpdateCatalogueLocation,
-    exact_fields, is_valid_executable_path, required_object, required_string, validate_version,
+    exact_fields, required_string,
 };
 
 pub(super) struct ParsedRecord {
@@ -368,4 +370,71 @@ fn capability_for_record_version(
         "tray.write" if version.accepts(RecordVersion::V1_24) => Some(Capability::TrayWrite),
         _ => None,
     }
+}
+
+fn required_object<'a>(
+    fields: &'a BTreeMap<String, JsonValue>,
+    field: &str,
+) -> Result<&'a BTreeMap<String, JsonValue>, InstalledApplicationError> {
+    fields
+        .get(field)
+        .and_then(JsonValue::as_object)
+        .ok_or(InstalledApplicationError::InvalidRecord)
+}
+
+fn validate_version(
+    fields: &BTreeMap<String, JsonValue>,
+) -> Result<RecordVersion, InstalledApplicationError> {
+    exact_fields(fields, &["major", "minor"])?;
+    let major = fields
+        .get("major")
+        .and_then(JsonValue::as_u16)
+        .ok_or(InstalledApplicationError::InvalidRecord)?;
+    let minor = fields
+        .get("minor")
+        .and_then(JsonValue::as_u16)
+        .ok_or(InstalledApplicationError::InvalidRecord)?;
+    match (major, minor) {
+        (1, 0) => Ok(RecordVersion::V1_0),
+        (1, 1) => Ok(RecordVersion::V1_1),
+        (1, 2) => Ok(RecordVersion::V1_2),
+        (1, 3) => Ok(RecordVersion::V1_3),
+        (1, 4) => Ok(RecordVersion::V1_4),
+        (1, 5) => Ok(RecordVersion::V1_5),
+        (1, 6) => Ok(RecordVersion::V1_6),
+        (1, 7) => Ok(RecordVersion::V1_7),
+        (1, 8) => Ok(RecordVersion::V1_8),
+        (1, 9) => Ok(RecordVersion::V1_9),
+        (1, 10) => Ok(RecordVersion::V1_10),
+        (1, 11) => Ok(RecordVersion::V1_11),
+        (1, 12) => Ok(RecordVersion::V1_12),
+        (1, 13) => Ok(RecordVersion::V1_13),
+        (1, 14) => Ok(RecordVersion::V1_14),
+        (1, 15) => Ok(RecordVersion::V1_15),
+        (1, 16) => Ok(RecordVersion::V1_16),
+        (1, 17) => Ok(RecordVersion::V1_17),
+        (1, 18) => Ok(RecordVersion::V1_18),
+        (1, 19) => Ok(RecordVersion::V1_19),
+        (1, 20) => Ok(RecordVersion::V1_20),
+        (1, 21) => Ok(RecordVersion::V1_21),
+        (1, 22) => Ok(RecordVersion::V1_22),
+        (1, 23) => Ok(RecordVersion::V1_23),
+        (1, 24) => Ok(RecordVersion::V1_24),
+        _ => Err(InstalledApplicationError::InvalidRecord),
+    }
+}
+
+fn is_valid_executable_path(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let extension = bytes
+        .get(bytes.len().saturating_sub(4)..)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case(b".exe"));
+    extension
+        && !value.is_empty()
+        && value.len() <= 240
+        && !value.contains(['\\', ':'])
+        && !bytes.contains(&0)
+        && value
+            .split('/')
+            .all(|component| !component.is_empty() && component != "." && component != "..")
 }

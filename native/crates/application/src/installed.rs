@@ -7,8 +7,7 @@
 
 use std::{
     collections::BTreeMap,
-    fmt,
-    fs::{self, File},
+    fmt, fs,
     io::Read,
     path::{Path, PathBuf},
 };
@@ -24,17 +23,21 @@ use crate::{
 
 const PACKAGE_MANIFEST_NAME: &str = "anodrel.application.json";
 
+mod filesystem;
 mod launcher;
 mod product;
 mod record;
 mod start_menu_name;
 mod update_catalogue;
 
+pub(super) use filesystem::canonical_executable_path;
 pub use product::{ProductDisplayMetadata, ProductDisplayMetadataError};
 pub use start_menu_name::{StartMenuName, StartMenuNameError};
 pub use update_catalogue::{
     MAX_UPDATE_CATALOGUE_PATH_BYTES, UpdateCatalogueLocation, UpdateCatalogueLocationError,
 };
+
+use filesystem::{canonical_directory, digest_file, read_limited};
 
 /// A fixed SHA-256 fingerprint for the publisher approved by an installed
 /// application record.
@@ -390,57 +393,6 @@ impl std::error::Error for InstalledApplicationError {
     }
 }
 
-fn canonical_directory(path: &Path) -> std::io::Result<PathBuf> {
-    let path = fs::canonicalize(path)?;
-    if fs::metadata(&path)?.is_dir() {
-        Ok(path)
-    } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path is not a directory",
-        ))
-    }
-}
-
-fn canonical_executable_path(
-    package_root: &Path,
-    declared_path: &str,
-) -> Result<PathBuf, InstalledApplicationError> {
-    let path = fs::canonicalize(package_root.join(declared_path))
-        .map_err(InstalledApplicationError::Io)?;
-    if !path.starts_with(package_root) {
-        return Err(InstalledApplicationError::ExecutableOutsidePackage);
-    }
-    if !fs::metadata(&path)
-        .map_err(InstalledApplicationError::Io)?
-        .is_file()
-    {
-        return Err(InstalledApplicationError::ExecutableNotFile);
-    }
-    Ok(path)
-}
-
-fn digest_file(path: &Path) -> Result<([u8; 32], usize), InstalledApplicationError> {
-    let mut file = File::open(path).map_err(InstalledApplicationError::Io)?;
-    sha256::digest_reader_limited(&mut file, MAX_EXECUTABLE_BYTES)
-        .map_err(InstalledApplicationError::Io)?
-        .ok_or(InstalledApplicationError::ExecutableTooLarge)
-}
-
-fn read_limited(path: &Path, maximum: usize) -> Result<String, InstalledApplicationError> {
-    let file = File::open(path).map_err(InstalledApplicationError::Io)?;
-    let mut reader = file.take((maximum + 1) as u64);
-    let mut contents = Vec::with_capacity(maximum.min(4_096));
-    reader
-        .read_to_end(&mut contents)
-        .map_err(InstalledApplicationError::Io)?;
-    if contents.len() > maximum {
-        Err(InstalledApplicationError::RecordTooLarge)
-    } else {
-        String::from_utf8(contents).map_err(|_| InstalledApplicationError::InvalidRecord)
-    }
-}
-
 pub(super) fn exact_fields(
     fields: &BTreeMap<String, JsonValue>,
     expected: &[&str],
@@ -460,73 +412,6 @@ pub(super) fn required_string<'a>(
         .get(field)
         .and_then(JsonValue::as_string)
         .ok_or(InstalledApplicationError::InvalidRecord)
-}
-
-fn required_object<'a>(
-    fields: &'a BTreeMap<String, JsonValue>,
-    field: &str,
-) -> Result<&'a BTreeMap<String, JsonValue>, InstalledApplicationError> {
-    fields
-        .get(field)
-        .and_then(JsonValue::as_object)
-        .ok_or(InstalledApplicationError::InvalidRecord)
-}
-
-fn validate_version(
-    fields: &BTreeMap<String, JsonValue>,
-) -> Result<record::RecordVersion, InstalledApplicationError> {
-    exact_fields(fields, &["major", "minor"])?;
-    let major = fields
-        .get("major")
-        .and_then(JsonValue::as_u16)
-        .ok_or(InstalledApplicationError::InvalidRecord)?;
-    let minor = fields
-        .get("minor")
-        .and_then(JsonValue::as_u16)
-        .ok_or(InstalledApplicationError::InvalidRecord)?;
-    match (major, minor) {
-        (1, 0) => Ok(record::RecordVersion::V1_0),
-        (1, 1) => Ok(record::RecordVersion::V1_1),
-        (1, 2) => Ok(record::RecordVersion::V1_2),
-        (1, 3) => Ok(record::RecordVersion::V1_3),
-        (1, 4) => Ok(record::RecordVersion::V1_4),
-        (1, 5) => Ok(record::RecordVersion::V1_5),
-        (1, 6) => Ok(record::RecordVersion::V1_6),
-        (1, 7) => Ok(record::RecordVersion::V1_7),
-        (1, 8) => Ok(record::RecordVersion::V1_8),
-        (1, 9) => Ok(record::RecordVersion::V1_9),
-        (1, 10) => Ok(record::RecordVersion::V1_10),
-        (1, 11) => Ok(record::RecordVersion::V1_11),
-        (1, 12) => Ok(record::RecordVersion::V1_12),
-        (1, 13) => Ok(record::RecordVersion::V1_13),
-        (1, 14) => Ok(record::RecordVersion::V1_14),
-        (1, 15) => Ok(record::RecordVersion::V1_15),
-        (1, 16) => Ok(record::RecordVersion::V1_16),
-        (1, 17) => Ok(record::RecordVersion::V1_17),
-        (1, 18) => Ok(record::RecordVersion::V1_18),
-        (1, 19) => Ok(record::RecordVersion::V1_19),
-        (1, 20) => Ok(record::RecordVersion::V1_20),
-        (1, 21) => Ok(record::RecordVersion::V1_21),
-        (1, 22) => Ok(record::RecordVersion::V1_22),
-        (1, 23) => Ok(record::RecordVersion::V1_23),
-        (1, 24) => Ok(record::RecordVersion::V1_24),
-        _ => Err(InstalledApplicationError::InvalidRecord),
-    }
-}
-
-fn is_valid_executable_path(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    let extension = bytes
-        .get(bytes.len().saturating_sub(4)..)
-        .is_some_and(|extension| extension.eq_ignore_ascii_case(b".exe"));
-    extension
-        && !value.is_empty()
-        && value.len() <= 240
-        && !value.contains(['\\', ':'])
-        && !bytes.contains(&0)
-        && value
-            .split('/')
-            .all(|component| !component.is_empty() && component != "." && component != "..")
 }
 
 #[cfg(test)]
