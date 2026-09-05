@@ -209,6 +209,20 @@ pub(super) fn repeated_zero_points() -> Vec<u8> {
     bytes
 }
 
+/// Builds a located zero-contour glyph with its declared design bounds.
+pub(super) fn empty_simple_glyph() -> Vec<u8> {
+    glyph_header(0, -4, -3, 12, 18)
+}
+
+/// Builds a zero-contour glyph whose ignored instructions prove the optional
+/// simple-glyph tail is bounded without executing bytecode.
+pub(super) fn empty_simple_glyph_with_instruction() -> Vec<u8> {
+    let mut glyph = empty_simple_glyph();
+    push_u16(&mut glyph, 1);
+    glyph.push(0xB0);
+    glyph
+}
+
 /// Builds a simple glyph whose coordinates use signed 16-bit deltas.
 pub(super) fn long_vector_points() -> Vec<u8> {
     let mut bytes = glyph_header(1, 200, -300, 300, -200);

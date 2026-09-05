@@ -27,6 +27,9 @@ pub(super) fn parse(glyph: Bytes<'_>) -> Result<GlyphOutline, GlyphOutlineError>
         glyph.i16(8).ok_or(GlyphOutlineError::MalformedOutline)?,
     )
     .ok_or(GlyphOutlineError::MalformedOutline)?;
+    if contour_count == 0 {
+        return parse_empty(glyph, bounds);
+    }
     if contour_count == -1 {
         return Err(GlyphOutlineError::CompositeGlyphUnsupported);
     }
@@ -38,6 +41,19 @@ pub(super) fn parse(glyph: Bytes<'_>) -> Result<GlyphOutline, GlyphOutlineError>
         usize::try_from(contour_count).map_err(|_| GlyphOutlineError::MalformedOutline)?,
         bounds,
     )
+}
+
+fn parse_empty(glyph: Bytes<'_>, bounds: GlyphBounds) -> Result<GlyphOutline, GlyphOutlineError> {
+    if glyph.len() == HEADER_LENGTH {
+        return Ok(GlyphOutline::new(bounds, Vec::new(), Vec::new()));
+    }
+    let mut cursor = HEADER_LENGTH;
+    let instruction_length = usize::from(read_u16(glyph, &mut cursor)?);
+    skip(glyph, &mut cursor, instruction_length)?;
+    if !glyph.zero_padding_from(cursor) {
+        return Err(GlyphOutlineError::MalformedOutline);
+    }
+    Ok(GlyphOutline::new(bounds, Vec::new(), Vec::new()))
 }
 
 fn parse_simple(

@@ -5,9 +5,10 @@ mod path;
 
 use crate::{FontError, FontFace, FontMetricError, GlyphOutlineError};
 use fixtures::{
-    cmap, composite_glyph, format4, format4_with_glyph_array, format12, glyph_over_contour_limit,
-    glyph_with_instruction, glyph_with_reserved_flag, glyph_with_trailing_byte, long_vector_points,
-    metrics_face, outline_face, outline_face_for_glyph, outline_face_with_nonzero_first_location,
+    cmap, composite_glyph, empty_simple_glyph, empty_simple_glyph_with_instruction, format4,
+    format4_with_glyph_array, format12, glyph_over_contour_limit, glyph_with_instruction,
+    glyph_with_reserved_flag, glyph_with_trailing_byte, long_vector_points, metrics_face,
+    outline_face, outline_face_for_glyph, outline_face_with_nonzero_first_location,
     repeated_zero_points, sfnt, simple_triangle, truncated_composite_marker,
 };
 
@@ -323,6 +324,27 @@ fn empty_located_glyph_is_distinct_from_missing_outline_source() {
         map_only.font_metrics().unwrap_err(),
         FontMetricError::MetricsUnavailable
     );
+}
+
+#[test]
+fn zero_contour_glyphs_preserve_bounds_with_or_without_ignored_instructions() {
+    for glyph_bytes in [empty_simple_glyph(), empty_simple_glyph_with_instruction()] {
+        let bytes = outline_face(glyph_bytes, false);
+        let face = FontFace::parse(&bytes).expect("zero-contour face should parse");
+        let glyph = face.glyph_id('A').expect("fixture maps A");
+        let outline = face.glyph_outline(glyph).expect("empty outline is valid");
+        assert_eq!(outline.contour_count(), 0);
+        assert_eq!(outline.point_count(), 0);
+        assert_eq!(
+            (
+                outline.bounds().x_min(),
+                outline.bounds().y_min(),
+                outline.bounds().x_max(),
+                outline.bounds().y_max(),
+            ),
+            (-4, -3, 12, 18)
+        );
+    }
 }
 
 #[test]

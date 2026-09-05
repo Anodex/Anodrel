@@ -108,7 +108,11 @@ rejects the reserved simple-glyph flag bit, and bounds one extracted glyph to
 constant time; extraction allocates only the returned outline and its temporary
 flag buffer.
 
-An empty location returns an empty outline. A valid composite glyph returns
+An empty location returns an empty outline with zero bounds. A located simple
+glyph with zero contours also returns an empty outline, preserving its validated
+header bounds. It may end immediately after the header, or it may carry a
+range-checked instruction length and ignored instruction bytes; no instructions
+are ever executed. A valid composite glyph returns
 `GlyphOutlineError::CompositeGlyphUnsupported`; it is never mistaken for an
 empty glyph. A nonzero character-map result outside `maxp` returns a closed
 invalid-glyph error. Invalid contour endpoints, repeats, coordinate deltas,
