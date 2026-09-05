@@ -73,6 +73,11 @@ v1/v2 rejection, portable snapshot and Windows mapping values, provider
 property publication, and every event gate: initial, unchanged, removed,
 clipped, stale, and changed-visible statuses.
 
+The separate fixed Windows event probe passed on 2026-09-04. It adds real
+client/provider callback evidence for one changed visible status. It does not
+replace the manual speech and Inspect checks below. See
+[live-status event probe](UI_AUTOMATION_LIVE_STATUS_EVENT_PROBE.md).
+
 Manual Windows verification uses the built-in `--sample-ui-live-status-client`
 route from `docs/DEVELOPMENT_DIAGNOSTICS.md`. Open its window, then start Narrator, so the
 check covers the order that originally found the listener-gate defect. Establish

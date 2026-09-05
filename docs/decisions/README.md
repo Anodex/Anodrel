@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0202: Windows UI Automation live-status probe keeps listening private.
+
 - 0201: Taskbar progress uses a fixed native probe.
 
 - 0200: Product-update progress stays native and bounded.

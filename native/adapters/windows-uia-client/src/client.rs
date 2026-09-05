@@ -13,7 +13,10 @@ use crate::{
     raw,
 };
 
-pub use events::{UiAutomationFocusSubscription, UiAutomationStructureSubscription};
+pub use events::{
+    UiAutomationFocusSubscription, UiAutomationLiveStatusSubscription,
+    UiAutomationStructureSubscription,
+};
 pub use geometry::UiAutomationRect;
 pub use model::{UiAutomationElement, UiAutomationNode, UiAutomationValue};
 pub use patterns::UiAutomationInvocation;

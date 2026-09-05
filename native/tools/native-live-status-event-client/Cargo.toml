@@ -1,0 +1,24 @@
+[package]
+name = "anodrel-native-live-status-event-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-native-live-status-event-client"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-client = { path = "../../crates/client" }
+anodrel-ui-client = { path = "../../crates/ui-client" }
+anodrel-windows-client = { path = "../../adapters/windows-client" }
+
+[dev-dependencies]
+anodrel-core = { path = "../../crates/core" }
+anodrel-json = { path = "../../crates/json" }
+anodrel-protocol = { path = "../../crates/protocol" }
+anodrel-ui = { path = "../../crates/ui" }
+anodrel-ui-document = { path = "../../crates/ui-document" }
+anodrel-ui-session = { path = "../../crates/ui-session" }
+anodrel-windows-bootstrap = { path = "../../adapters/windows-bootstrap" }
+anodrel-windows-pipe = { path = "../../adapters/windows-pipe" }

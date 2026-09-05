@@ -291,6 +291,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-native-live-status-event-client"
+version = "0.1.0"
+dependencies = [
+ "anodrel-client",
+ "anodrel-core",
+ "anodrel-json",
+ "anodrel-protocol",
+ "anodrel-ui",
+ "anodrel-ui-client",
+ "anodrel-ui-document",
+ "anodrel-ui-session",
+ "anodrel-windows-bootstrap",
+ "anodrel-windows-client",
+ "anodrel-windows-pipe",
+]
+
+[[package]]
 name = "anodrel-native-network-client-sample"
 version = "0.1.0"
 dependencies = [

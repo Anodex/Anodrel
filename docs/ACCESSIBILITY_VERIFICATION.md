@@ -126,6 +126,25 @@ rejected or stale-event silence, repeated replacement, arbitrary subscriptions,
 or an application event surface. Re-run it with the command in
 `docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md`.
 
+### Automated authenticated-session live-status-event acceptance
+
+This passed on Windows on 2026-09-04. A separate direct first-party MTA client
+attached to the compiled child's fixed session window, prepared its one
+revision-1 action, and registered one element-scoped listener for the standard
+`LiveRegionChanged` event. Invoking that fixed action caused the child to
+replace its polite version-3 status with a changed assertive status under the
+same `native.live.status` AutomationId. Windows delivered that exact event from
+that exact source. The listener was removed before a fresh private client
+invoked the fixed completion action; the child then closed its own session.
+
+The listener accepts no application data and the child has no listener or
+delivery channel. This proves one authenticated changed status, the provider's
+outbound event, real Windows registration and callback, and normal child close.
+It does not prove Narrator speech, Inspect-highlight correctness, repeated or
+rejected-update silence, a delivery guarantee, arbitrary subscriptions, or an
+application event surface. Re-run it with the command in
+`docs/UI_AUTOMATION_LIVE_STATUS_EVENT_PROBE.md`.
+
 Automated tests cover the mapping: every role's control type and focusability,
 each property's source, empty and named nodes, rectangle conversion at several
 scales and origins, an empty rectangle staying empty, and runtime-ID shape and
