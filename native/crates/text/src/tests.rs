@@ -30,6 +30,22 @@ fn builds_source_order_glyphs_with_exact_pen_positions() {
 }
 
 #[test]
+fn applies_owned_pair_adjustments_before_the_current_glyph_position() {
+    let bytes = kerned_metric_face('A', 'B', 1, &[0, 500, 600], &[(1, 2, -80), (2, 1, 20)]);
+    let face = FontFace::parse(&bytes).expect("kerning fixture face should parse");
+    let run = TextRun::build(&face, "ABA").expect("mapped text should build");
+
+    assert_eq!(run.advance_width(), 1_540);
+    assert_eq!(
+        run.glyphs()
+            .iter()
+            .map(|glyph| (glyph.glyph().value(), glyph.pen_x()))
+            .collect::<Vec<_>>(),
+        vec![(1, 0), (2, 420), (1, 1_040)]
+    );
+}
+
+#[test]
 fn empty_text_still_carries_validated_line_metrics() {
     let bytes = metric_face('A', 'A', 1, &[0, 500]);
     let face = FontFace::parse(&bytes).expect("fixture face should parse");
@@ -83,6 +99,13 @@ fn fixed_scalar_and_advance_limits_refuse_the_complete_request() {
         TextRun::build(&face, &"A".repeat(17)).unwrap_err(),
         TextRunError::AdvanceLimitExceeded
     );
+
+    let bytes = kerned_metric_face('A', 'A', 1, &[0, 0], &[(1, 1, -32_768)]);
+    let face = FontFace::parse(&bytes).expect("negative-kerning fixture should parse");
+    assert_eq!(
+        TextRun::build(&face, &"A".repeat(34)).unwrap_err(),
+        TextRunError::AdvanceLimitExceeded
+    );
 }
 
 fn metric_face(start: char, end: char, first_glyph: u16, advances: &[u16]) -> Vec<u8> {
@@ -92,6 +115,23 @@ fn metric_face(start: char, end: char, first_glyph: u16, advances: &[u16]) -> Ve
         (*b"maxp", maximum_profile(advances.len())),
         (*b"hhea", horizontal_header(advances.len())),
         (*b"hmtx", horizontal_metrics(advances)),
+    ])
+}
+
+fn kerned_metric_face(
+    start: char,
+    end: char,
+    first_glyph: u16,
+    advances: &[u16],
+    pairs: &[(u16, u16, i16)],
+) -> Vec<u8> {
+    sfnt(&[
+        (*b"cmap", cmap(start, end, first_glyph)),
+        (*b"head", head()),
+        (*b"maxp", maximum_profile(advances.len())),
+        (*b"hhea", horizontal_header(advances.len())),
+        (*b"hmtx", horizontal_metrics(advances)),
+        (*b"kern", kerning_table(pairs)),
     ])
 }
 
@@ -197,6 +237,47 @@ fn horizontal_metrics(advances: &[u16]) -> Vec<u8> {
     for advance in advances {
         push_u16(&mut bytes, *advance);
         bytes.extend_from_slice(&0_i16.to_be_bytes());
+    }
+    bytes
+}
+
+fn kerning_table(pairs: &[(u16, u16, i16)]) -> Vec<u8> {
+    let pair_bytes = pairs.len() * 6;
+    let search_range = if pairs.is_empty() {
+        0
+    } else {
+        u16::try_from((1_usize << pairs.len().ilog2()) * 6).expect("fixture range fits")
+    };
+    let mut bytes = Vec::new();
+    push_u16(&mut bytes, 0);
+    push_u16(&mut bytes, 1);
+    push_u16(&mut bytes, 0);
+    push_u16(
+        &mut bytes,
+        u16::try_from(14 + pair_bytes).expect("fixture length fits"),
+    );
+    push_u16(&mut bytes, 1);
+    push_u16(
+        &mut bytes,
+        u16::try_from(pairs.len()).expect("fixture pair count fits"),
+    );
+    push_u16(&mut bytes, search_range);
+    push_u16(
+        &mut bytes,
+        if pairs.is_empty() {
+            0
+        } else {
+            pairs.len().ilog2() as u16
+        },
+    );
+    push_u16(
+        &mut bytes,
+        u16::try_from(pair_bytes).expect("fixture pair bytes fit") - search_range,
+    );
+    for (left, right, adjustment) in pairs {
+        push_u16(&mut bytes, *left);
+        push_u16(&mut bytes, *right);
+        bytes.extend_from_slice(&adjustment.to_be_bytes());
     }
     bytes
 }

@@ -2,6 +2,7 @@
 
 mod composite;
 mod fixtures;
+mod kerning;
 mod path;
 
 use crate::{FontError, FontFace, FontMetricError, GlyphOutlineError};

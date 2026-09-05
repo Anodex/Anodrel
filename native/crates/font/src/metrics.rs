@@ -117,6 +117,11 @@ impl<'font> MetricSource<'font> {
         self.metrics
     }
 
+    /// Returns the validated number of glyph IDs available to related tables.
+    pub(crate) const fn glyph_count(&self) -> usize {
+        self.glyph_count
+    }
+
     /// Reads one glyph's advance and side bearing without allocating.
     pub(crate) fn horizontal_metric(
         &self,

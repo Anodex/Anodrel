@@ -1,6 +1,7 @@
 # Anodrel Font Faces
 
-**Status:** Portable character-map, horizontal-metric, bounded-outline, and quadratic-path foundation.
+**Status:** Portable character-map, horizontal-metric and pair-kerning,
+bounded-outline, and quadratic-path foundation.
 
 `anodrel-font` validates one already-owned TrueType face held in memory and
 looks up a Unicode scalar value in its character map. It can also extract one
@@ -26,6 +27,10 @@ let face = anodrel_font::FontFace::parse(bytes)?;
 let glyph = face.glyph_id('A');
 let metrics = face.font_metrics()?;
 let advance = glyph.map(|glyph| face.horizontal_metric(glyph)).transpose()?;
+let kerning = match (face.glyph_id('A'), face.glyph_id('V')) {
+    (Some(left), Some(right)) => face.horizontal_kerning(left, right)?,
+    _ => 0,
+};
 let outline = glyph.map(|glyph| face.glyph_outline(glyph)).transpose()?;
 let path = outline.as_ref().map(anodrel_font::GlyphOutline::quadratic_path);
 ```
@@ -84,6 +89,32 @@ It does not infer a missing metric from an outline. See Microsoft's OpenType
 [`hhea`](https://learn.microsoft.com/en-us/typography/opentype/spec/hhea), and
 [`hmtx`](https://learn.microsoft.com/en-us/typography/opentype/spec/hmtx)
 specifications.
+
+## Horizontal pair kerning
+
+An optional conventional OpenType version-0 `kern` table becomes available only
+beside a complete validated horizontal-metric source. `horizontal_kerning(left,
+right)` validates both face-local glyph IDs, then returns the signed design-unit
+adjustment for that ordered pair. It returns a closed metrics-unavailable
+outcome for a map-only face. A metric face with no `kern` table, an unmatched
+pair, or only valid non-horizontal tables returns zero; it never chooses a
+system or fallback text engine.
+
+The parser accepts at most 32 declared subtables and at most 2,097,124 table
+bytes. It validates every subtable's range and coverage flags, and selects only
+format-0 tables marked horizontal without `minimum` or `cross-stream`
+behaviour. Selected tables must have an exact length, valid binary-search
+fields, strictly sorted in-range pairs, and only final zero padding. A lookup
+binary-searches borrowed font bytes and makes no allocation. Matching selected
+values add in table order, except an override subtable replaces the earlier
+result. Other valid `kern` formats and modes are ignored rather than guessed.
+
+This is a deliberately small pre-shaping feature, not OpenType layout. GPOS,
+class kerning, vertical and cross-stream placement, device variation, and every
+other `kern` format remain absent. See [Decision
+0208](decisions/0208-first-party-pair-kerning-stays-bounded.md) and Microsoft's
+OpenType [`kern`](https://learn.microsoft.com/en-us/typography/opentype/spec/kern)
+table specification.
 
 ## Glyph outlines
 
@@ -159,8 +190,9 @@ application data are read during conversion.
 ## Deliberately absent
 
 - font discovery, paths, package policy, fallback, or a default family;
-- OpenType layout: shaping, ligatures, kerning, variation selection, bidirectional
-  text, script handling, line breaking, text measurement, and text sizing;
+- OpenType layout beyond bounded conventional pair kerning: GPOS, shaping,
+  ligatures, class kerning, variation selection, bidirectional text, script
+  handling, line breaking, text measurement, and text sizing;
 - component transforms and point attachment, hinting, rasterization, colour
   glyphs, bitmap strikes, or a canvas dependency;
 - application-controlled font bytes or a protocol field carrying fonts.
@@ -184,3 +216,6 @@ off-curve controls,
 implied half-unit midpoints, off-curve contour starts, closure, and empty
 outlines. Those tests contain no machine font and no operating-system
 dependency, so they run identically on every supported development host.
+Pair-kerning tests cover empty and absent sources, valid accumulated and
+override pairs, invalid IDs, binary-search fields, ordering, bounds, and
+irrelevant subtable modes.

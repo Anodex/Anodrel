@@ -4,6 +4,7 @@ use crate::{
     FontError,
     bytes::Bytes,
     cmap::{CharacterMap, parse_character_map},
+    kerning::{FontKerningError, KerningSource},
     metrics::{FontMetricError, FontMetrics, HorizontalMetric, MetricSource},
     outline::{GlyphOutline, GlyphOutlineError, OutlineSource},
 };
@@ -17,6 +18,7 @@ const HEAD_TAG: u32 = u32::from_be_bytes(*b"head");
 const MAXP_TAG: u32 = u32::from_be_bytes(*b"maxp");
 const HHEA_TAG: u32 = u32::from_be_bytes(*b"hhea");
 const HMTX_TAG: u32 = u32::from_be_bytes(*b"hmtx");
+const KERN_TAG: u32 = u32::from_be_bytes(*b"kern");
 const LOCA_TAG: u32 = u32::from_be_bytes(*b"loca");
 const GLYF_TAG: u32 = u32::from_be_bytes(*b"glyf");
 
@@ -39,6 +41,7 @@ impl GlyphId {
 pub struct FontFace<'font> {
     character_map: CharacterMap<'font>,
     metric_source: Option<MetricSource<'font>>,
+    kerning_source: Option<KerningSource<'font>>,
     outline_source: Option<OutlineSource<'font>>,
 }
 
@@ -67,6 +70,7 @@ impl<'font> FontFace<'font> {
         let mut maximum_profile = None;
         let mut horizontal_header = None;
         let mut horizontal_metrics = None;
+        let mut kerning = None;
         let mut locations = None;
         let mut glyph_data = None;
         for index in 0..table_count {
@@ -91,6 +95,7 @@ impl<'font> FontFace<'font> {
                 HMTX_TAG if horizontal_metrics.replace(table).is_some() => {
                     return Err(FontError::InvalidFace);
                 }
+                KERN_TAG if kerning.replace(table).is_some() => return Err(FontError::InvalidFace),
                 LOCA_TAG if locations.replace(table).is_some() => {
                     return Err(FontError::InvalidFace);
                 }
@@ -117,9 +122,11 @@ impl<'font> FontFace<'font> {
             glyph_data,
             metric_source.is_some(),
         )?;
+        let kerning_source = KerningSource::optional(kerning, metric_source.as_ref())?;
         Ok(Self {
             character_map,
             metric_source,
+            kerning_source,
             outline_source,
         })
     }
@@ -151,6 +158,27 @@ impl<'font> FontFace<'font> {
             .as_ref()
             .ok_or(FontMetricError::MetricsUnavailable)?
             .horizontal_metric(glyph)
+    }
+
+    /// Returns one conventional horizontal pair adjustment in font design units.
+    pub fn horizontal_kerning(
+        &self,
+        left: GlyphId,
+        right: GlyphId,
+    ) -> Result<i32, FontKerningError> {
+        let metrics = self
+            .metric_source
+            .as_ref()
+            .ok_or(FontKerningError::MetricsUnavailable)?;
+        if usize::from(left.value()) >= metrics.glyph_count()
+            || usize::from(right.value()) >= metrics.glyph_count()
+        {
+            return Err(FontKerningError::InvalidGlyphId);
+        }
+        self.kerning_source
+            .as_ref()
+            .map(|source| source.horizontal_kerning(left, right))
+            .unwrap_or(Ok(0))
     }
 }
 

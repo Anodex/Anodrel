@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0208: First-party pair kerning stays bounded.
+
 - 0207: First-party composite glyphs start with bounded translations.
 
 - 0206: Mask-offset compositing does not copy coverage.

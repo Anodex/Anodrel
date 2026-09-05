@@ -175,6 +175,31 @@ pub(super) fn metrics_face(
     ])
 }
 
+/// Builds a metric face with one caller-supplied optional conventional `kern` table.
+pub(super) fn metrics_face_with_kerning(
+    long_metrics: &[(u16, i16)],
+    trailing_side_bearings: &[i16],
+    character_glyph: u16,
+    kerning: Vec<u8>,
+) -> Vec<u8> {
+    let glyph_count = long_metrics.len() + trailing_side_bearings.len();
+    assert!(!long_metrics.is_empty(), "fixture needs one long metric");
+    sfnt_with_tables(&[
+        (*b"cmap", cmap(&[(3, 1, format4(character_glyph))])),
+        (*b"head", head(0)),
+        (
+            *b"maxp",
+            maximum_profile(u16::try_from(glyph_count).expect("glyph count fits")),
+        ),
+        (*b"hhea", horizontal_header(long_metrics.len())),
+        (
+            *b"hmtx",
+            horizontal_metrics(long_metrics, trailing_side_bearings),
+        ),
+        (*b"kern", kerning),
+    ])
+}
+
 /// Returns one table record's offset in a synthetic face.
 pub(super) fn table_record_offset(face: &[u8], tag: [u8; 4]) -> usize {
     let count = usize::from(u16::from_be_bytes([face[4], face[5]]));

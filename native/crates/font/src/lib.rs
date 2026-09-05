@@ -11,11 +11,13 @@ mod bytes;
 mod cmap;
 mod error;
 mod face;
+mod kerning;
 mod metrics;
 mod outline;
 
 pub use error::FontError;
 pub use face::{FontFace, GlyphId};
+pub use kerning::FontKerningError;
 pub use metrics::{FontMetricError, FontMetrics, HorizontalMetric};
 pub use outline::{
     GlyphBounds, GlyphOutline, GlyphOutlineError, GlyphPath, GlyphPathPoint, GlyphPoint,
