@@ -1,10 +1,14 @@
 //! Focused verification for host-owned native view registry behavior.
 
-use super::*;
+use super::{
+    product_update::{update_caption, whole_percent},
+    *,
+};
 use crate::win32::PackageFacts;
 use crate::win32::document::Document;
 use crate::win32::ui_lab::UiLab;
 use anodrel_diagnostics::LogBook;
+use anodrel_windows_product_update::ProductUpdateActivity;
 use std::time::Instant;
 
 fn document_view(title: &str) -> View {

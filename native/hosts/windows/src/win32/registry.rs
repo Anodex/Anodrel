@@ -18,18 +18,21 @@ use anodrel_file_dialog::{FileDialogRequest, FileDialogSelection};
 use anodrel_menu::{ContextMenuRequest, MenuRequest};
 use anodrel_windows_file_access::WindowsFileTextService;
 use anodrel_windows_folder_access::WindowsFolderEntryService;
-use anodrel_windows_product_update::{
-    ProductUpdateActivity, ProductUpdateController, ProductUpdatePoll, ProductUpdateStartError,
-    UpdateConsent,
-};
-use anodrel_windows_taskbar_progress::TaskbarProgress;
 
 mod accessibility;
+mod product_update;
 mod session;
 mod window_commands;
 
 pub(super) use accessibility::{
     accessibility_snapshot, service_accessibility_focus, service_accessibility_scroll,
+};
+pub(super) use product_update::{
+    ProductUpdatePresentationChange, begin_product_update, clear_product_update_taskbar,
+    compose_product_update_caption, has_product_update_action, poll_product_update,
+    prepare_product_update_presentation, product_update_is_active,
+    product_update_taskbar_button_created, product_update_taskbar_restarted,
+    refresh_product_update_presentation, submit_product_update_consent,
 };
 pub(super) use session::{
     attach_menu, complete_context_menu_request, complete_field_read, complete_file_dialog_request,
@@ -50,147 +53,6 @@ pub(super) use window_commands::{
 };
 
 static VIEWS: OnceLock<Mutex<BTreeMap<Hwnd, View>>> = OnceLock::new();
-/// Native update controllers are deliberately separate from `View`: painting
-/// clones a view snapshot, while a worker-owning controller has one UI-thread
-/// owner and must never be cloned into a paint path.
-static PRODUCT_UPDATES: OnceLock<Mutex<BTreeMap<Hwnd, ProductUpdateEntry>>> = OnceLock::new();
-
-/// One non-cloneable update controller plus the small UI-thread-only display
-/// state for the same verified product window.
-struct ProductUpdateEntry {
-    controller: ProductUpdateController,
-    presentation: Option<ProductUpdatePresentation>,
-}
-
-/// The fixed product-caption and optional taskbar state for one update action.
-///
-/// It contains no application identity, URL, filesystem path, candidate
-/// version, byte count, or error. The only displayed transfer fact is a
-/// whole percentage derived by the controller from signed bytes.
-struct ProductUpdatePresentation {
-    base_caption: String,
-    displayed_caption: String,
-    activity: ProductUpdateActivity,
-    taskbar_ready: bool,
-    displayed_taskbar: Option<TaskbarProgress>,
-}
-
-/// One UI-thread native presentation change prepared without calling Windows.
-pub(super) struct ProductUpdatePresentationChange {
-    pub(super) caption: Option<String>,
-    pub(super) taskbar: Option<TaskbarProgress>,
-}
-
-impl ProductUpdatePresentation {
-    fn new(base_caption: &str) -> Self {
-        Self {
-            base_caption: base_caption.to_owned(),
-            displayed_caption: base_caption.to_owned(),
-            activity: ProductUpdateActivity::Idle,
-            taskbar_ready: false,
-            displayed_taskbar: None,
-        }
-    }
-
-    fn set_base_caption(&mut self, base_caption: String) -> String {
-        self.base_caption = base_caption;
-        let next = update_caption(&self.base_caption, self.activity);
-        self.displayed_caption = next.clone();
-        next
-    }
-
-    fn update(&mut self, activity: ProductUpdateActivity) -> ProductUpdatePresentationChange {
-        self.activity = activity;
-        let next_caption = update_caption(&self.base_caption, activity);
-        let caption = (next_caption != self.displayed_caption).then(|| next_caption.clone());
-        self.displayed_caption = next_caption;
-        let taskbar = self.next_taskbar(activity);
-        ProductUpdatePresentationChange { caption, taskbar }
-    }
-
-    fn taskbar_button_created(
-        &mut self,
-        activity: ProductUpdateActivity,
-    ) -> ProductUpdatePresentationChange {
-        self.taskbar_ready = true;
-        self.displayed_taskbar = None;
-        self.update(activity)
-    }
-
-    fn taskbar_restarted(&mut self) {
-        self.taskbar_ready = false;
-        self.displayed_taskbar = None;
-    }
-
-    fn clear_taskbar(&mut self) -> Option<TaskbarProgress> {
-        let shown = self.taskbar_ready && self.displayed_taskbar.is_some();
-        self.taskbar_ready = false;
-        self.displayed_taskbar = None;
-        shown.then_some(TaskbarProgress::Clear)
-    }
-
-    fn next_taskbar(&mut self, activity: ProductUpdateActivity) -> Option<TaskbarProgress> {
-        if !self.taskbar_ready {
-            return None;
-        }
-        let next = taskbar_progress(activity);
-        if next == self.displayed_taskbar {
-            return None;
-        }
-        if next.is_none() && self.displayed_taskbar.is_none() {
-            return None;
-        }
-        self.displayed_taskbar = next;
-        Some(next.unwrap_or(TaskbarProgress::Clear))
-    }
-}
-
-fn update_caption(base_caption: &str, activity: ProductUpdateActivity) -> String {
-    match activity {
-        ProductUpdateActivity::Idle => base_caption.to_owned(),
-        ProductUpdateActivity::Discovering => {
-            format!("Checking for Anodrel updates — {base_caption}")
-        }
-        ProductUpdateActivity::Downloading {
-            completed_bytes,
-            total_bytes,
-        } => format!(
-            "Downloading Anodrel update — {}% — {base_caption}",
-            whole_percent(completed_bytes, total_bytes)
-        ),
-        ProductUpdateActivity::Installing => format!("Installing Anodrel update — {base_caption}"),
-    }
-}
-
-const fn whole_percent(completed_bytes: u64, total_bytes: u64) -> u8 {
-    if total_bytes == 0 {
-        return 0;
-    }
-    let completed = if completed_bytes > total_bytes {
-        total_bytes
-    } else {
-        completed_bytes
-    };
-    let whole = (completed / total_bytes) * 100;
-    let remainder = ((completed % total_bytes) * 100) / total_bytes;
-    (whole + remainder) as u8
-}
-
-const fn taskbar_progress(activity: ProductUpdateActivity) -> Option<TaskbarProgress> {
-    match activity {
-        ProductUpdateActivity::Idle => None,
-        ProductUpdateActivity::Discovering | ProductUpdateActivity::Installing => {
-            Some(TaskbarProgress::Activity)
-        }
-        ProductUpdateActivity::Downloading {
-            completed_bytes,
-            total_bytes,
-        } => Some(TaskbarProgress::Determinate {
-            completed: completed_bytes,
-            total: total_bytes,
-        }),
-    }
-}
 
 /// The immutable accessibility data published for one window-message query.
 ///
@@ -211,15 +73,8 @@ pub(super) struct AccessibilityPublication {
 }
 
 pub(super) fn insert(window: Hwnd, view: View) -> io::Result<()> {
-    let product_update = match &view {
-        View::UiSession(session) => session
-            .product_update_application_id()
-            .map(ProductUpdateController::new)
-            .transpose()
-            .map_err(product_update_start_error)?,
-        _ => None,
-    };
-    let mut updates = lock_product_updates()?;
+    let product_update = product_update::entry_for(&view)?;
+    let mut updates = product_update::lock()?;
     let mut views = lock_views()?;
     if views.contains_key(&window) || updates.contains_key(&window) {
         return Err(io::Error::new(
@@ -227,145 +82,11 @@ pub(super) fn insert(window: Hwnd, view: View) -> io::Result<()> {
             "window view was already registered",
         ));
     }
-    if let Some(controller) = product_update {
-        updates.insert(
-            window,
-            ProductUpdateEntry {
-                controller,
-                presentation: None,
-            },
-        );
+    if let Some(product_update) = product_update {
+        updates.insert(window, product_update);
     }
     views.insert(window, view);
     Ok(())
-}
-
-/// Returns whether one exact product window has a signed-policy update action.
-pub(super) fn has_product_update_action(window: Hwnd) -> io::Result<bool> {
-    Ok(lock_product_updates()?.contains_key(&window))
-}
-
-/// Starts one user-chosen native product update without holding a view lock.
-pub(super) fn begin_product_update(window: Hwnd) -> io::Result<Option<bool>> {
-    let mut updates = lock_product_updates()?;
-    let Some(entry) = updates.get_mut(&window) else {
-        return Ok(None);
-    };
-    entry
-        .controller
-        .begin()
-        .map(Some)
-        .map_err(product_update_start_error)
-}
-
-/// Polls one product update worker without issuing a native prompt or holding
-/// the view registry lock.
-pub(super) fn poll_product_update(window: Hwnd) -> io::Result<Option<ProductUpdatePoll>> {
-    let mut updates = lock_product_updates()?;
-    Ok(updates
-        .get_mut(&window)
-        .map(|entry| entry.controller.poll()))
-}
-
-/// Submits the direct UI-thread consent decision to its same-window controller.
-pub(super) fn submit_product_update_consent(
-    window: Hwnd,
-    consent: UpdateConsent,
-) -> io::Result<Option<ProductUpdatePoll>> {
-    let mut updates = lock_product_updates()?;
-    updates
-        .get_mut(&window)
-        .map(|entry| entry.controller.submit_consent(consent))
-        .transpose()
-        .map_err(product_update_start_error)
-}
-
-/// Returns whether a window's native product update still owns a worker.
-pub(super) fn product_update_is_active(window: Hwnd) -> io::Result<Option<bool>> {
-    let updates = lock_product_updates()?;
-    Ok(updates
-        .get(&window)
-        .map(|entry| entry.controller.is_active()))
-}
-
-/// Enables fixed update progress presentation once the native system-menu
-/// action exists for this verified product window.
-pub(super) fn prepare_product_update_presentation(
-    window: Hwnd,
-    base_caption: &str,
-) -> io::Result<bool> {
-    let mut updates = lock_product_updates()?;
-    let Some(entry) = updates.get_mut(&window) else {
-        return Ok(false);
-    };
-    entry.presentation = Some(ProductUpdatePresentation::new(base_caption));
-    Ok(true)
-}
-
-/// Replaces a product update's base caption and returns its host-composed form.
-pub(super) fn compose_product_update_caption(
-    window: Hwnd,
-    base_caption: String,
-) -> io::Result<String> {
-    let mut updates = lock_product_updates()?;
-    let Some(entry) = updates.get_mut(&window) else {
-        return Ok(base_caption);
-    };
-    Ok(entry
-        .presentation
-        .as_mut()
-        .map_or(base_caption.clone(), |presentation| {
-            presentation.set_base_caption(base_caption)
-        }))
-}
-
-/// Collects a current host-only progress presentation without calling Windows.
-pub(super) fn refresh_product_update_presentation(
-    window: Hwnd,
-) -> io::Result<Option<ProductUpdatePresentationChange>> {
-    let mut updates = lock_product_updates()?;
-    let Some(entry) = updates.get_mut(&window) else {
-        return Ok(None);
-    };
-    Ok(entry
-        .presentation
-        .as_mut()
-        .map(|presentation| presentation.update(entry.controller.activity())))
-}
-
-/// Marks this window taskbar-ready only after Windows sent its required signal.
-pub(super) fn product_update_taskbar_button_created(
-    window: Hwnd,
-) -> io::Result<Option<ProductUpdatePresentationChange>> {
-    let mut updates = lock_product_updates()?;
-    let Some(entry) = updates.get_mut(&window) else {
-        return Ok(None);
-    };
-    Ok(entry
-        .presentation
-        .as_mut()
-        .map(|presentation| presentation.taskbar_button_created(entry.controller.activity())))
-}
-
-/// Drops taskbar readiness after Windows announces that its taskbar restarted.
-pub(super) fn product_update_taskbar_restarted(window: Hwnd) -> io::Result<()> {
-    let mut updates = lock_product_updates()?;
-    if let Some(presentation) = updates
-        .get_mut(&window)
-        .and_then(|entry| entry.presentation.as_mut())
-    {
-        presentation.taskbar_restarted();
-    }
-    Ok(())
-}
-
-/// Clears a currently visible taskbar state before a product window ends.
-pub(super) fn clear_product_update_taskbar(window: Hwnd) -> io::Result<Option<TaskbarProgress>> {
-    let mut updates = lock_product_updates()?;
-    Ok(updates
-        .get_mut(&window)
-        .and_then(|entry| entry.presentation.as_mut())
-        .and_then(ProductUpdatePresentation::clear_taskbar))
 }
 
 pub(super) fn view_for(window: Hwnd) -> io::Result<Option<View>> {
@@ -466,7 +187,7 @@ pub(super) fn remove(window: Hwnd) -> io::Result<usize> {
     // The controller may own a worker handle. Remove it only after the view
     // lock is released, just like the product session, so cleanup cannot block
     // unrelated native messages behind the process-wide registry.
-    let product_update = lock_product_updates()?.remove(&window);
+    let product_update = product_update::lock()?.remove(&window);
     // A group member must learn about native destruction before its final
     // view drops, but after the registry lock is free. A product group may then
     // release its child and join workers without blocking unrelated messages.
@@ -494,7 +215,7 @@ pub(super) fn clear() -> io::Result<usize> {
         std::mem::take(&mut *views)
     };
     let product_updates = {
-        let mut updates = lock_product_updates()?;
+        let mut updates = product_update::lock()?;
         std::mem::take(&mut *updates)
     };
     let count = remaining.len();
@@ -513,19 +234,6 @@ fn lock_views() -> io::Result<std::sync::MutexGuard<'static, BTreeMap<Hwnd, View
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
         .map_err(|_| io::Error::other("window registry is unavailable"))
-}
-
-fn lock_product_updates()
--> io::Result<std::sync::MutexGuard<'static, BTreeMap<Hwnd, ProductUpdateEntry>>> {
-    PRODUCT_UPDATES
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-        .map_err(|_| io::Error::other("product update registry is unavailable"))
-}
-
-fn product_update_start_error(error: ProductUpdateStartError) -> io::Error {
-    let _ = error;
-    io::Error::other("product update action is unavailable")
 }
 
 /// The registry is process-global, so tests that assert on the remaining window
