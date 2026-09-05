@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0213: Windows owned-text report stays fixed and local.
+
 - 0212: Windows owned-text probe stays fixed and internal.
 
 - 0211: Windows selected-font data stays private and bounded.

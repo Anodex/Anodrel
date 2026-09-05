@@ -53,6 +53,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     if arguments.as_slice() == ["--idle-performance-report"] {
         return win32::run_idle_performance_report().map_err(Into::into);
     }
+    if arguments.as_slice() == ["--owned-text-report"] {
+        return win32::run_owned_text_report().map_err(Into::into);
+    }
     if let [command, client_path] = arguments.as_slice()
         && command == "--native-sample-client"
     {

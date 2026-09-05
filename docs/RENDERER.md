@@ -376,6 +376,11 @@ current painter nor its shaping and hinting quality. A fixed, non-windowed
 offset compositor twice; it is deliberately not a visible-painter replacement
 (Decisions 0211 and 0212).
 
+`--owned-text-report` is the corresponding fixed, non-windowed local
+measurement. It reports only source/run/cache facts, two row timings, and the
+current GDI width for the same fixed face. It is not a renderer benchmark or a
+quality-equivalence claim (Decision 0213).
+
 **3. Density.** Opt into per-monitor DPI awareness before creating a window. A
 renderer that produces its own antialiasing must not then be scaled by the
 system. Author layout against a base size and derive a scale from the client

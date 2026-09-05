@@ -48,6 +48,28 @@ coalescing, authentication, and capability policy without timing-sensitive
 assertions. The Windows adapter integration test exercises a real local named
 pipe from connection through authenticated health response.
 
+## Fixed owned-text report
+
+The Windows host has one no-window local diagnostic for the next owned-text
+decision:
+
+~~~text
+cargo run --release --manifest-path native/Cargo.toml -p anodrel-windows-host -- --owned-text-report
+~~~
+
+It always uses the host's fixed selected `Segoe UI` face and the literal
+`ANODREL` at 32 physical pixels. The JSON record carries only the bounded source
+size, fixed run metrics, retained-cache facts, and one first-row/reused-row
+timing. It neither accepts text or a font selection nor opens a window, starts
+an application session, writes data, or changes policy.
+
+This is deliberately not a performance benchmark. The two timing fields are
+one local observation of different work (cache miss versus exact cached reuse),
+not a stable number for cross-machine comparisons or a Windows release gate.
+The current GDI painter remains the visible route while a future proposal earns
+separate shaping, hinting, visual, accessibility, and whole-frame evidence. See
+[Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md).
+
 ## Static-window idle report
 
 The direct Windows host has one fixed release diagnostic for its own idle CPU

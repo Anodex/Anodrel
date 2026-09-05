@@ -64,6 +64,11 @@ integration must still define retained source ownership, clipping, invalidation,
 quality/performance parity, and accessibility agreement before it can make that
 claim.
 
+The fixed Windows owned-text report additionally emits the cache's retained
+mask and coverage-pixel totals after a first row and an integer-shifted second
+row. It is local diagnostic evidence of the exact reuse rule, not a cache
+statistics API or a performance claim.
+
 ## Verification
 
 Synthetic faces prove that identical glyph, scale, and phase reuse one retained
@@ -78,3 +83,4 @@ nothing. The tests use no machine font or operating-system API.
 - [Glyph rendering](GLYPH_RENDERING.md)
 - [Decision 0205](decisions/0205-glyph-mask-caches-stay-face-local-and-bounded.md)
 - [Decision 0206](decisions/0206-mask-offset-compositing-does-not-copy-coverage.md)
+- [Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md)

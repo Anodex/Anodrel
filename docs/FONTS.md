@@ -31,6 +31,9 @@ font choice through the protocol. Its Windows-only probe gives those bytes to
 run, glyph-mask cache, and canvas composition twice. The visible painter remains
 the separately bounded GDI route. See [Decision 0211](decisions/0211-windows-selected-font-data-stays-private-and-bounded.md)
 and [Decision 0212](decisions/0212-windows-owned-text-probe-stays-fixed-and-internal.md).
+The separate no-argument report records this fixed owned run's local advance
+beside the current GDI metric and reports retained coverage, without exposing a
+font choice or text input; see [Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md).
 
 The public surface is deliberately small:
 

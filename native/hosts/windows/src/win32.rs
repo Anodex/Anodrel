@@ -96,6 +96,7 @@ pub use launch::{
     run_startup_lab, run_ui_lab, run_ui_preview, run_uia_property_probe, run_window_group_lab,
     run_window_lab,
 };
+pub(crate) use owned_text_probe::run_report as run_owned_text_report;
 pub use product_tile::FIXTURE_APPLICATION_ID;
 pub(crate) use session_launch::run_ui_session_after_shown;
 pub use session_launch::{run_authenticated_ui_session, run_ui_session};
