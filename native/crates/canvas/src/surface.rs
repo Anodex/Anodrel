@@ -270,8 +270,18 @@ impl Canvas {
         }
     }
 
-    /// Composites a blurred coverage mask.
+    /// Composites coverage at the mask's own origin.
     pub fn fill_mask(&mut self, mask: &Mask, paint: &Paint) {
+        self.fill_mask_offset(mask, 0, 0, paint);
+    }
+
+    /// Composites retained coverage at one additional whole-pixel offset.
+    ///
+    /// The offset affects this operation only. It neither copies nor mutates
+    /// `mask`, allowing an immutable cached glyph mask to be reused at a new
+    /// whole-pixel position. Fractional placement belongs to the mask's own
+    /// coverage and is never resampled here.
+    pub fn fill_mask_offset(&mut self, mask: &Mask, offset_x: i32, offset_y: i32, paint: &Paint) {
         let solid = match paint {
             Paint::Solid(color) => Some(*color),
             _ => None,
@@ -279,24 +289,22 @@ impl Canvas {
         // Rows and columns are clamped once rather than tested per pixel: a
         // mask is usually mostly on-canvas, and glyph masks are composited many
         // times per frame.
-        let row_start = (-mask.origin_y).max(0) as u32;
-        let row_end = mask
-            .height
-            .min((self.height as i32 - mask.origin_y).max(0) as u32);
-        let column_start = (-mask.origin_x).max(0) as u32;
-        let column_end = mask
-            .width
-            .min((self.width as i32 - mask.origin_x).max(0) as u32);
+        let origin_x = i64::from(mask.origin_x) + i64::from(offset_x);
+        let origin_y = i64::from(mask.origin_y) + i64::from(offset_y);
+        let row_start = (-origin_y).clamp(0, i64::from(mask.height)) as u32;
+        let row_end = (i64::from(self.height) - origin_y).clamp(0, i64::from(mask.height)) as u32;
+        let column_start = (-origin_x).clamp(0, i64::from(mask.width)) as u32;
+        let column_end = (i64::from(self.width) - origin_x).clamp(0, i64::from(mask.width)) as u32;
 
         for row in row_start..row_end {
-            let y = (mask.origin_y + row as i32) as u32;
+            let y = (origin_y + i64::from(row)) as u32;
             let stride = (row as usize) * (mask.width as usize);
             for column in column_start..column_end {
                 let coverage = mask.coverage[stride + column as usize];
                 if coverage <= COVERAGE_EPSILON {
                     continue;
                 }
-                let x = (mask.origin_x + column as i32) as u32;
+                let x = (origin_x + i64::from(column)) as u32;
                 let color = solid
                     .unwrap_or_else(|| paint.sample(Point::new(x as f32 + 0.5, y as f32 + 0.5)));
                 blend_into(&mut self.pixels, self.width, x, y, color, coverage.min(1.0));

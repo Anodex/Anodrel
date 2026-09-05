@@ -23,6 +23,22 @@ fn repositioning_a_mask_moves_its_coverage_without_rebuilding_it() {
 }
 
 #[test]
+fn offset_compositing_reuses_one_mask_without_changing_its_origin() {
+    let mask = Mask::from_coverage(1, 1, 1, 1, vec![1.0]).expect("coverage length fits");
+    let mut moved = Canvas::new(5, 5);
+    moved.fill_mask_offset(&mask, 2, 1, &Paint::solid(Color::WHITE));
+    assert_eq!(moved.pixel(3, 2), Color::WHITE);
+    assert_eq!(moved.pixel(1, 1), Color::TRANSPARENT);
+
+    let mut original = Canvas::new(5, 5);
+    original.fill_mask(&mask, &Paint::solid(Color::WHITE));
+    assert_eq!(original.pixel(1, 1), Color::WHITE);
+
+    moved.fill_mask_offset(&mask, i32::MAX, i32::MIN, &Paint::solid(Color::WHITE));
+    assert_eq!(moved.pixel(3, 2), Color::WHITE);
+}
+
+#[test]
 fn a_reported_box_radius_is_the_one_the_blur_applies() {
     // Radii that round together must blur identically, or a caller keying a
     // retained mask on the reported radius would reuse the wrong blur.

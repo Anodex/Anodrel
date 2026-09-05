@@ -173,7 +173,8 @@ first.
 | `stroke_rounded_rect(rect, radius, width, paint)` | Shorthand. |
 | `draw_line(from, to, width, paint)` | Single segment. |
 | `draw_polyline(points, width, paint)` | Connected run with rounded joins. |
-| `fill_mask(mask, paint)` | Composites externally produced coverage. |
+| `fill_mask(mask, paint)` | Composites externally produced coverage at its own origin. |
+| `fill_mask_offset(mask, x, y, paint)` | Composites retained coverage at one extra whole-pixel offset without copying it. |
 | `fill_beveled(path, face, bevel)` | Fill plus directional edge shading. |
 | `draw_glow(path, radius, passes, paint)` | Soft bloom around a shape. |
 | `draw_shadow(path, offset, radius, color)` | Blurred offset shadow. |
@@ -205,8 +206,11 @@ canvas.fill_mask(&mask, &paint);
 - `Mask::from_coverage(x, y, w, h, coverage)` — wraps externally produced
   coverage, returning `None` if the length does not match. **This is the seam a
   host uses to bring platform-rendered glyphs into the canvas.**
-- `Mask::positioned(x, y)` — the same coverage at a new origin, so one
-  rasterized run can be drawn in several places.
+- `Mask::positioned(x, y)` — an owned copy at a new origin, for a caller that
+  needs an independently mutable mask.
+- `Canvas::fill_mask_offset(mask, x, y, paint)` — reads a retained mask at an
+  extra whole-pixel offset without changing or copying its coverage; this is
+  the composition half of the bounded glyph cache.
 - `blur(radius)` — three box passes approximating a Gaussian. Cost is linear in
   the masked area and independent of radius.
 

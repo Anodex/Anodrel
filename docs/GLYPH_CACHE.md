@@ -75,3 +75,4 @@ nothing. The tests use no machine font or operating-system API.
 - [Text runs](TEXT_RUNS.md)
 - [Glyph rendering](GLYPH_RENDERING.md)
 - [Decision 0205](decisions/0205-glyph-mask-caches-stay-face-local-and-bounded.md)
+- [Decision 0206](decisions/0206-mask-offset-compositing-does-not-copy-coverage.md)
