@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0204: First-party text runs stay unshaped and bounded.
+
 - 0203: Windows idle performance report measures one static window.
 
 - 0202: Windows UI Automation live-status probe keeps listening private.

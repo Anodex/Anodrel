@@ -6,7 +6,8 @@ This is the public contract for how Anodrel draws. It covers two portable
 crates — `anodrel-canvas` (how to draw) and `anodrel-brand` (what Anodrel looks
 like) — and the seam a native host implements to put their output on screen.
 `anodrel-glyph` is a separate, narrow adapter that supplies flattened glyph
-contours to the canvas; see `docs/GLYPH_RENDERING.md`.
+contours to the canvas, and `anodrel-text` supplies bounded unshaped glyph runs;
+see `docs/GLYPH_RENDERING.md` and `docs/TEXT_RUNS.md`.
 
 Neither crate depends on an operating system or on a third-party library, and
 both are `#![forbid(unsafe_code)]`. The reasoning behind that is Decision 0013.
@@ -357,11 +358,13 @@ nothing needs flipping. One call per frame means a partial frame is never
 visible, which is why the window class carries no background brush and
 `WM_ERASEBKGND` is answered directly.
 
-**2. Text.** The platform owns fonts, shaping, and hinting. The host draws
-glyphs into a private memory bitmap, lifts the grey levels out as coverage, and
-wraps them with `Mask::from_coverage`. Everything after that is canvas
-compositing — which is what buys gradient-filled type, real opacity during a
-reveal, and type that is part of the same single blit as the graphics.
+**2. Text.** The current Windows host owns its temporary GDI font, shaping, and
+hinting route. It draws glyphs into a private memory bitmap, lifts the grey
+levels out as coverage, and wraps them with `Mask::from_coverage`. Everything
+after that is canvas compositing — which is what buys gradient-filled type, real
+opacity during a reveal, and type that is part of the same single blit as the
+graphics. The first-party font, glyph, and text-run foundations are not yet
+connected to this painter, so they are not presented as a replacement for it.
 
 **3. Density.** Opt into per-monitor DPI awareness before creating a window. A
 renderer that produces its own antialiasing must not then be scaled by the

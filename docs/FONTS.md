@@ -7,8 +7,9 @@ looks up a Unicode scalar value in its character map. It can also extract one
 validated simple TrueType outline as contours of on- and off-curve points. It
 can deterministically convert those contours to exact quadratic paths. It is
 the first step toward first-party glyph coverage for Linux and future native
-hosts; it does not yet draw text. `docs/GLYPH_RENDERING.md` describes the
-separate renderer adapter that can flatten those paths.
+hosts; it does not yet draw text. `docs/TEXT_RUNS.md` describes the separate
+bounded glyph-run layer, while `docs/GLYPH_RENDERING.md` describes the renderer
+adapter that can flatten one path.
 
 ## Boundary
 

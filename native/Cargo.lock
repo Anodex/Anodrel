@@ -491,6 +491,13 @@ name = "anodrel-storage"
 version = "0.1.0"
 
 [[package]]
+name = "anodrel-text"
+version = "0.1.0"
+dependencies = [
+ "anodrel-font",
+]
+
+[[package]]
 name = "anodrel-transport"
 version = "0.1.0"
 dependencies = [
