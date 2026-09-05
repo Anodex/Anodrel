@@ -22,14 +22,26 @@ failure that names each file exceeding the limit.
 .\scripts\check-source-size.ps1
 ~~~
 
+## check-native-ownership.ps1
+
+Checks the native workspace against Decision 0005. It uses locked Cargo metadata
+and `native/Cargo.lock` to require only first-party `anodrel-*` packages, local
+dependency paths beneath `native/`, and no external package sources. It reads
+metadata and tracked files only; it installs nothing and makes no network,
+trust, installation, or desktop-UI change.
+
+~~~powershell
+.\scripts\check-native-ownership.ps1
+~~~
+
 ## verify-windows-release.ps1
 
 Runs the complete non-interactive Windows release evidence set: formatting,
-source-size, documentation links, whitespace, the native workspace tests, the
-release-only frame budget, and the sample host startup report. It makes no
-trust, installation, network, or desktop-UI change. It cannot replace the
-separate manual native consent, UAC, Start-menu, file-picker, accessibility,
-and signed-fixture checks in `docs/WINDOWS_RELEASE.md`.
+native ownership, source-size, documentation links, whitespace, the native
+workspace tests, the release-only frame budget, and the sample host startup
+report. It makes no trust, installation, network, or desktop-UI change. It
+cannot replace the separate manual native consent, UAC, Start-menu, file-picker,
+accessibility, and signed-fixture checks in `docs/WINDOWS_RELEASE.md`.
 
 ~~~powershell
 .\scripts\verify-windows-release.ps1

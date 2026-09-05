@@ -38,7 +38,11 @@ comparison. A result is only meaningful for the named application and workload.
 
 ## Initial verification
 
-`cargo tree --manifest-path native/Cargo.toml` verifies the native dependency graph.
+`scripts/check-native-ownership.ps1` verifies the locked native dependency
+graph: every package and declared dependency is first-party and local to
+`native/`, and the lockfile contains no external source. `cargo tree
+--manifest-path native/Cargo.toml` remains useful when inspecting how those
+first-party modules compose.
 Rendering is measured in a release build only; an unoptimised build is roughly
 ten times slower and is not representative. Because software rendering costs
 real time, expensive invariant layers are cached by the host rather than

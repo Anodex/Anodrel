@@ -44,6 +44,9 @@ jobs:
           rustup component add clippy
       - name: Check native formatting
         run: cargo fmt --manifest-path native/Cargo.toml --all --check
+      - name: Enforce native ownership policy
+        shell: powershell
+        run: ./scripts/check-native-ownership.ps1
       - name: Lint native workspace
         run: cargo clippy --manifest-path native/Cargo.toml --workspace --all-targets -- -D warnings
       - name: Run native workspace tests

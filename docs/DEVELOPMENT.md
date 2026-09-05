@@ -58,6 +58,7 @@ handle list:
 cargo fmt --manifest-path native/Cargo.toml --all --check
 cargo test --manifest-path native/Cargo.toml
 cargo clippy --manifest-path native/Cargo.toml --all-targets -- -D warnings
+.\scripts\check-native-ownership.ps1
 cargo tree --manifest-path native/Cargo.toml
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-pipe
 cargo test --manifest-path native/Cargo.toml -p anodrel-windows-bootstrap
@@ -274,10 +275,10 @@ For one repeatable non-interactive Windows release-evidence pass, run:
 .\scripts\verify-windows-release.ps1
 ~~~
 
-It runs formatting, source and documentation checks, the complete native
-workspace suite, the release frame budget, and the sample startup report. It
-does not create trust or installation state and cannot replace the documented
-native desktop and signed-fixture acceptance checks.
+It runs formatting, native ownership, source and documentation checks, the
+complete native workspace suite, the release frame budget, and the sample
+startup report. It does not create trust or installation state and cannot
+replace the documented native desktop and signed-fixture acceptance checks.
 
 
 ## Direct Linux Wayland lab

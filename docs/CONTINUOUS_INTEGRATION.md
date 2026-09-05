@@ -13,10 +13,11 @@ public TypeScript surface and the test host no longer agree.
 
 ## Native Windows host and documentation
 
-The Windows runner installs stable Rust, then checks formatting, runs Clippy as
-an error, and executes the full native workspace test suite. It also enforces
-the repository's 550-line maintained-source limit and validates every local
-link in `docs/` and the project site source.
+The Windows runner installs stable Rust, then checks formatting, proves that the
+locked native workspace contains only first-party local Anodrel packages, runs
+Clippy as an error, and executes the full native workspace test suite. It also
+enforces the repository's 550-line maintained-source limit and validates every
+local link in `docs/` and the project site source.
 
 This automation exercises code and documentation only. It does not replace the
 documented manual Windows checks for visual rendering, foreground policy,

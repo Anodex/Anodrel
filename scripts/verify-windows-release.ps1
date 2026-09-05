@@ -65,6 +65,7 @@ try {
     Invoke-NativeCheck -Label 'Rust formatting' -FilePath 'cargo' -Arguments @(
         'fmt', '--manifest-path', $nativeManifest, '--all', '--', '--check'
     )
+    Invoke-PowerShellCheck -Label 'Native ownership guard' -Path (Join-Path $repositoryRoot 'scripts\check-native-ownership.ps1')
     Invoke-PowerShellCheck -Label 'Source-size guard' -Path (Join-Path $repositoryRoot 'scripts\check-source-size.ps1')
     Invoke-PowerShellCheck -Label 'Documentation links' -Path (Join-Path $repositoryRoot 'scripts\check-documentation-links.ps1')
     Invoke-NativeCheck -Label 'Whitespace diff guard' -FilePath 'git' -Arguments @('diff', '--check')
