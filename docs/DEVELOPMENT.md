@@ -281,6 +281,16 @@ budget, and the sample startup report. It does not create trust or installation
 state and cannot replace the documented native desktop and signed-fixture
 acceptance checks.
 
+To rerun the six fixed direct Windows UI Automation diagnostics together, use:
+
+~~~text
+.\scripts\verify-windows-accessibility.ps1
+~~~
+
+It creates brief host-owned diagnostic windows but no trust, installation,
+network, package, or persistent user state. The manual Narrator and Inspect
+checks in `docs/ACCESSIBILITY_VERIFICATION.md` remain separate release evidence.
+
 
 ## Direct Linux Wayland lab
 

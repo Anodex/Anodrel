@@ -58,6 +58,8 @@ in `docs/DEVELOPMENT.md` and the feature documents:
 - pointer-originated context menu;
 - file and folder picker accepted and cancelled paths;
 - foreground, resize, fullscreen, and multi-window behaviour;
+- the six fixed direct UI Automation probes through
+  `scripts/verify-windows-accessibility.ps1`;
 - Narrator and Inspect checks for the published accessibility tree, focus,
   actions, field values, structure changes, hierarchy, scroll, and live status;
 - signed fixture provision, launch, action, close, verification, and removal;

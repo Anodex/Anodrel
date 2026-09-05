@@ -21,6 +21,27 @@ highlight verification. See `docs/UI_AUTOMATION_PROBE.md`,
 `docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md`, and Decisions 0106 through
 0114.
 
+### Repeatable direct UI Automation suite
+
+Run all six fixed direct Windows UI Automation diagnostics from one release
+build with:
+
+~~~powershell
+.\scripts\verify-windows-accessibility.ps1
+~~~
+
+Or double-click `start-uia-probes.bat` in the repository root. It builds the
+host and its three fixed first-party diagnostic children once, verifies the
+locked native graph is first-party, runs the property, focus, focus-event,
+Invoke, structure-event, and live-status-event probes in order, and closes each
+temporary window before starting the next. It needs an interactive Windows
+desktop but changes no certificate trust, installation, machine policy,
+application package, network state, or persistent user state.
+
+A successful suite confirms only the six fixed direct-client contracts below.
+It does not prove Narrator speech or Inspect-highlight correctness, so the
+manual checks remain required for release acceptance.
+
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 
 This passed on Windows on 2026-08-24. The direct first-party client created a

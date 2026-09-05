@@ -48,6 +48,20 @@ Start-menu, file-picker, accessibility, and signed-fixture checks in
 .\scripts\verify-windows-release.ps1
 ~~~
 
+## verify-windows-accessibility.ps1
+
+Builds the exact Windows host and three fixed first-party diagnostic children,
+then runs the property, focus, focus-event, Invoke, structure-event, and
+live-status-event UI Automation probes in sequence. It verifies the locked
+native graph is first-party before building, opens only temporary host-owned
+diagnostic windows, and needs an interactive Windows desktop; it creates no
+trust, installation, network, package, or persistent user state. It supplements,
+but does not replace, manual Narrator and Inspect acceptance.
+
+~~~powershell
+.\scripts\verify-windows-accessibility.ps1
+~~~
+
 ## provision-product-fixture.ps1
 
 Provisions or removes the development-only Windows product fixture described in
