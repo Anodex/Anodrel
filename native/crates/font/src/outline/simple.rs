@@ -2,12 +2,13 @@
 
 use crate::{
     bytes::Bytes,
-    outline::{GlyphBounds, GlyphOutline, GlyphOutlineError, GlyphPoint},
+    outline::{
+        GlyphBounds, GlyphOutline, GlyphOutlineError, GlyphPoint,
+        types::{MAX_CONTOURS, MAX_POINTS},
+    },
 };
 
 const HEADER_LENGTH: usize = 10;
-const MAX_CONTOURS: usize = 4_096;
-const MAX_POINTS: usize = 16_384;
 const ON_CURVE: u8 = 0x01;
 const X_SHORT: u8 = 0x02;
 const Y_SHORT: u8 = 0x04;
@@ -17,7 +18,7 @@ const Y_SAME_OR_POSITIVE: u8 = 0x20;
 const OVERLAP_SIMPLE: u8 = 0x40;
 const RESERVED: u8 = 0x80;
 
-/// Parses one located glyph as an empty, simple, or deliberately unsupported composite outline.
+/// Parses one located simple glyph into an owned bounded outline.
 pub(super) fn parse(glyph: Bytes<'_>) -> Result<GlyphOutline, GlyphOutlineError> {
     let contour_count = glyph.i16(0).ok_or(GlyphOutlineError::MalformedOutline)?;
     let bounds = GlyphBounds::new(
@@ -29,9 +30,6 @@ pub(super) fn parse(glyph: Bytes<'_>) -> Result<GlyphOutline, GlyphOutlineError>
     .ok_or(GlyphOutlineError::MalformedOutline)?;
     if contour_count == 0 {
         return parse_empty(glyph, bounds);
-    }
-    if contour_count == -1 {
-        return Err(GlyphOutlineError::CompositeGlyphUnsupported);
     }
     if contour_count < 0 {
         return Err(GlyphOutlineError::MalformedOutline);

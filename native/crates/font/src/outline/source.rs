@@ -3,7 +3,7 @@
 use crate::{
     FontError, GlyphId,
     bytes::Bytes,
-    outline::{GlyphOutline, GlyphOutlineError, simple},
+    outline::{GlyphOutline, GlyphOutlineError, composite, simple},
 };
 
 const HEAD_MINIMUM_LENGTH: usize = 54;
@@ -12,6 +12,7 @@ const INDEX_TO_LOC_FORMAT_OFFSET: usize = 50;
 const MAXP_VERSION: u32 = 0x0001_0000;
 const MAXP_MINIMUM_LENGTH: usize = 32;
 const GLYPH_COUNT_OFFSET: usize = 4;
+const MAX_COMPOSITE_DEPTH: usize = 16;
 
 /// One validated borrowed location index and glyph-data table.
 pub(crate) struct OutlineSource<'font> {
@@ -108,25 +109,65 @@ impl<'font> OutlineSource<'font> {
         Ok(source)
     }
 
-    /// Extracts one bounded simple glyph from its two already-validated locations.
+    /// Extracts one bounded simple or translated composite glyph from its source.
     pub(crate) fn glyph_outline(&self, glyph: GlyphId) -> Result<GlyphOutline, GlyphOutlineError> {
-        let index = usize::from(glyph.value());
+        self.glyph_outline_at(usize::from(glyph.value()), &mut [0; MAX_COMPOSITE_DEPTH], 0)
+    }
+
+    fn glyph_outline_at(
+        &self,
+        index: usize,
+        ancestors: &mut [u16; MAX_COMPOSITE_DEPTH],
+        depth: usize,
+    ) -> Result<GlyphOutline, GlyphOutlineError> {
         if index >= self.glyph_count {
             return Err(GlyphOutlineError::InvalidGlyphId);
         }
-        let start = self.location(index)?;
-        let end = self.location(index + 1)?;
-        if start == end {
+        if self.location(index)? == self.location(index + 1)? {
             return Ok(GlyphOutline::empty());
         }
+        let glyph = self.glyph_bytes(index)?;
+        match glyph.i16(0) {
+            Some(contour_count) if contour_count >= 0 => simple::parse(glyph),
+            Some(-1) => self.composite_outline(index, glyph, ancestors, depth),
+            _ => Err(GlyphOutlineError::MalformedOutline),
+        }
+    }
+
+    fn composite_outline(
+        &self,
+        index: usize,
+        glyph: Bytes<'font>,
+        ancestors: &mut [u16; MAX_COMPOSITE_DEPTH],
+        depth: usize,
+    ) -> Result<GlyphOutline, GlyphOutlineError> {
+        if depth == MAX_COMPOSITE_DEPTH {
+            return Err(GlyphOutlineError::ComplexityLimitExceeded);
+        }
+        let glyph_id = u16::try_from(index).map_err(|_| GlyphOutlineError::InvalidGlyphId)?;
+        if ancestors[..depth].contains(&glyph_id) {
+            return Err(GlyphOutlineError::CompositeCycle);
+        }
+        ancestors[depth] = glyph_id;
+        let composite = composite::parse(glyph)?;
+        let mut result = GlyphOutline::new(composite.bounds, Vec::new(), Vec::new());
+        for component in composite.components {
+            let child =
+                self.glyph_outline_at(usize::from(component.glyph.value()), ancestors, depth + 1)?;
+            result.append_translated(child, component.x_offset, component.y_offset)?;
+        }
+        Ok(result)
+    }
+
+    fn glyph_bytes(&self, index: usize) -> Result<Bytes<'font>, GlyphOutlineError> {
+        let start = self.location(index)?;
+        let end = self.location(index + 1)?;
         let length = end
             .checked_sub(start)
             .ok_or(GlyphOutlineError::MalformedOutline)?;
-        let glyph = self
-            .glyph_data
+        self.glyph_data
             .range(start, length)
-            .ok_or(GlyphOutlineError::MalformedOutline)?;
-        simple::parse(glyph)
+            .ok_or(GlyphOutlineError::MalformedOutline)
     }
 
     fn validate_locations(&self) -> Result<(), FontError> {

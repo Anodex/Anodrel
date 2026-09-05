@@ -1,5 +1,6 @@
-//! Bounded TrueType simple-outline extraction.
+//! Bounded TrueType outline extraction.
 
+mod composite;
 mod curves;
 mod error;
 mod path;

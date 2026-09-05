@@ -18,7 +18,7 @@ const MAX_BASELINE_ABS: f32 = 1_048_576.0;
 pub enum GlyphCacheError {
     /// The requested baseline is non-finite or outside the fixed canvas range.
     InvalidBaseline,
-    /// The selected face could not produce a simple outline for this glyph.
+    /// The selected face could not produce a bounded outline for this glyph.
     Outline(GlyphOutlineError),
     /// The glyph could not satisfy the existing bounded rendering contract.
     Render(GlyphRenderError),

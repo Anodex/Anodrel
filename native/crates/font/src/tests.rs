@@ -1,11 +1,12 @@
 //! Deterministic synthetic face tests.
 
+mod composite;
 mod fixtures;
 mod path;
 
 use crate::{FontError, FontFace, FontMetricError, GlyphOutlineError};
 use fixtures::{
-    cmap, composite_glyph, empty_simple_glyph, empty_simple_glyph_with_instruction, format4,
+    cmap, empty_simple_glyph, empty_simple_glyph_with_instruction, format4,
     format4_with_glyph_array, format12, glyph_over_contour_limit, glyph_with_instruction,
     glyph_with_reserved_flag, glyph_with_trailing_byte, long_vector_points, metrics_face,
     outline_face, outline_face_for_glyph, outline_face_with_nonzero_first_location,
@@ -348,12 +349,8 @@ fn zero_contour_glyphs_preserve_bounds_with_or_without_ignored_instructions() {
 }
 
 #[test]
-fn composite_and_reserved_simple_glyphs_are_refused() {
+fn malformed_and_over_limit_simple_glyphs_are_refused() {
     for (glyph, expected) in [
-        (
-            composite_glyph(),
-            GlyphOutlineError::CompositeGlyphUnsupported,
-        ),
         (
             glyph_with_reserved_flag(),
             GlyphOutlineError::MalformedOutline,

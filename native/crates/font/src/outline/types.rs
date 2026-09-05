@@ -1,4 +1,9 @@
-//! Public, owned simple-outline values.
+//! Public, owned bounded-outline values.
+
+use super::GlyphOutlineError;
+
+pub(super) const MAX_CONTOURS: usize = 4_096;
+pub(super) const MAX_POINTS: usize = 16_384;
 
 /// One signed design-unit rectangle from a TrueType glyph header.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -49,7 +54,7 @@ impl GlyphBounds {
     }
 }
 
-/// One TrueType simple-glyph point in signed font design units.
+/// One TrueType outline point in signed font design units.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GlyphPoint {
     x: i16,
@@ -82,7 +87,7 @@ impl GlyphPoint {
     }
 }
 
-/// One owned, validated simple TrueType glyph outline.
+/// One owned, validated TrueType glyph outline.
 #[derive(Debug, Eq, PartialEq)]
 pub struct GlyphOutline {
     bounds: GlyphBounds,
@@ -96,7 +101,7 @@ impl GlyphOutline {
         self.bounds
     }
 
-    /// Returns the number of simple contours.
+    /// Returns the number of contours.
     pub fn contour_count(&self) -> usize {
         self.contour_ends.len()
     }
@@ -130,5 +135,40 @@ impl GlyphOutline {
 
     pub(crate) fn empty() -> Self {
         Self::new(GlyphBounds::empty(), Vec::new(), Vec::new())
+    }
+
+    pub(crate) fn append_translated(
+        &mut self,
+        child: Self,
+        x_offset: i16,
+        y_offset: i16,
+    ) -> Result<(), GlyphOutlineError> {
+        if self
+            .contour_ends
+            .len()
+            .checked_add(child.contour_ends.len())
+            > Some(MAX_CONTOURS)
+            || self.points.len().checked_add(child.points.len()) > Some(MAX_POINTS)
+        {
+            return Err(GlyphOutlineError::ComplexityLimitExceeded);
+        }
+        let start = self.points.len();
+        let mut points = Vec::with_capacity(child.points.len());
+        for point in child.points {
+            let x = i16::try_from(i32::from(point.x) + i32::from(x_offset))
+                .map_err(|_| GlyphOutlineError::CompositeCoordinateOutOfRange)?;
+            let y = i16::try_from(i32::from(point.y) + i32::from(y_offset))
+                .map_err(|_| GlyphOutlineError::CompositeCoordinateOutOfRange)?;
+            points.push(GlyphPoint::new(x, y, point.on_curve));
+        }
+        self.points.extend(points);
+        for end in child.contour_ends {
+            self.contour_ends.push(
+                start
+                    .checked_add(end)
+                    .ok_or(GlyphOutlineError::ComplexityLimitExceeded)?,
+            );
+        }
+        Ok(())
     }
 }

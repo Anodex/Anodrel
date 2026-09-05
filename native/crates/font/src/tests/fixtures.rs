@@ -128,14 +128,27 @@ pub(super) fn outline_face_for_glyph(
     uses_long_locations: bool,
     character_glyph: u16,
 ) -> Vec<u8> {
-    let glyph = pad_to_word(glyph);
+    outline_face_with_glyphs(&[Vec::new(), glyph], uses_long_locations, character_glyph)
+}
+
+/// Builds a complete face with caller-selected glyph data and one `A` mapping.
+pub(super) fn outline_face_with_glyphs(
+    glyphs: &[Vec<u8>],
+    uses_long_locations: bool,
+    character_glyph: u16,
+) -> Vec<u8> {
+    assert!(!glyphs.is_empty(), "fixture needs glyph zero");
+    let (locations, glyph_data) = glyph_data_with_locations(glyphs);
     let location_format = if uses_long_locations { 1 } else { 0 };
     sfnt_with_tables(&[
         (*b"cmap", cmap(&[(3, 1, format4(character_glyph))])),
         (*b"head", head(location_format)),
-        (*b"maxp", maximum_profile(2)),
-        (*b"loca", locations(glyph.len(), uses_long_locations)),
-        (*b"glyf", glyph),
+        (
+            *b"maxp",
+            maximum_profile(u16::try_from(glyphs.len()).expect("fixture glyph count fits")),
+        ),
+        (*b"loca", location_table(&locations, uses_long_locations)),
+        (*b"glyf", glyph_data),
     ])
 }
 
@@ -177,7 +190,7 @@ pub(super) fn table_record_offset(face: &[u8], tag: [u8; 4]) -> usize {
 /// Builds a complete face whose otherwise-valid location index skips glyph-data bytes.
 pub(super) fn outline_face_with_nonzero_first_location() -> Vec<u8> {
     let glyph = pad_to_word(simple_triangle());
-    let mut location_table = locations(glyph.len(), false);
+    let mut location_table = location_table(&[0, 0, glyph.len()], false);
     location_table[0..2].copy_from_slice(&1_u16.to_be_bytes());
     location_table[2..4].copy_from_slice(&1_u16.to_be_bytes());
     sfnt_with_tables(&[
@@ -249,6 +262,27 @@ pub(super) fn composite_glyph() -> Vec<u8> {
     glyph_header(-1, 0, 0, 0, 0)
 }
 
+/// Builds a translation-only composite with its bounds derived by the caller.
+pub(super) fn translated_composite(
+    bounds: (i16, i16, i16, i16),
+    components: &[(u16, i16, i16)],
+) -> Vec<u8> {
+    assert!(
+        !components.is_empty(),
+        "fixture composite needs a component"
+    );
+    let mut bytes = glyph_header(-1, bounds.0, bounds.1, bounds.2, bounds.3);
+    for (index, (glyph, x_offset, y_offset)) in components.iter().enumerate() {
+        let more = usize::from(index + 1 < components.len());
+        let flags = 0x0003 | if more == 1 { 0x0020 } else { 0 };
+        push_u16(&mut bytes, flags);
+        push_u16(&mut bytes, *glyph);
+        bytes.extend_from_slice(&x_offset.to_be_bytes());
+        bytes.extend_from_slice(&y_offset.to_be_bytes());
+    }
+    bytes
+}
+
 /// Builds an incomplete composite marker with no required glyph header bounds.
 pub(super) fn truncated_composite_marker() -> Vec<u8> {
     (-1_i16).to_be_bytes().to_vec()
@@ -314,17 +348,28 @@ fn horizontal_metrics(long_metrics: &[(u16, i16)], trailing_side_bearings: &[i16
     bytes
 }
 
-fn locations(glyph_length: usize, uses_long_locations: bool) -> Vec<u8> {
-    let mut bytes = Vec::new();
+fn glyph_data_with_locations(glyphs: &[Vec<u8>]) -> (Vec<usize>, Vec<u8>) {
+    let mut locations = Vec::with_capacity(glyphs.len() + 1);
+    let mut glyph_data = Vec::new();
+    for glyph in glyphs {
+        locations.push(glyph_data.len());
+        glyph_data.extend(pad_to_word(glyph.clone()));
+    }
+    locations.push(glyph_data.len());
+    (locations, glyph_data)
+}
+
+fn location_table(locations: &[usize], uses_long_locations: bool) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(locations.len() * if uses_long_locations { 4 } else { 2 });
     if uses_long_locations {
-        for offset in [0, 0, glyph_length] {
+        for &offset in locations {
             push_u32(
                 &mut bytes,
                 u32::try_from(offset).expect("fixture location fits"),
             );
         }
     } else {
-        for offset in [0, 0, glyph_length] {
+        for &offset in locations {
             push_u16(
                 &mut bytes,
                 u16::try_from(offset / 2).expect("fixture location fits"),

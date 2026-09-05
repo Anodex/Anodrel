@@ -4,7 +4,7 @@
 
 `anodrel-glyph` is the narrow first-party adapter between validated
 `anodrel-font` geometry and the closed polygon contours accepted by
-`anodrel-canvas`. It prepares one simple glyph for a later host-owned coverage
+`anodrel-canvas`. It prepares one glyph outline for a later host-owned coverage
 mask. It does not load a font, choose a character, calculate metrics, lay out
 text, or paint pixels itself.
 
@@ -77,8 +77,8 @@ or report whether anything became visible.
 
 ## Deliberately absent
 
-- font discovery, file formats, character maps, composite glyphs, metrics,
-  hinting, kerning, shaping, fallback, line breaking, and text layout;
+- font discovery, file formats, character maps, metrics, hinting, kerning,
+  shaping, fallback, line breaking, and text layout;
 - per-application font configuration, a protocol operation, GPU work, drawing,
   or host presentation;
 - a Linux application surface, desktop input route, or accessibility tree.

@@ -112,6 +112,27 @@ fn parsed_glyphs_rasterize_to_a_bounded_coverage_mask() {
 }
 
 #[test]
+fn translated_composite_glyphs_flow_through_coverage_and_the_face_local_cache() {
+    let bytes = fixture::translated_composite_face();
+    let face = FontFace::parse(&bytes).expect("composite face should parse");
+    let glyph = face.glyph_id('A').expect("fixture maps A to its composite");
+    let outline = face
+        .glyph_outline(glyph)
+        .expect("translated composite should flatten");
+    assert_eq!(outline.contour_count(), 2);
+    let placement = GlyphPlacement::new(point(10.0, 30.0), 1.0).expect("placement fits");
+    let mask = coverage_mask(&outline.quadratic_path(), placement)
+        .expect("translated composite fits the coverage bound");
+    assert!(mask.width() > 20);
+
+    let mut cache = GlyphMaskCache::new(&face);
+    cache
+        .mask_at(glyph, point(10.0, 30.0), 1.0)
+        .expect("composite mask should enter the local cache");
+    assert_eq!(cache.retained_mask_count(), 1);
+}
+
+#[test]
 fn glyph_coverage_refuses_an_oversized_transformed_path() {
     let bytes = fixture::simple_outline_face();
     let face = FontFace::parse(&bytes).expect("synthetic face should parse");

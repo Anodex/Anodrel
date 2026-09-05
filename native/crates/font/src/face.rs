@@ -129,7 +129,7 @@ impl<'font> FontFace<'font> {
         self.character_map.glyph_id(character)
     }
 
-    /// Returns one owned simple outline for a glyph from this face.
+    /// Returns one owned bounded outline for a glyph from this face.
     pub fn glyph_outline(&self, glyph: GlyphId) -> Result<GlyphOutline, GlyphOutlineError> {
         self.outline_source
             .as_ref()

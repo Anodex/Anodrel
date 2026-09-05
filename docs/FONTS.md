@@ -1,10 +1,10 @@
 # Anodrel Font Faces
 
-**Status:** Portable character-map, horizontal-metric, simple-outline, and quadratic-path foundation.
+**Status:** Portable character-map, horizontal-metric, bounded-outline, and quadratic-path foundation.
 
 `anodrel-font` validates one already-owned TrueType face held in memory and
 looks up a Unicode scalar value in its character map. It can also extract one
-validated simple TrueType outline as contours of on- and off-curve points. It
+validated TrueType outline as contours of on- and off-curve points. It
 can deterministically convert those contours to exact quadratic paths. It is
 the first step toward first-party glyph coverage for Linux and future native
 hosts; it does not yet draw text. `docs/TEXT_RUNS.md` describes the separate
@@ -85,7 +85,7 @@ It does not infer a missing metric from an outline. See Microsoft's OpenType
 [`hmtx`](https://learn.microsoft.com/en-us/typography/opentype/spec/hmtx)
 specifications.
 
-## Simple outlines
+## Glyph outlines
 
 `FontFace::glyph_outline` becomes available only when the face contains one
 complete TrueType outline set: `head`, version-1.0 `maxp`, `loca`, and `glyf`.
@@ -95,11 +95,12 @@ none of these tables remains valid for character-map lookup alone; a partial
 set is rejected as a malformed face.
 
 An outline call reads one location pair in constant time, then validates and
-decodes a **simple** glyph. It returns its header bounds plus a flat point list
-and one contour-end index for each contour. `point_slice` exposes one contour
-without copying it. Points use signed font design units and preserve the
-TrueType on-curve flag. `quadratic_path` converts those points into a later
-rasterizer's line and quadratic segments without changing the source outline.
+decodes a simple glyph or the bounded translated composite subset. It returns
+its header bounds plus a flat point list and one contour-end index for each
+contour. `point_slice` exposes one contour without copying it. Points use signed
+font design units and preserve the TrueType on-curve flag. `quadratic_path`
+converts those points into a later rasterizer's line and quadratic segments
+without changing the source outline.
 
 The parser expands packed flag runs and relative x/y vectors only after every
 read is range-checked. It ignores instruction bytes without executing them,
@@ -112,12 +113,15 @@ An empty location returns an empty outline with zero bounds. A located simple
 glyph with zero contours also returns an empty outline, preserving its validated
 header bounds. It may end immediately after the header, or it may carry a
 range-checked instruction length and ignored instruction bytes; no instructions
-are ever executed. A valid composite glyph returns
-`GlyphOutlineError::CompositeGlyphUnsupported`; it is never mistaken for an
-empty glyph. A nonzero character-map result outside `maxp` returns a closed
-invalid-glyph error. Invalid contour endpoints, repeats, coordinate deltas,
-instructions, flags, or trailing non-padding bytes return a closed malformed
-outline error.
+are ever executed. A composite may contain at most 128 translated components
+and nest at most 16 levels; cycles and expanded point or contour counts above
+the same simple-glyph limits are closed errors. Every result coordinate remains
+a signed 16-bit design unit. Component scaling, rotation, shearing, scaled
+offsets, and point attachment return closed unsupported outcomes rather than
+rounding or silently changing geometry. A nonzero character-map result outside
+`maxp` returns a closed invalid-glyph error. Invalid contour endpoints, repeats,
+coordinate deltas, instructions, flags, or trailing non-padding bytes return a
+closed malformed-outline error. See [Decision 0207](decisions/0207-first-party-composite-glyphs-start-with-bounded-translations.md).
 
 The table and packed-point rules follow Microsoft's OpenType documentation for
 [`loca`](https://learn.microsoft.com/en-us/typography/opentype/spec/loca) and
@@ -125,7 +129,7 @@ The table and packed-point rules follow Microsoft's OpenType documentation for
 
 ## Quadratic paths
 
-`GlyphOutline::quadratic_path` is a pure conversion of one validated simple
+`GlyphOutline::quadratic_path` is a pure conversion of one validated
 outline. It emits one closed sequence per source contour: each sequence has a
 start point and a flat slice of `LineTo` or `QuadraticTo` segments whose final
 endpoint is that start point. An empty outline has no contours or segments.
@@ -157,14 +161,14 @@ application data are read during conversion.
 - font discovery, paths, package policy, fallback, or a default family;
 - OpenType layout: shaping, ligatures, kerning, variation selection, bidirectional
   text, script handling, line breaking, text measurement, and text sizing;
-- composite glyphs, hinting, rasterization, colour glyphs, bitmap strikes, or
-  a canvas dependency;
+- component transforms and point attachment, hinting, rasterization, colour
+  glyphs, bitmap strikes, or a canvas dependency;
 - application-controlled font bytes or a protocol field carrying fonts.
 
-A later composite decoder and rasterizer may consume the simple `GlyphOutline`
-or `GlyphPath` only after dedicated contracts establish transformation,
-recursion, memory limits, and rasterization quality. None may turn this parsing
-crate into a hidden font loader or a general text engine.
+A later composite extension may consume the validated `GlyphOutline` or
+`GlyphPath` only after a dedicated contract establishes transformation,
+attachment, precision, and output bounds. None may turn this parsing crate into
+a hidden font loader or a general text engine.
 
 ## Verification
 
@@ -172,10 +176,11 @@ The crate has synthetic minimal face tests for format 4 and format 12,
 non-BMP lookup, missing glyphs, selection priority, malformed table ranges,
 truncated maps, invalid group/segment ordering, and glyph-ID overflow. Simple
 outline tests cover short and long location formats, packed repeats and signed
-coordinate vectors, contour slices, empty glyphs, and malformed outline
-boundaries. Metric tests cover table completeness, units-per-em bounds, shared
-advances, individual side bearings, and malformed table lengths. Quadratic-path
-tests cover explicit lines, off-curve controls,
+coordinate vectors, contour slices, empty glyphs, bounded translated composite
+components, and malformed outline boundaries. Metric tests cover table
+completeness, units-per-em bounds, shared advances, individual side bearings,
+and malformed table lengths. Quadratic-path tests cover explicit lines,
+off-curve controls,
 implied half-unit midpoints, off-curve contour starts, closure, and empty
 outlines. Those tests contain no machine font and no operating-system
 dependency, so they run identically on every supported development host.
