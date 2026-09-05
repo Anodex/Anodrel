@@ -1,10 +1,11 @@
 //! Unit checks for top-level Windows-host helpers.
 
 use anodrel_application::ApplicationPackage;
+use anodrel_ui_document::MAX_ENCODED_DOCUMENT_BYTES;
 
-use super::{
-    MAX_ENCODED_DOCUMENT_BYTES, check_core_health, health_display, load_ui_preview_document,
-    package_facts, read_bounded_regular_utf8,
+use crate::startup::{
+    check_core_health, health_display, load_ui_preview_document, package_facts,
+    read_bounded_regular_utf8,
 };
 
 #[test]
