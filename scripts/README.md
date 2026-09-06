@@ -34,10 +34,23 @@ trust, installation, or desktop-UI change.
 .\scripts\check-native-ownership.ps1
 ~~~
 
+## check-typescript-ownership.ps1
+
+Checks the TypeScript workspace against Decision 0005. Every application and
+package runtime dependency must be a local `@anodrel/*` workspace package at
+the same version. It also locks the root to the reviewed TypeScript compiler,
+Node type definitions, and their one type-only transitive package. It reads the
+committed manifests and lockfile only; it installs nothing and makes no network,
+trust, installation, or desktop-UI change.
+
+~~~powershell
+.\scripts\check-typescript-ownership.ps1
+~~~
+
 ## verify-windows-release.ps1
 
 Runs the complete non-interactive Windows release evidence set: formatting,
-native ownership, strict native lint, source-size, documentation links,
+TypeScript and native ownership, strict native lint, source-size, documentation links,
 whitespace, the native workspace tests, the release-only frame budget, and the
 sample host startup report. It makes no trust, installation, network, or
 desktop-UI change. It cannot replace the separate manual native consent, UAC,

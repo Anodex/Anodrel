@@ -1,8 +1,10 @@
 //! Shared fixtures for installed-application verification.
 
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -12,6 +14,8 @@ use crate::sha256;
 
 const APPLICATION_ID: &str = "org.anodrel.sample";
 const FIXTURE_REMOVE_ATTEMPTS: u32 = 8;
+const CONCURRENT_FIXTURE_COUNT: usize = 16;
+static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 struct Fixture {
     root: PathBuf,
@@ -47,14 +51,16 @@ fn fixture() -> Fixture {
         .duration_since(UNIX_EPOCH)
         .expect("clock is after epoch")
         .as_nanos();
+    let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let root = std::env::temp_dir().join(format!(
-        "anodrel-installed-application-{}-{unique}",
-        std::process::id()
+        "anodrel-installed-application-{}-{unique}-{sequence}",
+        std::process::id(),
     ));
     let policy_root = root.join("policy");
     let package_root = root.join("package");
     let content_path = package_root.join("content").join("main.txt");
     let executable_path = package_root.join("bin").join("sample.exe");
+    fs::create_dir(&root).expect("fixture root is newly created");
     fs::create_dir_all(content_path.parent().expect("content has parent"))
         .expect("content directory is created");
     fs::create_dir_all(executable_path.parent().expect("executable has parent"))
@@ -98,6 +104,28 @@ fn fixture() -> Fixture {
         package_root,
         record_path,
         executable_path,
+    }
+}
+
+#[test]
+fn concurrent_fixtures_have_distinct_owned_roots() {
+    let fixtures = thread::scope(|scope| {
+        (0..CONCURRENT_FIXTURE_COUNT)
+            .map(|_| scope.spawn(fixture))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|worker| worker.join().expect("fixture worker completes"))
+            .collect::<Vec<_>>()
+    });
+    let roots = fixtures
+        .iter()
+        .map(|fixture| fixture.root.clone())
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(roots.len(), CONCURRENT_FIXTURE_COUNT);
+    for fixture in fixtures {
+        assert!(fixture.root.is_dir());
+        fixture.remove();
     }
 }
 

@@ -3,8 +3,9 @@
 Runs Anodrel's non-interactive Windows release evidence checks.
 
 .DESCRIPTION
-Runs formatting, strict native lint, source-size, documentation-link, complete
-native-workspace, release-frame-budget, and startup-report checks from one clean checkout. With
+Runs formatting, TypeScript and native ownership checks, strict native lint,
+source-size, documentation-link, complete native-workspace, release-frame-budget,
+and startup-report checks from one clean checkout. With
 -IncludeIdleReport, it also records the fixed 30-second static-window idle
 measurement. The default check prints evidence only and creates no certificate,
 trust entry, installer, machine policy, product shortcut, update request, or
@@ -65,6 +66,7 @@ try {
     Invoke-NativeCheck -Label 'Rust formatting' -FilePath 'cargo' -Arguments @(
         'fmt', '--manifest-path', $nativeManifest, '--all', '--', '--check'
     )
+    Invoke-PowerShellCheck -Label 'TypeScript ownership guard' -Path (Join-Path $repositoryRoot 'scripts\check-typescript-ownership.ps1')
     Invoke-PowerShellCheck -Label 'Native ownership guard' -Path (Join-Path $repositoryRoot 'scripts\check-native-ownership.ps1')
     Invoke-NativeCheck -Label 'Native workspace lint' -FilePath 'cargo' -Arguments @(
         'clippy', '--manifest-path', $nativeManifest, '--workspace', '--all-targets', '--', '-D', 'warnings'

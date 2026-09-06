@@ -24,6 +24,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Enforce TypeScript ownership policy
+        shell: powershell
+        run: ./scripts/check-typescript-ownership.ps1
       - name: Type-check the workspace
         run: npm run check
       - name: Run SDK and contract tests
