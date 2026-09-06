@@ -77,7 +77,11 @@ and documentation guards, the native workspace suite, release frame budget, and
 sample startup report. For a release candidate, run it with `-IncludeIdleReport` to add the
 fixed 30-second static-window idle measurement. That opt-in opens one diagnostic
 window but performs no trust, installation, network, or application interaction;
-it does not replace any manual item above.
+it does not replace any manual item above. Add `-IncludeAccessibilityReport` to
+run the six fixed direct Windows UI Automation probes after the non-interactive
+checks. That opt-in needs an interactive desktop and opens one temporary
+host-owned diagnostic window per probe; it is repeatable direct-client evidence,
+not a substitute for the manual Narrator and Inspect checks above.
 
 ## Windows-first sequence
 

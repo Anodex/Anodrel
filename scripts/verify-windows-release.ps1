@@ -7,9 +7,10 @@ Runs formatting, TypeScript and native ownership checks, strict native lint,
 source-size, documentation-link, complete native-workspace, release-frame-budget,
 and startup-report checks from one clean checkout. With
 -IncludeIdleReport, it also records the fixed 30-second static-window idle
-measurement. The default check prints evidence only and creates no certificate,
-trust entry, installer, machine policy, product shortcut, update request, or
-desktop window.
+measurement. With -IncludeAccessibilityReport, it also runs the six fixed
+direct Windows UI Automation probes. The default check prints evidence only and
+creates no certificate, trust entry, installer, machine policy, product
+shortcut, update request, or desktop window.
 
 It cannot prove native consent, UAC, Start-menu, Explorer, file-picker, menu,
 or screen-reader behaviour. Those remain explicit operator checks in
@@ -20,7 +21,10 @@ docs/WINDOWS_RELEASE.md.
 param(
     # Opt in to the real desktop measurement required for release-candidate
     # performance evidence. It shows a fixed host window for 30 seconds.
-    [switch] $IncludeIdleReport
+    [switch] $IncludeIdleReport,
+    # Opt in to the six direct UI Automation probes. Each creates and closes
+    # only its own temporary host-owned diagnostic window.
+    [switch] $IncludeAccessibilityReport
 )
 
 Set-StrictMode -Version Latest
@@ -89,6 +93,11 @@ try {
         Invoke-NativeCheck -Label 'Release idle-window report' -FilePath 'cargo' -Arguments @(
             'run', '--release', '--manifest-path', $nativeManifest, '-p', 'anodrel-windows-host',
             '--', '--idle-performance-report'
+        )
+    }
+    if ($IncludeAccessibilityReport) {
+        Invoke-PowerShellCheck -Label 'Windows UI Automation acceptance probes' -Path (
+            Join-Path $repositoryRoot 'scripts\verify-windows-accessibility.ps1'
         )
     }
 }

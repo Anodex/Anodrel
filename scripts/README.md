@@ -52,13 +52,17 @@ trust, installation, or desktop-UI change.
 Runs the complete non-interactive Windows release evidence set: formatting,
 TypeScript and native ownership, strict native lint, source-size, documentation links,
 whitespace, the native workspace tests, the release-only frame budget, and the
-sample host startup report. It makes no trust, installation, network, or
-desktop-UI change. It cannot replace the separate manual native consent, UAC,
-Start-menu, file-picker, accessibility, and signed-fixture checks in
-`docs/WINDOWS_RELEASE.md`.
+sample host startup report. `-IncludeIdleReport` adds the fixed 30-second
+static-window measurement. `-IncludeAccessibilityReport` adds the six direct
+Windows UI Automation probes, which need an interactive desktop and each open
+and close a temporary host-owned window. Neither option creates trust,
+installation, network, or persistent application state. The verifier cannot
+replace the separate manual native consent, UAC, Start-menu, file-picker,
+Narrator/Inspect, and signed-fixture checks in `docs/WINDOWS_RELEASE.md`.
 
 ~~~powershell
 .\scripts\verify-windows-release.ps1
+.\scripts\verify-windows-release.ps1 -IncludeIdleReport -IncludeAccessibilityReport
 ~~~
 
 ## verify-windows-accessibility.ps1
