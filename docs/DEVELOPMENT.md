@@ -255,6 +255,13 @@ include a release test run when changing anything the renderer touches:
 cargo test --release --manifest-path native/Cargo.toml
 ~~~
 
+The guard samples the same reveal frames in five batches and keeps the cheapest
+observation for each frame. This reduces scheduler contention from being mistaken
+for a rendering regression, but a saturated machine is still not a useful
+performance environment. Run it without an active build or CPU-heavy workload;
+see [the frame-cost guard](PERFORMANCE.md#frame-cost-guard) for the measurement
+method and its limits.
+
 Rendering itself is tested headless by asserting on pixels, so most visual
 regressions surface in `cargo test` without opening a window. See
 `docs/RENDERER.md` for the renderer's API and its testing approach.
