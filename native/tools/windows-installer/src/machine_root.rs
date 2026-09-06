@@ -280,18 +280,12 @@ mod raw {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        path::{Path, PathBuf},
-        sync::atomic::{AtomicU64, Ordering},
-    };
-
     use super::{MachineRootError, application_root_below, existing_application_root_below};
-
-    static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
+    use crate::test_support::TestDirectory;
 
     #[test]
     fn builds_only_the_fixed_application_hierarchy_below_a_normal_machine_parent() {
-        let parent = TemporaryDirectory::new();
+        let parent = TestDirectory::new("machine-root");
 
         let root = application_root_below(parent.path(), "org.anodrel.root-test")
             .expect("the fixed hierarchy is created");
@@ -312,7 +306,7 @@ mod tests {
 
     #[test]
     fn invalid_identity_cannot_create_a_machine_hierarchy() {
-        let parent = TemporaryDirectory::new();
+        let parent = TestDirectory::new("machine-root");
         assert!(matches!(
             application_root_below(parent.path(), "org.anodrel/escape"),
             Err(MachineRootError::ApplicationIdInvalid)
@@ -322,7 +316,7 @@ mod tests {
 
     #[test]
     fn existing_root_selection_never_creates_missing_components() {
-        let parent = TemporaryDirectory::new();
+        let parent = TestDirectory::new("machine-root");
         assert!(matches!(
             existing_application_root_below(parent.path(), "org.anodrel.root-test"),
             Err(MachineRootError::RootInvalid)
@@ -335,33 +329,5 @@ mod tests {
                 .path(),
             std::fs::canonicalize(created.path()).expect("the created fixed root canonicalizes")
         );
-    }
-
-    struct TemporaryDirectory(PathBuf);
-
-    impl TemporaryDirectory {
-        fn new() -> Self {
-            for _ in 0..32 {
-                let suffix = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-                let path = std::env::temp_dir().join(format!(
-                    "anodrel-machine-root-test-{}-{suffix}",
-                    std::process::id()
-                ));
-                if std::fs::create_dir(&path).is_ok() {
-                    return Self(path);
-                }
-            }
-            panic!("a temporary machine-root test directory could not be created");
-        }
-
-        fn path(&self) -> &Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TemporaryDirectory {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
     }
 }

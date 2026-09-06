@@ -1,17 +1,11 @@
 //! Direct Windows Shell Link checks using a temporary ordinary directory.
 
-use std::{
-    path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
-};
-
 use super::{ProductLaunchArguments, remove_regular_link, replace_link};
-
-static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
+use crate::test_support::TestDirectory;
 
 #[test]
 fn writes_one_shell_link_in_a_regular_temporary_directory() {
-    let directory = TemporaryDirectory::new();
+    let directory = TestDirectory::new("shortcut");
     let executable = std::env::current_exe().expect("current test image is available");
     let link = directory.path().join("Anodrel Test.lnk");
     let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
@@ -28,7 +22,7 @@ fn writes_one_shell_link_in_a_regular_temporary_directory() {
 
 #[test]
 fn removes_only_the_regular_shell_link_it_just_created() {
-    let directory = TemporaryDirectory::new();
+    let directory = TestDirectory::new("shortcut");
     let executable = std::env::current_exe().expect("current test image is available");
     let link = directory.path().join("Anodrel Test.lnk");
     let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
@@ -46,7 +40,7 @@ fn removes_only_the_regular_shell_link_it_just_created() {
 
 #[test]
 fn persists_only_the_fixed_product_launch_arguments() {
-    let directory = TemporaryDirectory::new();
+    let directory = TestDirectory::new("shortcut");
     let executable = std::env::current_exe().expect("current test image is available");
     let link = directory.path().join("Anodrel Arguments Test.lnk");
     let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
@@ -62,32 +56,4 @@ fn persists_only_the_fixed_product_launch_arguments() {
         super::com::read_persisted_arguments(&link).expect("link arguments are readable"),
         "--product-launch org.anodrel.shortcut-test"
     );
-}
-
-struct TemporaryDirectory(PathBuf);
-
-impl TemporaryDirectory {
-    fn new() -> Self {
-        for _ in 0..32 {
-            let suffix = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "anodrel-shortcut-test-{}-{suffix}",
-                std::process::id()
-            ));
-            if std::fs::create_dir(&path).is_ok() {
-                return Self(path);
-            }
-        }
-        panic!("temporary Shell Link test directory is unavailable");
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TemporaryDirectory {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
 }
