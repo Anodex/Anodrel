@@ -119,4 +119,6 @@ pub const MAX_RELEASE_MANIFEST_BYTES: usize = 16 * 1024;
 pub const MAX_PAYLOAD_BYTES: u64 = anodrel_release_bundle::MAX_BUNDLE_BYTES as u64;
 
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;

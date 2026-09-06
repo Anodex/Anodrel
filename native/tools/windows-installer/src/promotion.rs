@@ -126,12 +126,13 @@ fn version_destination(
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use anodrel_application::sha256;
     use anodrel_release_bundle::{BundleEntryInput, encode};
 
     use crate::staging::stage_checked_release;
+    use crate::test_support::TestDirectory;
     use crate::{PromotionError, ReleaseManifest, verify_bundle};
 
     use super::promote_staged_release;
@@ -140,7 +141,7 @@ mod tests {
 
     #[test]
     fn a_stage_moves_to_its_new_signed_version_without_becoming_disposable() {
-        let parent = TemporaryDirectory::new();
+        let parent = TestDirectory::new("promotion");
         let (manifest, staged) = staged_fixture(parent.path());
         let stage_root = staged.package_root().to_path_buf();
 
@@ -166,7 +167,7 @@ mod tests {
 
     #[test]
     fn an_existing_version_is_never_replaced() {
-        let parent = TemporaryDirectory::new();
+        let parent = TestDirectory::new("promotion");
         let destination = parent.path().join("1.2.3");
         std::fs::create_dir(&destination).expect("the existing version is created");
         std::fs::write(destination.join("keep.txt"), b"existing release")
@@ -254,32 +255,5 @@ mod tests {
 }}"#,
             payload.len()
         )
-    }
-
-    struct TemporaryDirectory(PathBuf);
-
-    impl TemporaryDirectory {
-        fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "anodrel-promotion-test-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("the system time is after the epoch")
-                    .as_nanos()
-            ));
-            std::fs::create_dir(&path).expect("the staging parent is created");
-            Self(path)
-        }
-
-        fn path(&self) -> &Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TemporaryDirectory {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
     }
 }

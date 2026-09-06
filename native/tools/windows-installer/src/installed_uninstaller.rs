@@ -173,6 +173,7 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::{InstalledUninstallerError, copy_current_image, installed_uninstaller_path};
+    use crate::test_support::TestDirectory;
 
     #[test]
     fn fixed_uninstaller_path_is_not_derived_from_product_text() {
@@ -186,7 +187,7 @@ mod tests {
 
     #[test]
     fn persisted_copy_must_match_the_streamed_current_image_bytes() {
-        let directory = TemporaryDirectory::new();
+        let directory = TestDirectory::new("installed-uninstaller");
         let source = directory.path().join("source.exe");
         let destination = directory.path().join("destination.exe");
         fs::write(&source, b"fixed signed image bytes").expect("source image is written");
@@ -201,7 +202,7 @@ mod tests {
 
     #[test]
     fn existing_destination_is_never_replaced() {
-        let directory = TemporaryDirectory::new();
+        let directory = TestDirectory::new("installed-uninstaller");
         let source = directory.path().join("source.exe");
         let destination = directory.path().join("destination.exe");
         fs::write(&source, b"new image").expect("source image is written");
@@ -215,32 +216,5 @@ mod tests {
             fs::read(destination).expect("existing image remains readable"),
             b"existing image"
         );
-    }
-
-    struct TemporaryDirectory(PathBuf);
-
-    impl TemporaryDirectory {
-        fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "anodrel-installed-uninstaller-test-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("system time is after the epoch")
-                    .as_nanos()
-            ));
-            fs::create_dir(&path).expect("temporary directory is created");
-            Self(path)
-        }
-
-        fn path(&self) -> &std::path::Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TemporaryDirectory {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
     }
 }

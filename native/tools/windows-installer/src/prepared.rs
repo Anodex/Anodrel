@@ -155,13 +155,12 @@ fn verify_staged_images(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use anodrel_application::sha256;
     use anodrel_release_bundle::{BundleEntryInput, encode};
     use anodrel_windows_signature::SignatureError;
 
     use crate::staging::stage_checked_release;
+    use crate::test_support::TestDirectory;
     use crate::{ReleaseManifest, verify_bundle};
 
     use super::{PreparedReleaseError, verify_staged_images};
@@ -170,7 +169,7 @@ mod tests {
 
     #[test]
     fn an_unsigned_staged_executable_cannot_be_prepared_for_promotion() {
-        let parent = TemporaryDirectory::new();
+        let parent = TestDirectory::new("prepared-release");
         let executable = b"not a signed executable";
         let content = b"prepared release content";
         let package = package_manifest(content);
@@ -236,32 +235,5 @@ mod tests {
 }}"#,
             payload.len()
         )
-    }
-
-    struct TemporaryDirectory(PathBuf);
-
-    impl TemporaryDirectory {
-        fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "anodrel-prepared-release-test-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("the system time is after the epoch")
-                    .as_nanos()
-            ));
-            std::fs::create_dir(&path).expect("the staging parent is created");
-            Self(path)
-        }
-
-        fn path(&self) -> &std::path::Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TemporaryDirectory {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
     }
 }

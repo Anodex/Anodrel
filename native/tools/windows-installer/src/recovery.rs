@@ -130,9 +130,8 @@ fn decimal_component(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::discover_private_stages;
+    use crate::test_support::TestDirectory;
 
     #[cfg(windows)]
     use super::cleanup_private_stages;
@@ -141,7 +140,7 @@ mod tests {
 
     #[test]
     fn discovery_returns_only_exact_normal_private_stage_directories() {
-        let root = TemporaryDirectory::new();
+        let root = TestDirectory::new("recovery");
         for name in [
             ".anodrel-stage-1-2-3-45-0",
             ".anodrel-stage-1-2-3-45-1",
@@ -166,7 +165,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn cleanup_removes_only_discovered_private_stage_trees() {
-        let root = TemporaryDirectory::new();
+        let root = TestDirectory::new("recovery");
         let stage = root.path().join(".anodrel-stage-1-2-3-45-0");
         std::fs::create_dir_all(stage.join("nested")).expect("the stage tree is created");
         std::fs::write(stage.join("nested/entry.txt"), b"stale data")
@@ -188,7 +187,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn uninstall_cleanup_retains_only_the_fixed_running_image() {
-        let root = TemporaryDirectory::new();
+        let root = TestDirectory::new("recovery");
         let package = root.path().join("1.2.3");
         let installer = package
             .join("uninstaller")
@@ -218,32 +217,5 @@ mod tests {
         assert!(!package.join("content").exists());
         assert!(!package.join("anodrel.application.json").exists());
         assert!(!package.join("uninstaller").join("stale.txt").exists());
-    }
-
-    struct TemporaryDirectory(PathBuf);
-
-    impl TemporaryDirectory {
-        fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "anodrel-recovery-test-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("the system time is after the epoch")
-                    .as_nanos()
-            ));
-            std::fs::create_dir(&path).expect("the test root is created");
-            Self(path)
-        }
-
-        fn path(&self) -> &std::path::Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TemporaryDirectory {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
     }
 }

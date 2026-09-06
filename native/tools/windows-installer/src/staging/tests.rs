@@ -1,18 +1,19 @@
 //! Contract tests for private staged release extraction.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anodrel_application::sha256;
 use anodrel_release_bundle::{BundleEntryInput, encode};
 
 use crate::staging::stage_checked_release;
+use crate::test_support::TestDirectory;
 use crate::{ReleaseManifest, StagedReleaseError, verify_bundle};
 
 const PUBLISHER: &str = "7089521dabfd335eacdddd28f07cef005bfa68f4aace58c81643e43b6db20585";
 
 #[test]
 fn an_exact_checked_bundle_becomes_a_valid_private_staged_package() {
-    let parent = TemporaryDirectory::new();
+    let parent = TestDirectory::new("staging");
     let (manifest, payload) = valid_release();
     let manifest = ReleaseManifest::parse(&manifest).expect("the fixture manifest is valid");
     let bundle = verify_bundle(&manifest, &payload).expect("the fixture bundle is valid");
@@ -38,7 +39,7 @@ fn an_exact_checked_bundle_becomes_a_valid_private_staged_package() {
 
 #[test]
 fn a_stage_failure_leaves_no_partial_staging_directory() {
-    let parent = TemporaryDirectory::new();
+    let parent = TestDirectory::new("staging");
     let (manifest, payload) = valid_release();
     let manifest = ReleaseManifest::parse(&manifest.replace("bin/Product.exe", "bin/Missing.exe"))
         .expect("the altered manifest remains syntactically valid");
@@ -54,7 +55,7 @@ fn a_stage_failure_leaves_no_partial_staging_directory() {
 
 #[test]
 fn windows_reserved_names_fail_before_files_are_created() {
-    let parent = TemporaryDirectory::new();
+    let parent = TestDirectory::new("staging");
     let executable = b"staged executable";
     let package = package_manifest();
     let payload = encode(&[
@@ -148,31 +149,4 @@ fn directory_is_empty(path: &Path) -> bool {
         .expect("the staging parent is readable")
         .next()
         .is_none()
-}
-
-struct TemporaryDirectory(PathBuf);
-
-impl TemporaryDirectory {
-    fn new() -> Self {
-        let path = std::env::temp_dir().join(format!(
-            "anodrel-staging-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("the system time is after the epoch")
-                .as_nanos()
-        ));
-        std::fs::create_dir(&path).expect("the staging parent is created");
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TemporaryDirectory {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
 }
