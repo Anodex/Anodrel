@@ -1,4 +1,4 @@
-//! Test-only temporary directories with per-process unique ownership.
+//! Test-only isolated temporary directories allocated per process.
 
 use std::{
     fs,
@@ -26,7 +26,7 @@ impl TestDirectory {
         Self { path }
     }
 
-    /// Returns the owned directory path for one fixture's contained files.
+    /// Returns this fixture's root directory for contained files.
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
