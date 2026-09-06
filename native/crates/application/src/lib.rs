@@ -13,6 +13,8 @@ mod manifest;
 mod network_policy;
 mod package;
 pub mod sha256;
+#[cfg(test)]
+mod test_support;
 
 use std::{fmt, io};
 

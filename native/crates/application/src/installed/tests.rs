@@ -4,21 +4,17 @@ use std::{
     collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::{InstalledApplication, InstalledApplicationError};
-use crate::sha256;
+use crate::{sha256, test_support::TestDirectory};
 
 const APPLICATION_ID: &str = "org.anodrel.sample";
-const FIXTURE_REMOVE_ATTEMPTS: u32 = 8;
 const CONCURRENT_FIXTURE_COUNT: usize = 16;
-static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 struct Fixture {
-    root: PathBuf,
+    root: TestDirectory,
     policy_root: PathBuf,
     package_root: PathBuf,
     record_path: PathBuf,
@@ -27,40 +23,16 @@ struct Fixture {
 
 impl Fixture {
     fn remove(self) {
-        for attempt in 1..=FIXTURE_REMOVE_ATTEMPTS {
-            match fs::remove_dir_all(&self.root) {
-                Ok(()) => return,
-                // Windows can briefly retain a just-read test file for a
-                // scanner. A bounded retry keeps that external race from
-                // making the suite flaky without masking a persistent leak.
-                Err(error)
-                    if error.kind() == std::io::ErrorKind::PermissionDenied
-                        && attempt < FIXTURE_REMOVE_ATTEMPTS =>
-                {
-                    thread::sleep(Duration::from_millis(u64::from(attempt) * 10));
-                }
-                Err(error) => panic!("fixture directory is removed: {error}"),
-            }
-        }
-        unreachable!("fixture cleanup either succeeds or reports its final error");
+        self.root.remove();
     }
 }
 
 fn fixture() -> Fixture {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock is after epoch")
-        .as_nanos();
-    let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "anodrel-installed-application-{}-{unique}-{sequence}",
-        std::process::id(),
-    ));
-    let policy_root = root.join("policy");
-    let package_root = root.join("package");
+    let root = TestDirectory::new("installed-application");
+    let policy_root = root.path().join("policy");
+    let package_root = root.path().join("package");
     let content_path = package_root.join("content").join("main.txt");
     let executable_path = package_root.join("bin").join("sample.exe");
-    fs::create_dir(&root).expect("fixture root is newly created");
     fs::create_dir_all(content_path.parent().expect("content has parent"))
         .expect("content directory is created");
     fs::create_dir_all(executable_path.parent().expect("executable has parent"))
@@ -119,12 +91,12 @@ fn concurrent_fixtures_have_distinct_owned_roots() {
     });
     let roots = fixtures
         .iter()
-        .map(|fixture| fixture.root.clone())
+        .map(|fixture| fixture.root.path().to_path_buf())
         .collect::<BTreeSet<_>>();
 
     assert_eq!(roots.len(), CONCURRENT_FIXTURE_COUNT);
     for fixture in fixtures {
-        assert!(fixture.root.is_dir());
+        assert!(fixture.root.path().is_dir());
         fixture.remove();
     }
 }

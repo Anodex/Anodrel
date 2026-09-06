@@ -164,30 +164,19 @@ pub fn validate_text_content(text: &str) -> Result<(), ApplicationError> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-        time::{SystemTime, UNIX_EPOCH},
-    };
+    use std::{fs, path::PathBuf};
 
     use super::ApplicationPackage;
-    use crate::{ApplicationError, sha256};
+    use crate::{ApplicationError, sha256, test_support::TestDirectory};
 
-    fn fixture(content: &[u8], declared_digest: &str) -> (PathBuf, PathBuf) {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock is after epoch")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "anodrel-application-package-{}-{unique}",
-            std::process::id()
-        ));
-        let content_path = root.join("content").join("main.txt");
+    fn fixture(content: &[u8], declared_digest: &str) -> (PathBuf, TestDirectory) {
+        let root = TestDirectory::new("application-package");
+        let content_path = root.path().join("content").join("main.txt");
         fs::create_dir_all(content_path.parent().expect("content has parent"))
             .expect("fixture directory is created");
         fs::write(&content_path, content).expect("fixture content is written");
         fs::write(
-            root.join("anodrel.application.json"),
+            root.path().join("anodrel.application.json"),
             format!(
                 r#"{{
                     "manifestVersion": {{"major": 1, "minor": 0}},
@@ -202,15 +191,15 @@ mod tests {
             ),
         )
         .expect("fixture manifest is written");
-        (root.join("anodrel.application.json"), root)
+        (root.path().join("anodrel.application.json"), root)
     }
 
     fn digest(content: &[u8]) -> String {
         sha256::lower_hex(&sha256::digest(content))
     }
 
-    fn remove_fixture(root: &Path) {
-        fs::remove_dir_all(root).expect("fixture directory is removed");
+    fn remove_fixture(root: TestDirectory) {
+        root.remove();
     }
 
     #[test]
@@ -223,7 +212,7 @@ mod tests {
         assert_eq!(package.identity().application_id(), "org.anodrel.sample");
         assert_eq!(package.identity().display_name(), "Anodrel Sample");
         assert_eq!(package.text(), "Hello from the verified package.\n");
-        remove_fixture(&root);
+        remove_fixture(root);
     }
 
     #[test]
@@ -234,7 +223,7 @@ mod tests {
             ApplicationPackage::load(&manifest),
             Err(ApplicationError::ContentDigestMismatch)
         ));
-        remove_fixture(&root);
+        remove_fixture(root);
     }
 
     #[test]
@@ -246,6 +235,6 @@ mod tests {
             ApplicationPackage::load(&manifest),
             Err(ApplicationError::InvalidText)
         ));
-        remove_fixture(&root);
+        remove_fixture(root);
     }
 }

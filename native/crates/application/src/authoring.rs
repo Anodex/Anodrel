@@ -118,30 +118,15 @@ fn json_string(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs,
-        path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
-    };
+    use std::fs;
 
     use super::write_text_package;
-    use crate::{ApplicationError, ApplicationPackage};
-
-    fn temporary_root() -> PathBuf {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock is after epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "anodrel-application-authoring-{}-{unique}",
-            std::process::id()
-        ))
-    }
+    use crate::{ApplicationError, ApplicationPackage, test_support::TestDirectory};
 
     #[test]
     fn writes_a_package_the_loader_independently_accepts() {
-        let root = temporary_root();
-        let destination = root.join("nested").join("starter");
+        let root = TestDirectory::new("application-authoring");
+        let destination = root.path().join("nested").join("starter");
         let manifest = write_text_package(
             &destination,
             "org.example.starter",
@@ -160,20 +145,20 @@ mod tests {
             b"content/main.txt -text\n"
         );
 
-        fs::remove_dir_all(root).expect("temporary package is removed");
+        root.remove();
     }
 
     #[test]
     fn refuses_invalid_inputs_without_creating_the_destination() {
-        let root = temporary_root();
-        let destination = root.join("starter");
+        let root = TestDirectory::new("application-authoring");
+        let destination = root.path().join("starter");
         assert!(matches!(
             write_text_package(&destination, "Invalid.Id", "Starter", "Valid"),
             Err(ApplicationError::InvalidManifest)
         ));
         assert!(!destination.exists());
 
-        let invalid_display = root.join("invalid-display");
+        let invalid_display = root.path().join("invalid-display");
         assert!(matches!(
             write_text_package(
                 &invalid_display,
@@ -185,7 +170,7 @@ mod tests {
         ));
         assert!(!invalid_display.exists());
 
-        let invalid_text = root.join("invalid-text");
+        let invalid_text = root.path().join("invalid-text");
         assert!(matches!(
             write_text_package(
                 &invalid_text,
@@ -203,6 +188,6 @@ mod tests {
             Err(ApplicationError::PackageDestinationExists)
         ));
 
-        fs::remove_dir_all(root).expect("temporary package is removed");
+        root.remove();
     }
 }

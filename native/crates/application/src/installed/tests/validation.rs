@@ -34,7 +34,7 @@ fn rejects_a_record_that_disagrees_with_the_package_identity() {
 #[test]
 fn rejects_a_record_outside_the_selected_policy_root() {
     let fixture = fixture();
-    let other_policy_root = fixture.root.join("other-policy");
+    let other_policy_root = fixture.root.path().join("other-policy");
     fs::create_dir(&other_policy_root).expect("other policy directory is created");
 
     assert!(matches!(
