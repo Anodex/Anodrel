@@ -50,6 +50,10 @@ let kerning = match (face.glyph_id('A'), face.glyph_id('V')) {
     (Some(left), Some(right)) => face.horizontal_kerning(left, right)?,
     _ => 0,
 };
+let latin_kerning = match (face.glyph_id('A'), face.glyph_id('V')) {
+    (Some(left), Some(right)) => face.basic_latin_horizontal_kerning(left, right)?,
+    _ => 0,
+};
 let outline = glyph.map(|glyph| face.glyph_outline(glyph)).transpose()?;
 let path = outline.as_ref().map(anodrel_font::GlyphOutline::quadratic_path);
 ```
@@ -109,7 +113,7 @@ It does not infer a missing metric from an outline. See Microsoft's OpenType
 [`hmtx`](https://learn.microsoft.com/en-us/typography/opentype/spec/hmtx)
 specifications.
 
-## Horizontal pair kerning
+## Horizontal pair positioning
 
 An optional conventional OpenType version-0 `kern` table becomes available only
 beside a complete validated horizontal-metric source. `horizontal_kerning(left,
@@ -128,11 +132,23 @@ binary-searches borrowed font bytes and makes no allocation. Matching selected
 values add in table order, except an override subtable replaces the earlier
 result. Other valid `kern` formats and modes are ignored rather than guessed.
 
-This is a deliberately small pre-shaping feature, not OpenType layout. GPOS,
-class kerning, vertical and cross-stream placement, device variation, and every
-other `kern` format remain absent. See [Decision
-0208](decisions/0208-first-party-pair-kerning-stays-bounded.md) and Microsoft's
-OpenType [`kern`](https://learn.microsoft.com/en-us/typography/opentype/spec/kern)
+For all-ASCII source runs, `basic_latin_horizontal_kerning(left, right)` first
+uses a bounded GPOS version-1.0 `latn` default-language `kern` feature when it
+is available. It accepts only pair-positioning formats 1 and 2 with an
+x-advance-only first value record, either directly through lookup type 2 or
+through its version-1 extension, and only zero or `IgnoreMarks` lookup flags.
+Class matrices, pair sets, lookups, and the whole source are bounded and remain
+borrowed. GPOS replaces rather than adds to the legacy result, avoiding double
+kerning on a face that carries both representations. Non-ASCII runs and every
+unsupported valid GPOS form retain the legacy result.
+
+This remains a deliberately small pre-shaping feature, not OpenType layout.
+Non-Latin script selection, language selection, GPOS version 1.1, contextual,
+mark, vertical, cross-stream, device, and variation positioning remain absent,
+as does every other `kern` format. See [Decision
+0208](decisions/0208-first-party-pair-kerning-stays-bounded.md), [Decision
+0216](decisions/0216-first-party-basic-latin-gpos-pair-positioning-stays-bounded.md),
+and Microsoft's OpenType [`kern`](https://learn.microsoft.com/en-us/typography/opentype/spec/kern)
 table specification.
 
 ## Glyph outlines
@@ -210,9 +226,10 @@ application data are read during conversion.
 
 - font discovery, paths, package policy, fallback, or a default family in the
   portable parser;
-- OpenType layout beyond bounded conventional pair kerning: GPOS, shaping,
-  ligatures, class kerning, variation selection, bidirectional text, script
-  handling, line breaking, text measurement, and text sizing;
+- OpenType layout beyond bounded conventional and basic-Latin GPOS pair
+  positioning: shaping, ligatures, contextual or mark positioning, variation
+  selection, bidirectional text, script handling, line breaking, text
+  measurement, and text sizing;
 - component transforms and point attachment, hinting, rasterization, colour
   glyphs, bitmap strikes, or a canvas dependency;
 - application-controlled font bytes or a protocol field carrying fonts.

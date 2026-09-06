@@ -2,6 +2,7 @@
 
 mod composite;
 mod fixtures;
+mod gpos;
 mod kerning;
 mod path;
 

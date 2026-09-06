@@ -1,7 +1,7 @@
 # Anodrel Text Runs
 
 **Status:** Portable first-party single-line placement with bounded conventional
-pair kerning.
+and basic-Latin GPOS pair positioning.
 
 `anodrel-text` converts one UTF-8 value into a bounded ordered run of glyph
 identifiers and horizontal pen positions from one already-validated
@@ -30,9 +30,10 @@ operating-system state.
 
 For every Unicode scalar in source order, the builder asks the selected
 character map for one nonzero glyph identifier and reads that glyph's horizontal
-metric. Between a prior and current glyph, it reads the face's bounded
-conventional pair adjustment before recording the current pen position and
-advancing it:
+metric. Between a prior and current glyph, it reads the face's bounded pair
+adjustment before recording the current pen position and advancing it. An
+all-ASCII source run uses the selected basic-Latin GPOS adjustment when one is
+available; every other run uses conventional `kern` adjustment:
 
 ~~~text
 if previous_glyph exists:
@@ -43,12 +44,12 @@ pen_x += glyph.advance_width
 
 The first glyph starts at zero; each later pair adjustment is applied after the
 previous advance and before the next position. All positions and the final
-advance are signed, unscaled font design units. Absent `kern`, unmatched pairs,
-and valid non-horizontal tables yield a zero adjustment. A later renderer
-selects its own explicit pixel scale and baseline, then uses the existing glyph
-adapter to convert an individual outline to canvas coverage. This keeps line
-placement out of font parsing and keeps device coordinates out of the run
-builder.
+advance are signed, unscaled font design units. An absent selected source,
+unmatched pair, or valid unsupported positioning form yields a zero adjustment.
+A later renderer selects its own explicit pixel scale and baseline, then uses
+the existing glyph adapter to convert an individual outline to canvas coverage.
+This keeps line placement out of font parsing and keeps device coordinates out
+of the run builder.
 
 ## Limits and closed outcomes
 
@@ -70,9 +71,11 @@ has complete horizontal metrics.
   fallback, caching, or a protocol operation;
 - glyph outlines, glyph masks, paint, native drawing, device density, and
   host-window integration;
-- GPOS, class, vertical, cross-stream, or variation kerning; ligatures,
-  contextual shaping, combining-mark placement, bidirectional ordering, script
-  handling, line breaking, wrapping, or text editing.
+- OpenType layout beyond the narrow basic-Latin GPOS pair source: non-Latin or
+  language selection, GPOS version 1.1, contextual, mark, vertical,
+  cross-stream, device, or variation positioning; ligatures, contextual
+  shaping, combining-mark placement, bidirectional ordering, script handling,
+  line breaking, wrapping, or text editing.
 
 This is not a claim that scalar-to-glyph placement is correct typography for
 every script. It is an explicit first-party foundation for the simple
@@ -84,7 +87,8 @@ behaviour requires a separate contract rather than silently widening this one.
 Synthetic in-memory TrueType faces prove source order, exact pen advances,
 empty runs, unavailable glyph and metric outcomes, scalar and signed-position
 limits, rejection of a character map that points outside its metric source, and
-pair adjustment placement. A separate Windows-host probe uses its fixed selected
+pair adjustment placement, selected basic-Latin GPOS placement, and the explicit
+non-ASCII legacy fallback. A separate Windows-host probe uses its fixed selected
 face for `ANODREL` and composes the resulting run twice through the owned glyph
 cache; it is an internal integration check, not a general text API. The portable
 crate's own tests open no machine font or call an operating-system API.
@@ -105,3 +109,4 @@ check rather than text-quality evidence.
 - [Decision 0208](decisions/0208-first-party-pair-kerning-stays-bounded.md)
 - [Decision 0213](decisions/0213-windows-owned-text-report-stays-fixed-and-local.md)
 - [Decision 0214](decisions/0214-fixed-owned-text-metric-check-stays-local.md)
+- [Decision 0216](decisions/0216-first-party-basic-latin-gpos-pair-positioning-stays-bounded.md)

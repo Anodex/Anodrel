@@ -46,6 +46,38 @@ fn applies_owned_pair_adjustments_before_the_current_glyph_position() {
 }
 
 #[test]
+fn basic_latin_runs_use_selected_gpos_pair_positioning_before_legacy_kerning() {
+    let bytes = gpos_metric_face('A', 'A', 1, &[0, 500], -70);
+    let face = FontFace::parse(&bytes).expect("GPOS fixture face should parse");
+    let run = TextRun::build(&face, "AA").expect("basic Latin run should build");
+
+    assert_eq!(run.advance_width(), 930);
+    assert_eq!(
+        run.glyphs()
+            .iter()
+            .map(|glyph| glyph.pen_x())
+            .collect::<Vec<_>>(),
+        vec![0, 430]
+    );
+}
+
+#[test]
+fn non_ascii_runs_do_not_apply_the_basic_latin_gpos_source() {
+    let bytes = gpos_metric_face('\u{00C0}', '\u{00C0}', 1, &[0, 500], -70);
+    let face = FontFace::parse(&bytes).expect("GPOS fixture face should parse");
+    let run = TextRun::build(&face, "\u{00C0}\u{00C0}").expect("non-ASCII run should build");
+
+    assert_eq!(run.advance_width(), 1_000);
+    assert_eq!(
+        run.glyphs()
+            .iter()
+            .map(|glyph| glyph.pen_x())
+            .collect::<Vec<_>>(),
+        vec![0, 500]
+    );
+}
+
+#[test]
 fn empty_text_still_carries_validated_line_metrics() {
     let bytes = metric_face('A', 'A', 1, &[0, 500]);
     let face = FontFace::parse(&bytes).expect("fixture face should parse");
@@ -132,6 +164,23 @@ fn kerned_metric_face(
         (*b"hhea", horizontal_header(advances.len())),
         (*b"hmtx", horizontal_metrics(advances)),
         (*b"kern", kerning_table(pairs)),
+    ])
+}
+
+fn gpos_metric_face(
+    start: char,
+    end: char,
+    first_glyph: u16,
+    advances: &[u16],
+    adjustment: i16,
+) -> Vec<u8> {
+    sfnt(&[
+        (*b"cmap", cmap(start, end, first_glyph)),
+        (*b"head", head()),
+        (*b"maxp", maximum_profile(advances.len())),
+        (*b"hhea", horizontal_header(advances.len())),
+        (*b"hmtx", horizontal_metrics(advances)),
+        (*b"GPOS", gpos_pair(adjustment)),
     ])
 }
 
@@ -280,6 +329,49 @@ fn kerning_table(pairs: &[(u16, u16, i16)]) -> Vec<u8> {
         bytes.extend_from_slice(&adjustment.to_be_bytes());
     }
     bytes
+}
+
+/// Builds one bounded `latn`/`kern` GPOS type-two pair lookup for this test.
+fn gpos_pair(adjustment: i16) -> Vec<u8> {
+    let mut pair = Vec::new();
+    for value in [1, 18, 4, 0, 1, 12, 1, 1] {
+        push_u16(&mut pair, value);
+    }
+    pair.extend_from_slice(&adjustment.to_be_bytes());
+    for value in [1, 1, 1] {
+        push_u16(&mut pair, value);
+    }
+
+    let mut script = Vec::new();
+    push_u16(&mut script, 1);
+    script.extend_from_slice(b"latn");
+    push_u16(&mut script, 8);
+    for value in [4, 0, 0, u16::MAX, 1, 0] {
+        push_u16(&mut script, value);
+    }
+    let mut feature = Vec::new();
+    push_u16(&mut feature, 1);
+    feature.extend_from_slice(b"kern");
+    for value in [8, 0, 1, 0] {
+        push_u16(&mut feature, value);
+    }
+    let mut lookup = Vec::new();
+    for value in [1, 4, 2, 0, 1, 8] {
+        push_u16(&mut lookup, value);
+    }
+    lookup.extend_from_slice(&pair);
+
+    let script_offset = 10_u16;
+    let feature_offset = script_offset + u16::try_from(script.len()).expect("fixture fits");
+    let lookup_offset = feature_offset + u16::try_from(feature.len()).expect("fixture fits");
+    let mut table = Vec::new();
+    for value in [1, 0, script_offset, feature_offset, lookup_offset] {
+        push_u16(&mut table, value);
+    }
+    table.extend_from_slice(&script);
+    table.extend_from_slice(&feature);
+    table.extend_from_slice(&lookup);
+    table
 }
 
 fn push_u16(bytes: &mut Vec<u8>, value: u16) {

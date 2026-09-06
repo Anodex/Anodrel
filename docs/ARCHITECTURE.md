@@ -122,13 +122,14 @@ cache, and canvas compositor twice. Neither replaces the current GDI painter.
 one such path through an explicit device transform into a bounded canvas
 polygon and then one bounded coverage mask; it does not parse or draw a font.
 `anodrel-text` supplies the preceding bounded, source-ordered single-line glyph
-order and signed horizontal pen positions, including conventional pair kerning,
+order and signed horizontal pen positions, including conventional and bounded
+basic-Latin GPOS pair positioning,
 from one validated face. `anodrel-glyph` also has a
 face-local bounded coverage cache. A future host therefore still supplies a face
 source, a blit, and a display-density signal. See `docs/RENDERER.md`,
 `docs/FONTS.md`, `docs/TEXT_RUNS.md`, `docs/GLYPH_RENDERING.md`, and
 `docs/GLYPH_CACHE.md`, Decisions 0013, 0133 through 0138, and 0204 through
-0212.
+0216.
 
 The Windows host also has an Anodrel Startup Lab. It validates a supplied
 application package and performs its internal protocol health check before

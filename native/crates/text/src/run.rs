@@ -51,6 +51,7 @@ impl TextRun {
     /// breaking.
     pub fn build(face: &FontFace<'_>, text: &str) -> Result<Self, TextRunError> {
         let metrics = face.font_metrics().map_err(TextRunError::Metric)?;
+        let uses_basic_latin_positioning = text.is_ascii();
         let mut glyphs = Vec::with_capacity(text.len().min(MAX_RUN_GLYPHS));
         let mut advance_width = 0_i32;
         let mut previous_glyph = None;
@@ -66,9 +67,12 @@ impl TextRun {
                 .horizontal_metric(glyph)
                 .map_err(TextRunError::Metric)?;
             if let Some(previous_glyph) = previous_glyph {
-                let adjustment = face
-                    .horizontal_kerning(previous_glyph, glyph)
-                    .map_err(TextRunError::Kerning)?;
+                let adjustment = if uses_basic_latin_positioning {
+                    face.basic_latin_horizontal_kerning(previous_glyph, glyph)
+                } else {
+                    face.horizontal_kerning(previous_glyph, glyph)
+                }
+                .map_err(TextRunError::Kerning)?;
                 advance_width = bounded_position(advance_width, adjustment)?;
             }
             glyphs.push(RunGlyph {

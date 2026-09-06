@@ -11,6 +11,7 @@ mod bytes;
 mod cmap;
 mod error;
 mod face;
+mod gpos;
 mod kerning;
 mod metrics;
 mod outline;

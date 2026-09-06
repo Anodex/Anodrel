@@ -4,6 +4,7 @@ use crate::{
     FontError,
     bytes::Bytes,
     cmap::{CharacterMap, parse_character_map},
+    gpos::GposSource,
     kerning::{FontKerningError, KerningSource},
     metrics::{FontMetricError, FontMetrics, HorizontalMetric, MetricSource},
     outline::{GlyphOutline, GlyphOutlineError, OutlineSource},
@@ -19,6 +20,7 @@ const MAXP_TAG: u32 = u32::from_be_bytes(*b"maxp");
 const HHEA_TAG: u32 = u32::from_be_bytes(*b"hhea");
 const HMTX_TAG: u32 = u32::from_be_bytes(*b"hmtx");
 const KERN_TAG: u32 = u32::from_be_bytes(*b"kern");
+const GPOS_TAG: u32 = u32::from_be_bytes(*b"GPOS");
 const LOCA_TAG: u32 = u32::from_be_bytes(*b"loca");
 const GLYF_TAG: u32 = u32::from_be_bytes(*b"glyf");
 
@@ -42,6 +44,7 @@ pub struct FontFace<'font> {
     character_map: CharacterMap<'font>,
     metric_source: Option<MetricSource<'font>>,
     kerning_source: Option<KerningSource<'font>>,
+    gpos_source: Option<GposSource<'font>>,
     outline_source: Option<OutlineSource<'font>>,
 }
 
@@ -71,6 +74,7 @@ impl<'font> FontFace<'font> {
         let mut horizontal_header = None;
         let mut horizontal_metrics = None;
         let mut kerning = None;
+        let mut gpos = None;
         let mut locations = None;
         let mut glyph_data = None;
         for index in 0..table_count {
@@ -96,6 +100,7 @@ impl<'font> FontFace<'font> {
                     return Err(FontError::InvalidFace);
                 }
                 KERN_TAG if kerning.replace(table).is_some() => return Err(FontError::InvalidFace),
+                GPOS_TAG if gpos.replace(table).is_some() => return Err(FontError::InvalidFace),
                 LOCA_TAG if locations.replace(table).is_some() => {
                     return Err(FontError::InvalidFace);
                 }
@@ -123,10 +128,12 @@ impl<'font> FontFace<'font> {
             metric_source.is_some(),
         )?;
         let kerning_source = KerningSource::optional(kerning, metric_source.as_ref())?;
+        let gpos_source = GposSource::optional(gpos, metric_source.as_ref())?;
         Ok(Self {
             character_map,
             metric_source,
             kerning_source,
+            gpos_source,
             outline_source,
         })
     }
@@ -179,6 +186,31 @@ impl<'font> FontFace<'font> {
             .as_ref()
             .map(|source| source.horizontal_kerning(left, right))
             .unwrap_or(Ok(0))
+    }
+
+    /// Returns one basic-Latin pair adjustment in font design units.
+    ///
+    /// A selected GPOS `latn`/`kern` lookup replaces the legacy `kern` result
+    /// when it is available. Callers must use this only for all-ASCII source
+    /// runs; other scripts retain [`Self::horizontal_kerning`]'s legacy path.
+    pub fn basic_latin_horizontal_kerning(
+        &self,
+        left: GlyphId,
+        right: GlyphId,
+    ) -> Result<i32, FontKerningError> {
+        let metrics = self
+            .metric_source
+            .as_ref()
+            .ok_or(FontKerningError::MetricsUnavailable)?;
+        if usize::from(left.value()) >= metrics.glyph_count()
+            || usize::from(right.value()) >= metrics.glyph_count()
+        {
+            return Err(FontKerningError::InvalidGlyphId);
+        }
+        match &self.gpos_source {
+            Some(source) => Ok(source.horizontal_kerning(left, right)),
+            None => self.horizontal_kerning(left, right),
+        }
     }
 }
 
