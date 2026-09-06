@@ -42,6 +42,11 @@ A successful suite confirms only the six fixed direct-client contracts below.
 It does not prove Narrator speech or Inspect-highlight correctness, so the
 manual checks remain required for release acceptance.
 
+The suite was most recently re-run on 2026-09-06 against the release build:
+property, focus, focus-event, Invoke, structure-event, and live-status-event
+probes all passed. This records repeatable Windows-client evidence only; it is
+not a substitute for the manual checks below.
+
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 
 This passed on Windows on 2026-08-24. The direct first-party client created a
