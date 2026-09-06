@@ -83,8 +83,8 @@ therefore remains an explicit operator action.
 
 ## Evidence and remaining work
 
-Release-only automated evidence currently includes a 6.37 ms average and
-8.09 ms worst sustained frame time against a 16 ms interval, startup reporting,
+Release-only automated evidence currently includes a 6.30 ms average and
+7.98 ms worst sustained frame time against a 16 ms interval, startup reporting,
 an idle-window report, native workspace tests, and contract coverage. These are
 guards, not a substitute for visible Windows behavior.
 
