@@ -17,8 +17,6 @@ const ANTIALIASED_QUALITY: Dword = 4;
 const DEFAULT_PITCH: Dword = 0;
 const GDI_ERROR: Dword = Dword::MAX;
 const HGDI_ERROR: Hgdiobj = -1;
-const SURFACE_FONT_SIZE: i32 = 16;
-const SURFACE_FONT_WEIGHT: i32 = 400;
 
 /// The fixed typeface selected by every first-party Windows surface.
 pub(super) const SURFACE_FACE_NAME: &str = "Segoe UI";
@@ -133,13 +131,14 @@ pub(super) fn with_surface_font<R>(
     work(selected.device_context)
 }
 
-/// Reads one bounded, process-private copy of the fixed regular surface face.
+/// Reads one bounded, process-private copy of the exact selected surface face.
 ///
 /// The return value is not persisted, exposed through the protocol, or used by
-/// the current GDI painter. A later owned text path must explicitly consume it.
+/// the current GDI painter. Fixed local owned-text diagnostics supply the same
+/// size and weight that GDI selected for their matching comparison case.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) fn selected_face_data() -> Option<Vec<u8>> {
-    with_surface_font(SURFACE_FONT_SIZE, SURFACE_FONT_WEIGHT, |device_context| {
+pub(super) fn selected_face_data(size: i32, weight: i32) -> Option<Vec<u8>> {
+    with_surface_font(size, weight, |device_context| {
         // SAFETY: the memory DC owns a selected TrueType surface font for the
         // duration of the closure. The first call asks only for a byte count;
         // the second writes exactly into the owned vector's initialized range.
@@ -182,8 +181,8 @@ mod tests {
 
     #[test]
     fn selected_surface_face_is_bounded_and_accepted_by_the_owned_parser() {
-        let data =
-            selected_face_data().expect("fixed Windows surface face is available as TrueType");
+        let data = selected_face_data(16, 400)
+            .expect("fixed Windows surface face is available as TrueType");
         assert!(!data.is_empty());
         assert!(data.len() <= MAX_SELECTED_FACE_BYTES);
 
@@ -213,6 +212,6 @@ mod tests {
             let _ = with_surface_font(16, 400, |_| -> Option<()> { panic!("test unwind") });
         });
         assert!(result.is_err());
-        assert!(selected_face_data().is_some());
+        assert!(selected_face_data(16, 400).is_some());
     }
 }

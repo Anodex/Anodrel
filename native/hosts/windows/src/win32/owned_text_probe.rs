@@ -11,7 +11,7 @@ use anodrel_font::FontFace;
 use anodrel_glyph::GlyphMaskCache;
 use anodrel_text::TextRun;
 
-use super::{selected_font, text};
+use super::{owned_text, selected_font, text};
 
 const PROBE_TEXT: &str = "ANODREL";
 const PROBE_EM_PIXELS: f32 = 32.0;
@@ -170,13 +170,12 @@ fn inspect() -> Result<OwnedTextReport, OwnedTextProbeError> {
 fn with_owned_run<T>(
     work: impl FnOnce(&[u8], &FontFace<'_>, &TextRun, f32) -> Result<T, OwnedTextProbeError>,
 ) -> Result<T, OwnedTextProbeError> {
-    let source = selected_font::selected_face_data().ok_or(OwnedTextProbeError::Source)?;
+    let source = selected_font::selected_face_data(PROBE_EM_PIXELS as i32, PROBE_WEIGHT)
+        .ok_or(OwnedTextProbeError::Source)?;
     let face = FontFace::parse(&source).map_err(|_| OwnedTextProbeError::InvalidFace)?;
     let run = TextRun::build(&face, PROBE_TEXT).map_err(|_| OwnedTextProbeError::Run)?;
-    let pixels_per_design_unit = PROBE_EM_PIXELS / f32::from(run.metrics().units_per_em());
-    if !pixels_per_design_unit.is_finite() || pixels_per_design_unit <= 0.0 {
-        return Err(OwnedTextProbeError::Advance);
-    }
+    let pixels_per_design_unit = owned_text::pixels_per_design_unit(&run, PROBE_EM_PIXELS)
+        .ok_or(OwnedTextProbeError::Advance)?;
     work(&source, &face, &run, pixels_per_design_unit)
 }
 
@@ -196,17 +195,15 @@ fn draw_row(
     baseline_y: f32,
     paint: &Paint,
 ) -> Result<(), OwnedTextProbeError> {
-    for glyph in run.glyphs() {
-        let baseline = point(
-            PROBE_LEFT + glyph.pen_x() as f32 * pixels_per_design_unit,
-            baseline_y,
-        );
-        let mask = cache
-            .mask_at(glyph.glyph(), baseline, pixels_per_design_unit)
-            .map_err(|_| OwnedTextProbeError::Glyph)?;
-        canvas.fill_mask_offset(mask.mask(), mask.offset_x(), mask.offset_y(), paint);
-    }
-    Ok(())
+    owned_text::draw_row(
+        canvas,
+        cache,
+        run,
+        pixels_per_design_unit,
+        point(PROBE_LEFT, baseline_y),
+        paint,
+    )
+    .map_err(|_| OwnedTextProbeError::Glyph)
 }
 
 /// Times exactly one fixed row's owned cache lookup and composition work.
@@ -248,11 +245,8 @@ fn owned_advance_milli_pixels(
     run: &TextRun,
     pixels_per_design_unit: f32,
 ) -> Result<i64, OwnedTextProbeError> {
-    let milli_pixels = f64::from(run.advance_width()) * f64::from(pixels_per_design_unit) * 1_000.0;
-    if !milli_pixels.is_finite() || !(0.0..=i64::MAX as f64).contains(&milli_pixels) {
-        return Err(OwnedTextProbeError::Advance);
-    }
-    Ok(milli_pixels.round() as i64)
+    owned_text::advance_milli_pixels(run, pixels_per_design_unit)
+        .ok_or(OwnedTextProbeError::Advance)
 }
 
 /// Measures the fixed report's run-width difference without widening its schema.

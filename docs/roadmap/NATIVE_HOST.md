@@ -78,7 +78,9 @@ rasterizer and one bitmap blit. The portable renderer, brand artwork,
 font parser, glyph path/coverage adapter, glyph cache, and text-run foundation
 have no third-party or operating-system dependency. The production painter
 continues to use GDI text while the owned text path remains a fixed bounded
-quality and performance probe.
+quality and performance probe. A second local fixed-label comparison now
+measures current GDI and owned coverage geometry without promoting the owned
+route to a visible painter.
 
 Release-only frame, startup, idle, transport, and renderer measurements are
 maintained under [Performance](../PERFORMANCE.md). The current frame guard

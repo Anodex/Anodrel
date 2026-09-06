@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0215: Windows owned-text comparison stays fixed and local.
+
 - 0214: Fixed owned-text metric check stays local.
 
 - 0213: Windows owned-text report stays fixed and local.

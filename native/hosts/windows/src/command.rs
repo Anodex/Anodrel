@@ -37,7 +37,8 @@ macro_rules! two_argument_command {
 
 const USAGE: &str = concat!(
     "usage: anodrel-windows-host <exact command>\n",
-    "local reports: --owned-text-report | --idle-performance-report | ",
+    "local reports: --owned-text-report | --owned-text-comparison-report | ",
+    "--idle-performance-report | ",
     "--taskbar-progress-probe | --startup-report <anodrel.application.json>\n",
     "surfaces: --application <anodrel.application.json> | ",
     "--showcase <anodrel.application.json> | --ui-preview <document.json> | ",
@@ -56,6 +57,9 @@ pub(crate) fn run(arguments: Vec<String>, started: Instant) -> Result<(), Box<dy
     }
     if arguments.as_slice() == ["--owned-text-report"] {
         return win32::run_owned_text_report().map_err(Into::into);
+    }
+    if arguments.as_slice() == ["--owned-text-comparison-report"] {
+        return win32::run_owned_text_comparison_report().map_err(Into::into);
     }
 
     one_argument_command!(arguments, "--native-sample-client", native_probe::run);

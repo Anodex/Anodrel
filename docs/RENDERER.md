@@ -381,6 +381,12 @@ measurement. It reports only source/run/cache facts, two row timings, and the
 current GDI width for the same fixed face. It is not a renderer benchmark or a
 quality-equivalence claim (Decision 0213).
 
+`--owned-text-comparison-report` extends that evidence to four compiled static
+Windows-host labels at their exact regular or medium selected face. It compares
+GDI and owned advances, coverage counts, and aligned coverage overlap without
+opening a window or accepting input. It is still neither a visual-quality gate
+nor a visible-painter replacement; its exact fixed scope is Decision 0215.
+
 **3. Density.** Opt into per-monitor DPI awareness before creating a window. A
 renderer that produces its own antialiasing must not then be scaled by the
 system. Author layout against a base size and derive a scale from the client
