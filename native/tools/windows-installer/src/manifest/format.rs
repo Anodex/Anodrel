@@ -6,7 +6,7 @@ use anodrel_json::JsonValue;
 
 use crate::ReleaseManifestError;
 
-use super::{exact_fields, required_u16};
+use super::fields::{exact_fields, required_u16};
 
 /// One supported strict release-manifest field set.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

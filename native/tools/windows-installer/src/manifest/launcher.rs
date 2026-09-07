@@ -5,7 +5,7 @@ use anodrel_json::JsonValue;
 
 use crate::ReleaseManifestError;
 
-use super::{exact_fields, is_valid_executable_path, required_string};
+use super::fields::{exact_fields, is_valid_executable_path, required_string};
 
 /// One distinct Anodrel Windows host executable selected for product launch.
 pub struct ProductLauncher {

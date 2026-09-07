@@ -7,7 +7,10 @@ use anodrel_json::JsonValue;
 
 use crate::ReleaseManifestError;
 
-use super::{ProductMetadata, exact_fields, required_string};
+use super::{
+    ProductMetadata,
+    fields::{exact_fields, required_string},
+};
 
 /// Parses the exact product metadata shape for one release-manifest version.
 pub(super) fn parse(
