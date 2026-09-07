@@ -71,6 +71,10 @@ try {
         'fmt', '--manifest-path', $nativeManifest, '--all', '--', '--check'
     )
     Invoke-PowerShellCheck -Label 'TypeScript ownership guard' -Path (Join-Path $repositoryRoot 'scripts\check-typescript-ownership.ps1')
+    Invoke-NativeCheck -Label 'Windows PowerShell TypeScript ownership guard' -FilePath 'powershell' -Arguments @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+        (Join-Path $repositoryRoot 'scripts\check-typescript-ownership.ps1')
+    )
     Invoke-PowerShellCheck -Label 'Native ownership guard' -Path (Join-Path $repositoryRoot 'scripts\check-native-ownership.ps1')
     Invoke-NativeCheck -Label 'Native workspace lint' -FilePath 'cargo' -Arguments @(
         'clippy', '--manifest-path', $nativeManifest, '--workspace', '--all-targets', '--', '-D', 'warnings'

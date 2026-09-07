@@ -43,6 +43,9 @@ Node type definitions, and their one type-only transitive package. It reads the
 committed manifests and lockfile only; it installs nothing and makes no network,
 trust, installation, or desktop-UI change.
 
+It supports the inbox Windows PowerShell used by the repository's batch helpers
+as well as newer PowerShell releases.
+
 ~~~powershell
 .\scripts\check-typescript-ownership.ps1
 ~~~
@@ -59,11 +62,18 @@ and close a temporary host-owned window. Neither option creates trust,
 installation, network, or persistent application state. The verifier cannot
 replace the separate manual native consent, UAC, Start-menu, file-picker,
 Narrator/Inspect, and signed-fixture checks in `docs/WINDOWS_RELEASE.md`.
+It also reruns the TypeScript ownership guard through the inbox Windows
+PowerShell so double-clicked batch entry points stay covered.
 
 ~~~powershell
 .\scripts\verify-windows-release.ps1
 .\scripts\verify-windows-release.ps1 -IncludeIdleReport -IncludeAccessibilityReport
 ~~~
+
+Double-click `start-windows-release-evidence.bat` from the repository root to
+run that full release-candidate command without entering its options manually.
+It needs an interactive Windows desktop and opens the one 30-second idle window
+followed by the six temporary accessibility-probe windows.
 
 ## verify-windows-accessibility.ps1
 

@@ -33,6 +33,11 @@ $approvedLockDevelopmentPackages = @(
     'undici-types'
 )
 $violations = [System.Collections.Generic.List[string]]::new()
+$usesWindowsPowerShell = $PSVersionTable.PSEdition -eq 'Desktop'
+
+if ($usesWindowsPowerShell) {
+    Add-Type -AssemblyName System.Web.Extensions
+}
 
 function Add-Violation {
     param([Parameter(Mandatory)] [string] $Message)
@@ -46,7 +51,39 @@ function Get-Json {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "Required workspace file is missing: $Path"
     }
-    return [System.IO.File]::ReadAllText($Path) | ConvertFrom-Json -AsHashtable
+    $content = [System.IO.File]::ReadAllText($Path)
+    if ($usesWindowsPowerShell) {
+        return ([System.Web.Script.Serialization.JavaScriptSerializer]::new()).DeserializeObject($content)
+    }
+    return $content | ConvertFrom-Json -AsHashtable
+}
+
+function Get-RepositoryRelativePath {
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string] $Root
+    )
+
+    $separator = [System.IO.Path]::DirectorySeparatorChar
+    $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $prefix = "$fullRoot$separator"
+    if (-not $fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Workspace manifest is outside the repository: $Path"
+    }
+    return $fullPath.Substring($prefix.Length)
+}
+
+function Test-KeyedMap {
+    param([AllowNull()] [object] $Object)
+
+    return $Object -is [System.Collections.IDictionary] -or (
+        $null -ne $Object.PSObject.Methods['ContainsKey'] -and
+        $null -ne $Object.PSObject.Properties['Keys']
+    )
 }
 
 function Get-PropertyValue {
@@ -55,8 +92,8 @@ function Get-PropertyValue {
         [Parameter(Mandatory)] [string] $Name
     )
 
-    if ($Object -is [System.Collections.IDictionary]) {
-        if (-not $Object.Contains($Name)) {
+    if (Test-KeyedMap $Object) {
+        if (-not $Object.ContainsKey($Name)) {
             return $null
         }
         return $Object[$Name]
@@ -74,9 +111,9 @@ function Get-ObjectProperties {
     if ($null -eq $Object) {
         return @()
     }
-    if ($Object -is [System.Collections.IDictionary]) {
-        return @($Object.GetEnumerator() | ForEach-Object {
-                [PSCustomObject]@{ Name = [string]$_.Key; Value = $_.Value }
+    if (Test-KeyedMap $Object) {
+        return @($Object.Keys | ForEach-Object {
+                [PSCustomObject]@{ Name = [string]$_; Value = $Object[$_] }
             })
     }
     return @($Object.PSObject.Properties)
@@ -162,7 +199,7 @@ if ($workspaceFiles.Count -eq 0) {
 $workspaceManifests = @{}
 $workspaceNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($file in $workspaceFiles) {
-    $relativeManifestPath = [System.IO.Path]::GetRelativePath($repositoryRoot, $file.FullName)
+    $relativeManifestPath = Get-RepositoryRelativePath -Path $file.FullName -Root $repositoryRoot
     $relativePath = [System.IO.Path]::GetDirectoryName($relativeManifestPath).Replace([char]92, [char]47)
     $manifest = Get-Json $file.FullName
     $workspaceName = [string](Get-PropertyValue -Object $manifest -Name 'name')

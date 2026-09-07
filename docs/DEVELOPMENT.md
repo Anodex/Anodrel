@@ -290,7 +290,8 @@ It runs formatting, native ownership, strict native lint, source and
 documentation checks, the complete native workspace suite, the release frame
 budget, and the sample startup report. It does not create trust or installation
 state and cannot replace the documented native desktop and signed-fixture
-acceptance checks.
+acceptance checks. It also runs the TypeScript ownership guard through the
+inbox Windows PowerShell used by the repository's double-clickable batch files.
 
 To rerun the six fixed direct Windows UI Automation diagnostics together, use:
 
@@ -301,6 +302,18 @@ To rerun the six fixed direct Windows UI Automation diagnostics together, use:
 It creates brief host-owned diagnostic windows but no trust, installation,
 network, package, or persistent user state. The manual Narrator and Inspect
 checks in `docs/ACCESSIBILITY_VERIFICATION.md` remain separate release evidence.
+
+For the full repeatable release-candidate evidence set, including the static
+idle window and the six direct UI Automation probes, double-click
+`start-windows-release-evidence.bat` in the repository root. It runs the same
+explicit command below and needs an interactive desktop:
+
+~~~text
+.\scripts\verify-windows-release.ps1 -IncludeIdleReport -IncludeAccessibilityReport
+~~~
+
+It does not create certificate trust, install a fixture, change machine policy,
+or replace any required manual desktop check.
 
 
 ## Direct Linux Wayland lab

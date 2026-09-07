@@ -82,6 +82,8 @@ run the six fixed direct Windows UI Automation probes after the non-interactive
 checks. That opt-in needs an interactive desktop and opens one temporary
 host-owned diagnostic window per probe; it is repeatable direct-client evidence,
 not a substitute for the manual Narrator and Inspect checks above.
+`start-windows-release-evidence.bat` runs both release-candidate opt-ins from
+the repository root for an interactive Windows desktop.
 
 ## Windows-first sequence
 
