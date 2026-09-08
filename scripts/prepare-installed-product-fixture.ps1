@@ -31,6 +31,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $CertificateSubject = 'CN=Anodrel Development Installed Fixture'
+$CertificateProvider = 'Microsoft Enhanced RSA and AES Cryptographic Provider'
 $FixtureVersion = '0.1.0'
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 $CargoManifest = Join-Path $RepositoryRoot 'native\Cargo.toml'
@@ -114,6 +115,28 @@ function Get-CertificateFingerprint {
     }
 }
 
+function Test-FixtureCertificateSigner {
+    param([Parameter(Mandatory)] $Certificate)
+
+    $privateKey = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Certificate)
+    if ($null -eq $privateKey) {
+        return $false
+    }
+    try {
+        if ($privateKey -isnot [Security.Cryptography.RSACryptoServiceProvider]) {
+            return $false
+        }
+        $container = $privateKey.CspKeyContainerInfo
+        return $container.ProviderName -eq $CertificateProvider -and $container.KeyNumber -eq 2
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $privateKey.Dispose()
+    }
+}
+
 function Get-FixtureCertificate {
     $certificates = @(
         Get-ChildItem 'Cert:\CurrentUser\My' |
@@ -123,11 +146,19 @@ function Get-FixtureCertificate {
                 $_.NotAfter -gt (Get-Date).AddDays(1)
             }
     )
-    if ($certificates.Count -gt 1) {
-        throw 'More than one usable development installer certificate exists. Remove the duplicate before preparing the fixture.'
+    $compatibleCertificates = @(
+        $certificates | Where-Object { Test-FixtureCertificateSigner -Certificate $_ }
+    )
+    if ($compatibleCertificates.Count -gt 1) {
+        throw 'More than one compatible development installer certificate exists. Remove the duplicate before preparing the fixture.'
     }
-    if ($certificates.Count -eq 1) {
-        return @{ Certificate = $certificates[0]; Created = $false }
+    if ($certificates.Count -ne $compatibleCertificates.Count) {
+        Write-Host 'Removing an incompatible development installer certificate.'
+        Remove-FixtureCertificate
+        $compatibleCertificates = @()
+    }
+    if ($compatibleCertificates.Count -eq 1) {
+        return @{ Certificate = $compatibleCertificates[0]; Created = $false }
     }
 
     Write-Host 'Creating the development installer code-signing certificate.'
@@ -137,6 +168,8 @@ function Get-FixtureCertificate {
         -KeyUsage DigitalSignature `
         -KeyAlgorithm RSA `
         -KeyLength 3072 `
+        -Provider $CertificateProvider `
+        -KeySpec Signature `
         -CertStoreLocation 'Cert:\CurrentUser\My' `
         -NotAfter (Get-Date).AddMonths(6)
     return @{ Certificate = $certificate; Created = $true }
@@ -158,7 +191,7 @@ function Add-MachineTrust {
                 ).Count -gt 0
                 if (-not $alreadyPresent) {
                     $store.Add($Certificate)
-                    $addedStores += $storeName
+                    $addedStores += "Cert:\LocalMachine\$storeName"
                     Write-Host "Installed the development certificate into LocalMachine\$storeName."
                 }
             }
@@ -352,18 +385,34 @@ try {
         -FailureMessage 'The signed fixture installer did not pass its read-only verification.' | Out-Null
 }
 catch {
+    $preparationError = $_
     if ($fixtureDirectoryCreated) {
-        Remove-FixtureDirectory
+        try {
+            Remove-FixtureDirectory
+        }
+        catch {
+            Write-Warning 'The failed preparation left its local output for manual inspection.'
+        }
     }
     if ($null -ne $certificateState) {
         if ($addedTrustStores.Count -gt 0) {
-            Remove-CertificateEntries -Certificate $certificateState.Certificate -Stores $addedTrustStores
+            try {
+                Remove-CertificateEntries -Certificate $certificateState.Certificate -Stores $addedTrustStores
+            }
+            catch {
+                Write-Warning 'The failed preparation could not remove every machine-trust entry it created.'
+            }
         }
         if ($certificateState.Created) {
-            Remove-CertificateEntries -Certificate $certificateState.Certificate -Stores @('Cert:\CurrentUser\My')
+            try {
+                Remove-CertificateEntries -Certificate $certificateState.Certificate -Stores @('Cert:\CurrentUser\My')
+            }
+            catch {
+                Write-Warning 'The failed preparation could not remove its current-user certificate.'
+            }
         }
     }
-    throw
+    throw $preparationError
 }
 
 Write-Host ''

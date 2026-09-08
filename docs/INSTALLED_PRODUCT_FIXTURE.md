@@ -49,10 +49,12 @@ format, webview, Node runtime, or third-party desktop runtime is involved.
 ## Prepare the signed installer
 
 This is an explicit development-machine trust change. The script creates or
-reuses one local certificate in the current user's personal certificate store
-and adds that exact certificate to `LocalMachine\Root` and
-`LocalMachine\TrustedPublisher`. It needs an elevated PowerShell session and
-reverses those entries during removal.
+reuses one fixed Windows legacy-CSP RSA signature certificate in the current
+user's personal certificate store and adds that exact certificate to
+`LocalMachine\Root` and `LocalMachine\TrustedPublisher`. The direct owned
+`SignerSignEx` route requires a certificate associated with a CSP; a default
+CNG development key is deliberately replaced rather than reused. It needs an
+elevated PowerShell session and reverses those entries during removal.
 
 Before using it, make sure the staged product fixture is not selected. If you
 previously ran `provision-product-fixture.ps1`, remove that fixture first; the

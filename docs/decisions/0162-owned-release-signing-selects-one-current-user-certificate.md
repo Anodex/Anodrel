@@ -41,6 +41,11 @@ service.
 - The final signed image is produced by Anodrel and Windows APIs only.
 - Certificate selection is reproducible and non-interactive, but the operator
   must provision an accessible current-user signing certificate separately.
+- The development installer fixture creates one fixed legacy-CSP RSA signature
+  key, not a default CNG key: the direct `SignerSignEx` call supplies no
+  provider descriptor and Windows requires the selected certificate to be
+  associated with a CSP in that mode. Production key-provider choices remain
+  an explicit revisit condition.
 - Version 1 signatures have no timestamp. A production release needs an
   approved timestamp policy before certificate expiry can be handled honestly.
 - A development self-signed certificate remains a manual, removable fixture;
