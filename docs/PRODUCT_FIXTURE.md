@@ -280,27 +280,31 @@ Automated coverage lives with each component:
 - the Startup Lab has a test that the launch tile is linked only when a
   preflight result says the fixture validated.
 
-### End-to-end validation is still pending
+### End-to-end evidence
 
-**The joined signed path has never been run.** Provisioning installs a locally
-generated code-signing certificate into machine trust, and that has deliberately
-not been done on any machine yet. So while every component is unit tested, and
-the protocol half of the fixture's own conversation is covered by an integration
-test that needs no provisioning, the following remain unverified in practice:
+On 2026-09-07, the primary joined path was demonstrated on the development
+machine. The query-only `-Verify` route accepted the signed record, the copied
+launcher started and exited, and the operator completed the visible product
+session action. This is evidence that the real signed record, Authenticode
+acceptance, launcher self-verification, locked child launch, bootstrap delivery,
+authenticated window, semantic action, and normal session close joined on that
+machine.
 
-- that Windows Authenticode accepts the generated development certificate;
-- that the composed record passes the host's own parser against a real signed
-  executable;
-- that launcher self-verification, locked child launch, bootstrap delivery, and
-  child start succeed together;
-- that the Startup Lab tile goes live and back again with provisioning; and
-- that the child, pipe worker, and window shut down cleanly on each path.
+That is intentionally a **primary-path result**, not full fixture acceptance.
+The following checks remain to be run and recorded before a release candidate
+can call this fixture flow complete:
 
-Treat this fixture as designed and tested in parts, not as demonstrated.
-`docs/DEVELOPMENT_DIAGNOSTICS.md` carries the manual sequence for whenever installing that
-certificate is acceptable: provision, run the host route, confirm the delivered
-document, activate the action, watch the window close, and confirm the child is
-gone.
+- the title-bar-close path, including child cleanup;
+- terminating the child while its window is open, including automatic window
+  close;
+- Startup Lab cancellation while the session is starting;
+- removal of the staged fixture, including the Startup Lab returning to its
+  inert state; and
+- the separate installed-fixture installation, Explorer, uninstallation,
+  recovery, and cleanup procedure.
+
+`docs/DEVELOPMENT_DIAGNOSTICS.md` carries those manual checks. The fixture
+remains a development test harness, not a product or production trust result.
 
 See `docs/LAUNCH.md`, `docs/PRODUCT_SESSIONS.md`, `docs/SIGNING.md`, the
 [installed development fixture](INSTALLED_PRODUCT_FIXTURE.md), and Decisions
