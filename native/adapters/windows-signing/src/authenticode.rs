@@ -101,12 +101,8 @@ pub(super) fn sign_file(path: &Path, fingerprint: [u8; 32]) -> Result<(), Window
         file_name: image_name.as_ptr(),
         file: ptr::null_mut(),
     };
-    let mut subject = SignerSubjectInfo {
-        size: size_of::<SignerSubjectInfo>(),
-        index: ptr::null_mut(),
-        choice: SIGNER_SUBJECT_FILE,
-        file_info: &mut file,
-    };
+    let mut signer_index = 0;
+    let mut subject = file_subject(&mut file, &mut signer_index);
     let mut store_info = SignerCertificateStoreInfo {
         size: size_of::<SignerCertificateStoreInfo>(),
         certificate: certificate.context(),
@@ -130,8 +126,9 @@ pub(super) fn sign_file(path: &Path, fingerprint: [u8; 32]) -> Result<(), Window
     let mut raw_context = ptr::null_mut();
     // SAFETY: Every structure has the documented C layout and references data
     // that remains alive throughout this synchronous call. The certificate is
-    // selected from the live current-user store, and all optional pointer
-    // parameters are null by contract.
+    // selected from the live current-user store. The reserved subject index is
+    // a live pointer to zero as `SignerSignEx` requires, and all optional
+    // pointer parameters are null by contract.
     let status = unsafe {
         (signer.sign)(
             0,
@@ -150,6 +147,15 @@ pub(super) fn sign_file(path: &Path, fingerprint: [u8; 32]) -> Result<(), Window
         return Err(WindowsSigningError::AuthenticodeFailed);
     }
     Ok(())
+}
+
+fn file_subject(file: &mut SignerFileInfo, index: &mut u32) -> SignerSubjectInfo {
+    SignerSubjectInfo {
+        size: size_of::<SignerSubjectInfo>(),
+        index,
+        choice: SIGNER_SUBJECT_FILE,
+        file_info: file,
+    }
 }
 
 struct SigningLibrary {
@@ -274,11 +280,11 @@ const fn size_of<T>() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
+    use std::{mem, ptr};
 
     use super::{
         SignerCertificate, SignerCertificateStoreInfo, SignerFileInfo, SignerSignatureInfo,
-        SignerSubjectInfo,
+        SignerSubjectInfo, file_subject,
     };
 
     #[cfg(target_pointer_width = "64")]
@@ -289,5 +295,22 @@ mod tests {
         assert_eq!(mem::size_of::<SignerCertificateStoreInfo>(), 32);
         assert_eq!(mem::size_of::<SignerCertificate>(), 24);
         assert_eq!(mem::size_of::<SignerSignatureInfo>(), 40);
+    }
+
+    #[test]
+    fn file_subject_passes_a_live_zero_for_the_reserved_index() {
+        let mut file = SignerFileInfo {
+            size: mem::size_of::<SignerFileInfo>() as u32,
+            file_name: ptr::null(),
+            file: ptr::null_mut(),
+        };
+        let mut index = 0;
+        let expected_index = &mut index as *mut u32;
+        let subject = file_subject(&mut file, &mut index);
+
+        assert_eq!(subject.index, expected_index);
+        // SAFETY: `subject.index` points at the live local `index` through the
+        // complete assertion, just as it does through the synchronous signer call.
+        assert_eq!(unsafe { *subject.index }, 0);
     }
 }
