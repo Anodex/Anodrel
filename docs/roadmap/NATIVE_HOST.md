@@ -84,7 +84,7 @@ route to a visible painter.
 
 Release-only frame, startup, idle, transport, and renderer measurements are
 maintained under [Performance](../PERFORMANCE.md). The current frame guard
-records 6.30 ms average and 7.98 ms worst sustained frame time against a 16 ms
+records 6.34 ms average and 8.06 ms worst sustained frame time against a 16 ms
 interval; that is a regression guard, not an application comparison claim.
 
 ### Distribution and updates
