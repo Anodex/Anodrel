@@ -1,16 +1,21 @@
 //! The closed three-operation typed UI session.
 
+mod payload;
+
 use std::io::{Read, Write};
 
 use anodrel_client::{Client, ProtocolVersion};
 use anodrel_json::JsonValue;
-use anodrel_ui_document::{decode, decode_v2, decode_v3};
 use anodrel_window::WindowTitleProposal;
 
 use crate::{
     ContextMenuRevision, DocumentRevision, MenuRevision, SecondaryWindowId, UiActionBatch,
     UiClientError, UiContextMenuActionBatch, UiEventBatch, UiFieldSnapshot, WindowUiActionBatch,
     context_menu_model::decode_context_menu_model, menu_model::decode_menu_model,
+};
+use payload::{
+    document_payload, parse_document_revision, targeted_document_payload, validate_document,
+    validate_document_v2, validate_document_v3, window_document_payload,
 };
 
 /// The smallest protocol version that provides every typed UI-session operation.
@@ -29,8 +34,6 @@ const UI_MULTI_WINDOW_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(25);
 const UI_LIVE_STATUS_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(26);
 /// The first protocol version with explicit scroll documents in secondary views.
 const UI_MULTI_WINDOW_SCROLL_PROTOCOL: ProtocolVersion = ProtocolVersion::v1(27);
-/// The operation-level document input limit inside one Wire v1 message.
-const MAX_SESSION_DOCUMENT_BYTES: usize = 24 * 1024;
 /// The initial request sequence. Zero remains unavailable as an internal guard.
 const INITIAL_REQUEST_SEQUENCE: u64 = 1;
 
@@ -415,81 +418,6 @@ where
             .ok_or(UiClientError::RequestIdsExhausted)?;
         Ok(format!("anodrel-ui-{sequence}"))
     }
-}
-
-fn validate_document(document: &str) -> Result<(), UiClientError> {
-    if document.len() > MAX_SESSION_DOCUMENT_BYTES || decode(document).is_err() {
-        Err(UiClientError::DocumentInvalid)
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_document_v2(document: &str) -> Result<(), UiClientError> {
-    if document.len() > MAX_SESSION_DOCUMENT_BYTES || decode_v2(document).is_err() {
-        Err(UiClientError::DocumentInvalid)
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_document_v3(document: &str) -> Result<(), UiClientError> {
-    if document.len() > MAX_SESSION_DOCUMENT_BYTES || decode_v3(document).is_err() {
-        Err(UiClientError::DocumentInvalid)
-    } else {
-        Ok(())
-    }
-}
-
-fn document_payload(document: &str) -> JsonValue {
-    JsonValue::Object(
-        [(
-            "document".to_owned(),
-            JsonValue::String(document.to_owned()),
-        )]
-        .into_iter()
-        .collect(),
-    )
-}
-
-fn window_document_payload(title: &str, document: &str) -> JsonValue {
-    JsonValue::Object(
-        [
-            ("title".to_owned(), JsonValue::String(title.to_owned())),
-            (
-                "document".to_owned(),
-                JsonValue::String(document.to_owned()),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    )
-}
-
-fn targeted_document_payload(window: SecondaryWindowId, document: &str) -> JsonValue {
-    JsonValue::Object(
-        [
-            (
-                "windowId".to_owned(),
-                JsonValue::String(window.protocol_string()),
-            ),
-            (
-                "document".to_owned(),
-                JsonValue::String(document.to_owned()),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    )
-}
-
-fn parse_document_revision(result: &JsonValue) -> Result<DocumentRevision, UiClientError> {
-    result
-        .as_object()
-        .and_then(|fields| fields.get("revision"))
-        .and_then(JsonValue::as_string)
-        .ok_or(UiClientError::ResponseInvalid)
-        .and_then(DocumentRevision::parse)
 }
 
 impl<Stream> std::fmt::Debug for UiSession<Stream> {
