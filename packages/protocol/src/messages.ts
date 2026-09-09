@@ -1,12 +1,7 @@
 /** Versioned request, response, error, and semantic-event envelopes. */
 
-import type {
-  Capability,
-  PayloadFor,
-  PlatformOperation,
-  ProtocolVersion,
-  ResultFor,
-} from "./index.js";
+import type { PayloadFor, PlatformOperation, ResultFor } from "./index.js";
+import type { Capability, ProtocolVersion } from "./types.js";
 
 /**
  * The request constructed by the client SDK. The transport adapter binds it to

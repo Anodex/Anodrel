@@ -1,6 +1,6 @@
 //! Private pure validation primitives shared by protocol payload guards.
 
-import type { ProtocolVersion } from "../index.js";
+import type { ProtocolVersion } from "../types.js";
 
 export function isValidatedHttpsUrl(value: string): boolean {
   if (value.length === 0 || !/^[\x21-\x7e]+$/.test(value) || value.includes("\\")) {
