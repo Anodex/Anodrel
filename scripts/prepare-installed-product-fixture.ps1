@@ -8,13 +8,13 @@ the same owned release chain used by the Windows installer: package staging,
 bundle authoring, manifest derivation, resource embedding, and Authenticode
 signing. It creates a local development code-signing certificate and adds it to
 machine trust, which is a real machine change. Run it only on a development
-machine and use -Remove after the signed installer has explicitly uninstalled
-the fixture.
+machine and use -Remove only after the signed installer has explicitly
+uninstalled the fixture and Windows has completed its restart-delayed cleanup.
 
 The script has no product, package, certificate, output, or installer command
 inputs. Its only optional action is -Remove, which removes only this script's
 known local output and certificate entries after no valid fixture record is
-selected.
+selected and no installed fixture directory remains.
 
 .EXAMPLE
 PS> .\scripts\prepare-installed-product-fixture.ps1
@@ -45,6 +45,8 @@ $ManifestPath = Join-Path $FixtureRoot 'fixture.release.json'
 $UnsignedInstallerPath = Join-Path $FixtureRoot 'fixture.unsigned-installer.exe'
 $SignedInstallerPath = Join-Path $FixtureRoot 'AnodrelDevelopmentProductFixtureInstaller.exe'
 $FixturePolicyPath = "HKLM:\Software\Anodrel\Applications\$FixtureApplicationId"
+$ProgramFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
+$InstalledFixtureRoot = [IO.Path]::GetFullPath((Join-Path $ProgramFiles "Anodrel\Applications\$FixtureApplicationId"))
 
 function Assert-Elevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -290,6 +292,12 @@ function Assert-FixturePolicyAbsent {
     throw 'A product-fixture policy record remains but does not validate. Do not remove fixture trust or prepare another fixture until that machine state has been investigated.'
 }
 
+function Assert-FixtureInstalledCleanupComplete {
+    if (Test-Path -LiteralPath $InstalledFixtureRoot) {
+        throw 'Installed product-fixture cleanup is still pending. Restart Windows to complete delayed removal, then run this script again. Do not remove development certificate trust first.'
+    }
+}
+
 function Sign-Image {
     param(
         [Parameter(Mandatory)] [string] $Path,
@@ -336,6 +344,7 @@ if ($Remove) {
     $provisioningTool = Get-ToolPath -Name 'anodrel-product-provisioning'
     Assert-Elevated
     Assert-FixturePolicyAbsent -ProvisioningTool $provisioningTool
+    Assert-FixtureInstalledCleanupComplete
     Remove-FixtureDirectory
     Remove-FixtureCertificate
     Write-Host 'The prepared installed product fixture has been removed.'
@@ -357,6 +366,7 @@ Build-Tools -Packages $packages
 $provisioningTool = Get-ToolPath -Name 'anodrel-product-provisioning'
 
 Assert-FixturePolicyAbsent -ProvisioningTool $provisioningTool
+Assert-FixtureInstalledCleanupComplete
 if (Test-Path -LiteralPath $FixtureRoot) {
     throw 'The fixed fixture output directory already exists. Run this script with -Remove after confirming no fixture record is selected.'
 }
@@ -439,4 +449,4 @@ Write-Host 'Start this signed installer normally to exercise native consent and 
 Write-Host "  & `"$SignedInstallerPath`""
 Write-Host ''
 Write-Host 'After installation, launch “Anodrel Product Fixture” from the Start menu, use its action, and confirm that it closes.'
-Write-Host 'To remove it, run the installed signed uninstaller with “remove” from a normal PowerShell session, then run this script with -Remove.'
+Write-Host 'To remove it, run the installed signed uninstaller with “remove” from a normal PowerShell session, restart Windows, then run this script with -Remove.'

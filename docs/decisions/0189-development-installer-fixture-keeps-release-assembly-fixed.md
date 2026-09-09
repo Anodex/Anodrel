@@ -44,8 +44,10 @@ An operator starts the signed installer normally to see native consent and the
 fixed UAC handoff, then launches the registered Start-menu entry. The removal
 route refuses while a valid fixture record remains selected, so an operator
 must first use the matching signed installer's explicit elevated `uninstall`
-command. It then removes only its known generated directory and certificate
-entries.
+command. It also refuses while the restart-delayed uninstaller cleanup still
+leaves the fixed package directory, so development certificate trust remains
+available to that signed image until Windows has deleted it. It then removes
+only its known generated directory and certificate entries.
 
 The certificate, package version, update source, product metadata, grants,
 child path, launcher path, and output names are development-fixture constants.

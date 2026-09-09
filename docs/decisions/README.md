@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0218: Fixture trust remains through delayed uninstaller cleanup.
+
 - 0217: Initial-install failures use fixed safe statuses.
 
 - 0216: First-party basic-Latin GPOS pair positioning stays bounded.

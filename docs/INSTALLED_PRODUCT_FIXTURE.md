@@ -121,18 +121,25 @@ derived Start-menu entry. The running signed image and its empty directories
 are queued for deletion at the next restart. It accepts no application
 identity, package path, registry path, or cleanup target.
 
-After that command succeeds, remove the generated development material from an
-elevated PowerShell session:
+That removal schedules its still-running signed uninstaller and its empty
+package directories for deletion at the next Windows restart. **Restart Windows
+before removing the development certificate.** This preserves trust until the
+last signed cleanup image is gone and prevents a stale uninstaller from failing
+signature verification.
+
+After the restart, remove the generated development material from an elevated
+PowerShell session:
 
 ~~~powershell
 .\scripts\prepare-installed-product-fixture.ps1 -Remove
 ~~~
 
 The script refuses to remove certificate trust or its local output while any
-product-fixture policy record remains, including a record that fails
-validation. This prevents an operator from leaving an installed fixture whose
-signature no longer chains to its intended development trust or discarding the
-evidence needed to investigate a failed machine transaction.
+product-fixture policy record or installed package directory remains, including
+a record that fails validation. This prevents an operator from leaving an
+installed fixture whose signature no longer chains to its intended development
+trust or discarding the evidence needed to investigate a failed machine
+transaction.
 
 ## Relationship to the staged fixture
 
