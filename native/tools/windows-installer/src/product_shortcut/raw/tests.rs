@@ -21,6 +21,21 @@ fn writes_one_shell_link_in_a_regular_temporary_directory() {
 }
 
 #[test]
+fn writes_one_shell_link_from_canonical_windows_paths() {
+    let directory = TestDirectory::new("shortcut-canonical");
+    let executable = std::env::current_exe().expect("current test image is available");
+    let executable = std::fs::canonicalize(executable).expect("test image canonicalizes");
+    let parent = executable.parent().expect("test image has a parent");
+    let link = directory.path().join("Anodrel Canonical Test.lnk");
+    let arguments = ProductLaunchArguments::for_application("org.anodrel.shortcut-test")
+        .expect("fixed test identity is valid");
+
+    replace_link(&executable, parent, &arguments, &link)
+        .expect("canonical Windows paths persist a Shell Link");
+    assert!(link.is_file());
+}
+
+#[test]
 fn removes_only_the_regular_shell_link_it_just_created() {
     let directory = TestDirectory::new("shortcut");
     let executable = std::env::current_exe().expect("current test image is available");

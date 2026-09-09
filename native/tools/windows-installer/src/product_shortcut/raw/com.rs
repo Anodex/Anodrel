@@ -6,7 +6,7 @@ use std::{
     ptr::{self, NonNull},
 };
 
-use super::{ShortcutWriteError, wide_path};
+use super::{ShortcutWriteError, wide_shell_path};
 
 type Hresult = i32;
 
@@ -126,7 +126,7 @@ pub(super) fn persist_link(
     set_link_working_directory(&link, package_root)?;
     set_link_arguments(&link, arguments)?;
     let persistence = query_persist_file(&link)?;
-    let temporary_path = wide_path(temporary_path)?;
+    let temporary_path = wide_shell_path(temporary_path)?;
     // SAFETY: `persistence` owns a valid `IPersistFile`; the staged path is
     // NUL terminated, within the fixed normal parent, and `1` is TRUE for the
     // documented remember-path flag.
@@ -169,7 +169,7 @@ fn create_shell_link() -> Result<Com<ShellLink>, ShortcutWriteError> {
 }
 
 fn set_link_path(link: &Com<ShellLink>, path: &Path) -> Result<(), ShortcutWriteError> {
-    let path = wide_path(path)?;
+    let path = wide_shell_path(path)?;
     // SAFETY: `link` owns an `IShellLinkW`; `path` remains NUL terminated for
     // the documented synchronous call.
     let result = unsafe { ((*(*link.as_ptr()).vtable).set_path)(link.as_ptr(), path.as_ptr()) };
@@ -182,7 +182,7 @@ fn set_link_working_directory(
     link: &Com<ShellLink>,
     path: &Path,
 ) -> Result<(), ShortcutWriteError> {
-    let path = wide_path(path)?;
+    let path = wide_shell_path(path)?;
     // SAFETY: `link` owns an `IShellLinkW`; `path` remains NUL terminated for
     // the documented synchronous call.
     let result =
@@ -219,7 +219,7 @@ pub(super) fn read_persisted_arguments(path: &Path) -> Result<String, ShortcutWr
     let _apartment = ComApartment::initialize()?;
     let link = create_shell_link()?;
     let persistence = query_persist_file(&link)?;
-    let path = wide_path(path)?;
+    let path = wide_shell_path(path)?;
     // SAFETY: `persistence` owns an `IPersistFile`; the test-created path is
     // NUL terminated and its mode is the documented read-only value.
     let loaded =

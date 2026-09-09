@@ -289,6 +289,31 @@ fn wide_path(path: &Path) -> Result<Vec<u16>, ShortcutWriteError> {
     Ok(wide)
 }
 
+/// Encodes one verified local path for the Shell Link COM surface.
+///
+/// Rust canonicalization on Windows produces an extended-length `\\?\` path.
+/// That form remains the record and verification representation, but
+/// `IShellLinkW` rejects it for a target, working directory, or persisted link.
+/// Shell Link receives only the equivalent ordinary local-drive representation.
+pub(super) fn wide_shell_path(path: &Path) -> Result<Vec<u16>, ShortcutWriteError> {
+    let mut wide = wide_path(path)?;
+    const EXTENDED_PREFIX: [u16; 4] = [b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+    if !wide.starts_with(&EXTENDED_PREFIX) {
+        return Ok(wide);
+    }
+    wide.drain(..EXTENDED_PREFIX.len());
+    let is_ascii_drive = wide.first().is_some_and(|drive| {
+        (u16::from(b'A')..=u16::from(b'Z')).contains(drive)
+            || (u16::from(b'a')..=u16::from(b'z')).contains(drive)
+    });
+    let is_local_drive = is_ascii_drive
+        && wide.get(1) == Some(&u16::from(b':'))
+        && wide.get(2) == Some(&u16::from(b'\\'));
+    is_local_drive
+        .then_some(wide)
+        .ok_or(ShortcutWriteError::PathInvalid)
+}
+
 fn succeeded(result: Hresult) -> bool {
     result >= 0
 }
