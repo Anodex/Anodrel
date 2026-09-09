@@ -48,6 +48,7 @@ impl std::fmt::Debug for PayloadDescriptor {
 }
 
 /// One exact application release selected by a signed installer image.
+#[derive(Clone)]
 pub struct ReleaseManifest {
     application_id: String,
     package_version: PackageVersion,

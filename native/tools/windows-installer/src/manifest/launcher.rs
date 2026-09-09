@@ -8,6 +8,7 @@ use crate::ReleaseManifestError;
 use super::fields::{exact_fields, is_valid_executable_path, required_string};
 
 /// One distinct Anodrel Windows host executable selected for product launch.
+#[derive(Clone)]
 pub struct ProductLauncher {
     path: String,
     digest: [u8; 32],

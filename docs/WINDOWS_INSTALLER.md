@@ -168,7 +168,10 @@ A promotion-ready stage can become only its signed three-part version directory
 under the same installer-owned application root. The destination must be
 absent. The owned boundary uses `MoveFileExW` with neither copy nor replacement
 flags, so it cannot overwrite an existing version or fall back to a
-cross-volume copy-and-delete operation.
+cross-volume copy-and-delete operation. After that move, it renders a fresh
+machine record for the final version directory and validates it against that
+complete promoted package. A record rendered for a private staging directory
+is never published.
 
 Promotion itself publishes no machine policy. If it fails, the stage stays
 unpublished and its owner removes it. If it succeeds but a later registry

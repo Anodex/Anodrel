@@ -11,6 +11,7 @@ pub const MAX_UPDATE_CATALOGUE_PATH_BYTES: usize = 512;
 ///
 /// This is private native-host policy. It never grants application network
 /// authority and must not be serialized to a renderer or protocol response.
+#[derive(Clone)]
 pub struct UpdateCatalogueLocation {
     origin: NetworkOrigin,
     request_path: String,

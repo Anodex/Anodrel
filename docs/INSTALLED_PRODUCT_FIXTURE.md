@@ -56,10 +56,12 @@ user's personal certificate store and adds that exact certificate to
 CNG development key is deliberately replaced rather than reused. It needs an
 elevated PowerShell session and reverses those entries during removal.
 
-Before using it, make sure the staged product fixture is not selected. If you
+Before using it, make sure no product-fixture policy record remains. If you
 previously ran `provision-product-fixture.ps1`, remove that fixture first; the
 two procedures share an identity and an initial installation must refuse an
-existing selected policy.
+existing policy. The preparation script also refuses a record that fails
+validation; it will not remove development trust or assemble another fixture
+over uncertain machine state.
 
 From an **elevated** PowerShell session at the repository root:
 
@@ -126,10 +128,11 @@ elevated PowerShell session:
 .\scripts\prepare-installed-product-fixture.ps1 -Remove
 ~~~
 
-The script refuses to remove certificate trust or its local output while a
-valid product-fixture policy remains selected. This prevents an operator from
-leaving an installed fixture whose signature no longer chains to its intended
-development trust.
+The script refuses to remove certificate trust or its local output while any
+product-fixture policy record remains, including a record that fails
+validation. This prevents an operator from leaving an installed fixture whose
+signature no longer chains to its intended development trust or discarding the
+evidence needed to investigate a failed machine transaction.
 
 ## Relationship to the staged fixture
 

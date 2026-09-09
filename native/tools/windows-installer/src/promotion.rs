@@ -5,9 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anodrel_application::InstalledApplication;
+
 use crate::prepared::into_promotion_parts;
 use crate::staging::StagedRelease;
-use crate::{PackageVersion, PreparedRelease};
+use crate::{PackageVersion, PreparedRelease, ReleaseManifest};
 
 mod raw;
 
@@ -59,6 +61,8 @@ pub enum PromotionError {
     VersionAlreadyExists,
     /// Windows could not rename the private stage to the sibling version directory.
     DirectoryMoveFailed,
+    /// The final promoted package could not validate against its final record.
+    PromotedRecordInvalid(anodrel_application::InstalledApplicationError),
 }
 
 impl fmt::Display for PromotionError {
@@ -67,12 +71,22 @@ impl fmt::Display for PromotionError {
             Self::StagingPathInvalid => "the private staging path is invalid",
             Self::VersionAlreadyExists => "the release version already exists",
             Self::DirectoryMoveFailed => "Windows could not promote the release directory",
+            Self::PromotedRecordInvalid(_) => "the promoted release record is invalid",
         };
         formatter.write_str(message)
     }
 }
 
-impl std::error::Error for PromotionError {}
+impl std::error::Error for PromotionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::PromotedRecordInvalid(error) => Some(error),
+            Self::StagingPathInvalid | Self::VersionAlreadyExists | Self::DirectoryMoveFailed => {
+                None
+            }
+        }
+    }
+}
 
 /// Promotes a fully checked stage to its new signed version directory.
 ///
@@ -84,16 +98,15 @@ impl std::error::Error for PromotionError {}
 pub fn promote_prepared_release(
     prepared: PreparedRelease,
 ) -> Result<PromotedRelease, PromotionError> {
-    let (staged, version, application_id) = into_promotion_parts(prepared);
-    promote_staged_release(staged, version, application_id)
+    let (staged, manifest) = into_promotion_parts(prepared);
+    promote_staged_release(staged, manifest)
 }
 
 fn promote_staged_release(
     staged: StagedRelease,
-    version: PackageVersion,
-    application_id: String,
+    manifest: ReleaseManifest,
 ) -> Result<PromotedRelease, PromotionError> {
-    let destination = version_destination(staged.package_root(), version)?;
+    let destination = version_destination(staged.package_root(), manifest.package_version())?;
     if destination
         .try_exists()
         .map_err(|_| PromotionError::StagingPathInvalid)?
@@ -101,9 +114,12 @@ fn promote_staged_release(
         return Err(PromotionError::VersionAlreadyExists);
     }
     raw::move_directory(staged.package_root(), &destination)?;
-    let (package_root, install_record) = staged.into_promoted_parts(destination);
+    let package_root = staged.into_promoted_root(destination);
+    let install_record = manifest.render_install_record(&package_root);
+    InstalledApplication::load_from_trusted_record(&install_record, manifest.application_id())
+        .map_err(PromotionError::PromotedRecordInvalid)?;
     Ok(PromotedRelease {
-        application_id,
+        application_id: manifest.application_id().to_owned(),
         package_root,
         install_record,
     })
@@ -128,7 +144,7 @@ fn version_destination(
 mod tests {
     use std::path::Path;
 
-    use anodrel_application::sha256;
+    use anodrel_application::{InstalledApplication, sha256};
     use anodrel_release_bundle::{BundleEntryInput, encode};
 
     use crate::staging::stage_checked_release;
@@ -145,12 +161,8 @@ mod tests {
         let (manifest, staged) = staged_fixture(parent.path());
         let stage_root = staged.package_root().to_path_buf();
 
-        let promoted = promote_staged_release(
-            staged,
-            manifest.package_version(),
-            manifest.application_id().to_owned(),
-        )
-        .expect("a unique sibling version receives the checked stage");
+        let promoted = promote_staged_release(staged, manifest)
+            .expect("a unique sibling version receives the checked stage");
         let destination = parent.path().join("1.2.3");
         assert!(!stage_root.exists());
         assert!(destination.is_dir());
@@ -175,11 +187,7 @@ mod tests {
         let (manifest, staged) = staged_fixture(parent.path());
 
         assert!(matches!(
-            promote_staged_release(
-                staged,
-                manifest.package_version(),
-                manifest.application_id().to_owned(),
-            ),
+            promote_staged_release(staged, manifest),
             Err(PromotionError::VersionAlreadyExists)
         ));
         assert_eq!(
@@ -193,6 +201,24 @@ mod tests {
             1,
             "the failed private stage was cleaned up"
         );
+    }
+
+    #[test]
+    fn promoted_record_names_the_version_directory_not_the_private_stage() {
+        let parent = TestDirectory::new("promotion-record");
+        let (manifest, staged) = staged_fixture(parent.path());
+        let promoted = promote_staged_release(staged, manifest)
+            .expect("a unique sibling version receives the checked stage");
+        let installed = InstalledApplication::load_from_trusted_record(
+            promoted.install_record(),
+            "org.anodrel.promotion-test",
+        )
+        .expect("the published record names the promoted package");
+        let expected = std::fs::canonicalize(parent.path().join("1.2.3"))
+            .expect("the promoted directory canonicalizes");
+
+        assert_eq!(installed.package_root(), expected);
+        assert!(!promoted.install_record().contains(".anodrel-stage-"));
     }
 
     fn staged_fixture(parent: &Path) -> (ReleaseManifest, crate::staging::StagedRelease) {

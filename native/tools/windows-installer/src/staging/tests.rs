@@ -28,7 +28,8 @@ fn an_exact_checked_bundle_becomes_a_valid_private_staged_package() {
             .expect("the staged content is readable"),
         b"staged release content"
     );
-    assert!(staged.install_record.contains("\"recordVersion\""));
+    let record = manifest.render_install_record(staged.package_root());
+    assert!(record.contains("\"recordVersion\""));
     let staged_root = staged.package_root.clone();
     drop(staged);
     assert!(

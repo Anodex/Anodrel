@@ -27,7 +27,6 @@ pub(crate) struct StagedRelease {
     package_root: PathBuf,
     executable_path: PathBuf,
     product_launcher_path: Option<PathBuf>,
-    install_record: String,
     cleanup_on_drop: bool,
 }
 
@@ -50,10 +49,10 @@ impl StagedRelease {
         self.product_launcher_path.as_deref()
     }
 
-    /// Transfers the retained record after a successful directory promotion.
-    pub(crate) fn into_promoted_parts(mut self, package_root: PathBuf) -> (PathBuf, String) {
+    /// Transfers this checked stage to its already chosen promoted directory.
+    pub(crate) fn into_promoted_root(mut self, package_root: PathBuf) -> PathBuf {
         self.cleanup_on_drop = false;
-        (package_root, std::mem::take(&mut self.install_record))
+        package_root
     }
 }
 
@@ -61,7 +60,6 @@ impl fmt::Debug for StagedRelease {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("StagedRelease")
-            .field("install_record_bytes", &self.install_record.len())
             .finish_non_exhaustive()
     }
 }
@@ -152,7 +150,6 @@ pub(crate) fn stage_checked_release(
             .map_err(StagedReleaseError::PackageInvalid)?;
 
     Ok(guard.finish(
-        record,
         installed.executable_path().to_path_buf(),
         installed.product_launcher_path().map(Path::to_path_buf),
     ))
@@ -267,7 +264,6 @@ impl StagingGuard {
 
     fn finish(
         mut self,
-        install_record: String,
         executable_path: PathBuf,
         product_launcher_path: Option<PathBuf>,
     ) -> StagedRelease {
@@ -276,7 +272,6 @@ impl StagingGuard {
             package_root: self.path.clone(),
             executable_path,
             product_launcher_path,
-            install_record,
             cleanup_on_drop: true,
         }
     }

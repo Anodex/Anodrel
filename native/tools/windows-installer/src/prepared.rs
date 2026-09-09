@@ -7,15 +7,14 @@ use anodrel_windows_signature::{SignatureError, verify_embedded_signature};
 use crate::installed_uninstaller::{InstalledUninstallerError, stage_current_installer_image};
 use crate::staging::{StagedRelease, stage_checked_release};
 use crate::{
-    PackageVersion, ReleaseManifest, SignedReleaseError, StagedReleaseError,
-    VerifiedEmbeddedRelease, verify_current_signed_release,
+    ReleaseManifest, SignedReleaseError, StagedReleaseError, VerifiedEmbeddedRelease,
+    verify_current_signed_release,
 };
 
 /// A private release stage that passed installer and executable publisher checks.
 pub struct PreparedRelease {
     staged: StagedRelease,
-    version: PackageVersion,
-    application_id: String,
+    manifest: ReleaseManifest,
 }
 
 impl fmt::Debug for PreparedRelease {
@@ -23,7 +22,7 @@ impl fmt::Debug for PreparedRelease {
         formatter
             .debug_tuple("PreparedRelease")
             .field(&self.staged)
-            .field(&self.version)
+            .field(&self.manifest.package_version())
             .finish()
     }
 }
@@ -111,8 +110,6 @@ pub(crate) fn prepare_verified_signed_release(
     release: VerifiedEmbeddedRelease<'_>,
 ) -> Result<PreparedRelease, PreparedReleaseError> {
     let manifest = release.release().manifest();
-    let version = manifest.package_version();
-    let application_id = manifest.application_id().to_owned();
     let staged = stage_checked_release(staging_parent, manifest, release.release().bundle())
         .map_err(PreparedReleaseError::StagingInvalid)?;
     stage_current_installer_image(&staged, manifest)
@@ -120,16 +117,13 @@ pub(crate) fn prepare_verified_signed_release(
     verify_staged_images(&staged, manifest)?;
     Ok(PreparedRelease {
         staged,
-        version,
-        application_id,
+        manifest: manifest.clone(),
     })
 }
 
 /// Transfers a fully checked stage to the owned promotion boundary.
-pub(crate) fn into_promotion_parts(
-    prepared: PreparedRelease,
-) -> (StagedRelease, PackageVersion, String) {
-    (prepared.staged, prepared.version, prepared.application_id)
+pub(crate) fn into_promotion_parts(prepared: PreparedRelease) -> (StagedRelease, ReleaseManifest) {
+    (prepared.staged, prepared.manifest)
 }
 
 fn verify_staged_images(

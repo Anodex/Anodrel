@@ -32,6 +32,7 @@ $ErrorActionPreference = 'Stop'
 
 $CertificateSubject = 'CN=Anodrel Development Installed Fixture'
 $CertificateProvider = 'Microsoft Enhanced RSA and AES Cryptographic Provider'
+$FixtureApplicationId = 'org.anodrel.product-fixture'
 $FixtureVersion = '0.1.0'
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 $CargoManifest = Join-Path $RepositoryRoot 'native\Cargo.toml'
@@ -43,6 +44,7 @@ $BundlePath = Join-Path $FixtureRoot 'fixture.bundle'
 $ManifestPath = Join-Path $FixtureRoot 'fixture.release.json'
 $UnsignedInstallerPath = Join-Path $FixtureRoot 'fixture.unsigned-installer.exe'
 $SignedInstallerPath = Join-Path $FixtureRoot 'AnodrelDevelopmentProductFixtureInstaller.exe'
+$FixturePolicyPath = "HKLM:\Software\Anodrel\Applications\$FixtureApplicationId"
 
 function Assert-Elevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -268,6 +270,26 @@ function Test-FixturePolicySelected {
     }
 }
 
+function Test-FixturePolicyRecordPresent {
+    if (-not (Test-Path -LiteralPath $FixturePolicyPath)) {
+        return $false
+    }
+    $properties = Get-ItemProperty -LiteralPath $FixturePolicyPath
+    return $null -ne $properties.PSObject.Properties['record']
+}
+
+function Assert-FixturePolicyAbsent {
+    param([Parameter(Mandatory)] [string] $ProvisioningTool)
+
+    if (-not (Test-FixturePolicyRecordPresent)) {
+        return
+    }
+    if (Test-FixturePolicySelected -ProvisioningTool $ProvisioningTool) {
+        throw 'A valid product-fixture record is still selected. Run the matching signed installer uninstall command, or remove the staged fixture through its own script, before continuing.'
+    }
+    throw 'A product-fixture policy record remains but does not validate. Do not remove fixture trust or prepare another fixture until that machine state has been investigated.'
+}
+
 function Sign-Image {
     param(
         [Parameter(Mandatory)] [string] $Path,
@@ -313,9 +335,7 @@ if ($Remove) {
     Build-Tools -Packages @('anodrel-product-provisioning')
     $provisioningTool = Get-ToolPath -Name 'anodrel-product-provisioning'
     Assert-Elevated
-    if (Test-FixturePolicySelected -ProvisioningTool $provisioningTool) {
-        throw 'A valid product-fixture record is still selected. Run the matching signed installer uninstall command, or remove the staged fixture through its own script, before using -Remove.'
-    }
+    Assert-FixturePolicyAbsent -ProvisioningTool $provisioningTool
     Remove-FixtureDirectory
     Remove-FixtureCertificate
     Write-Host 'The prepared installed product fixture has been removed.'
@@ -336,9 +356,7 @@ $packages = @(
 Build-Tools -Packages $packages
 $provisioningTool = Get-ToolPath -Name 'anodrel-product-provisioning'
 
-if (Test-FixturePolicySelected -ProvisioningTool $provisioningTool) {
-    throw 'A valid product-fixture record is already selected. Remove that fixture before preparing an initial-install acceptance run.'
-}
+Assert-FixturePolicyAbsent -ProvisioningTool $provisioningTool
 if (Test-Path -LiteralPath $FixtureRoot) {
     throw 'The fixed fixture output directory already exists. Run this script with -Remove after confirming no fixture record is selected.'
 }
