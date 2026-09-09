@@ -1,8 +1,10 @@
 //! Fixed no-argument composition for one signed initial installation.
 
 use anodrel_windows_install_consent::{InitialInstallConsent, request_initial_install_consent};
-use anodrel_windows_install_handoff::begin_elevated_initial_install;
+use anodrel_windows_install_handoff::{ElevatedInitialInstallExit, begin_elevated_initial_install};
 use anodrel_windows_installer::prepare_current_initial_install;
+
+use crate::install_exit;
 
 /// Runs the only interactive first-install route without accepting input.
 pub(super) fn run() -> Result<String, String> {
@@ -17,6 +19,9 @@ pub(super) fn run() -> Result<String, String> {
         .map_err(display_error)?
         .wait()
         .map_err(display_error)?;
+    if let ElevatedInitialInstallExit::Failed(exit_code) = completed.exit() {
+        return Err(install_exit::message_for_failed_code(exit_code).to_owned());
+    }
     completed.verify_installation().map_err(display_error)?;
     Ok("Current signed Anodrel release installed.".to_owned())
 }

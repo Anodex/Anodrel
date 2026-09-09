@@ -114,8 +114,11 @@ impl InitialInstallProcessHandle {
         Ok(Self(info.process))
     }
 
-    /// Waits for the owned process and reports only its conventional outcome.
-    pub(crate) fn wait(&self) -> Result<bool, InitialInstallHandoffError> {
+    /// Waits for the owned process and returns its conventional exit code.
+    ///
+    /// The caller may map only installer-defined fixed values. Raw Windows
+    /// errors and child output never cross this boundary.
+    pub(crate) fn wait(&self) -> Result<u32, InitialInstallHandoffError> {
         // SAFETY: this handle was returned by ShellExecuteExW and remains owned
         // by this value until its Drop closes it.
         if unsafe { WaitForSingleObject(self.0, INFINITE) } != WAIT_OBJECT_0 {
@@ -127,7 +130,7 @@ impl InitialInstallProcessHandle {
         if unsafe { GetExitCodeProcess(self.0, &mut exit_code) } == 0 {
             return Err(InitialInstallHandoffError::ProcessWaitFailed);
         }
-        Ok(exit_code == 0)
+        Ok(exit_code)
     }
 }
 

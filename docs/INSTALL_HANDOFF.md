@@ -32,9 +32,11 @@ consumed or dropped.
 A zero child exit is not installation success. It permits only the existing
 opaque [initial-install acceptance](INSTALL_ACCEPTANCE.md) postcondition proof,
 which reloads the fixed machine policy and validates the selected signed
-release. A nonzero exit has no proof route. An abandoned child is not killed or
-interpreted; it independently performs the installer’s fixed signature and
-machine-policy gates.
+release. A nonzero exit has no proof route. The no-argument installer may map
+only its own fixed documented child status to a path-free stage message; it
+never parses child output or exposes raw Windows error codes. An abandoned child
+is not killed or interpreted; it independently performs the installer’s fixed
+signature and machine-policy gates.
 
 ## Exclusions
 

@@ -3,14 +3,15 @@
 use std::fs;
 
 use anodrel_windows_installer::{
-    MAX_RELEASE_MANIFEST_BYTES, ReleaseManifest, install_current_signed_release,
-    remove_current_apps_features, remove_current_product_shortcut, remove_policy_removed_package,
-    remove_verified_uninstall_policy, rollback_current_signed_release,
-    update_current_signed_release, verify_current_signed_release, verify_current_uninstall_target,
+    InstallCurrentError, MAX_RELEASE_MANIFEST_BYTES, ReleaseManifest,
+    install_current_signed_release, remove_current_apps_features, remove_current_product_shortcut,
+    remove_policy_removed_package, remove_verified_uninstall_policy,
+    rollback_current_signed_release, update_current_signed_release, verify_current_signed_release,
+    verify_current_uninstall_target,
 };
 
 use crate::registered_uninstall;
-use crate::{elevation::require_elevation, initial_install};
+use crate::{elevation::require_elevation, initial_install, install_exit};
 
 const USAGE: &str = concat!(
     "usage:\n",
@@ -42,6 +43,41 @@ pub(super) enum Command {
     ValidateManifest(String),
 }
 
+/// A closed console error with a conventional process exit code.
+pub(super) struct CommandError {
+    message: String,
+    exit_code: u8,
+}
+
+impl CommandError {
+    /// Creates the conventional failure outcome for non-install commands.
+    pub(super) fn general(error: impl std::fmt::Display) -> Self {
+        Self {
+            message: error.to_string(),
+            exit_code: 1,
+        }
+    }
+
+    /// Creates the fixed child outcome for an installation transaction failure.
+    fn install(error: InstallCurrentError) -> Self {
+        Self {
+            exit_code: install_exit::code_for(&error),
+            message: display_error(error),
+        }
+    }
+
+    /// Returns the conventional process exit code.
+    pub(super) const fn exit_code(&self) -> u8 {
+        self.exit_code
+    }
+}
+
+impl std::fmt::Display for CommandError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
 /// Parses only the supported fixed command shapes.
 pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
     match arguments {
@@ -60,16 +96,19 @@ pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
 }
 
 /// Performs one parsed command without exposing machine-owned operation inputs.
-pub(super) fn execute(command: Command) -> Result<String, String> {
+pub(super) fn execute(command: Command) -> Result<String, CommandError> {
     match command {
-        Command::InitialInstall => initial_install::run(),
-        Command::Verify => verify(),
-        Command::Install => elevated(install),
-        Command::Update => elevated(update),
-        Command::Rollback => elevated(rollback),
-        Command::Remove => registered_uninstall::run(),
-        Command::Uninstall => elevated(uninstall),
-        Command::ValidateManifest(path) => validate_manifest(&path),
+        Command::InitialInstall => initial_install::run().map_err(CommandError::general),
+        Command::Verify => verify().map_err(CommandError::general),
+        Command::Install => {
+            require_elevation().map_err(CommandError::general)?;
+            install().map_err(CommandError::install)
+        }
+        Command::Update => elevated(update).map_err(CommandError::general),
+        Command::Rollback => elevated(rollback).map_err(CommandError::general),
+        Command::Remove => registered_uninstall::run().map_err(CommandError::general),
+        Command::Uninstall => elevated(uninstall).map_err(CommandError::general),
+        Command::ValidateManifest(path) => validate_manifest(&path).map_err(CommandError::general),
     }
 }
 
@@ -86,8 +125,8 @@ fn verify() -> Result<String, String> {
     ))
 }
 
-fn install() -> Result<String, String> {
-    install_current_signed_release().map_err(display_error)?;
+fn install() -> Result<String, InstallCurrentError> {
+    install_current_signed_release()?;
     Ok("Current signed Anodrel release installed.".to_owned())
 }
 

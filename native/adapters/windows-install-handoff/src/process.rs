@@ -14,8 +14,11 @@ use crate::{InitialInstallHandoffError, raw::InitialInstallProcessHandle};
 pub enum ElevatedInitialInstallExit {
     /// The installer process returned exit code zero.
     Succeeded,
-    /// The installer process returned a nonzero exit code.
-    Failed,
+    /// The installer process returned a nonzero conventional exit code.
+    ///
+    /// This is process metadata, not installation proof. Callers must treat
+    /// only their own documented fixed values as meaningful.
+    Failed(u32),
 }
 
 /// One UAC-approved elevated installer process and its original approval.
@@ -37,13 +40,13 @@ impl ElevatedInitialInstallProcess {
         let Some(running) = self.running.take() else {
             return Err(InitialInstallHandoffError::ProcessWaitFailed);
         };
-        let succeeded = running.process.wait()?;
+        let exit_code = running.process.wait()?;
         let RunningInitialInstall { process, approval } = running;
         drop(process);
-        let exit = if succeeded {
+        let exit = if exit_code == 0 {
             ElevatedInitialInstallExit::Succeeded
         } else {
-            ElevatedInitialInstallExit::Failed
+            ElevatedInitialInstallExit::Failed(exit_code)
         };
         Ok(CompletedElevatedInitialInstall { exit, approval })
     }
@@ -75,7 +78,7 @@ impl CompletedElevatedInitialInstall {
                 let prepared = (*self.approval).into_prepared();
                 verify_current_initial_installation(&prepared)
             }
-            ElevatedInitialInstallExit::Failed => {
+            ElevatedInitialInstallExit::Failed(_) => {
                 Err(InitialInstallCompletionError::InstallerReportedFailure)
             }
         }

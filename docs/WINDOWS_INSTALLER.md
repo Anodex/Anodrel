@@ -359,6 +359,12 @@ requires the postcondition proof. See [initial-install acceptance](INSTALL_ACCEP
 and [interactive initial-install flow](INSTALL_FLOW.md). Named machine-changing
 commands still require an explicitly elevated shell.
 
+The fixed elevated `install` child uses only small installer-defined exit
+categories. The no-argument parent maps recognized categories to safe stage
+messages and otherwise reports one generic failure. It never relays child
+output, raw Windows errors, paths, registry state, or a claim that machine
+policy changed after a nonzero exit.
+
 Initial release work deliberately excludes automatic download, background
 updates, key rotation, file associations, service installation, and
 notifications. Start-menu registration is limited to one signed policy-derived

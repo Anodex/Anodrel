@@ -39,7 +39,9 @@ package root to end in the same canonical version directory.
 
 The resulting value is opaque. It does not report paths, registry data,
 certificates, a process exit code, progress, restart behavior, or a launch
-result. A nonzero elevated exit has no proof route.
+result. A nonzero elevated exit has no proof route. The no-argument installer
+can use a fixed child status only to choose a safe failure message; that status
+does not report a process code, policy state, path, or installation result.
 
 ## Exclusions
 
