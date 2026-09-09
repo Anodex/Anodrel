@@ -21,6 +21,18 @@ fn writes_one_shell_link_in_a_regular_temporary_directory() {
 }
 
 #[test]
+fn stages_shell_links_with_a_link_extension() {
+    let directory = TestDirectory::new("shortcut-stage");
+    let temporary = super::TemporaryLink::create(directory.path())
+        .expect("a private Shell Link stage is created");
+
+    assert!(
+        temporary.path().to_string_lossy().ends_with(".tmp.lnk"),
+        "the private stage is recognizable as a Shell Link"
+    );
+}
+
+#[test]
 fn writes_one_shell_link_from_canonical_windows_paths() {
     let directory = TestDirectory::new("shortcut-canonical");
     let executable = std::env::current_exe().expect("current test image is available");

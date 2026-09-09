@@ -377,11 +377,38 @@ impl TemporaryLink {
             return Err(ShortcutWriteError::TemporaryFileUnavailable);
         }
         verify_normal_file(&path)?;
-        Ok(Self { path, active: true })
+        Self { path, active: true }.rename_as_shell_link_stage()
     }
 
     fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Renames the system-created temporary file to a private `.lnk` stage.
+    ///
+    /// The Start-menu Shell Link writer accepts only a `.lnk` or `.url`
+    /// persistence path. The unique `GetTempFileNameW` result is renamed in
+    /// place without replacement before COM writes the link contents.
+    fn rename_as_shell_link_stage(mut self) -> Result<Self, ShortcutWriteError> {
+        let staged_path = self.path.with_extension("tmp.lnk");
+        let source = wide_path(&self.path)?;
+        let destination = wide_path(&staged_path)?;
+        // SAFETY: both paths are fixed siblings in the verified normal folder.
+        // No replacement flag is present, so a pre-existing private stage
+        // remains untouched.
+        let moved = unsafe {
+            MoveFileExW(
+                source.as_ptr(),
+                destination.as_ptr(),
+                MOVEFILE_WRITE_THROUGH,
+            )
+        };
+        if moved == 0 {
+            return Err(ShortcutWriteError::TemporaryFileUnavailable);
+        }
+        self.path = staged_path;
+        verify_normal_file(&self.path)?;
+        Ok(self)
     }
 
     fn replace(mut self, destination: &Path) -> Result<(), ShortcutWriteError> {
