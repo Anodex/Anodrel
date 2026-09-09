@@ -17,7 +17,7 @@ Anodrel application is automatically faster.
 | Retained text | Moving a cached text run must not clone its antialiased coverage or grow text memory without a pixel bound. | The Windows host stores one origin-zero mask, composites it through a bounded integer offset, and retains at most 2,097,152 coverage pixels. |
 | Message memory | Bound bytes before parsing and bound a single receive burst. | 64 KiB payload; four framed messages per receive. |
 | Startup | Do no application I/O, network work, or deferred-service initialization before the first window is responsive. | Current host performs only its internal health check. |
-| UI responsiveness | Never block the Windows message loop on stream I/O or expensive work. | Required by the transport contract; adapter work is not implemented yet. |
+| UI responsiveness | Never block the Windows message loop on stream I/O or expensive work. | Each authenticated pipe runs on a host-owned worker. The UI thread consumes bounded mailboxes on its session timer; product start, launcher verification, update transfer, UAC waiting, and postcondition checks use dedicated workers. |
 | Privilege | Native authority remains host-issued and operation-specific. | The transport frame carries no authority; core ignores supplied capability context. |
 
 ## Measurements before comparison claims
@@ -51,6 +51,24 @@ The wire and session unit tests verify framing, limits, fragmentation,
 coalescing, authentication, and capability policy without timing-sensitive
 assertions. The Windows adapter integration test exercises a real local named
 pipe from connection through authenticated health response.
+
+## Windows UI-thread isolation
+
+The host keeps blocking stream and machine work outside the Win32 message loop.
+Each authenticated session starts its named-pipe server on an owned worker;
+the UI thread only consumes its bounded document and service mailboxes through
+the session timer. A product session additionally starts its policy, locked
+digest, Authenticode, and child-process preparation on a worker before creating
+the native window. Its update action keeps discovery, transfer, elevation wait,
+and postcondition verification off the UI thread as well.
+
+Windows-native work that must run on the owning UI thread—painting, window
+creation, input, menus, dialogs, and bounded mailbox completion—remains there.
+That separation does not make a modal Windows dialog non-blocking; it prevents
+application pipe traffic or expensive verification from starving paint and
+input dispatch. The detailed lifetime contracts are in
+[UI sessions](UI_SESSIONS.md), [product sessions](PRODUCT_SESSIONS.md), and
+[product updates](PRODUCT_UPDATES.md).
 
 ## Fixed owned-text report
 
