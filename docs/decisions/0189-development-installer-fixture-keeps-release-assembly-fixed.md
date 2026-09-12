@@ -1,10 +1,12 @@
 # Decision 0189: Development installer fixture keeps release assembly fixed
 
-**Status:** Accepted
+**Status:** Superseded in part by Decisions 0219 and 0220. This preserves the
+original regular-fixture rationale; current no-restart behavior is documented
+in those later records.
 
 **Date:** 2026-09-03
 
-## Context
+## Historical context
 
 The development product fixture proves an invited child, verified launcher, and
 native session only from a staged directory. The owned Windows installer can
@@ -20,7 +22,7 @@ into an unreviewed packaging or machine-administration interface. Automatically
 running an elevated installer from a trust-provisioning script would also hide
 the native consent and UAC boundary that the installer is meant to prove.
 
-## Decision
+## Original decision
 
 Add one Windows-only `prepare-installed-product-fixture.ps1` script. It accepts
 only `-Remove`; every build and product value is fixed in the repository. Its

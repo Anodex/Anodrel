@@ -6,6 +6,10 @@ removing trust. Legacy scheduled deletions retain the procedure below.
 
 **Date:** 2026-09-08
 
+The historical restart-only mechanism below applies only to legacy installed
+images. Current fixture removal follows Decision 0219's signed helper/cache
+path and Decision 0220's isolated acceptance procedure.
+
 ## Context
 
 The fixed installed uninstaller removes its own final signed image only at the

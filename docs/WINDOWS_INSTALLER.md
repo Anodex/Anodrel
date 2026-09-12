@@ -219,13 +219,15 @@ The next owned step removes only the fixed `record` value from that application'
 64-bit machine key. It neither deletes the key nor any package file. The later
 tree cleanup receives only its opaque policy-removed result.
 
-Package cleanup consumes only that policy-removed result. It removes all normal
-package content other than the still-running fixed uninstaller image and its
-ancestor directory, and refuses every reparse point. Direct `MoveFileExW`
-operations then register the image, empty directory, and empty package root in
-that order for deletion at the next restart. It does not remove application
-data or credentials; a failure to register that final cleanup is reported
-instead of being presented as completed removal.
+Package cleanup consumes only that policy-removed result. A byte-identical
+signed helper outside the selected package independently rederives and verifies
+that result before it removes normal package content. It waits for the original
+uninstaller to exit, refuses every reparse point, and reports final success only
+after the package directory is gone. The helper cannot delete its own mapped
+image, so it leaves a signed cache that a later verified maintenance action
+retires. It does not remove application data or credentials and never schedules
+reboot deletion as a fallback. See Decision 0219 and the later no-restart
+contract in this document.
 
 ## Update-candidate preflight contract
 

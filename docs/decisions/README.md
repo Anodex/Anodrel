@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0220: Isolated fixture accepts signed no-restart cleanup.
+
 - 0219: Signed uninstall cleanup uses a private verified handoff.
 
 - 0218: Fixture trust remains through delayed uninstaller cleanup.
