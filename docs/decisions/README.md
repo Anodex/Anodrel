@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0221: Local signed update fixture stays fixed and private.
+
 - 0220: Isolated fixture accepts signed no-restart cleanup.
 
 - 0219: Signed uninstall cleanup uses a private verified handoff.

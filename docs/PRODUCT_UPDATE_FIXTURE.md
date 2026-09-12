@@ -4,6 +4,11 @@
 fixture release, its HTTPS catalogue, and a temporary trusted development
 certificate are still required for a successful manual run.
 
+The next acceptance slice supplies those inputs through a separate fixed local
+fixture rather than an external endpoint. Its contract is in
+[Local signed update fixture](LOCAL_UPDATE_FIXTURE.md). It will use a distinct
+identity and must not alter this runner's fixed ordinary-fixture identity.
+
 ## Purpose
 
 `anodrel-product-update-acceptance` exercises Anodrel's native Windows update
