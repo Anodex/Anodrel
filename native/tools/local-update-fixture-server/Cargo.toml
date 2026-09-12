@@ -1,0 +1,13 @@
+[package]
+name = "anodrel-local-update-fixture-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "anodrel-local-update-fixture-server"
+path = "src/main.rs"
+
+[dependencies]
+anodrel-local-update-fixture = { path = "../../crates/local-update-fixture" }
+anodrel-windows-paths = { path = "../../adapters/windows-paths" }

@@ -90,6 +90,7 @@ members = [
   "tools/product-fixture",
   "tools/product-provisioning",
   "tools/product-update-acceptance",
+  "tools/local-update-fixture-server",
   "tools/windows-installer",
   "tools/windows-installer-shell",
   "tools/release-bundle-tool",
