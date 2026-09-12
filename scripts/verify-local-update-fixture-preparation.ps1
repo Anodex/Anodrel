@@ -23,27 +23,7 @@ $TlsEndpoints = @('127.0.0.1:45863', '[::1]:45863')
 $HttpsPrefix = 'https://localhost:45863/anodrel/local-update/'
 $HttpApplicationId = '{9b0f5f1f-58cf-4e70-8c24-1a23258b6c82}'
 
-function Get-CertificateFingerprint {
-    param([Parameter(Mandatory)] $Certificate)
-
-    $algorithm = [Security.Cryptography.SHA256]::Create()
-    try {
-        return -join ($algorithm.ComputeHash($Certificate.RawData) | ForEach-Object { $_.ToString('x2') })
-    }
-    finally {
-        $algorithm.Dispose()
-    }
-}
-
-function Get-HttpCertificateHash {
-    param([Parameter(Mandatory)] $Certificate)
-
-    $hash = ($Certificate.Thumbprint -replace '\s', '')
-    if ($hash -notmatch '^[0-9A-Fa-f]{40}$') {
-        throw 'The fixed local update TLS certificate has no valid Windows certificate hash.'
-    }
-    return $hash
-}
+. (Join-Path $PSScriptRoot 'local-update-fixture-certificate.ps1')
 
 function Get-OneCertificate {
     param(
@@ -65,9 +45,9 @@ function Assert-CertificateTrusted {
         [Parameter(Mandatory)] [string] $Store
     )
 
-    $fingerprint = Get-CertificateFingerprint -Certificate $Certificate
+    $fingerprint = Get-LocalUpdateFixtureCertificateFingerprint -Certificate $Certificate
     $match = Get-ChildItem -LiteralPath $Store | Where-Object {
-        (Get-CertificateFingerprint -Certificate $_) -eq $fingerprint
+        (Get-LocalUpdateFixtureCertificateFingerprint -Certificate $_) -eq $fingerprint
     } | Select-Object -First 1
     if ($null -eq $match) {
         throw "The fixed local update certificate is not trusted in $Store."
@@ -120,7 +100,7 @@ Assert-CertificateTrusted -Certificate $publisher -Store 'Cert:\LocalMachine\Roo
 Assert-CertificateTrusted -Certificate $publisher -Store 'Cert:\LocalMachine\TrustedPublisher'
 Assert-CertificateTrusted -Certificate $tls -Store 'Cert:\LocalMachine\Root'
 
-$httpHash = (Get-HttpCertificateHash -Certificate $tls).ToLowerInvariant()
+$httpHash = (Get-LocalUpdateFixtureHttpCertificateHash -Certificate $tls).ToLowerInvariant()
 $applicationId = $HttpApplicationId.ToLowerInvariant()
 foreach ($endpoint in $TlsEndpoints) {
     $binding = Get-NetshHttpOutput -Arguments @('http', 'show', 'sslcert', "ipport=$endpoint")

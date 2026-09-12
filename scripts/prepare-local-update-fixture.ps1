@@ -33,6 +33,7 @@ $PolicyPath = "HKLM:\Software\Anodrel\Applications\$ApplicationId"
 
 . (Join-Path $PSScriptRoot 'local-update-fixture-http.ps1')
 . (Join-Path $PSScriptRoot 'local-update-fixture-release.ps1')
+. (Join-Path $PSScriptRoot 'local-update-fixture-certificate.ps1')
 
 function Assert-Elevated {
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -61,28 +62,6 @@ function Get-FixtureTool {
         throw "The local update fixture build did not produce $Name.exe."
     }
     return $path
-}
-
-function Get-CertificateFingerprint {
-    param([Parameter(Mandatory)] $Certificate)
-
-    $algorithm = [Security.Cryptography.SHA256]::Create()
-    try {
-        return -join ($algorithm.ComputeHash($Certificate.RawData) | ForEach-Object { $_.ToString('x2') })
-    }
-    finally {
-        $algorithm.Dispose()
-    }
-}
-
-function Get-HttpCertificateHash {
-    param([Parameter(Mandatory)] $Certificate)
-
-    $hash = ($Certificate.Thumbprint -replace '\s', '')
-    if ([string]::IsNullOrWhiteSpace($hash)) {
-        throw 'The local update fixture TLS certificate has no Windows certificate hash.'
-    }
-    return $hash
 }
 
 function Find-PublisherCertificate {
@@ -124,14 +103,14 @@ function Add-CertificateTrust {
         [Parameter(Mandatory)] [string[]] $StoreNames
     )
 
-    $fingerprint = Get-CertificateFingerprint -Certificate $Certificate
+    $fingerprint = Get-LocalUpdateFixtureCertificateFingerprint -Certificate $Certificate
     $added = @()
     foreach ($storeName in $StoreNames) {
         $store = New-Object Security.Cryptography.X509Certificates.X509Store($storeName, 'LocalMachine')
         $store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
         try {
             $present = @($store.Certificates | Where-Object {
-                (Get-CertificateFingerprint -Certificate $_) -eq $fingerprint
+                (Get-LocalUpdateFixtureCertificateFingerprint -Certificate $_) -eq $fingerprint
             }).Count -ne 0
             if (-not $present) {
                 $store.Add($Certificate)
@@ -151,10 +130,10 @@ function Remove-CertificateTrust {
         [Parameter(Mandatory)] [string[]] $Stores
     )
 
-    $fingerprint = Get-CertificateFingerprint -Certificate $Certificate
+    $fingerprint = Get-LocalUpdateFixtureCertificateFingerprint -Certificate $Certificate
     foreach ($storePath in $Stores) {
         Get-ChildItem $storePath | Where-Object {
-            (Get-CertificateFingerprint -Certificate $_) -eq $fingerprint
+            (Get-LocalUpdateFixtureCertificateFingerprint -Certificate $_) -eq $fingerprint
         } | ForEach-Object { Remove-Item -LiteralPath $_.PSPath -Force }
     }
 }
@@ -217,7 +196,7 @@ if ($Remove) {
         $_.Subject -eq $TlsSubject -and $_.FriendlyName -eq $TlsFriendlyName
     })
     if ($tls.Count -gt 1) { throw 'More than one local update fixture TLS certificate exists. Nothing was removed.' }
-    if ($tls.Count -eq 1) { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-HttpCertificateHash -Certificate $tls[0]) }
+    if ($tls.Count -eq 1) { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-LocalUpdateFixtureHttpCertificateHash -Certificate $tls[0]) }
     Remove-FixtureOutput
     if ($tls.Count -eq 1) {
         Remove-FixtureCertificate -Certificate $tls[0] -Stores @('Cert:\LocalMachine\Root') -SourceStore 'Cert:\LocalMachine\My'
@@ -267,7 +246,7 @@ try {
     $publisherState = Find-PublisherCertificate
     $publisher = $publisherState.Certificate
     $publisherTrust = @(Add-CertificateTrust -Certificate $publisher -StoreNames @('Root', 'TrustedPublisher'))
-    $publisherFingerprint = Get-CertificateFingerprint -Certificate $publisher
+    $publisherFingerprint = Get-LocalUpdateFixtureCertificateFingerprint -Certificate $publisher
     New-Item -ItemType Directory -Path (Join-Path $PublicationRoot 'releases\0.1.1') -Force | Out-Null
     New-LocalUpdateFixtureRelease -Tools $tools -ReleaseRoot (Join-Path $FixtureRoot 'initial') `
         -Version '{ "major": 0, "minor": 1, "patch": 0 }' -PublisherFingerprint $publisherFingerprint `
@@ -283,14 +262,14 @@ try {
         -FailureMessage 'The local update fixture catalogue could not be signed.'
     $tlsState = Find-TlsCertificate
     $tlsTrust = @(Add-CertificateTrust -Certificate $tlsState.Certificate -StoreNames @('Root'))
-    Add-FixtureHttpEndpoint -CertificateFingerprint (Get-HttpCertificateHash -Certificate $tlsState.Certificate) `
+    Add-FixtureHttpEndpoint -CertificateFingerprint (Get-LocalUpdateFixtureHttpCertificateHash -Certificate $tlsState.Certificate) `
         -AccountName ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
     $endpointConfigured = $true
 }
 catch {
     $preparationError = $_
     if ($endpointConfigured) {
-        try { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-HttpCertificateHash -Certificate $tlsState.Certificate) } catch { Write-Warning 'The failed preparation left its local HTTPS configuration in place.' }
+        try { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-LocalUpdateFixtureHttpCertificateHash -Certificate $tlsState.Certificate) } catch { Write-Warning 'The failed preparation left its local HTTPS configuration in place.' }
     }
     try { Remove-FixtureOutput } catch { Write-Warning 'The failed preparation left its local files for inspection.' }
     if ($tlsTrust.Count -gt 0) { try { Remove-CertificateTrust -Certificate $tlsState.Certificate -Stores $tlsTrust } catch { Write-Warning 'The failed preparation could not remove every TLS trust entry it created.' } }
