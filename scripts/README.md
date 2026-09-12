@@ -130,3 +130,20 @@ Reads the one fixed no-restart fixture's package, policy record, Installed Apps
 key, and Start-menu link after interactive removal. It changes nothing and
 proves only that those registered surfaces are absent; it cannot observe the
 native consent/UAC interaction, helper dialog, cache retirement, or a reboot.
+
+## prepare-local-update-fixture.ps1
+
+Prepares the distinct `org.anodrel.local-update-fixture` acceptance route. It
+builds two fixed signed releases (0.1.0 and 0.1.1), creates a signed local CMS
+catalogue, temporarily trusts its publisher and localhost TLS certificates,
+and configures a loopback-only Windows HTTPS endpoint. It needs an elevated
+PowerShell session and does not install either release or start the local
+server. `-Remove` removes only this fixture after its signed package and cache
+are absent. See [the local signed update fixture](../docs/LOCAL_UPDATE_FIXTURE.md).
+
+## verify-local-update-fixture.ps1
+
+Read-only verification for the selected fixed 0.1.1 local update fixture. It
+checks its prepared signed candidate, selected package, signed child/launcher,
+Apps & features key, and Start-menu link. It cannot observe consent, UAC,
+server behaviour, or a visible result.

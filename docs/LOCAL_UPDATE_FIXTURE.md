@@ -1,6 +1,8 @@
 # Local signed update fixture
 
-**Status:** Contract accepted; implementation is next Windows release work.
+**Status:** The fixed local publication, listener, release preparation, and
+read-only selected-release verifier are implemented. A real operator acceptance
+run remains required.
 
 ## Purpose
 
