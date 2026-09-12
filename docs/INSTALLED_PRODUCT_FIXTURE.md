@@ -122,6 +122,13 @@ title-bar-close, installer-verify-after-install, uninstall, restart-cleanup,
 and recovery checks remain required before a Windows release candidate can
 claim full fixture acceptance.
 
+On the same date, a fresh installed fixture passed
+`verify-installed-product-fixture.ps1`: it verified the selected signed release,
+the direct `Anodrel.org.anodrel.product-fixture` Installed Apps key, and the
+registered Start-menu shortcut's launcher, working directory, and fixed
+product-launch argument. The title-bar-close, uninstall, cleanup-handoff, and
+recovery checks remain open.
+
 ## Removal
 
 First, remove the installed fixture from a normal PowerShell session. The
