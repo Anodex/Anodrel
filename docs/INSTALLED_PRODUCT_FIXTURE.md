@@ -103,6 +103,17 @@ available; it cannot prove that the native consent, UAC, Start-menu, Explorer,
 or window interactions occurred. Record those visible checks for a Windows
 release candidate rather than treating successful preparation as acceptance.
 
+### Recorded development acceptance
+
+On 2026-09-11, an operator completed the positive primary path on the
+development machine: preparation and read-only image verification, native
+consent and UAC installation, Start-menu launch, the visible *Signed child,
+authenticated window* session, and **Complete product session** shutdown. This
+is evidence for that positive path only. The separate installed-apps,
+title-bar-close, installer-verify-after-install, uninstall, restart-cleanup,
+and recovery checks remain required before a Windows release candidate can
+claim full fixture acceptance.
+
 ## Removal
 
 First, remove the installed fixture from a normal PowerShell session. The
