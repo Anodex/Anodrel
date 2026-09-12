@@ -321,6 +321,27 @@ latency, and neither transport workload may be presented as rendering
 performance. Each mode needs an equivalent workload and recorded environment
 before a cross-runtime comparison is published.
 
+### Current local release evidence
+
+On 2026-09-12, the release tools ran on the development machine's Windows
+x86_64 target with 24 logical processors available to the process. This is a
+local regression record, not a hardware-normalized baseline or a comparison to
+another runtime.
+
+| Workload | Samples | Result |
+| --- | ---: | --- |
+| Sustained Startup Lab frame guard | 840 ms reveal | 6.269 ms mean; 7.987 ms worst, within the 16 ms interval. |
+| Windows pipe loopback, 1,024-byte payload | 5,000 | 19.0 microseconds p50; 24.2 microseconds p95; 40.0 microseconds p99. |
+| Windows pipe loopback, 65,536-byte payload | 5,000 | 146.8 microseconds p50; 264.7 microseconds p95; 320.4 microseconds p99. |
+| Renderer `mask-fill-gradient` | 300 | 1.745 ms p50; 1.795 ms p95; 1.860 ms p99. |
+| Renderer `mask-fill-quantized-gradient` | 300 | 1.069 ms p50; 1.146 ms p95; 1.265 ms p99. |
+
+The renderer rows cover only the owned software rasterizer; they exclude a
+native window, presentation, and the platform blit. The pipe rows include the
+owned named pipe, frame codec, authenticated transport, and core handler, but
+exclude pipe creation, connection, authentication, warmup, and close. Preserve
+the raw JSON report with OS build and power mode before making a comparison.
+
 ## Renderer workload
 
 ~~~text
