@@ -338,8 +338,9 @@ installer command will recover only Anodrel-owned stale staging directories.
 
 ## Commands and exclusions
 
-The installer has only `install`, `update`, `rollback`, `uninstall`, and
-`verify` commands. `install`, `update`, `rollback`, and `uninstall` need
+The installer has fixed `install`, `update`, `rollback`, `uninstall`,
+`cleanup-cache`, `remove`, and `verify` commands plus its private `cleanup`
+handoff mode. `install`, `update`, `rollback`, `cleanup-cache`, `cleanup`, and `uninstall` need
 elevation; `verify` is read-only. All commands select the embedded identity
 only. They do not accept an arbitrary executable, package root, registry path,
 policy, capability, certificate, or network URL.
@@ -350,6 +351,15 @@ themselves. `verify` is read-only and can show that the current signed embedded
 release was accepted without writing machine state. The development-only
 `validate-manifest <path>` command still validates one sidecar manifest and
 cannot write machine state.
+
+No-restart uninstall uses a signed copy outside the selected package, a private
+commit exchange, and a shared per-application maintenance lock. A normal return
+from `remove` proves policy absence, not completed deletion; the helper reports
+the final package result separately. `cleanup-cache` verifies exited helper
+images, resumes their committed cleanup only with absent policy, and retires
+them before fixture trust removal. It accepts no target. See
+[uninstall flow](UNINSTALL_FLOW.md) and Decision 0219. Legacy reboot-deletion
+queues are not migrated by the new code.
 
 The installer exposes an opaque initial-install preflight and matching
 postcondition proof; its no-argument route composes them with a direct native,

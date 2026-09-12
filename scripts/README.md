@@ -112,7 +112,9 @@ an elevated development PowerShell session because it adds a temporary local
 certificate to machine trust, but it does **not** install the fixture itself.
 The printed signed installer command preserves the native consent and UAC
 checks. Follow [the installed fixture guide](../docs/INSTALLED_PRODUCT_FIXTURE.md)
-for preparation, acceptance, and removal. After its signed uninstaller reports
-success, restart Windows before using `-Remove`: the script refuses to remove
-temporary certificate trust while Windows still holds the restart-delayed
-uninstaller cleanup.
+for preparation, acceptance, and removal. The new signed cleanup helper removes
+the package without a restart. Close its result dialog before using `-Remove`;
+the internal `installed-fixture-cleanup.ps1` helper invokes signed cache
+retirement before certificate removal. Active or invalid caches keep trust
+intact. Older installed uninstallers that already scheduled reboot deletion
+still need their legacy cleanup; rebuilding does not replace installed images.

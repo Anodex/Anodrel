@@ -66,6 +66,7 @@ over uncertain machine state.
 From an **elevated** PowerShell session at the repository root:
 
 ~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
 .\scripts\prepare-installed-product-fixture.ps1
 ~~~
 
@@ -92,17 +93,19 @@ After approving the native confirmation and the Windows UAC prompt:
 4. Activate **Complete product session**, or reach it with Tab and Enter.
 5. Confirm the window and fixture child both exit promptly.
 6. From a normal PowerShell session, run the printed signed installer with
-   `verify`; it must accept the selected installed release.
+   `verify`; it must accept that image's embedded signed release (not prove
+   installed machine policy).
 7. Confirm **Anodrel Product Fixture** appears in Windows **Installed apps**
    with the signed display name, publisher, and version.
 8. Close the product window with its title-bar button in a separate run and
    confirm the child also exits.
 
-After installation, the following read-only command checks the signed selected
-release, direct Installed Apps registration, and exact Start-menu launcher
+After installation, the following read-only command checks the prepared signed
+image, direct Installed Apps registration, and exact Start-menu launcher
 target. It does not replace the visible Windows checks above:
 
 ~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
 .\scripts\verify-installed-product-fixture.ps1
 ~~~
 
@@ -118,12 +121,12 @@ development machine: preparation and read-only image verification, native
 consent and UAC installation, Start-menu launch, the visible *Signed child,
 authenticated window* session, and **Complete product session** shutdown. This
 is evidence for that positive path only. The separate installed-apps,
-title-bar-close, installer-verify-after-install, uninstall, restart-cleanup,
+title-bar-close, installer-verify-after-install, uninstall, helper cleanup,
 and recovery checks remain required before a Windows release candidate can
 claim full fixture acceptance.
 
 On the same date, a fresh installed fixture passed
-`verify-installed-product-fixture.ps1`: it verified the selected signed release,
+`verify-installed-product-fixture.ps1`: it verified the prepared signed image,
 the direct `Anodrel.org.anodrel.product-fixture` Installed Apps key, and the
 registered Start-menu shortcut's launcher, working directory, and fixed
 product-launch argument. The title-bar-close, uninstall, cleanup-handoff, and
@@ -136,6 +139,7 @@ installed fixed signed image, not the original download, is the only accepted
 removal command. It will show native confirmation and then Windows' UAC prompt:
 
 ~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
 $programFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
 $uninstaller = Join-Path $programFiles 'Anodrel\Applications\org.anodrel.product-fixture\0.1.0\uninstaller\anodrel-windows-installer.exe'
 & $uninstaller remove
@@ -143,29 +147,51 @@ $uninstaller = Join-Path $programFiles 'Anodrel\Applications\org.anodrel.product
 
 That command revalidates the selected release, package version, and publisher
 before removing the fixed policy, ordinary Program Files package content, and
-derived Start-menu entry. The running signed image and its empty directories
-are queued for deletion at the next restart. It accepts no application
+derived Start-menu entry. A separate verified signed helper waits for the
+original uninstallers to exit, then removes the package. It accepts no application
 identity, package path, registry path, or cleanup target.
 
-That removal schedules its still-running signed uninstaller and its empty
-package directories for deletion at the next Windows restart. **Restart Windows
-before removing the development certificate.** This preserves trust until the
-last signed cleanup image is gone and prevents a stale uninstaller from failing
-signature verification.
+Wait for the helper's **No Windows restart is required** success result and
+close that dialog. A console message saying removal was accepted is not final
+package-deletion proof. On incomplete cleanup, close the application and dialog,
+then use the elevated cleanup below; it can resume committed signed cleanup.
 
-After the restart, remove the generated development material from an elevated
-PowerShell session:
+**Legacy exception:** an already installed old uninstaller still schedules
+reboot deletion. Rebuilding this repository does not update that installed
+image or cancel previously scheduled deletions. Do not reinstall the same
+version over a legacy pending-deletion queue.
+
+Remove the generated development material from an **elevated** PowerShell:
 
 ~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
 .\scripts\prepare-installed-product-fixture.ps1 -Remove
 ~~~
 
 The script refuses to remove certificate trust or its local output while any
-product-fixture policy record or installed package directory remains, including
+product-fixture policy record, installed package directory, or cleanup cache remains, including
 a record that fails validation. This prevents an operator from leaving an
 installed fixture whose signature no longer chains to its intended development
 trust or discarding the evidence needed to investigate a failed machine
 transaction.
+
+Before removing trust, the script invokes the prepared signed image's fixed
+`cleanup-cache` command when caches exist. Windows must accept the cached
+signatures, and every cache must be reclaimed. A running result dialog, invalid
+image, unexpected cache contents, or locked package stops the operation without
+removing trust. Successful helper cleanup permits preparing and installing the
+same fixture again immediately, without restarting Windows.
+
+### No-restart acceptance still required
+
+Use a freshly signed build with the helper, not an old installed binary. Record
+install, launch/close, native removal consent/UAC, final helper success, absent
+package/registration/shortcut, cache retirement, and immediate same-version
+reinstall without a reboot. Separately test cancellation, a busy application,
+interrupted cleanup and refusal of altered cache content. Automated executable
+lifetime tests passed on Windows; this signed joined path is not yet recorded
+as accepted. Do not remove trust to simulate a signature failure on an installed
+fixture; use a disposable development environment for negative trust tests.
 
 For this fixed fixture, that package directory is the selected version path:
 `C:\Program Files\Anodrel\Applications\org.anodrel.product-fixture\0.1.0`.

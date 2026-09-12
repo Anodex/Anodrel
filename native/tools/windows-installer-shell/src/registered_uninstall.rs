@@ -91,7 +91,10 @@ pub(super) fn run() -> Result<String, String> {
         return Err("the elevated removal did not complete".to_owned());
     }
     verify_policy_absent()?;
-    Ok("Anodrel removal completed; final cleanup runs at the next restart.".to_owned())
+    Ok(
+        "Anodrel removal accepted; the cleanup helper will confirm when package removal completes."
+            .to_owned(),
+    )
 }
 
 fn request_confirmation() -> Result<bool, String> {

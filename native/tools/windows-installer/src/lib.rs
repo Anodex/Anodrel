@@ -4,12 +4,14 @@
 //! First-party Windows installer foundations.
 //!
 //! This crate validates the private release carried by a signed Windows
-//! installer and can prepare it in a private staging directory. It does not
-//! promote a version directory, change the registry, install a certificate, or
-//! launch an application.
+//! installer and composes staging, installation, update, rollback and removal
+//! behind fixed signed identities. Removal uses a separately verified signed
+//! helper, not an application capability. This crate never installs trust.
 
 #[cfg(windows)]
 mod apps_features;
+#[cfg(windows)]
+mod cleanup;
 mod error;
 #[cfg(windows)]
 mod image;
@@ -21,6 +23,8 @@ mod installation;
 mod installed_uninstaller;
 #[cfg(windows)]
 mod machine_root;
+#[cfg(windows)]
+mod maintenance;
 mod manifest;
 mod payload;
 #[cfg(windows)]
@@ -52,6 +56,11 @@ pub use apps_features::{
     AppsFeaturesPreflightError, AppsFeaturesRegistrationError, RegisteredAppsFeatures,
     RemovedAppsFeatures, VerifiedAppsFeaturesTarget, refresh_current_apps_features,
     remove_current_apps_features, verify_current_apps_features_target,
+};
+#[cfg(windows)]
+pub use cleanup::{
+    CleanupError, begin_current_uninstall_cleanup, retire_current_cleanup_cache,
+    run_current_uninstall_cleanup,
 };
 pub use error::ReleaseManifestError;
 #[cfg(windows)]
@@ -103,9 +112,8 @@ pub use signing::{SignedReleaseError, VerifiedEmbeddedRelease, verify_current_si
 pub use staging::StagedReleaseError;
 #[cfg(windows)]
 pub use uninstall::{
-    PolicyRemovedUninstallTarget, UninstallPackageRemovalError, UninstallPolicyRemovalError,
-    UninstallPreflightError, VerifiedUninstallTarget, remove_policy_removed_package,
-    remove_verified_uninstall_policy, verify_current_uninstall_target,
+    PolicyRemovedUninstallTarget, UninstallPolicyRemovalError, UninstallPreflightError,
+    VerifiedUninstallTarget, remove_verified_uninstall_policy, verify_current_uninstall_target,
 };
 #[cfg(windows)]
 pub use update::{UpdatePreflightError, VerifiedUpdateCandidate, verify_current_update_candidate};

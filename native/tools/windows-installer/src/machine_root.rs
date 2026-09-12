@@ -52,6 +52,8 @@ pub enum MachineRootError {
     RootInvalid,
     /// A missing fixed root component could not be created.
     RootCreationFailed,
+    /// Another maintenance transaction is active, or its lock is unsafe.
+    MaintenanceUnavailable,
 }
 
 impl fmt::Display for MachineRootError {
@@ -63,6 +65,7 @@ impl fmt::Display for MachineRootError {
             Self::PathInvalid => "the Windows installation path is invalid",
             Self::RootInvalid => "the fixed installation root is unsafe",
             Self::RootCreationFailed => "the fixed installation root could not be created",
+            Self::MaintenanceUnavailable => "application maintenance is busy or unavailable",
         })
     }
 }

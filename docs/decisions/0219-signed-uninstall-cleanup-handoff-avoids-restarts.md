@@ -20,30 +20,60 @@ removed during uninstall, so a later process cannot use it as its only proof.
 
 ## Decision
 
-The owned signed installer will add one fixed cleanup mode and one private
-handoff protocol. The elevated selected uninstaller creates a separately
-located, byte-for-byte verified copy of its current signed image in a
-machine-owned private cleanup stage. It starts that image with only the fixed
-`cleanup` command and supplies its target through one inherited private stream;
-no cleanup target appears in a command line, environment variable, registry
-value, or predictable file.
+The signed installer adds a fixed `cleanup` mode and private anonymous pipes.
+The elevated selected uninstaller creates a byte-identical signed copy under
+the fixed application's Program Files root, outside its version directory.
+The stage name is `.anodrel-cleanup-<pid>-<timestamp>`; neither number selects a
+process or package. The image has the fixed installed-uninstaller filename.
+No target crosses the handoff: the helper derives identity and version from
+its own signed manifest and independently reads the still-selected policy.
 
 Before the elevated parent removes selected policy or package content, the
 helper independently reads the still-selected machine record and proves:
 
-- its inherited cleanup description names that exact selected package;
+- its own signed manifest matches that exact selected package;
 - the selected executable and both signed installer images have the selected
   publisher; and
 - the selected package and uninstaller paths are canonical, ordinary,
   installer-derived locations.
 
-The helper acknowledges that proof privately. Only after that acknowledgement
-does the parent remove the Start-menu and Apps & features registrations, remove
-selected policy, and exit. The helper then removes only normal selected-package
-entries, waits for the original selected installer process to exit, removes its
-fixed remaining image and directories, and finally removes its own private
-stage. A cleanup failure is a safe incomplete-removal result; it never falls
-back to caller-selected deletion or silently reports success.
+The private protocol has exactly four-byte version-1 frames: helper READY
+`ACR1`, parent COMMIT `ACC1`, helper ACCEPTED `ACA1`. READY follows verification;
+COMMIT transfers transaction responsibility to the helper; ACCEPTED follows
+registration and policy removal, not package deletion. Reads have 30-second
+deadlines. Missing or invalid COMMIT makes no policy/package change. A parent
+failure after COMMIT must not terminate committed cleanup. No application IPC
+field or public capability is added; other frame versions are rejected.
+
+Install, update, rollback, helper cleanup, and cache retirement take the same
+exclusive, non-inherited `.anodrel-maintenance.lock` file handle in the fixed
+identity root. State is revalidated under the lock. The name remains after
+release so concurrent processes cannot acquire different lock objects.
+
+After COMMIT, the helper removes the derived registrations, flushes an empty
+`committed` marker in its protected cache, then removes selected policy. It
+retries normal package deletion for at most 30 seconds while the original
+uninstallers exit. It refuses reparse points and any reappearing selected policy.
+It never terminates the application or schedules reboot deletion. Only complete
+package deletion earns the native success dialog; timeout reports incomplete
+cleanup and preserves the recovery cache.
+
+Windows also prevents deleting the helper's own mapped executable. Therefore
+the helper exits leaving its signed cached image, not a package requiring a
+restart. This corrects the original design's unverified self-deletion promise.
+The next signed install/update, or elevated fixed `cleanup-cache` command,
+reclaims exited caches. It verifies the cached image's signature, manifest,
+application and publisher, and accepts only the fixed image and optional empty
+marker. It never recurses through unexpected cache contents or deletes a live
+helper. A pending marker with absent policy permits finishing only the cached
+manifest's fixed version tree; with selected policy it never deletes a package.
+Maintenance exclusion prevents an old recovery from deleting a new install.
+The marker is not a path, command or untrusted capability; administrators remain
+inside the machine-trust boundary. No more than 16 caches may be staged.
+
+Fixture cleanup retires these caches before removing development trust and
+fails closed on a live, invalid or unreclaimed cache. Legacy installers that
+already queued reboot deletion are not migrated or silently cancelled here.
 
 ## Consequences
 

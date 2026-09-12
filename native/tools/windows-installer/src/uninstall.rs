@@ -20,6 +20,9 @@ pub struct VerifiedUninstallTarget {
 }
 
 impl VerifiedUninstallTarget {
+    pub(crate) fn package_root(&self) -> &Path {
+        &self.package_root
+    }
     #[must_use]
     pub(crate) fn application_id(&self) -> &str {
         &self.application_id
@@ -41,6 +44,9 @@ impl fmt::Debug for PolicyRemovedUninstallTarget {
 }
 
 impl PolicyRemovedUninstallTarget {
+    pub(crate) fn application_id(&self) -> &str {
+        self.target.application_id()
+    }
     #[must_use]
     pub(crate) fn package_root(&self) -> &std::path::Path {
         &self.target.package_root
@@ -102,25 +108,6 @@ impl fmt::Display for UninstallPolicyRemovalError {
 }
 impl std::error::Error for UninstallPolicyRemovalError {}
 
-/// A policy-removed package tree could not be deleted safely.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum UninstallPackageRemovalError {
-    /// A link or junction was encountered and cleanup refused to traverse it.
-    ReparsePointRefused,
-    /// Windows could not remove the verified package tree.
-    PackageRemovalFailed,
-}
-
-impl fmt::Display for UninstallPackageRemovalError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::ReparsePointRefused => "package cleanup refused a reparse point",
-            Self::PackageRemovalFailed => "the installed package could not be removed",
-        })
-    }
-}
-impl std::error::Error for UninstallPackageRemovalError {}
-
 impl fmt::Display for UninstallPreflightError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
@@ -166,6 +153,13 @@ impl std::error::Error for UninstallPreflightError {
 /// returns no path or publisher identity through public formatting.
 pub fn verify_current_uninstall_target() -> Result<VerifiedUninstallTarget, UninstallPreflightError>
 {
+    let target = verify_selected_uninstall_target()?;
+    current_image_is_selected_uninstaller(target.package_root())?;
+    Ok(target)
+}
+
+pub(crate) fn verify_selected_uninstall_target()
+-> Result<VerifiedUninstallTarget, UninstallPreflightError> {
     let release =
         verify_current_signed_release().map_err(UninstallPreflightError::InstallerInvalid)?;
     let manifest = release.release().manifest();
@@ -183,7 +177,11 @@ pub fn verify_current_uninstall_target() -> Result<VerifiedUninstallTarget, Unin
         .is_some_and(|version| version == manifest.package_version())
         .then_some(())
         .ok_or(UninstallPreflightError::SelectedVersionInvalid)?;
-    current_image_is_selected_uninstaller(installed.package_root())?;
+    let machine = crate::machine_root::existing_machine_application_root(manifest.application_id())
+        .map_err(|_| UninstallPreflightError::CurrentImageNotSelected)?;
+    if installed.package_root().parent() != Some(machine.path()) {
+        return Err(UninstallPreflightError::CurrentImageNotSelected);
+    }
     Ok(VerifiedUninstallTarget {
         application_id: manifest.application_id().to_owned(),
         package_root: installed.package_root().to_path_buf(),
@@ -225,34 +223,6 @@ pub fn remove_verified_uninstall_policy(
 ) -> Result<PolicyRemovedUninstallTarget, UninstallPolicyRemovalError> {
     raw::remove_record(target.application_id())?;
     Ok(PolicyRemovedUninstallTarget { target })
-}
-
-/// Removes only the verified package tree after fixed policy removal.
-pub fn remove_policy_removed_package(
-    target: PolicyRemovedUninstallTarget,
-) -> Result<(), UninstallPackageRemovalError> {
-    crate::recovery::raw::remove_normal_tree_except_installer(target.package_root()).map_err(
-        |error| match error {
-            crate::RecoveryCleanupError::ReparsePointRefused => {
-                UninstallPackageRemovalError::ReparsePointRefused
-            }
-            crate::RecoveryCleanupError::DiscoveryFailed(_)
-            | crate::RecoveryCleanupError::RemovalFailed => {
-                UninstallPackageRemovalError::PackageRemovalFailed
-            }
-        },
-    )?;
-    crate::recovery::raw::schedule_installer_tree_removal(target.package_root()).map_err(|error| {
-        match error {
-            crate::RecoveryCleanupError::ReparsePointRefused => {
-                UninstallPackageRemovalError::ReparsePointRefused
-            }
-            crate::RecoveryCleanupError::DiscoveryFailed(_)
-            | crate::RecoveryCleanupError::RemovalFailed => {
-                UninstallPackageRemovalError::PackageRemovalFailed
-            }
-        }
-    })
 }
 
 mod raw {

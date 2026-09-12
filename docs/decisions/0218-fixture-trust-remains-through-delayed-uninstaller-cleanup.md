@@ -1,6 +1,8 @@
 # Decision 0218: Fixture trust remains through delayed uninstaller cleanup
 
-**Status:** Accepted
+**Status:** Trust-lifetime invariant retained; restart-only mechanism superseded
+by Decision 0219. New fixture cleanup retires verified helper caches before
+removing trust. Legacy scheduled deletions retain the procedure below.
 
 **Date:** 2026-09-08
 

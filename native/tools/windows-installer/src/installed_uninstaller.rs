@@ -110,7 +110,10 @@ fn staged_uninstaller_path(package_root: &Path) -> Result<PathBuf, InstalledUnin
     Ok(destination)
 }
 
-fn copy_current_image(source: &Path, destination: &Path) -> Result<(), InstalledUninstallerError> {
+pub(crate) fn copy_current_image(
+    source: &Path,
+    destination: &Path,
+) -> Result<(), InstalledUninstallerError> {
     let source_metadata =
         fs::metadata(source).map_err(|_| InstalledUninstallerError::CurrentImageUnavailable)?;
     if !source_metadata.is_file() {

@@ -227,6 +227,14 @@ pub fn verify_current_rollback_target() -> Result<VerifiedRollbackTarget, Rollba
 pub fn rollback_current_signed_release() -> Result<RolledBackRelease, RollbackCurrentError> {
     let target =
         verify_current_rollback_target().map_err(RollbackCurrentError::PreflightInvalid)?;
+    let root = existing_machine_application_root(target.application_id()).map_err(|e| {
+        RollbackCurrentError::PreflightInvalid(RollbackPreflightError::MachineRootInvalid(e))
+    })?;
+    let _maintenance = crate::maintenance::MaintenanceLock::acquire(root.path()).map_err(|e| {
+        RollbackCurrentError::PreflightInvalid(RollbackPreflightError::MachineRootInvalid(e))
+    })?;
+    let target =
+        verify_current_rollback_target().map_err(RollbackCurrentError::PreflightInvalid)?;
     let prior = capture_current_product_shortcut()
         .map_err(RollbackCurrentError::PriorProductShortcutInvalid)?;
     restore_previous_record(target.application_id())

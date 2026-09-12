@@ -186,6 +186,12 @@ strict resource-bearing release envelope through private staging, extracted
 publisher verification, no-overwrite promotion, fixed policy publication,
 recovery, uninstall, a refreshed publisher-and-forward-version update
 transaction, and a one-record policy-backed rollback. The release authoring
+boundary's no-restart uninstall stages a byte-identical signed helper outside
+the package, uses a private commit exchange, and serializes maintenance with
+a per-application lock. Exited signed helper caches retain bounded recovery
+evidence until a later verified maintenance run; no application can supply a
+cleanup target. See [uninstall flow](UNINSTALL_FLOW.md) and Decision 0219.
+The release authoring
 boundary creates bounded owned bundles, derives strict manifests from those
 checked bundle bytes, embeds them into fresh images, and signs only fresh checked
 image copies with one explicit current-user certificate through Windows

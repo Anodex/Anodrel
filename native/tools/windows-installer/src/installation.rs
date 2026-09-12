@@ -106,6 +106,12 @@ pub fn install_current_signed_release() -> Result<InstalledRelease, InstallCurre
     require_no_selected_policy(release.release().manifest().application_id())?;
     let root = current_machine_application_root(release.release().manifest().application_id())
         .map_err(InstallCurrentError::MachineRootInvalid)?;
+    let _maintenance = crate::maintenance::MaintenanceLock::acquire(root.path())
+        .map_err(InstallCurrentError::MachineRootInvalid)?;
+    require_no_selected_policy(release.release().manifest().application_id())?;
+    crate::cleanup::retire_cache(root.path(), release.release().manifest()).map_err(|_| {
+        InstallCurrentError::MachineRootInvalid(MachineRootError::MaintenanceUnavailable)
+    })?;
     let prepared = prepare_current_signed_release(root.path())
         .map_err(InstallCurrentError::PreparationFailed)?;
     let promoted =

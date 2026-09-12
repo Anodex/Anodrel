@@ -107,6 +107,12 @@ impl std::error::Error for UpdateCurrentError {
 pub fn update_current_signed_release() -> Result<UpdatedRelease, UpdateCurrentError> {
     let candidate =
         verify_current_update_candidate().map_err(UpdateCurrentError::CandidateInvalid)?;
+    let root = current_machine_application_root(candidate.application_id())
+        .map_err(UpdateCurrentError::MachineRootInvalid)?;
+    let _maintenance = crate::maintenance::MaintenanceLock::acquire(root.path())
+        .map_err(UpdateCurrentError::MachineRootInvalid)?;
+    let candidate =
+        verify_current_update_candidate().map_err(UpdateCurrentError::CandidateInvalid)?;
     let prior = capture_current_product_shortcut()
         .map_err(UpdateCurrentError::PriorProductShortcutInvalid)?;
     let release =
@@ -114,8 +120,9 @@ pub fn update_current_signed_release() -> Result<UpdatedRelease, UpdateCurrentEr
     if !candidate.matches_manifest(release.release().manifest()) {
         return Err(UpdateCurrentError::CandidateChanged);
     }
-    let root = current_machine_application_root(candidate.application_id())
-        .map_err(UpdateCurrentError::MachineRootInvalid)?;
+    crate::cleanup::retire_cache(root.path(), release.release().manifest()).map_err(|_| {
+        UpdateCurrentError::MachineRootInvalid(MachineRootError::MaintenanceUnavailable)
+    })?;
     let prepared = prepare_verified_signed_release(root.path(), release)
         .map_err(UpdateCurrentError::PreparationFailed)?;
     let promoted =

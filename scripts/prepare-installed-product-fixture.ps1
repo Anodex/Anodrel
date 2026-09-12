@@ -9,7 +9,8 @@ bundle authoring, manifest derivation, resource embedding, and Authenticode
 signing. It creates a local development code-signing certificate and adds it to
 machine trust, which is a real machine change. Run it only on a development
 machine and use -Remove only after the signed installer has explicitly
-uninstalled the fixture and Windows has completed its restart-delayed cleanup.
+uninstalled the fixture and its signed helper has completed package cleanup.
+Older installed binaries may still have previously scheduled restart cleanup.
 
 The script has no product, package, certificate, output, or installer command
 inputs. Its only optional action is -Remove, which removes only this script's
@@ -47,6 +48,8 @@ $SignedInstallerPath = Join-Path $FixtureRoot 'AnodrelDevelopmentProductFixtureI
 $FixturePolicyPath = "HKLM:\Software\Anodrel\Applications\$FixtureApplicationId"
 $ProgramFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
 $InstalledFixturePackageRoot = [IO.Path]::GetFullPath((Join-Path $ProgramFiles "Anodrel\Applications\$FixtureApplicationId\$FixtureVersion"))
+
+. (Join-Path $PSScriptRoot 'installed-fixture-cleanup.ps1')
 
 function Assert-Elevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -294,7 +297,7 @@ function Assert-FixturePolicyAbsent {
 
 function Assert-FixtureInstalledCleanupComplete {
     if (Test-Path -LiteralPath $InstalledFixturePackageRoot) {
-        throw 'Installed product-fixture cleanup is still pending. Restart Windows to complete delayed removal, then run this script again. Do not remove development certificate trust first.'
+        throw 'Installed fixture cleanup is incomplete. With the new helper, close the application and removal-result dialog, then run this script with -Remove from an elevated shell. Only an older uninstaller that explicitly scheduled restart cleanup still requires a restart. Keep development trust until cleanup finishes.'
     }
 }
 
@@ -344,6 +347,7 @@ if ($Remove) {
     $provisioningTool = Get-ToolPath -Name 'anodrel-product-provisioning'
     Assert-Elevated
     Assert-FixturePolicyAbsent -ProvisioningTool $provisioningTool
+    Invoke-FixtureCleanupCache
     Assert-FixtureInstalledCleanupComplete
     Remove-FixtureDirectory
     Remove-FixtureCertificate
@@ -448,5 +452,5 @@ Write-Host 'The signed development installer fixture is prepared and has passed 
 Write-Host 'Start this signed installer normally to exercise native consent and the fixed UAC handoff:'
 Write-Host "  & `"$SignedInstallerPath`""
 Write-Host ''
-Write-Host 'After installation, launch “Anodrel Product Fixture” from the Start menu, use its action, and confirm that it closes.'
-Write-Host 'To remove it, run the installed signed uninstaller with “remove” from a normal PowerShell session, restart Windows, then run this script with -Remove.'
+Write-Host 'After installation, launch "Anodrel Product Fixture" from the Start menu, use its action, and confirm that it closes.'
+Write-Host 'To remove it, run the installed signed uninstaller with "remove" from a normal PowerShell session. Wait for and close the helper result dialog, then run this script with -Remove from an elevated shell. Successful helper cleanup does not require a restart.'

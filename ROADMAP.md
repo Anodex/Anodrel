@@ -69,6 +69,10 @@ production decisions.
 
 ### Current Windows release focus
 
+- No-restart uninstall helper, private handshake, maintenance exclusion and
+  signed cache recovery are implemented. Real Windows executable-lifetime and
+  failure-path tests pass; fresh signed uninstall/reinstall acceptance remains
+  open. See [uninstall flow](docs/UNINSTALL_FLOW.md).
 - Complete visible desktop acceptance for the documented feature set.
 - Run and record the signed development fixture install, launcher, update,
   recovery, and cleanup paths when an operator explicitly authorizes the

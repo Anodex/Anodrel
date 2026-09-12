@@ -1,6 +1,7 @@
 # Decision 0197: The installed uninstaller cleans itself at restart
 
-**Status:** Accepted
+**Status:** Superseded by Decision 0219 for newly built installers. Existing
+installed images and their already scheduled reboot deletions remain unchanged.
 
 **Date:** 2026-09-04
 

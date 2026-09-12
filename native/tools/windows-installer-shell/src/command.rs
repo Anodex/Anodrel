@@ -4,10 +4,8 @@ use std::fs;
 
 use anodrel_windows_installer::{
     InstallCurrentError, MAX_RELEASE_MANIFEST_BYTES, ReleaseManifest,
-    install_current_signed_release, remove_current_apps_features, remove_current_product_shortcut,
-    remove_policy_removed_package, remove_verified_uninstall_policy,
+    begin_current_uninstall_cleanup, install_current_signed_release, retire_current_cleanup_cache,
     rollback_current_signed_release, update_current_signed_release, verify_current_signed_release,
-    verify_current_uninstall_target,
 };
 
 use crate::registered_uninstall;
@@ -22,6 +20,7 @@ const USAGE: &str = concat!(
     "  anodrel-windows-installer rollback\n",
     "  anodrel-windows-installer remove\n",
     "  anodrel-windows-installer uninstall\n",
+    "  anodrel-windows-installer cleanup-cache\n",
     "  anodrel-windows-installer validate-manifest <release-manifest.json>\n",
     "\n",
     "No-argument invocation starts the fixed signed initial-install flow. Named install,\n",
@@ -40,6 +39,8 @@ pub(super) enum Command {
     Rollback,
     Remove,
     Uninstall,
+    Cleanup,
+    CleanupCache,
     ValidateManifest(String),
 }
 
@@ -88,6 +89,8 @@ pub(super) fn parse(arguments: &[String]) -> Result<Command, String> {
         [command] if command == "rollback" => Ok(Command::Rollback),
         [command] if command == "remove" => Ok(Command::Remove),
         [command] if command == "uninstall" => Ok(Command::Uninstall),
+        [command] if command == "cleanup" => Ok(Command::Cleanup),
+        [command] if command == "cleanup-cache" => Ok(Command::CleanupCache),
         [command, path] if command == "validate-manifest" => {
             Ok(Command::ValidateManifest(path.clone()))
         }
@@ -108,6 +111,12 @@ pub(super) fn execute(command: Command) -> Result<String, CommandError> {
         Command::Rollback => elevated(rollback).map_err(CommandError::general),
         Command::Remove => registered_uninstall::run().map_err(CommandError::general),
         Command::Uninstall => elevated(uninstall).map_err(CommandError::general),
+        Command::Cleanup => elevated(crate::cleanup_mode::run).map_err(CommandError::general),
+        Command::CleanupCache => elevated(|| {
+            retire_current_cleanup_cache().map_err(display_error)?;
+            Ok("Exited Anodrel cleanup helpers retired.".to_owned())
+        })
+        .map_err(CommandError::general),
         Command::ValidateManifest(path) => validate_manifest(&path).map_err(CommandError::general),
     }
 }
@@ -141,12 +150,11 @@ fn rollback() -> Result<String, String> {
 }
 
 fn uninstall() -> Result<String, String> {
-    let target = verify_current_uninstall_target().map_err(display_error)?;
-    remove_current_product_shortcut().map_err(display_error)?;
-    remove_current_apps_features().map_err(display_error)?;
-    let policy_removed = remove_verified_uninstall_policy(target).map_err(display_error)?;
-    remove_policy_removed_package(policy_removed).map_err(display_error)?;
-    Ok("Current signed Anodrel release uninstalled.".to_owned())
+    begin_current_uninstall_cleanup().map_err(display_error)?;
+    Ok(
+        "Anodrel removal accepted; package cleanup finishes after this uninstaller exits."
+            .to_owned(),
+    )
 }
 
 fn elevated(action: fn() -> Result<String, String>) -> Result<String, String> {
@@ -189,6 +197,11 @@ mod tests {
         assert_eq!(parse(&arguments(&["rollback"])), Ok(Command::Rollback));
         assert_eq!(parse(&arguments(&["remove"])), Ok(Command::Remove));
         assert_eq!(parse(&arguments(&["uninstall"])), Ok(Command::Uninstall));
+        assert_eq!(parse(&arguments(&["cleanup"])), Ok(Command::Cleanup));
+        assert_eq!(
+            parse(&arguments(&["cleanup-cache"])),
+            Ok(Command::CleanupCache)
+        );
         assert_eq!(
             parse(&arguments(&["validate-manifest", "release.json"])),
             Ok(Command::ValidateManifest("release.json".to_owned()))
@@ -198,6 +211,8 @@ mod tests {
             &["update", "--url", "https://example.test"][..],
             &["rollback", "1.2.3"][..],
             &["uninstall", "org.example.product"][..],
+            &["cleanup", "C:\\target"][..],
+            &["cleanup-cache", "org.example.product"][..],
             &["verify", "--registry"][..],
             &["--package", "release.bin"][..],
         ] {

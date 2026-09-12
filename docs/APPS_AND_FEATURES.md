@@ -64,10 +64,10 @@ Install, update, and rollback register only after their policy publication
 succeeds. If registration fails, the selected record remains authoritative and
 the operation reports incomplete product registration; it does not roll policy
 back. Uninstall removes the verified Apps & features key and Start-menu link
-before it removes policy and then every other package file. It retains only its
-executing fixed image and ancestor directory, then uses direct Windows delayed
-removal to delete that image, the empty directory, and the empty package root
-at the next restart. A missing registration key is harmless. An unsafe or
+before it removes policy and then the selected package. A verified signed helper
+outside the package finishes removal after the original uninstallers exit;
+successful cleanup needs no restart. Its exited image is retired on the next
+signed maintenance run. A missing registration key is harmless. An unsafe or
 undeletable key leaves selected policy untouched.
 
 Apps & features invokes the installed image's fixed interactive removal route.

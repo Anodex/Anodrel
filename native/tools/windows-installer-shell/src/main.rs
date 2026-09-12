@@ -1,5 +1,6 @@
 //! Fixed operator commands and no-argument flow for the owned Windows installer.
 
+mod cleanup_mode;
 mod command;
 mod elevation;
 mod initial_install;
@@ -15,7 +16,9 @@ fn main() -> ExitCode {
         .and_then(command::execute);
     match outcome {
         Ok(message) => {
-            println!("{message}");
+            if !message.is_empty() {
+                println!("{message}");
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {
