@@ -18,6 +18,9 @@ pub use error::ProductUpdateAcceptanceError;
 /// The one development fixture identity this diagnostic may update.
 pub const FIXTURE_APPLICATION_ID: &str = "org.anodrel.product-fixture";
 
+/// The separate development fixture identity allowed only by the local runner.
+pub const LOCAL_UPDATE_FIXTURE_APPLICATION_ID: &str = "org.anodrel.local-update-fixture";
+
 /// One closed result from an explicit manual update acceptance attempt.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProductUpdateAcceptanceOutcome {
@@ -59,7 +62,23 @@ impl ProductUpdateAcceptanceOutcome {
 /// process observation, and policy proof in order. It does not restart an
 /// application or turn a successful installer exit into verification.
 pub fn run() -> Result<ProductUpdateAcceptanceOutcome, ProductUpdateAcceptanceError> {
-    let offer = discover_current_update(FIXTURE_APPLICATION_ID)
+    run_for_fixture(FIXTURE_APPLICATION_ID)
+}
+
+/// Runs the separate fixed local-update fixture acceptance sequence.
+///
+/// This has no input because its identity is a compile-time constant distinct
+/// from the ordinary development fixture. It is not an application API or a
+/// general update launcher.
+pub fn run_local_update_fixture()
+-> Result<ProductUpdateAcceptanceOutcome, ProductUpdateAcceptanceError> {
+    run_for_fixture(LOCAL_UPDATE_FIXTURE_APPLICATION_ID)
+}
+
+fn run_for_fixture(
+    fixture_application_id: &'static str,
+) -> Result<ProductUpdateAcceptanceOutcome, ProductUpdateAcceptanceError> {
+    let offer = discover_current_update(fixture_application_id)
         .map_err(ProductUpdateAcceptanceError::Offer)?;
     let offer =
         match request_update_consent(offer).map_err(ProductUpdateAcceptanceError::Consent)? {
@@ -87,13 +106,27 @@ pub fn run() -> Result<ProductUpdateAcceptanceOutcome, ProductUpdateAcceptanceEr
 
 #[cfg(test)]
 mod tests {
-    use super::{FIXTURE_APPLICATION_ID, ProductUpdateAcceptanceOutcome};
+    use super::{
+        FIXTURE_APPLICATION_ID, LOCAL_UPDATE_FIXTURE_APPLICATION_ID, ProductUpdateAcceptanceOutcome,
+    };
 
     #[test]
     fn the_runner_can_select_only_the_declared_fixture_identity() {
         assert_eq!(FIXTURE_APPLICATION_ID, "org.anodrel.product-fixture");
         assert!(anodrel_application::is_valid_application_id(
             FIXTURE_APPLICATION_ID
+        ));
+    }
+
+    #[test]
+    fn local_runner_uses_one_distinct_declared_fixture_identity() {
+        assert_eq!(
+            LOCAL_UPDATE_FIXTURE_APPLICATION_ID,
+            "org.anodrel.local-update-fixture"
+        );
+        assert_ne!(LOCAL_UPDATE_FIXTURE_APPLICATION_ID, FIXTURE_APPLICATION_ID);
+        assert!(anodrel_application::is_valid_application_id(
+            LOCAL_UPDATE_FIXTURE_APPLICATION_ID
         ));
     }
 

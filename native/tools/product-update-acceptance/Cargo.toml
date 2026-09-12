@@ -8,6 +8,10 @@ license.workspace = true
 name = "anodrel-product-update-acceptance"
 path = "src/main.rs"
 
+[[bin]]
+name = "anodrel-local-update-fixture-acceptance"
+path = "src/local_update_main.rs"
+
 [dependencies]
 anodrel-application = { path = "../../crates/application" }
 anodrel-windows-update-consent = { path = "../../adapters/windows-update-consent" }

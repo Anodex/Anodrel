@@ -53,8 +53,8 @@ The preparation script will create the two fresh signed installers, derive and
 sign the catalogue from the locked 0.1.1 image, configure the temporary
 Windows-only TLS endpoint, and register only the fixed 0.1.0 release. It will
 not install the product or start the server. Normal-user commands will start
-the server, invoke the existing no-argument acceptance runner, and stop the
-server. Removing the fixture will first require policy/package/cache absence,
+the server, invoke the separate no-argument local-fixture acceptance runner,
+and stop the server. Removing the fixture will first require policy/package/cache absence,
 then remove only this fixture's URL reservation, TLS binding, certificates,
 and private staging directory.
 
