@@ -21,6 +21,16 @@ removes local fixture output or development certificate entries. A remaining
 directory is a closed failure that tells the operator to restart Windows; the
 script does not remove, rename, or inspect that directory.
 
+For this fixed fixture, the package directory is exactly:
+
+~~~text
+<Program Files>\Anodrel\Applications\org.anodrel.product-fixture\0.1.0
+~~~
+
+The application-identity parent is not the selected package directory. It may
+remain empty after Windows has completed the scheduled removal and must not
+prevent cleanup of the development certificate.
+
 The normal preparation route applies the same absence check before assembling a
 new fixture. It therefore refuses a same-version reinstall over incomplete
 restart-delayed cleanup.

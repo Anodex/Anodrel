@@ -141,6 +141,11 @@ installed fixture whose signature no longer chains to its intended development
 trust or discarding the evidence needed to investigate a failed machine
 transaction.
 
+For this fixed fixture, that package directory is the selected version path:
+`C:\Program Files\Anodrel\Applications\org.anodrel.product-fixture\0.1.0`.
+An empty application-identity parent directory is not a selected package and
+does not block development-fixture cleanup.
+
 ## Relationship to the staged fixture
 
 `provision-product-fixture.ps1` remains useful for the smaller, staged

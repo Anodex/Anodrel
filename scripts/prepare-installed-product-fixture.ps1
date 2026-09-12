@@ -46,7 +46,7 @@ $UnsignedInstallerPath = Join-Path $FixtureRoot 'fixture.unsigned-installer.exe'
 $SignedInstallerPath = Join-Path $FixtureRoot 'AnodrelDevelopmentProductFixtureInstaller.exe'
 $FixturePolicyPath = "HKLM:\Software\Anodrel\Applications\$FixtureApplicationId"
 $ProgramFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
-$InstalledFixtureRoot = [IO.Path]::GetFullPath((Join-Path $ProgramFiles "Anodrel\Applications\$FixtureApplicationId"))
+$InstalledFixturePackageRoot = [IO.Path]::GetFullPath((Join-Path $ProgramFiles "Anodrel\Applications\$FixtureApplicationId\$FixtureVersion"))
 
 function Assert-Elevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -293,7 +293,7 @@ function Assert-FixturePolicyAbsent {
 }
 
 function Assert-FixtureInstalledCleanupComplete {
-    if (Test-Path -LiteralPath $InstalledFixtureRoot) {
+    if (Test-Path -LiteralPath $InstalledFixturePackageRoot) {
         throw 'Installed product-fixture cleanup is still pending. Restart Windows to complete delayed removal, then run this script again. Do not remove development certificate trust first.'
     }
 }
