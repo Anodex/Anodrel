@@ -22,6 +22,7 @@ members = [
   "crates/application",
   "crates/release-bundle",
   "crates/update-catalogue",
+  "crates/local-update-fixture",
   "crates/session-policy",
   "crates/paths",
   "crates/storage",
