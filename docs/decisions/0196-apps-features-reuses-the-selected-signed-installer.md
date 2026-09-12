@@ -40,8 +40,12 @@ will read fresh selected policy and verify the fixed installed image before it
 writes one all-users key below:
 
 ~~~text
-HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Anodrel\<application-id>
+HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Anodrel.<application-id>
 ~~~
+
+This is one direct child key of Windows' `Uninstall` registry location. Windows
+enumerates direct children there; an Anodrel-owned intermediate parent would
+not be a visible Apps & features entry.
 
 The writer may use only signed product display metadata, the release version,
 and the fixed installed image. Its uninstall command will contain one quoted

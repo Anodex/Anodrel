@@ -48,7 +48,7 @@ verification requires all of the following:
 Only this proof can create or update the one machine key:
 
 ~~~text
-HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Anodrel\<application-id>
+HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Anodrel.<application-id>
 ~~~
 
 The identity remains the key component. The registry values `DisplayName`,

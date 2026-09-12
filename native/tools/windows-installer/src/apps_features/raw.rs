@@ -16,8 +16,8 @@ const REG_DWORD: u32 = 4;
 const ERROR_SUCCESS: i32 = 0;
 const ERROR_FILE_NOT_FOUND: i32 = 2;
 const ERROR_PATH_NOT_FOUND: i32 = 3;
-const APPS_FEATURES_PREFIX: &str =
-    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Anodrel\\";
+const APPS_FEATURES_ROOT: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
+const ENTRY_PREFIX: &str = "Anodrel.";
 const DISPLAY_NAME: &str = "DisplayName";
 const DISPLAY_VERSION: &str = "DisplayVersion";
 const NO_MODIFY: &str = "NoModify";
@@ -73,13 +73,15 @@ pub(super) fn write(target: &VerifiedAppsFeaturesTarget) -> Result<(), ()> {
 }
 
 pub(super) fn remove(target: &VerifiedAppsFeaturesTarget) -> Result<(), ()> {
-    let parent = APPS_FEATURES_PREFIX.trim_end_matches('\\');
-    let key = match open_key(parent, KEY_SET_VALUE | KEY_CREATE_SUB_KEY | DELETE) {
+    let key = match open_key(
+        APPS_FEATURES_ROOT.trim_end_matches('\\'),
+        KEY_SET_VALUE | KEY_CREATE_SUB_KEY | DELETE,
+    ) {
         Ok(key) => key,
         Err(OpenKeyError::Missing) => return Ok(()),
         Err(OpenKeyError::Failed) => return Err(()),
     };
-    let name = wide(&target.application_id)?;
+    let name = wide(&entry_name(&target.application_id))?;
     let entry = match open_key(&entry_path(&target.application_id), KEY_SET_VALUE) {
         Ok(entry) => entry,
         Err(OpenKeyError::Missing) => return Ok(()),
@@ -185,7 +187,11 @@ fn delete_value(key: &RegistryKey, name: &str) -> Result<(), ()> {
 }
 
 fn entry_path(application_id: &str) -> String {
-    format!("{APPS_FEATURES_PREFIX}{application_id}")
+    format!("{APPS_FEATURES_ROOT}{}", entry_name(application_id))
+}
+
+fn entry_name(application_id: &str) -> String {
+    format!("{ENTRY_PREFIX}{application_id}")
 }
 
 fn display_version(version: crate::PackageVersion) -> String {
@@ -223,13 +229,17 @@ impl Drop for RegistryKey {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_version, entry_path, uninstall_command};
+    use super::{display_version, entry_name, entry_path, uninstall_command};
 
     #[test]
     fn registry_location_and_command_are_fixed_from_private_policy_data() {
         assert_eq!(
             entry_path("org.anodrel.sample"),
-            "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Anodrel\\org.anodrel.sample"
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Anodrel.org.anodrel.sample"
+        );
+        assert_eq!(
+            entry_name("org.anodrel.sample"),
+            "Anodrel.org.anodrel.sample"
         );
         assert_eq!(
             display_version(crate::PackageVersion::new(1, 2, 3)),
