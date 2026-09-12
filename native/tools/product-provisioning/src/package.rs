@@ -22,6 +22,15 @@ const MANIFEST_NAME: &str = "anodrel.application.json";
 /// so a staged package can never carry a stale digest. The executable is staged
 /// separately by the provisioning script, which also signs it.
 pub fn stage(package_root: &Path) -> io::Result<()> {
+    stage_fixture(package_root, &fixture::REGULAR_STAGED_FIXTURE)
+}
+
+/// Stages the distinct fixed no-restart acceptance fixture without policy work.
+pub fn stage_no_restart(package_root: &Path) -> io::Result<()> {
+    stage_fixture(package_root, &fixture::NO_RESTART_STAGED_FIXTURE)
+}
+
+fn stage_fixture(package_root: &Path, selected: &fixture::StagedFixture) -> io::Result<()> {
     let content_path = package_root.join("content");
     let executable_directory = package_root.join("bin");
     fs::create_dir_all(&content_path)?;
@@ -31,7 +40,7 @@ pub fn stage(package_root: &Path) -> io::Result<()> {
     write_exact(&content_path.join("main.txt"), content)?;
     write_exact(
         &package_root.join(MANIFEST_NAME),
-        manifest(content).as_bytes(),
+        manifest(content, selected).as_bytes(),
     )
 }
 
@@ -58,7 +67,7 @@ fn staged_image(package_root: &Path, file_name: &str) -> io::Result<PathBuf> {
 }
 
 /// Builds the strict manifest for exactly the bytes staged as content.
-fn manifest(content: &[u8]) -> String {
+fn manifest(content: &[u8], selected: &fixture::StagedFixture) -> String {
     let digest = sha256::to_lower_hex(&sha256::digest(content));
     format!(
         concat!(
@@ -73,8 +82,8 @@ fn manifest(content: &[u8]) -> String {
             "  }}\n",
             "}}\n"
         ),
-        fixture::APPLICATION_ID,
-        fixture::DISPLAY_NAME,
+        selected.application_id,
+        selected.display_name,
         fixture::CONTENT_PATH,
         digest
     )
@@ -90,12 +99,15 @@ fn write_exact(path: &Path, bytes: &[u8]) -> io::Result<()> {
 mod tests {
     use anodrel_application::ApplicationManifest;
 
-    use super::{fixture, launcher, manifest, stage};
+    use super::{fixture, launcher, manifest, stage, stage_no_restart};
 
     #[test]
     fn the_staged_manifest_parses_and_matches_its_own_content_digest() {
-        let parsed = ApplicationManifest::parse(&manifest(fixture::CONTENT_TEXT.as_bytes()))
-            .expect("the staged manifest is valid");
+        let parsed = ApplicationManifest::parse(&manifest(
+            fixture::CONTENT_TEXT.as_bytes(),
+            &fixture::REGULAR_STAGED_FIXTURE,
+        ))
+        .expect("the staged manifest is valid");
 
         assert_eq!(parsed.identity().application_id(), fixture::APPLICATION_ID);
         assert_eq!(parsed.identity().display_name(), fixture::DISPLAY_NAME);
@@ -119,5 +131,27 @@ mod tests {
         assert!(launcher(&root).is_err());
 
         std::fs::remove_dir_all(root).expect("the fixture staging directory is removed");
+    }
+
+    #[test]
+    fn no_restart_staging_has_its_own_fixed_identity() {
+        let root = std::env::temp_dir().join(format!(
+            "anodrel-no-restart-fixture-stage-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        stage_no_restart(&root).unwrap();
+        let package =
+            anodrel_application::ApplicationPackage::load(root.join("anodrel.application.json"))
+                .unwrap();
+        assert_eq!(
+            package.identity().application_id(),
+            fixture::NO_RESTART_APPLICATION_ID
+        );
+        assert_eq!(
+            package.identity().display_name(),
+            fixture::NO_RESTART_DISPLAY_NAME
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

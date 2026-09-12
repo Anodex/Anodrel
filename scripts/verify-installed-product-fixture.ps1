@@ -3,23 +3,28 @@
 Verifies the fixed installed Anodrel development fixture without changing it.
 
 .DESCRIPTION
-Checks only the fixed fixture's signed installer verification, package layout,
+Checks only one fixed fixture's signed installer verification, package layout,
 Windows Installed Apps record, and Start-menu launcher. It neither installs,
 uninstalls, changes certificate trust, nor writes registry or filesystem state.
 #>
 
 [CmdletBinding()]
-param()
+param([switch] $NoRestartAcceptance)
 
 $ErrorActionPreference = 'Stop'
 
-$applicationId = 'org.anodrel.product-fixture'
+$fixture = if ($NoRestartAcceptance) {
+    @{ ApplicationId = 'org.anodrel.no-restart-fixture'; DisplayName = 'Anodrel No-Restart Fixture'; LocalDirectory = 'InstalledNoRestartFixture'; InstallerName = 'AnodrelDevelopmentNoRestartFixtureInstaller.exe' }
+} else {
+    @{ ApplicationId = 'org.anodrel.product-fixture'; DisplayName = 'Anodrel Product Fixture'; LocalDirectory = 'InstalledProductFixture'; InstallerName = 'AnodrelDevelopmentProductFixtureInstaller.exe' }
+}
+$applicationId = $fixture.ApplicationId
 $version = '0.1.0'
-$displayName = 'Anodrel Product Fixture'
+$displayName = $fixture.DisplayName
 $programFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
 $packageRoot = Join-Path $programFiles "Anodrel\Applications\$applicationId\$version"
 $launcher = Join-Path $packageRoot 'bin\anodrel-windows-host.exe'
-$installer = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'Anodrel\InstalledProductFixture\AnodrelDevelopmentProductFixtureInstaller.exe'
+$installer = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "Anodrel\$($fixture.LocalDirectory)\$($fixture.InstallerName)"
 $shortcut = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::CommonPrograms)) "Anodrel\$displayName.lnk"
 $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Anodrel.$applicationId"
 

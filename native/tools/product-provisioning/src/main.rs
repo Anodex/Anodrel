@@ -20,7 +20,8 @@ use std::{env, process::ExitCode};
 
 const USAGE: &str = concat!(
     "usage: anodrel-product-provisioning <command>\n",
-    "  stage <package-root>       write the fixture manifest and content\n",
+    "  stage <package-root>       write the regular fixture manifest and content\n",
+    "  stage-no-restart <package-root>  write the isolated no-restart fixture package\n",
     "  provision <package-root>   verify signed child and launcher images, then write machine policy\n",
     "  verify                     report whether the machine record currently validates\n",
     "  remove                     delete the fixture machine-policy key",
@@ -30,6 +31,7 @@ fn main() -> ExitCode {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
     let outcome = match arguments.as_slice() {
         [command, package_root] if command == "stage" => stage(package_root),
+        [command, package_root] if command == "stage-no-restart" => stage_no_restart(package_root),
         [command, package_root] if command == "provision" => provision(package_root),
         [command] if command == "verify" => verify(),
         [command] if command == "remove" => remove(),
@@ -46,6 +48,19 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn stage_no_restart(package_root: &str) -> Result<String, String> {
+    let root = std::path::Path::new(package_root);
+    package::stage_no_restart(root).map_err(|_| {
+        "the no-restart fixture package could not be staged; check the target directory".to_owned()
+    })?;
+    Ok(format!(
+        "Staged the {} package manifest and content. Copy signed child and launcher images to bin\\{} and bin\\{} next.",
+        fixture::NO_RESTART_APPLICATION_ID,
+        fixture::EXECUTABLE_FILE_NAME,
+        fixture::LAUNCHER_FILE_NAME,
+    ))
 }
 
 fn stage(package_root: &str) -> Result<String, String> {
@@ -121,7 +136,7 @@ mod tests {
 
     #[test]
     fn usage_names_every_supported_command_and_nothing_else() {
-        for command in ["stage", "provision", "verify", "remove"] {
+        for command in ["stage", "stage-no-restart", "provision", "verify", "remove"] {
             assert!(USAGE.contains(command), "usage omits {command}");
         }
         // There is deliberately no command that accepts a registry path, value
@@ -129,6 +144,7 @@ mod tests {
         for absent in ["--key", "--value", "--application-id", "--capability"] {
             assert!(!USAGE.contains(absent), "usage exposes {absent}");
         }
+        assert!(!USAGE.contains("provision-no-restart"));
     }
 
     #[test]

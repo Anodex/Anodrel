@@ -13,38 +13,62 @@ uninstalled the fixture and its signed helper has completed package cleanup.
 Older installed binaries may still have previously scheduled restart cleanup.
 
 The script has no product, package, certificate, output, or installer command
-inputs. Its only optional action is -Remove, which removes only this script's
-known local output and certificate entries after no valid fixture record is
-selected and no installed fixture directory remains.
+inputs. `-NoRestartAcceptance` selects a second fixed fixture for signed
+no-restart-removal acceptance. It has its own app identity, output directory,
+and development certificate, so it cannot replace the regular fixture.
+`-Remove` removes only the selected fixture after its policy, package, and
+helper cache have all been removed.
 
 .EXAMPLE
 PS> .\scripts\prepare-installed-product-fixture.ps1
 
 .EXAMPLE
 PS> .\scripts\prepare-installed-product-fixture.ps1 -Remove
+
+.EXAMPLE
+PS> .\scripts\prepare-installed-product-fixture.ps1 -NoRestartAcceptance
 #>
 
 [CmdletBinding()]
 param(
-    [switch] $Remove
+    [switch] $Remove,
+    [switch] $NoRestartAcceptance
 )
 
 $ErrorActionPreference = 'Stop'
 
-$CertificateSubject = 'CN=Anodrel Development Installed Fixture'
 $CertificateProvider = 'Microsoft Enhanced RSA and AES Cryptographic Provider'
-$FixtureApplicationId = 'org.anodrel.product-fixture'
+$Fixture = if ($NoRestartAcceptance) {
+    @{
+        CertificateSubject = 'CN=Anodrel Development No-Restart Fixture'
+        ApplicationId = 'org.anodrel.no-restart-fixture'
+        DisplayName = 'Anodrel No-Restart Fixture'
+        LocalDirectory = 'InstalledNoRestartFixture'
+        InstallerName = 'AnodrelDevelopmentNoRestartFixtureInstaller.exe'
+    }
+} else {
+    @{
+        CertificateSubject = 'CN=Anodrel Development Installed Fixture'
+        ApplicationId = 'org.anodrel.product-fixture'
+        DisplayName = 'Anodrel Product Fixture'
+        LocalDirectory = 'InstalledProductFixture'
+        InstallerName = 'AnodrelDevelopmentProductFixtureInstaller.exe'
+    }
+}
+$CertificateSubject = $Fixture.CertificateSubject
+$FixtureApplicationId = $Fixture.ApplicationId
+$FixtureDisplayName = $Fixture.DisplayName
 $FixtureVersion = '0.1.0'
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 $CargoManifest = Join-Path $RepositoryRoot 'native\Cargo.toml'
 $LocalData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
-$FixtureRoot = [IO.Path]::GetFullPath((Join-Path $LocalData 'Anodrel\InstalledProductFixture'))
+$FixtureRoot = [IO.Path]::GetFullPath((Join-Path $LocalData "Anodrel\$($Fixture.LocalDirectory)"))
 $PackageRoot = Join-Path $FixtureRoot 'package'
 $PlanPath = Join-Path $FixtureRoot 'fixture.release-plan.json'
 $BundlePath = Join-Path $FixtureRoot 'fixture.bundle'
 $ManifestPath = Join-Path $FixtureRoot 'fixture.release.json'
 $UnsignedInstallerPath = Join-Path $FixtureRoot 'fixture.unsigned-installer.exe'
-$SignedInstallerPath = Join-Path $FixtureRoot 'AnodrelDevelopmentProductFixtureInstaller.exe'
+$SignedInstallerPath = Join-Path $FixtureRoot $Fixture.InstallerName
 $FixturePolicyPath = "HKLM:\Software\Anodrel\Applications\$FixtureApplicationId"
 $ProgramFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
 $InstalledFixturePackageRoot = [IO.Path]::GetFullPath((Join-Path $ProgramFiles "Anodrel\Applications\$FixtureApplicationId\$FixtureVersion"))
@@ -254,7 +278,7 @@ function Remove-FixtureDirectory {
     }
 
     $anodrelRoot = [IO.Path]::GetFullPath((Join-Path $LocalData 'Anodrel'))
-    $expectedRoot = Join-Path $anodrelRoot 'InstalledProductFixture'
+    $expectedRoot = Join-Path $anodrelRoot $Fixture.LocalDirectory
     if ($FixtureRoot -ne $expectedRoot) {
         throw 'The fixed fixture output path was not resolved as expected.'
     }
@@ -289,10 +313,13 @@ function Assert-FixturePolicyAbsent {
     if (-not (Test-FixturePolicyRecordPresent)) {
         return
     }
-    if (Test-FixturePolicySelected -ProvisioningTool $ProvisioningTool) {
-        throw 'A valid product-fixture record is still selected. Run the matching signed installer uninstall command, or remove the staged fixture through its own script, before continuing.'
+    if ($NoRestartAcceptance) {
+        throw 'A no-restart fixture policy record remains. Run its matching signed installer removal command before continuing.'
     }
-    throw 'A product-fixture policy record remains but does not validate. Do not remove fixture trust or prepare another fixture until that machine state has been investigated.'
+    if (Test-FixturePolicySelected -ProvisioningTool $ProvisioningTool) {
+        throw 'A valid fixed fixture record is still selected. Run its matching signed installer removal command before continuing.'
+    }
+    throw 'A fixed fixture policy record remains but does not validate. Do not remove fixture trust or prepare another fixture until that machine state has been investigated.'
 }
 
 function Assert-FixtureInstalledCleanupComplete {
@@ -331,9 +358,9 @@ function Write-ReleasePlan {
     "path": "/anodrel/development-fixture.p7s"
   },
   "product": {
-    "displayName": "Anodrel Product Fixture",
+    "displayName": "$FixtureDisplayName",
     "publisherName": "Anodrel",
-    "startMenuName": "Anodrel Product Fixture"
+    "startMenuName": "$FixtureDisplayName"
   },
   "launcher": { "path": "bin/anodrel-windows-host.exe" }
 }
@@ -392,7 +419,8 @@ try {
     $imageTool = Get-ToolPath -Name 'anodrel-release-image'
     $signTool = Get-ToolPath -Name 'anodrel-release-sign'
 
-    Invoke-Native -FilePath $provisioningTool -Arguments @('stage', $PackageRoot) `
+    $stageCommand = if ($NoRestartAcceptance) { 'stage-no-restart' } else { 'stage' }
+    Invoke-Native -FilePath $provisioningTool -Arguments @($stageCommand, $PackageRoot) `
         -FailureMessage 'The fixed fixture package could not be staged.' | Out-Null
     Copy-Item -LiteralPath $fixtureChild -Destination (Join-Path $PackageRoot 'bin\anodrel-product-fixture.exe')
     Copy-Item -LiteralPath $hostLauncher -Destination (Join-Path $PackageRoot 'bin\anodrel-windows-host.exe')
@@ -452,5 +480,5 @@ Write-Host 'The signed development installer fixture is prepared and has passed 
 Write-Host 'Start this signed installer normally to exercise native consent and the fixed UAC handoff:'
 Write-Host "  & `"$SignedInstallerPath`""
 Write-Host ''
-Write-Host 'After installation, launch "Anodrel Product Fixture" from the Start menu, use its action, and confirm that it closes.'
+Write-Host "After installation, launch $FixtureDisplayName from the Start menu, use its action, and confirm that it closes."
 Write-Host 'To remove it, run the installed signed uninstaller with "remove" from a normal PowerShell session. Wait for and close the helper result dialog, then run this script with -Remove from an elevated shell. Successful helper cleanup does not require a restart.'

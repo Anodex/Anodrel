@@ -118,3 +118,8 @@ the internal `installed-fixture-cleanup.ps1` helper invokes signed cache
 retirement before certificate removal. Active or invalid caches keep trust
 intact. Older installed uninstallers that already scheduled reboot deletion
 still need their legacy cleanup; rebuilding does not replace installed images.
+
+Pass `-NoRestartAcceptance` to prepare the separate fixed acceptance fixture.
+It uses a distinct app identity and development certificate, so it can prove
+helper removal and immediate reinstall without disturbing a legacy fixture.
+The full procedure is in [the installed fixture guide](../docs/INSTALLED_PRODUCT_FIXTURE.md).

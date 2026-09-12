@@ -8,8 +8,14 @@
 /// The development fixture's application ID, distinct from `org.anodrel.sample`.
 pub const APPLICATION_ID: &str = "org.anodrel.product-fixture";
 
+/// The isolated identity used only to accept no-restart uninstall behaviour.
+pub const NO_RESTART_APPLICATION_ID: &str = "org.anodrel.no-restart-fixture";
+
 /// The display name the staged manifest carries.
 pub const DISPLAY_NAME: &str = "Anodrel Product Fixture";
+
+/// The fixed display name for the isolated no-restart acceptance fixture.
+pub const NO_RESTART_DISPLAY_NAME: &str = "Anodrel No-Restart Fixture";
 
 /// The fixed publisher display text retained only in fixture machine policy.
 pub const PUBLISHER_NAME: &str = "Anodrel";
@@ -50,6 +56,26 @@ pub const CONTENT_PATH: &str = "content/main.txt";
 /// so the record parser's package-identity check has a valid package to read.
 pub const CONTENT_TEXT: &str = "Anodrel development product fixture.\n\nThis package exists only to give the verified Windows product session a valid machine-policy identity. It is not a product, an installer, or an SDK sample.\n";
 
+/// Fixed immutable facts used while staging either first-party fixture package.
+pub struct StagedFixture {
+    /// Application identity rendered into the package manifest.
+    pub application_id: &'static str,
+    /// Human-facing application name rendered into the package manifest.
+    pub display_name: &'static str,
+}
+
+/// The ordinary development fixture package.
+pub const REGULAR_STAGED_FIXTURE: StagedFixture = StagedFixture {
+    application_id: APPLICATION_ID,
+    display_name: DISPLAY_NAME,
+};
+
+/// The isolated no-restart acceptance package. It cannot provision policy.
+pub const NO_RESTART_STAGED_FIXTURE: StagedFixture = StagedFixture {
+    application_id: NO_RESTART_APPLICATION_ID,
+    display_name: NO_RESTART_DISPLAY_NAME,
+};
+
 /// The exact machine-selected grants the fixture record carries.
 ///
 /// This is the smallest set that can prove a native window round trip. No
@@ -62,7 +88,8 @@ mod tests {
     use anodrel_application::is_valid_application_id;
 
     use super::{
-        APPLICATION_ID, CAPABILITIES, CONTENT_PATH, EXECUTABLE_PATH, LAUNCHER_PATH, START_MENU_NAME,
+        APPLICATION_ID, CAPABILITIES, CONTENT_PATH, EXECUTABLE_PATH, LAUNCHER_PATH,
+        NO_RESTART_APPLICATION_ID, START_MENU_NAME,
     };
 
     #[test]
@@ -75,6 +102,8 @@ mod tests {
         // Provisioning must never be able to redirect the existing package or
         // Startup Lab identity to a fixture executable.
         assert_ne!(APPLICATION_ID, "org.anodrel.sample");
+        assert_ne!(NO_RESTART_APPLICATION_ID, "org.anodrel.sample");
+        assert_ne!(APPLICATION_ID, NO_RESTART_APPLICATION_ID);
     }
 
     #[test]

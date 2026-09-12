@@ -46,6 +46,24 @@ signature verification, installation, registration, and removal use the direct
 Windows adapters already used by the platform. No installer framework, archive
 format, webview, Node runtime, or third-party desktop runtime is involved.
 
+## Isolated no-restart acceptance fixture
+
+`-NoRestartAcceptance` selects a second fixed fixture for proving the signed
+helper removal route. It has a distinct app identity, display name, local output
+directory, and development certificate, so it does not touch an already
+installed regular fixture.
+
+| Item | Value |
+| --- | --- |
+| Application ID | `org.anodrel.no-restart-fixture` |
+| Display / Start-menu name | `Anodrel No-Restart Fixture` |
+| Local output | `%LOCALAPPDATA%\Anodrel\InstalledNoRestartFixture` |
+| Certificate | `CN=Anodrel Development No-Restart Fixture` |
+
+It is not a distribution channel or an application option. It is an isolated,
+repeatable Windows release check. The script still accepts no paths, package,
+identity, certificate, or installer-command input.
+
 ## Prepare the signed installer
 
 This is an explicit development-machine trust change. The script creates or
@@ -81,6 +99,41 @@ When preparation succeeds it prints the exact command for the signed installer.
 Start that command from a normal, non-elevated PowerShell session or by opening
 the signed executable. This preserves the intended native confirmation and
 fixed UAC handoff. Do not pass an installer command or an application path.
+
+### No-restart acceptance procedure
+
+This procedure does not alter the regular fixture:
+
+1. From an **elevated** PowerShell session, prepare the isolated image:
+
+   ~~~powershell
+   Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+   .\scripts\prepare-installed-product-fixture.ps1 -NoRestartAcceptance
+   ~~~
+
+2. From normal PowerShell, run the printed installer with no arguments; accept
+   native consent and UAC. Launch **Anodrel No-Restart Fixture**, complete the
+   product session, and close it.
+3. Verify the registered package without changing it:
+
+   ~~~powershell
+   Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+   .\scripts\verify-installed-product-fixture.ps1 -NoRestartAcceptance
+   ~~~
+
+4. From normal PowerShell, run its installed `remove` route. Accept consent and
+   UAC, wait for **No Windows restart is required**, then close that dialog.
+5. Without restarting, from an elevated PowerShell session retire the signed
+   helper cache and separate development certificate:
+
+   ~~~powershell
+   Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+   .\scripts\prepare-installed-product-fixture.ps1 -NoRestartAcceptance -Remove
+   ~~~
+
+6. Prepare and install the same fixture again. That proves immediate
+   same-version reuse. Cancellation, a busy application, and interrupted
+   cleanup are separate required negative checks.
 
 ## Acceptance check
 
