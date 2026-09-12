@@ -147,3 +147,10 @@ Read-only verification for the selected fixed 0.1.1 local update fixture. It
 checks its prepared signed candidate, selected package, signed child/launcher,
 Apps & features key, and Start-menu link. It cannot observe consent, UAC,
 server behaviour, or a visible result.
+
+## verify-local-update-fixture-preparation.ps1
+
+Read-only verification of the fixed local update fixture before installation.
+It checks the staged signed installers and catalogue, the isolated temporary
+publisher and TLS certificate trust, and the two fixed loopback TLS bindings
+plus URL reservation. It creates no listener, files, trust, or product state.

@@ -95,6 +95,15 @@ Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
 .\scripts\prepare-local-update-fixture.ps1
 ~~~
 
+Before installing, use this normal PowerShell read-only check to confirm the
+prepared artifacts, temporary certificate trust, loopback TLS bindings, and URL
+reservation. It does not open a listener or change any state:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+.\scripts\verify-local-update-fixture-preparation.ps1
+~~~
+
 In a normal PowerShell window, install the fixed initial 0.1.0 release through
 its native consent and UAC route:
 
