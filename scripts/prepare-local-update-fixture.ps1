@@ -75,6 +75,16 @@ function Get-CertificateFingerprint {
     }
 }
 
+function Get-HttpCertificateHash {
+    param([Parameter(Mandatory)] $Certificate)
+
+    $hash = ($Certificate.Thumbprint -replace '\s', '')
+    if ([string]::IsNullOrWhiteSpace($hash)) {
+        throw 'The local update fixture TLS certificate has no Windows certificate hash.'
+    }
+    return $hash
+}
+
 function Find-PublisherCertificate {
     $certificates = @(Get-ChildItem 'Cert:\CurrentUser\My' | Where-Object {
         $_.Subject -eq $CertificateSubject -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date).AddDays(1)
@@ -207,7 +217,7 @@ if ($Remove) {
         $_.Subject -eq $TlsSubject -and $_.FriendlyName -eq $TlsFriendlyName
     })
     if ($tls.Count -gt 1) { throw 'More than one local update fixture TLS certificate exists. Nothing was removed.' }
-    if ($tls.Count -eq 1) { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-CertificateFingerprint -Certificate $tls[0]) }
+    if ($tls.Count -eq 1) { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-HttpCertificateHash -Certificate $tls[0]) }
     Remove-FixtureOutput
     if ($tls.Count -eq 1) {
         Remove-FixtureCertificate -Certificate $tls[0] -Stores @('Cert:\LocalMachine\Root') -SourceStore 'Cert:\LocalMachine\My'
@@ -273,14 +283,14 @@ try {
         -FailureMessage 'The local update fixture catalogue could not be signed.'
     $tlsState = Find-TlsCertificate
     $tlsTrust = @(Add-CertificateTrust -Certificate $tlsState.Certificate -StoreNames @('Root'))
-    Add-FixtureHttpEndpoint -CertificateFingerprint (Get-CertificateFingerprint -Certificate $tlsState.Certificate) `
+    Add-FixtureHttpEndpoint -CertificateFingerprint (Get-HttpCertificateHash -Certificate $tlsState.Certificate) `
         -AccountName ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
     $endpointConfigured = $true
 }
 catch {
     $preparationError = $_
     if ($endpointConfigured) {
-        try { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-CertificateFingerprint -Certificate $tlsState.Certificate) } catch { Write-Warning 'The failed preparation left its local HTTPS configuration in place.' }
+        try { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-HttpCertificateHash -Certificate $tlsState.Certificate) } catch { Write-Warning 'The failed preparation left its local HTTPS configuration in place.' }
     }
     try { Remove-FixtureOutput } catch { Write-Warning 'The failed preparation left its local files for inspection.' }
     if ($tlsTrust.Count -gt 0) { try { Remove-CertificateTrust -Certificate $tlsState.Certificate -Stores $tlsTrust } catch { Write-Warning 'The failed preparation could not remove every TLS trust entry it created.' } }
