@@ -330,7 +330,7 @@ another runtime.
 
 | Workload | Samples | Result |
 | --- | ---: | --- |
-| Sustained Startup Lab frame guard | 840 ms reveal | 6.269 ms mean; 7.987 ms worst, within the 16 ms interval. |
+| Sustained Startup Lab frame guard | 840 ms reveal | 6.271 ms mean; 7.902 ms worst, within the 16 ms interval. |
 | Windows pipe loopback, 1,024-byte payload | 5,000 | 19.0 microseconds p50; 24.2 microseconds p95; 40.0 microseconds p99. |
 | Windows pipe loopback, 65,536-byte payload | 5,000 | 146.8 microseconds p50; 264.7 microseconds p95; 320.4 microseconds p99. |
 | Renderer `mask-fill-gradient` | 300 | 1.745 ms p50; 1.795 ms p95; 1.860 ms p99. |
