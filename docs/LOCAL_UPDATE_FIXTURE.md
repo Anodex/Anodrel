@@ -60,6 +60,12 @@ and stop the server. Removing the fixture will first require policy/package/cach
 then remove only this fixture's URL reservation, TLS binding, certificates,
 and private staging directory.
 
+After the signed uninstaller has removed the selected policy, the elevated
+`-Remove` preparation command automatically invokes its fixed signed candidate's
+`cleanup-cache` route if an exited helper cache remains. It removes neither a
+selected policy nor a live package, and it fails closed rather than removing
+trust while cache recovery remains incomplete.
+
 ## Acceptance sequence
 
 ~~~text

@@ -149,12 +149,25 @@ function Remove-CertificateTrust {
     }
 }
 
-function Assert-FixtureNotInstalled {
+function Assert-FixturePolicyAbsent {
     if ((Test-Path -LiteralPath $PolicyPath) -and $null -ne (Get-ItemProperty -LiteralPath $PolicyPath).PSObject.Properties['record']) {
         throw 'The local update fixture is still selected. Remove it with its signed uninstaller before changing fixture trust.'
     }
+}
+
+function Retire-FixtureCleanupCache {
+    if (-not (Test-Path -LiteralPath $InstalledRoot)) { return }
+    if (-not (Test-Path -LiteralPath $CandidateInstaller -PathType Leaf)) {
+        throw 'The local update fixture cleanup cache remains but its prepared signed candidate is unavailable.'
+    }
+    $signature = Get-AuthenticodeSignature -LiteralPath $CandidateInstaller
+    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -ne $CertificateSubject) {
+        throw 'The prepared local update fixture candidate signature is invalid. Fixture trust was not removed.'
+    }
+    Invoke-LocalUpdateFixtureNative -FilePath $CandidateInstaller -Arguments @('cleanup-cache') `
+        -FailureMessage 'The local update fixture cleanup cache could not be retired. Close every Anodrel removal-result dialog and retry.'
     if (Test-Path -LiteralPath $InstalledRoot) {
-        throw 'The local update fixture package or cleanup cache remains. Complete its signed removal before changing fixture trust.'
+        throw 'The local update fixture package or cleanup cache remains after signed retirement. Fixture trust was not removed.'
     }
 }
 
@@ -181,7 +194,8 @@ function Remove-FixtureCertificate {
 Assert-Elevated
 
 if ($Remove) {
-    Assert-FixtureNotInstalled
+    Assert-FixturePolicyAbsent
+    Retire-FixtureCleanupCache
     $tls = @(Get-ChildItem 'Cert:\LocalMachine\My' | Where-Object {
         $_.Subject -eq $TlsSubject -and $_.FriendlyName -eq $TlsFriendlyName
     })
@@ -198,7 +212,10 @@ if ($Remove) {
     return
 }
 
-Assert-FixtureNotInstalled
+Assert-FixturePolicyAbsent
+if (Test-Path -LiteralPath $InstalledRoot) {
+    throw 'The local update fixture package or cleanup cache remains. Complete its signed removal before preparing another fixture.'
+}
 if (Test-Path -LiteralPath $FixtureRoot) {
     throw 'The fixed local update fixture output directory already exists. Run this script with -Remove after uninstalling the fixture.'
 }
