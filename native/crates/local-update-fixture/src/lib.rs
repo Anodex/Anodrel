@@ -13,6 +13,6 @@ mod routing;
 
 pub use publication::{
     APPLICATION_ID, CATALOGUE_REQUEST_TARGET, FixturePublication, FixturePublicationError,
-    INITIAL_VERSION, INSTALLER_REQUEST_TARGET, LOCALHOST, PORT, UPDATE_VERSION,
+    INITIAL_VERSION, INSTALLER_REQUEST_TARGET, LOCALHOST, PORT, UPDATE_VERSION, publication_root,
 };
 pub use routing::{FixtureResource, resolve_request};

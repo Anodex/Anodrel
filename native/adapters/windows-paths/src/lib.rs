@@ -21,6 +21,15 @@ pub fn application_directories(
     ApplicationDirectories::from_local_data_root(&root, identity).map_err(WindowsPathsError::Layout)
 }
 
+/// Returns the current user's absolute Local AppData root.
+///
+/// This narrow operating-system lookup performs no filesystem I/O and exposes
+/// no application protocol surface. Native tools may derive their own fixed
+/// private namespaces from this root without accepting a user-selected path.
+pub fn local_application_data_root() -> Result<std::path::PathBuf, WindowsPathsError> {
+    raw::local_application_data_root().map_err(WindowsPathsError::from)
+}
+
 /// Derives the host's own locations, which belong to no application.
 ///
 /// # Errors
@@ -77,7 +86,12 @@ impl std::error::Error for WindowsPathsError {
 mod tests {
     use anodrel_application::ApplicationManifest;
 
-    use super::{application_directories, host_directories};
+    use super::{application_directories, host_directories, local_application_data_root};
+
+    #[test]
+    fn current_user_local_data_root_is_absolute_without_creating_a_directory() {
+        assert!(local_application_data_root().unwrap().is_absolute());
+    }
 
     #[test]
     fn reads_the_current_user_root_without_creating_a_directory() {

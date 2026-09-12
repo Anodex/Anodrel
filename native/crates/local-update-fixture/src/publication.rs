@@ -25,6 +25,19 @@ const INSTALLER_RELATIVE_PATH: &str = "releases/0.1.1/installer.exe";
 const MAXIMUM_CATALOGUE_BYTES: u64 = 128 * 1024;
 const MAXIMUM_INSTALLER_BYTES: u64 = 576 * 1024 * 1024;
 
+/// Derives the fixed local publication directory without touching the filesystem.
+///
+/// `local_data_root` must come from the current user's operating-system known
+/// folder. This fixture namespace is intentionally separate from any
+/// application data path and no caller chooses a component of it.
+#[must_use]
+pub fn publication_root(local_data_root: &Path) -> PathBuf {
+    local_data_root
+        .join("Anodrel")
+        .join("LocalUpdateFixture")
+        .join("publication")
+}
+
 /// The two regular checked files a fixture server may publish.
 #[derive(Debug)]
 pub struct FixturePublication {
@@ -144,6 +157,7 @@ mod tests {
     use super::{
         APPLICATION_ID, CATALOGUE_REQUEST_TARGET, FixturePublication, FixturePublicationError,
         INITIAL_VERSION, INSTALLER_REQUEST_TARGET, LOCALHOST, PORT, UPDATE_VERSION,
+        publication_root,
     };
 
     #[test]
@@ -189,6 +203,14 @@ mod tests {
         assert_eq!(
             INSTALLER_REQUEST_TARGET,
             "/anodrel/local-update/releases/0.1.1/installer.exe"
+        );
+    }
+
+    #[test]
+    fn publication_root_has_only_fixed_namespace_components() {
+        assert_eq!(
+            publication_root(std::path::Path::new(r"C:\\Local")),
+            std::path::Path::new(r"C:\\Local\\Anodrel\\LocalUpdateFixture\\publication")
         );
     }
 
