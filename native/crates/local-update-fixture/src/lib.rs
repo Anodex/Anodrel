@@ -9,8 +9,10 @@
 //! publication files required by Decision 0221.
 
 mod publication;
+mod routing;
 
 pub use publication::{
     APPLICATION_ID, CATALOGUE_REQUEST_TARGET, FixturePublication, FixturePublicationError,
     INITIAL_VERSION, INSTALLER_REQUEST_TARGET, LOCALHOST, PORT, UPDATE_VERSION,
 };
+pub use routing::{FixtureResource, resolve_request};
