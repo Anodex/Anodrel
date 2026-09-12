@@ -84,6 +84,73 @@ result. Read-only verifiers may prove only fixed policy, package, registration,
 and release-version facts; they cannot claim a dialog was seen or a restart was
 unnecessary.
 
+## Operator procedure
+
+Run preparation from an **elevated PowerShell**. It changes temporary machine
+certificate trust and the fixed loopback HTTP Server configuration, but does
+not install the fixture:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+.\scripts\prepare-local-update-fixture.ps1
+~~~
+
+In a normal PowerShell window, install the fixed initial 0.1.0 release through
+its native consent and UAC route:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+$installer = Join-Path $env:LOCALAPPDATA 'Anodrel\LocalUpdateFixture\AnodrelDevelopmentLocalUpdateFixtureInstaller.exe'
+& $installer
+~~~
+
+Launch **Anodrel Local Update Fixture** once from the Start menu and close its
+product window. Keep the following server command running in a second normal
+PowerShell window; it has no network route beyond the fixed localhost HTTPS
+prefix, and `Ctrl+C` stops it:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+cargo run --release --manifest-path native\Cargo.toml -p anodrel-local-update-fixture-server
+~~~
+
+In another normal PowerShell window, start the fixed acceptance command. First
+decline the native Anodrel confirmation once to prove it stops before download;
+run it again, approve both the Anodrel and UAC confirmations, and wait for the
+success result:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+cargo run --release --manifest-path native\Cargo.toml -p anodrel-product-update-acceptance --bin anodrel-local-update-fixture-acceptance
+~~~
+
+Stop the server with `Ctrl+C`, then read the resulting selected release. This
+changes nothing:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+.\scripts\verify-local-update-fixture.ps1
+~~~
+
+To remove the test fixture, use a normal PowerShell window for the signed
+uninstaller, accepting its native remove confirmation and UAC prompt. Close the
+helper's final result dialog:
+
+~~~powershell
+$programFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
+$uninstaller = Join-Path $programFiles 'Anodrel\Applications\org.anodrel.local-update-fixture\0.1.1\uninstaller\anodrel-windows-installer.exe'
+& $uninstaller remove
+~~~
+
+Finally, use an **elevated PowerShell** to retire any exited helper cache and
+remove only this fixture's loopback binding, trust, certificates, and local
+artifacts. No Windows restart is required by this fresh fixture route:
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+.\scripts\prepare-local-update-fixture.ps1 -Remove
+~~~
+
 ## Exclusions
 
 This fixture does not add a public port, arbitrary listener, HTTP, proxy,
