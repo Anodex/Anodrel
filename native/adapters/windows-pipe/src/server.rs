@@ -1,7 +1,10 @@
-//! Native Windows named-pipe server lifecycle and authenticated worker setup.
+//! Native Windows named-pipe lifecycle and authenticated worker setup.
 //!
-//! This module retains all pipe handles, access-control checks, and worker
-//! shutdown rules behind the adapter's explicit server API.
+//! This module retains pipe handles, access-control checks, endpoint creation,
+//! and worker shutdown. Legacy service-composition constructors live in the
+//! focused `service_builders` child module.
+
+mod service_builders;
 
 use super::*;
 
@@ -28,7 +31,7 @@ impl WindowsPipeServer {
 
     /// Creates an authenticated endpoint from a complete host-owned service
     /// bundle. The bundle is fixed before the peer can authenticate and is
-    /// consumed by this server, so it cannot be altered by protocol traffic.
+    /// consumed by this server, so protocol traffic cannot alter it.
     pub fn create_with_services(
         policy: HostPolicy,
         session_id: impl Into<String>,
@@ -39,9 +42,8 @@ impl WindowsPipeServer {
         })
     }
 
-    /// Creates an authenticated interactive endpoint from host-owned UI
-    /// components and a complete service bundle. The native window that owns
-    /// the components is selected separately by host code.
+    /// Creates an interactive endpoint from host-owned UI components and a
+    /// complete service bundle. Host code separately owns the native window.
     pub fn create_with_session_components_and_service_bundle(
         policy: HostPolicy,
         session_id: impl Into<String>,
@@ -62,13 +64,9 @@ impl WindowsPipeServer {
         })
     }
 
-    /// Creates an authenticated interactive endpoint whose primary view belongs
-    /// to one host-created session-owned window group.
-    ///
-    /// The group contains portable state and mailboxes only. Native host code
-    /// remains responsible for servicing its creation requests on the owning
-    /// UI thread and for retaining its lifetime with the associated window.
-    #[allow(clippy::too_many_arguments)] // The explicit host-owned boundaries are security-relevant.
+    /// Creates an interactive endpoint whose primary view belongs to one
+    /// host-created session-owned window group.
+    #[allow(clippy::too_many_arguments)] // Explicit host-owned boundaries are security-relevant.
     pub fn create_with_session_window_group_and_service_bundle(
         policy: HostPolicy,
         session_id: impl Into<String>,
@@ -87,8 +85,8 @@ impl WindowsPipeServer {
         })
     }
 
-    /// Creates an authenticated worker-thread endpoint with only an
-    /// identity-bound credential service enabled.
+    /// Creates an authenticated worker endpoint with only an identity-bound
+    /// credential service enabled.
     pub fn create_with_credential_service(
         policy: HostPolicy,
         session_id: impl Into<String>,
@@ -99,11 +97,8 @@ impl WindowsPipeServer {
         })
     }
 
-    /// Creates one endpoint whose accepted UI document snapshots are published
-    /// into the supplied per-session mailbox.
-    ///
-    /// The caller owns the mailbox's consumer and must keep it separate from
-    /// the pipe worker thread and from all other sessions.
+    /// Creates one endpoint whose accepted document snapshots are published to
+    /// the supplied per-session mailbox.
     pub fn create_with_ui_document_mailbox(
         policy: HostPolicy,
         session_id: impl Into<String>,
@@ -117,8 +112,8 @@ impl WindowsPipeServer {
         )
     }
 
-    /// Creates one endpoint whose native view uses the supplied bounded document
-    /// and semantic-input mailboxes.
+    /// Creates one endpoint whose view uses bounded document and input
+    /// mailboxes.
     pub fn create_with_ui_mailboxes(
         policy: HostPolicy,
         session_id: impl Into<String>,
@@ -149,210 +144,6 @@ impl WindowsPipeServer {
                 ui_document_mailbox,
                 ui_input_mailbox,
                 session_close_signal,
-            )
-        })
-    }
-
-    /// Creates one endpoint with explicit native components and one portable
-    /// clipboard service supplied by the native host.
-    pub fn create_with_session_components_and_clipboard(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_clipboard(
-                policy,
-                credentials,
-                ui_document_mailbox,
-                ui_input_mailbox,
-                session_close_signal,
-                clipboard,
-            )
-        })
-    }
-
-    /// Creates one endpoint with explicit native components and the portable
-    /// services required by its authenticated application session.
-    pub fn create_with_session_components_and_services(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-        external_links: impl ExternalLinkService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_with_session_components_and_all_services(
-            policy,
-            session_id,
-            ui_document_mailbox,
-            ui_input_mailbox,
-            session_close_signal,
-            clipboard,
-            external_links,
-            UnavailableFileDialogs,
-        )
-    }
-
-    /// Creates one endpoint with all platform services for its authenticated
-    /// application session.
-    #[allow(clippy::too_many_arguments)] // The host supplies each session-bound service explicitly.
-    pub fn create_with_session_components_and_all_services(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-        external_links: impl ExternalLinkService + 'static,
-        file_dialogs: impl FileDialogService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_with_session_components_and_all_services_and_file_access(
-            policy,
-            session_id,
-            ui_document_mailbox,
-            ui_input_mailbox,
-            session_close_signal,
-            clipboard,
-            external_links,
-            file_dialogs,
-            anodrel_file_access::UnavailableFileSelectionService,
-            anodrel_file_access::UnavailableFileTextService,
-        )
-    }
-
-    /// Creates one endpoint with explicit selection-capture and selected-file
-    /// text services for its authenticated application session.
-    #[allow(clippy::too_many_arguments)] // Explicit per-session native service seams stay visible.
-    pub fn create_with_session_components_and_all_services_and_file_access(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-        external_links: impl ExternalLinkService + 'static,
-        file_dialogs: impl FileDialogService + 'static,
-        file_selections: impl FileSelectionService + 'static,
-        file_text: impl FileTextService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_with_session_components_and_all_services_and_file_access_and_storage(
-            policy,
-            session_id,
-            ui_document_mailbox,
-            ui_input_mailbox,
-            session_close_signal,
-            clipboard,
-            external_links,
-            file_dialogs,
-            file_selections,
-            file_text,
-            UnavailableStorage,
-        )
-    }
-
-    /// Creates one endpoint with an explicit host-owned application-state store.
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_with_session_components_and_all_services_and_file_access_and_storage(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-        external_links: impl ExternalLinkService + 'static,
-        file_dialogs: impl FileDialogService + 'static,
-        file_selections: impl FileSelectionService + 'static,
-        file_text: impl FileTextService + 'static,
-        storage: impl StorageService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
-            policy,
-            session_id,
-            ui_document_mailbox,
-            ui_input_mailbox,
-            session_close_signal,
-            clipboard,
-            external_links,
-            file_dialogs,
-            file_selections,
-            file_text,
-            storage,
-            UnavailableDiagnostics,
-        )
-    }
-
-    /// Creates one endpoint with an explicit bounded host diagnostics source.
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-        external_links: impl ExternalLinkService + 'static,
-        file_dialogs: impl FileDialogService + 'static,
-        file_selections: impl FileSelectionService + 'static,
-        file_text: impl FileTextService + 'static,
-        storage: impl StorageService + 'static,
-        diagnostics: impl DiagnosticsService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
-            policy,
-            session_id,
-            ui_document_mailbox,
-            ui_input_mailbox,
-            session_close_signal,
-            clipboard,
-            external_links,
-            file_dialogs,
-            file_selections,
-            file_text,
-            storage,
-            diagnostics,
-            UnavailableCredentials,
-        )
-    }
-
-    /// Creates one worker-thread pipe endpoint with an identity-bound
-    /// credential service. The service is created by the native host, never by
-    /// the pipe peer or bootstrap invitation.
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
-        policy: HostPolicy,
-        session_id: impl Into<String>,
-        ui_document_mailbox: UiDocumentMailbox,
-        ui_input_mailbox: UiInputMailbox,
-        session_close_signal: SessionCloseSignal,
-        clipboard: impl ClipboardService + 'static,
-        external_links: impl ExternalLinkService + 'static,
-        file_dialogs: impl FileDialogService + 'static,
-        file_selections: impl FileSelectionService + 'static,
-        file_text: impl FileTextService + 'static,
-        storage: impl StorageService + 'static,
-        diagnostics: impl DiagnosticsService + 'static,
-        credential_service: impl CredentialService + 'static,
-    ) -> io::Result<(Self, SessionInvitation)> {
-        Self::create_endpoint(session_id.into(), move |credentials| {
-            TransportSession::with_session_components_and_all_services_and_file_access_and_storage_and_diagnostics_and_credentials(
-                policy,
-                credentials,
-                ui_document_mailbox,
-                ui_input_mailbox,
-                session_close_signal,
-                clipboard,
-                external_links,
-                file_dialogs,
-                file_selections,
-                file_text,
-                storage,
-                diagnostics,
-                credential_service,
             )
         })
     }
@@ -391,9 +182,7 @@ impl WindowsPipeServer {
         ))
     }
 
-    /// Serves one connected client to EOF. This blocks on pipe reads, so call it
-    /// only from a dedicated worker thread. Any transport failure closes the
-    /// stream without exposing parser or authentication details to the client.
+    /// Serves one connected client to EOF on a dedicated worker thread.
     pub fn serve_one(mut self) -> io::Result<()> {
         if self.stop_requested.load(Ordering::Acquire) {
             return Ok(());
