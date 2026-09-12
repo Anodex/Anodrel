@@ -237,7 +237,10 @@ name = "anodrel-local-update-fixture-server"
 version = "0.1.0"
 dependencies = [
  "anodrel-local-update-fixture",
+ "anodrel-windows-installer",
  "anodrel-windows-paths",
+ "anodrel-windows-signature",
+ "anodrel-windows-update-catalogue-signature",
 ]
 
 [[package]]

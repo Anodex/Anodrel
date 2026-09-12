@@ -5,7 +5,7 @@ use std::fmt;
 /// One safe reason the local update fixture server could not continue.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LocalUpdateFixtureServerError {
-    /// The fixed local publication root or its two artifacts did not validate.
+    /// The fixed local publication, signed candidate, or signed catalogue did not validate.
     Publication,
     /// Windows could not bind, receive, or reply through the fixed listener.
     Listener,

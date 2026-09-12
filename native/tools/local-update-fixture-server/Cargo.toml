@@ -11,3 +11,6 @@ path = "src/main.rs"
 [dependencies]
 anodrel-local-update-fixture = { path = "../../crates/local-update-fixture" }
 anodrel-windows-paths = { path = "../../adapters/windows-paths" }
+anodrel-windows-installer = { path = "../../tools/windows-installer" }
+anodrel-windows-signature = { path = "../../adapters/windows-signature" }
+anodrel-windows-update-catalogue-signature = { path = "../../adapters/windows-update-catalogue-signature" }

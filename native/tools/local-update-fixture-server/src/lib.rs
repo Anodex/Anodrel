@@ -8,6 +8,7 @@
 //! this tool then serves one at a time through the Windows HTTP Server API.
 
 mod error;
+mod preflight;
 mod raw;
 
 use std::{fs::File, path::Path};
@@ -21,6 +22,7 @@ pub use error::LocalUpdateFixtureServerError;
 /// A bound no-argument Windows HTTPS fixture server.
 pub struct LocalUpdateFixtureServer {
     publication: FixturePublication,
+    _candidate: anodrel_windows_installer::VerifiedInstallerImage,
     queue: raw::RequestQueue,
 }
 
@@ -35,9 +37,15 @@ impl LocalUpdateFixtureServer {
             .map_err(|_| LocalUpdateFixtureServerError::Publication)?;
         let publication = FixturePublication::open(&publication_root(&local_data))
             .map_err(|_| LocalUpdateFixtureServerError::Publication)?;
+        let candidate = preflight::verify(&publication)
+            .map_err(|_| LocalUpdateFixtureServerError::Publication)?;
         let queue =
             raw::RequestQueue::bind().map_err(|_| LocalUpdateFixtureServerError::Listener)?;
-        Ok(Self { publication, queue })
+        Ok(Self {
+            publication,
+            _candidate: candidate,
+            queue,
+        })
     }
 
     /// Serves the fixed request set until the process is stopped.

@@ -48,8 +48,12 @@ It serves exact `GET` requests for the catalogue and installer paths above. It
 returns a fixed not-found response for every other method or path, accepts no
 request body, writes no application data, proxies no traffic, and exposes no
 directory listing, logging endpoint, shutdown endpoint, or mutable control
-surface. Startup independently rechecks that the two prepared regular files
-remain inside its fixed root before accepting a request.
+surface. Before accepting a request, startup independently checks both regular
+files under its fixed root, locks and verifies the candidate's Authenticode and
+embedded release, then verifies that the attached CMS catalogue has the same
+publisher, identity, version, candidate-release facts, byte length, and fixed
+HTTPS installer location. The locked candidate remains held while the server
+runs.
 
 The preparation script will create the two fresh signed installers, derive and
 sign the catalogue from the locked 0.1.1 image, configure the temporary
