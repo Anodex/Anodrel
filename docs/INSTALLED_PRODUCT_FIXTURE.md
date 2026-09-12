@@ -98,6 +98,14 @@ After approving the native confirmation and the Windows UAC prompt:
 8. Close the product window with its title-bar button in a separate run and
    confirm the child also exits.
 
+After installation, the following read-only command checks the signed selected
+release, direct Installed Apps registration, and exact Start-menu launcher
+target. It does not replace the visible Windows checks above:
+
+~~~powershell
+.\scripts\verify-installed-product-fixture.ps1
+~~~
+
 The prepared image makes the signed installer and its direct policy checks
 available; it cannot prove that the native consent, UAC, Start-menu, Explorer,
 or window interactions occurred. Record those visible checks for a Windows
