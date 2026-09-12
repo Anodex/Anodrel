@@ -178,17 +178,24 @@ function Remove-FixtureOutput {
     if ($FixtureRoot -ne $expected -or -not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
         throw 'The fixed local update fixture output directory is unsafe. It was not removed.'
     }
+    $nestedReparsePoint = Get-ChildItem -LiteralPath $FixtureRoot -Force -Recurse |
+        Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 } |
+        Select-Object -First 1
+    if ($null -ne $nestedReparsePoint) {
+        throw 'The fixed local update fixture output directory contains a reparse point. It was not removed.'
+    }
     Remove-Item -LiteralPath $FixtureRoot -Recurse -Force
 }
 
 function Remove-FixtureCertificate {
-    param([Parameter(Mandatory)] $Certificate, [Parameter(Mandatory)] [string[]] $Stores)
+    param(
+        [Parameter(Mandatory)] $Certificate,
+        [Parameter(Mandatory)] [string[]] $Stores,
+        [Parameter(Mandatory)] [string] $SourceStore
+    )
 
     Remove-CertificateTrust -Certificate $Certificate -Stores $Stores
-    if ($Certificate.PSParentPath -eq 'Microsoft.PowerShell.Security\Certificate::CurrentUser\My' -or
-        $Certificate.PSParentPath -eq 'Microsoft.PowerShell.Security\Certificate::LocalMachine\My') {
-        Remove-Item -LiteralPath $Certificate.PSPath -Force
-    }
+    Remove-CertificateTrust -Certificate $Certificate -Stores @($SourceStore)
 }
 
 Assert-Elevated
@@ -202,11 +209,13 @@ if ($Remove) {
     if ($tls.Count -gt 1) { throw 'More than one local update fixture TLS certificate exists. Nothing was removed.' }
     if ($tls.Count -eq 1) { Remove-FixtureHttpEndpoint -CertificateFingerprint (Get-CertificateFingerprint -Certificate $tls[0]) }
     Remove-FixtureOutput
-    if ($tls.Count -eq 1) { Remove-FixtureCertificate -Certificate $tls[0] -Stores @('Cert:\LocalMachine\Root') }
+    if ($tls.Count -eq 1) {
+        Remove-FixtureCertificate -Certificate $tls[0] -Stores @('Cert:\LocalMachine\Root') -SourceStore 'Cert:\LocalMachine\My'
+    }
     $publishers = @(Get-ChildItem 'Cert:\CurrentUser\My' | Where-Object { $_.Subject -eq $CertificateSubject })
     if ($publishers.Count -gt 1) { throw 'More than one local update fixture publisher certificate exists. Nothing was removed.' }
     if ($publishers.Count -eq 1) {
-        Remove-FixtureCertificate -Certificate $publishers[0] -Stores @('Cert:\LocalMachine\Root', 'Cert:\LocalMachine\TrustedPublisher')
+        Remove-FixtureCertificate -Certificate $publishers[0] -Stores @('Cert:\LocalMachine\Root', 'Cert:\LocalMachine\TrustedPublisher') -SourceStore 'Cert:\CurrentUser\My'
     }
     Write-Host 'The prepared local signed update fixture has been removed.'
     return
