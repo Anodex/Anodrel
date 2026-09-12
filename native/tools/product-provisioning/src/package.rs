@@ -30,6 +30,11 @@ pub fn stage_no_restart(package_root: &Path) -> io::Result<()> {
     stage_fixture(package_root, &fixture::NO_RESTART_STAGED_FIXTURE)
 }
 
+/// Stages the distinct fixed local-update acceptance fixture without policy work.
+pub fn stage_local_update(package_root: &Path) -> io::Result<()> {
+    stage_fixture(package_root, &fixture::LOCAL_UPDATE_STAGED_FIXTURE)
+}
+
 fn stage_fixture(package_root: &Path, selected: &fixture::StagedFixture) -> io::Result<()> {
     let content_path = package_root.join("content");
     let executable_directory = package_root.join("bin");
@@ -99,7 +104,7 @@ fn write_exact(path: &Path, bytes: &[u8]) -> io::Result<()> {
 mod tests {
     use anodrel_application::ApplicationManifest;
 
-    use super::{fixture, launcher, manifest, stage, stage_no_restart};
+    use super::{fixture, launcher, manifest, stage, stage_local_update, stage_no_restart};
 
     #[test]
     fn the_staged_manifest_parses_and_matches_its_own_content_digest() {
@@ -151,6 +156,28 @@ mod tests {
         assert_eq!(
             package.identity().display_name(),
             fixture::NO_RESTART_DISPLAY_NAME
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn local_update_staging_has_its_own_fixed_identity() {
+        let root = std::env::temp_dir().join(format!(
+            "anodrel-local-update-fixture-stage-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        stage_local_update(&root).unwrap();
+        let package =
+            anodrel_application::ApplicationPackage::load(root.join("anodrel.application.json"))
+                .unwrap();
+        assert_eq!(
+            package.identity().application_id(),
+            fixture::LOCAL_UPDATE_APPLICATION_ID
+        );
+        assert_eq!(
+            package.identity().display_name(),
+            fixture::LOCAL_UPDATE_DISPLAY_NAME
         );
         std::fs::remove_dir_all(root).unwrap();
     }

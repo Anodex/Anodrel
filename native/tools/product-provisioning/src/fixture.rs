@@ -11,11 +11,17 @@ pub const APPLICATION_ID: &str = "org.anodrel.product-fixture";
 /// The isolated identity used only to accept no-restart uninstall behaviour.
 pub const NO_RESTART_APPLICATION_ID: &str = "org.anodrel.no-restart-fixture";
 
+/// The isolated identity used only to accept the local signed update route.
+pub const LOCAL_UPDATE_APPLICATION_ID: &str = "org.anodrel.local-update-fixture";
+
 /// The display name the staged manifest carries.
 pub const DISPLAY_NAME: &str = "Anodrel Product Fixture";
 
 /// The fixed display name for the isolated no-restart acceptance fixture.
 pub const NO_RESTART_DISPLAY_NAME: &str = "Anodrel No-Restart Fixture";
+
+/// The fixed display name for the isolated local update acceptance fixture.
+pub const LOCAL_UPDATE_DISPLAY_NAME: &str = "Anodrel Local Update Fixture";
 
 /// The fixed publisher display text retained only in fixture machine policy.
 pub const PUBLISHER_NAME: &str = "Anodrel";
@@ -76,6 +82,12 @@ pub const NO_RESTART_STAGED_FIXTURE: StagedFixture = StagedFixture {
     display_name: NO_RESTART_DISPLAY_NAME,
 };
 
+/// The isolated fixture package used only by the local update acceptance path.
+pub const LOCAL_UPDATE_STAGED_FIXTURE: StagedFixture = StagedFixture {
+    application_id: LOCAL_UPDATE_APPLICATION_ID,
+    display_name: LOCAL_UPDATE_DISPLAY_NAME,
+};
+
 /// The exact machine-selected grants the fixture record carries.
 ///
 /// This is the smallest set that can prove a native window round trip. No
@@ -89,7 +101,7 @@ mod tests {
 
     use super::{
         APPLICATION_ID, CAPABILITIES, CONTENT_PATH, EXECUTABLE_PATH, LAUNCHER_PATH,
-        NO_RESTART_APPLICATION_ID, START_MENU_NAME,
+        LOCAL_UPDATE_APPLICATION_ID, NO_RESTART_APPLICATION_ID, START_MENU_NAME,
     };
 
     #[test]
@@ -104,6 +116,8 @@ mod tests {
         assert_ne!(APPLICATION_ID, "org.anodrel.sample");
         assert_ne!(NO_RESTART_APPLICATION_ID, "org.anodrel.sample");
         assert_ne!(APPLICATION_ID, NO_RESTART_APPLICATION_ID);
+        assert_ne!(APPLICATION_ID, LOCAL_UPDATE_APPLICATION_ID);
+        assert_ne!(NO_RESTART_APPLICATION_ID, LOCAL_UPDATE_APPLICATION_ID);
     }
 
     #[test]
