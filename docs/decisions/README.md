@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0219: Signed uninstall cleanup uses a private verified handoff.
+
 - 0218: Fixture trust remains through delayed uninstaller cleanup.
 
 - 0217: Initial-install failures use fixed safe statuses.
