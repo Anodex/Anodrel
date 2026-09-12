@@ -123,3 +123,10 @@ Pass `-NoRestartAcceptance` to prepare the separate fixed acceptance fixture.
 It uses a distinct app identity and development certificate, so it can prove
 helper removal and immediate reinstall without disturbing a legacy fixture.
 The full procedure is in [the installed fixture guide](../docs/INSTALLED_PRODUCT_FIXTURE.md).
+
+## verify-no-restart-fixture-removal.ps1
+
+Reads the one fixed no-restart fixture's package, policy record, Installed Apps
+key, and Start-menu link after interactive removal. It changes nothing and
+proves only that those registered surfaces are absent; it cannot observe the
+native consent/UAC interaction, helper dialog, cache retirement, or a reboot.

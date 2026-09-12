@@ -123,7 +123,16 @@ This procedure does not alter the regular fixture:
 
 4. From normal PowerShell, run its installed `remove` route. Accept consent and
    UAC, wait for **No Windows restart is required**, then close that dialog.
-5. Without restarting, from an elevated PowerShell session retire the signed
+5. Before restarting, prove that the registered surfaces and package have gone:
+
+   ~~~powershell
+   Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
+   .\scripts\verify-no-restart-fixture-removal.ps1
+   ~~~
+
+   This is read-only evidence of removal. It does not claim to have observed
+   native consent, UAC, the helper dialog, a reboot, or cache retirement.
+6. Without restarting, from an elevated PowerShell session retire the signed
    helper cache and separate development certificate:
 
    ~~~powershell
@@ -131,7 +140,7 @@ This procedure does not alter the regular fixture:
    .\scripts\prepare-installed-product-fixture.ps1 -NoRestartAcceptance -Remove
    ~~~
 
-6. Prepare and install the same fixture again. That proves immediate
+7. Prepare and install the same fixture again. That proves immediate
    same-version reuse. Cancellation, a busy application, and interrupted
    cleanup are separate required negative checks.
 
