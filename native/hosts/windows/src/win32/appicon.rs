@@ -1,11 +1,7 @@
-//! The window icon, rasterized from the brand mark at run time.
-//!
-//! The icon is drawn by the same renderer that draws the hero mark, from the
-//! same geometry, so it cannot drift from the identity on screen. Generating it
-//! also means the host ships no image file and needs no image decoder.
+//! The window icon rendered from the shared Anodrel brand source.
 
-use anodrel_brand::{mark, mark::MarkStyle, palette};
-use anodrel_canvas::{Canvas, Paint, Rect, Stop, point};
+use anodrel_brand::app_icon;
+use anodrel_canvas::Canvas;
 
 use super::present::BitmapInfo;
 use super::{Bool, Dword, Hdc, Uint};
@@ -47,48 +43,6 @@ unsafe extern "system" {
 #[link(name = "user32")]
 unsafe extern "system" {
     fn CreateIconIndirect(info: *const IconInfo) -> Hicon;
-}
-
-/// Renders the app icon at `size` pixels square.
-///
-/// The treatment is the mark on a rounded plate, matching the product icon: a
-/// bare mark loses its silhouette against a light taskbar.
-fn render(size: u32) -> Canvas {
-    let mut canvas = Canvas::new(size, size);
-    let extent = size as f32;
-    let plate = Rect::new(0.0, 0.0, extent, extent);
-    let radius = extent * 0.22;
-
-    canvas.fill_rounded_rect(
-        plate,
-        radius,
-        &Paint::linear(
-            point(0.0, 0.0),
-            point(extent, extent),
-            vec![
-                Stop::new(0.0, palette::BACKDROP_LIFT),
-                Stop::new(1.0, palette::BACKDROP),
-            ],
-        ),
-    );
-    canvas.stroke_rounded_rect(
-        plate.inflate(-extent * 0.012),
-        radius,
-        (extent * 0.016).max(1.0),
-        &Paint::solid(palette::PANEL_EDGE),
-    );
-
-    let inset = extent * 0.17;
-    mark::draw(
-        &mut canvas,
-        Rect::new(inset, inset, extent - inset, extent - inset),
-        if size >= 64 {
-            MarkStyle::hero()
-        } else {
-            MarkStyle::compact()
-        },
-    );
-    canvas
 }
 
 /// Builds a Windows icon handle from a rendered canvas.
@@ -153,23 +107,26 @@ fn to_icon(canvas: &Canvas) -> Option<Hicon> {
 ///
 /// Returns `(small, large)`, either of which may be `None`.
 pub(super) fn create() -> (Option<Hicon>, Option<Hicon>) {
-    (to_icon(&render(32)), to_icon(&render(256)))
+    (
+        to_icon(&app_icon::render(32)),
+        to_icon(&app_icon::render(256)),
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::render;
+    use anodrel_brand::app_icon;
     use anodrel_brand::palette;
 
     #[test]
     fn the_icon_plate_is_opaque_at_its_centre() {
-        let canvas = render(64);
+        let canvas = app_icon::render(64);
         assert_eq!(canvas.pixel(32, 32).alpha, 255);
     }
 
     #[test]
     fn the_icon_corners_stay_transparent_for_the_rounded_plate() {
-        let canvas = render(64);
+        let canvas = app_icon::render(64);
         assert_eq!(canvas.pixel(0, 0).alpha, 0);
         assert_eq!(canvas.pixel(63, 0).alpha, 0);
         assert_eq!(canvas.pixel(0, 63).alpha, 0);
@@ -178,7 +135,7 @@ mod tests {
 
     #[test]
     fn the_mark_is_drawn_over_the_plate() {
-        let canvas = render(128);
+        let canvas = app_icon::render(128);
         // The apex sits on the centre line in the upper half of the mark.
         let apex = canvas.pixel(64, 40);
         assert_ne!(apex, palette::BACKDROP);
@@ -188,7 +145,7 @@ mod tests {
     #[test]
     fn both_shipped_sizes_render() {
         for size in [32, 256] {
-            let canvas = render(size);
+            let canvas = app_icon::render(size);
             assert_eq!(canvas.width(), size);
             assert_eq!(canvas.height(), size);
         }

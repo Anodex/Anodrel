@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0223: Start-menu icons are host-owned brand assets.
+
 - 0222: Uninstall retirement cleans one verified rollback package.
 
 - 0221: Local signed update fixture stays fixed and private.

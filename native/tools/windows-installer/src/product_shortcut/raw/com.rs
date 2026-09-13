@@ -74,8 +74,9 @@ struct ShellLinkVtable {
     set_hotkey: *const c_void,
     get_show_cmd: *const c_void,
     set_show_cmd: *const c_void,
-    get_icon_location: *const c_void,
-    set_icon_location: *const c_void,
+    get_icon_location:
+        unsafe extern "system" fn(*mut ShellLink, *mut u16, i32, *mut i32) -> Hresult,
+    set_icon_location: unsafe extern "system" fn(*mut ShellLink, *const u16, i32) -> Hresult,
     set_relative_path: *const c_void,
     resolve: *const c_void,
     set_path: unsafe extern "system" fn(*mut ShellLink, *const u16) -> Hresult,
@@ -118,6 +119,7 @@ pub(super) fn persist_link(
     launcher_path: &Path,
     package_root: &Path,
     arguments: &str,
+    icon_path: &Path,
     temporary_path: &Path,
 ) -> Result<(), ShortcutWriteError> {
     let _apartment = ComApartment::initialize()?;
@@ -125,6 +127,7 @@ pub(super) fn persist_link(
     set_link_path(&link, launcher_path)?;
     set_link_working_directory(&link, package_root)?;
     set_link_arguments(&link, arguments)?;
+    set_link_icon_location(&link, icon_path)?;
     let persistence = query_persist_file(&link)?;
     let temporary_path = wide_shell_path(temporary_path)?;
     // SAFETY: `persistence` owns a valid `IPersistFile`; the staged path is
@@ -192,6 +195,17 @@ fn set_link_working_directory(
         .ok_or(ShortcutWriteError::LinkSaveFailed)
 }
 
+fn set_link_icon_location(link: &Com<ShellLink>, path: &Path) -> Result<(), ShortcutWriteError> {
+    let path = wide_shell_path(path)?;
+    // SAFETY: `link` owns an `IShellLinkW`; the fixed host-owned icon path is
+    // NUL terminated and resource index zero selects the ICO container.
+    let result =
+        unsafe { ((*(*link.as_ptr()).vtable).set_icon_location)(link.as_ptr(), path.as_ptr(), 0) };
+    succeeded(result)
+        .then_some(())
+        .ok_or(ShortcutWriteError::LinkSaveFailed)
+}
+
 fn query_persist_file(link: &Com<ShellLink>) -> Result<Com<PersistFile>, ShortcutWriteError> {
     let unknown = link.as_ptr().cast::<Unknown>();
     let mut raw_persistence = ptr::null_mut();
@@ -245,6 +259,47 @@ pub(super) fn read_persisted_arguments(path: &Path) -> Result<String, ShortcutWr
         .position(|unit| *unit == 0)
         .ok_or(ShortcutWriteError::LinkSaveFailed)?;
     String::from_utf16(&buffer[..length]).map_err(|_| ShortcutWriteError::LinkSaveFailed)
+}
+
+#[cfg(test)]
+pub(super) fn read_persisted_icon_location(
+    path: &Path,
+) -> Result<(std::path::PathBuf, i32), ShortcutWriteError> {
+    use std::os::windows::ffi::OsStringExt;
+
+    let _apartment = ComApartment::initialize()?;
+    let link = create_shell_link()?;
+    let persistence = query_persist_file(&link)?;
+    let path = wide_shell_path(path)?;
+    // SAFETY: the link and bounded path meet `IPersistFile::Load`'s contract.
+    let loaded =
+        unsafe { ((*(*persistence.as_ptr()).vtable).load)(persistence.as_ptr(), path.as_ptr(), 0) };
+    if !succeeded(loaded) {
+        return Err(ShortcutWriteError::LinkSaveFailed);
+    }
+    let mut buffer = [0_u16; 32_767];
+    let mut index = -1;
+    // SAFETY: the fixed buffer is bounded and writable; `index` receives one
+    // documented resource index while the link stays alive.
+    let result = unsafe {
+        ((*(*link.as_ptr()).vtable).get_icon_location)(
+            link.as_ptr(),
+            buffer.as_mut_ptr(),
+            buffer.len() as i32,
+            &mut index,
+        )
+    };
+    if !succeeded(result) {
+        return Err(ShortcutWriteError::LinkSaveFailed);
+    }
+    let length = buffer
+        .iter()
+        .position(|unit| *unit == 0)
+        .ok_or(ShortcutWriteError::LinkSaveFailed)?;
+    Ok((
+        std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length])),
+        index,
+    ))
 }
 
 fn succeeded(result: Hresult) -> bool {

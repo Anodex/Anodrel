@@ -1,9 +1,10 @@
 # Windows Start-menu registration
 
 **Status:** The signed selected-policy preflight, version 1.4 release metadata,
-matching record v1.23, direct Shell Link writer, fixed launcher route, and
-policy-transaction composition are implemented. Apps & features is a separate
-implemented Windows surface; AUMID registration remains separate work.
+matching record v1.23, direct Shell Link writer, host-owned brand icon, fixed
+launcher route, and policy-transaction composition are implemented. Apps &
+features is a separate implemented Windows surface; AUMID registration remains
+separate work.
 
 ## Purpose
 
@@ -28,10 +29,16 @@ only from the verified selected record. `startMenuName` is a separately signed, 
 the general product display name is never used in a filename, directory,
 registry key, command, URL, or authority decision.
 
+The icon is not product data. The installer derives one fixed `Anodrel.ico`
+file below the same verified common Anodrel directory, atomically renders it
+from first-party brand geometry, and assigns resource index zero to the link.
+It remains after one product uninstall because it is shared by all Anodrel
+Start-menu entries.
+
 ## Preflight boundary
 
 The opaque preflight result has no application protocol, user input, path,
-shortcut filename, icon, working directory, generated arguments, registry-write,
+ shortcut filename, product icon, working directory, generated arguments, registry-write,
 COM-object, link, launch, notification, or removal operation. A record through
 v1.22 has no product launcher and therefore refuses registration rather than
 inventing a direct-child target.
@@ -44,9 +51,10 @@ directly, requires that directory and its fixed `Anodrel` child to be ordinary
 non-reparse directories, and writes the link through a temporary ordinary file
 followed by same-directory replacement with write-through. The link's target is
 the selected product launcher, its working directory is the selected package
-root, and its only argument sequence is generated as
-`--product-launch <selected application ID>`. It has no custom icon,
-description, source URL, application input, or runtime path discovery.
+root, its icon location is the fixed host-written `Anodrel.ico`, and its only
+argument sequence is generated as `--product-launch <selected application ID>`.
+It accepts no custom icon, description, source URL, application input, or
+runtime path discovery.
 
 The direct writer has an automated Windows test that creates a link only inside
 a temporary directory and removes it afterwards. It also reads the persisted
@@ -73,8 +81,8 @@ leaves the selected policy untouched.
 
 This does not register an Application User Model ID, write Apps & features data,
 add a taskbar pin, create a desktop shortcut, choose a
-custom icon, accept command-line arguments, launch an application, or report
+ application-provided custom icon, accept command-line arguments, launch an application, or report
 whether a person saw a Start-menu item.
 
 See [product registration](PRODUCT_REGISTRATION.md), [installed application records](LAUNCH.md),
-and Decisions 0183 through 0187.
+and Decisions 0183 through 0187 and 0223.

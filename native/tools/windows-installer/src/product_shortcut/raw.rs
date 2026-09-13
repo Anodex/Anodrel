@@ -9,6 +9,7 @@ use std::{
 use anodrel_application::{StartMenuName, is_valid_application_id};
 
 mod com;
+mod icon;
 
 type Hresult = i32;
 
@@ -46,6 +47,8 @@ pub(super) enum ShortcutWriteError {
     LinkSaveFailed,
     /// Windows did not replace the existing fixed Shell Link.
     LinkReplacementFailed,
+    /// Windows did not write the fixed host-owned Anodrel icon.
+    IconWriteFailed,
     /// Windows did not remove the fixed Shell Link.
     LinkRemovalFailed,
 }
@@ -136,8 +139,15 @@ pub(super) fn replace_common_programs_shortcut(
     verify_normal_directory(&common_programs)?;
     let anodrel_directory = common_programs.join("Anodrel");
     create_or_verify_normal_directory(&anodrel_directory)?;
+    let icon_path = icon::replace(&anodrel_directory)?;
     let link_path = anodrel_directory.join(format!("{}.lnk", start_menu_name.as_str()));
-    replace_link(launcher_path, package_root, arguments, &link_path)
+    replace_link(
+        launcher_path,
+        package_root,
+        arguments,
+        &icon_path,
+        &link_path,
+    )
 }
 
 /// Removes one fixed all-users Start-menu link using already verified data.
@@ -186,16 +196,18 @@ fn replace_link(
     launcher_path: &Path,
     package_root: &Path,
     arguments: &ProductLaunchArguments,
+    icon_path: &Path,
     link_path: &Path,
 ) -> Result<(), ShortcutWriteError> {
     verify_absent_or_regular_file(link_path)?;
     let parent = link_path.parent().ok_or(ShortcutWriteError::PathInvalid)?;
     verify_normal_directory(parent)?;
-    let temporary = TemporaryLink::create(parent)?;
+    let temporary = TemporaryFile::create(parent, "tmp.lnk")?;
     com::persist_link(
         launcher_path,
         package_root,
         arguments.as_str(),
+        icon_path,
         temporary.path(),
     )?;
     temporary.replace(link_path)
@@ -347,13 +359,13 @@ impl Drop for TaskMemoryWide {
     }
 }
 
-struct TemporaryLink {
+pub(super) struct TemporaryFile {
     path: PathBuf,
     active: bool,
 }
 
-impl TemporaryLink {
-    fn create(directory: &Path) -> Result<Self, ShortcutWriteError> {
+impl TemporaryFile {
+    pub(super) fn create(directory: &Path, extension: &str) -> Result<Self, ShortcutWriteError> {
         let expected_parent = directory.to_path_buf();
         let directory = wide_path(directory)?;
         let prefix = [b'A' as u16, b'N' as u16, b'R' as u16, 0];
@@ -377,20 +389,19 @@ impl TemporaryLink {
             return Err(ShortcutWriteError::TemporaryFileUnavailable);
         }
         verify_normal_file(&path)?;
-        Self { path, active: true }.rename_as_shell_link_stage()
+        Self { path, active: true }.rename_with_extension(extension)
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.path
     }
 
-    /// Renames the system-created temporary file to a private `.lnk` stage.
+    /// Renames a private Windows temporary file without replacement.
     ///
-    /// The Start-menu Shell Link writer accepts only a `.lnk` or `.url`
-    /// persistence path. The unique `GetTempFileNameW` result is renamed in
-    /// place without replacement before COM writes the link contents.
-    fn rename_as_shell_link_stage(mut self) -> Result<Self, ShortcutWriteError> {
-        let staged_path = self.path.with_extension("tmp.lnk");
+    /// The only callers use the fixed `tmp.lnk` and `tmp.ico` extensions that
+    /// the corresponding Windows surface expects before atomic replacement.
+    fn rename_with_extension(mut self, extension: &str) -> Result<Self, ShortcutWriteError> {
+        let staged_path = self.path.with_extension(extension);
         let source = wide_path(&self.path)?;
         let destination = wide_path(&staged_path)?;
         // SAFETY: both paths are fixed siblings in the verified normal folder.
@@ -411,7 +422,7 @@ impl TemporaryLink {
         Ok(self)
     }
 
-    fn replace(mut self, destination: &Path) -> Result<(), ShortcutWriteError> {
+    pub(super) fn replace(mut self, destination: &Path) -> Result<(), ShortcutWriteError> {
         let source = wide_path(&self.path)?;
         let destination = wide_path(destination)?;
         // SAFETY: both paths are fixed siblings in the verified normal folder;
@@ -431,7 +442,7 @@ impl TemporaryLink {
     }
 }
 
-impl Drop for TemporaryLink {
+impl Drop for TemporaryFile {
     fn drop(&mut self) {
         if !self.active {
             return;

@@ -766,6 +766,7 @@ name = "anodrel-windows-installer"
 version = "0.1.0"
 dependencies = [
  "anodrel-application",
+ "anodrel-brand",
  "anodrel-json",
  "anodrel-network",
  "anodrel-protocol",

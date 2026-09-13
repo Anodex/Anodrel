@@ -20,6 +20,7 @@
 //!
 //! # Layout
 //!
+//! - [`app_icon`] — the native-window and Windows-shell mark.
 //! - [`palette`] — every colour a first-party surface may use.
 //! - [`mark`] — the authored mark, its geometry fallback, and its rendering.
 //! - [`icon`] — line glyphs for status cards and action tiles.
@@ -41,6 +42,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+pub mod app_icon;
 pub mod icon;
 pub mod mark;
 pub mod palette;

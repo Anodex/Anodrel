@@ -4,7 +4,7 @@ Verifies the fixed installed Anodrel development fixture without changing it.
 
 .DESCRIPTION
 Checks only one fixed fixture's signed installer verification, package layout,
-Windows Installed Apps record, and Start-menu launcher. It neither installs,
+Windows Installed Apps record, and Start-menu launcher/icon. It neither installs,
 uninstalls, changes certificate trust, nor writes registry or filesystem state.
 #>
 
@@ -26,6 +26,7 @@ $packageRoot = Join-Path $programFiles "Anodrel\Applications\$applicationId\$ver
 $launcher = Join-Path $packageRoot 'bin\anodrel-windows-host.exe'
 $installer = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) "Anodrel\$($fixture.LocalDirectory)\$($fixture.InstallerName)"
 $shortcut = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::CommonPrograms)) "Anodrel\$displayName.lnk"
+$icon = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::CommonPrograms)) 'Anodrel\Anodrel.ico'
 $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Anodrel.$applicationId"
 
 function Assert-File {
@@ -53,10 +54,11 @@ if ($entry.DisplayName -ne $displayName -or $entry.DisplayVersion -ne $version -
 }
 
 Assert-File -Path $shortcut -Label 'Start-menu shortcut'
+Assert-File -Path $icon -Label 'Start-menu brand icon'
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
-if ($link.TargetPath -ne $launcher -or $link.WorkingDirectory -ne $packageRoot -or $link.Arguments -ne "--product-launch $applicationId") {
-    throw 'The fixed Start-menu shortcut does not select the verified launcher route.'
+if ($link.TargetPath -ne $launcher -or $link.WorkingDirectory -ne $packageRoot -or $link.Arguments -ne "--product-launch $applicationId" -or $link.IconLocation -ne "$icon,0") {
+    throw 'The fixed Start-menu shortcut does not select the verified branded launcher route.'
 }
 
 [PSCustomObject]@{
@@ -65,5 +67,6 @@ if ($link.TargetPath -ne $launcher -or $link.WorkingDirectory -ne $packageRoot -
     PackageRoot = $packageRoot
     InstalledAppsKey = $registryPath
     StartMenuShortcut = $shortcut
+    StartMenuIcon = $icon
     Status = 'verified'
 } | ConvertTo-Json

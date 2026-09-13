@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 anodrel-application = { path = "../../crates/application" }
+anodrel-brand = { path = "../../crates/brand" }
 anodrel-json = { path = "../../crates/json" }
 anodrel-network = { path = "../../crates/network" }
 anodrel-protocol = { path = "../../crates/protocol" }

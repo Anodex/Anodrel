@@ -190,7 +190,8 @@ claim full fixture acceptance.
 On the same date, a fresh installed fixture passed
 `verify-installed-product-fixture.ps1`: it verified the prepared signed image,
 the direct `Anodrel.org.anodrel.product-fixture` Installed Apps key, and the
-registered Start-menu shortcut's launcher, working directory, and fixed
+registered Start-menu shortcut's launcher, working directory, fixed host-owned
+brand icon, and fixed
 product-launch argument. The title-bar-close, uninstall, cleanup-handoff, and
 recovery checks remain open.
 
