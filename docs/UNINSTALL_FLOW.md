@@ -54,8 +54,11 @@ in a protected, uniquely named cache outside the package until the next signed
 install/update or elevated `cleanup-cache` command. Close the result dialog
 before retiring that cache. An empty protected commit marker permits that same
 signed recovery route to finish an interrupted package deletion with absent
-policy. Unknown files, invalid signatures, links, active helpers and invalid
-policy fail closed. See Decision 0219 for the exact protocol and cache rules.
+policy. After that selected package is gone, it can retire only the one lower
+package named by the validated private rollback record; it never scans version
+directories. Unknown files, invalid signatures, links, active helpers and
+invalid policy fail closed. See Decisions 0219 and 0222 for the exact protocol
+and retirement rules.
 
 Old installed binaries are unchanged by compiling this code. Previously queued
 restart deletions are not cancelled; do not reinstall over a legacy pending

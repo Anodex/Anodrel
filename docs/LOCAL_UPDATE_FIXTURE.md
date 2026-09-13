@@ -65,10 +65,13 @@ then remove only this fixture's URL reservation, TLS binding, certificates,
 and private staging directory.
 
 After the signed uninstaller has removed the selected policy, the elevated
-`-Remove` preparation command automatically invokes its fixed signed candidate's
-`cleanup-cache` route if an exited helper cache remains. It removes neither a
+`-Remove` preparation command builds one fresh signed 0.1.1 retirement image
+from the fixture's existing publisher identity and invokes only its fixed
+`cleanup-cache` route. That route can retire an exited helper cache and the one
+validated lower rollback package retained by the update. It removes neither a
 selected policy nor a live package, and it fails closed rather than removing
-trust while cache recovery remains incomplete.
+trust while recovery remains incomplete. The retirement image is private
+fixture output, never installed or published.
 
 ## Acceptance sequence
 

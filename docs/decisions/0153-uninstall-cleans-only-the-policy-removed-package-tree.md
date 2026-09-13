@@ -1,6 +1,6 @@
 # Decision 0153: Uninstall cleans only the policy-removed package tree
 
-**Status:** Accepted
+**Status:** Superseded by Decision 0222
 
 **Date:** 2026-08-31
 

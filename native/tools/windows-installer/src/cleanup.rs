@@ -17,6 +17,7 @@ use std::{
 
 mod cache;
 mod channel;
+mod prior;
 mod stage;
 #[cfg(test)]
 mod tests;
@@ -128,6 +129,8 @@ pub fn run_current_uninstall_cleanup() -> Result<(), CleanupError> {
     let current = std::env::current_exe().map_err(|_| CleanupError::Cache)?;
     let marker = cache::mark_committed(current.parent().ok_or(CleanupError::Cache)?)?;
     let removed = remove_verified_uninstall_policy(target).map_err(|_| CleanupError::Policy)?;
+    let current_version = release.release().manifest().package_version();
+    let publisher = *release.release().manifest().publisher_fingerprint();
     // Failure to notify a dead parent must not strand a committed cleanup.
     let _ = channel::write_stdout(ACCEPTED);
     let deadline = Instant::now() + TIMEOUT;
@@ -142,6 +145,12 @@ pub fn run_current_uninstall_cleanup() -> Result<(), CleanupError> {
         }
         match crate::recovery::raw::remove_normal_tree(removed.package_root()) {
             Ok(()) => {
+                prior::remove_verified_prior(
+                    root.path(),
+                    removed.application_id(),
+                    publisher,
+                    current_version,
+                )?;
                 std::fs::remove_file(marker).map_err(|_| CleanupError::Cache)?;
                 return Ok(());
             }
@@ -165,7 +174,17 @@ pub fn retire_current_cleanup_cache() -> Result<(), CleanupError> {
     .map_err(|_| CleanupError::Cache)?;
     let _maintenance = crate::maintenance::MaintenanceLock::acquire(root.path())
         .map_err(|_| CleanupError::Cache)?;
-    cache::retire(root.path(), release.release().manifest())
+    cache::retire(root.path(), release.release().manifest())?;
+    match load_installed_application(release.release().manifest().application_id()) {
+        Err(PolicyStoreError::RecordNotFound) => prior::remove_verified_prior(
+            root.path(),
+            release.release().manifest().application_id(),
+            *release.release().manifest().publisher_fingerprint(),
+            release.release().manifest().package_version(),
+        ),
+        Ok(_) => Ok(()),
+        Err(_) => Err(CleanupError::Policy),
+    }
 }
 
 struct PendingChild(Option<Child>);

@@ -65,10 +65,11 @@ succeeds. If registration fails, the selected record remains authoritative and
 the operation reports incomplete product registration; it does not roll policy
 back. Uninstall removes the verified Apps & features key and Start-menu link
 before it removes policy and then the selected package. A verified signed helper
-outside the package finishes removal after the original uninstallers exit;
-successful cleanup needs no restart. Its exited image is retired on the next
-signed maintenance run. A missing registration key is harmless. An unsafe or
-undeletable key leaves selected policy untouched.
+outside the package finishes removal after the original uninstallers exit and
+can then retire the one validated retained rollback package; successful cleanup
+needs no restart. Its exited image is retired on the next signed maintenance
+run. A missing registration key is harmless. An unsafe or undeletable key
+leaves selected policy untouched.
 
 Apps & features invokes the installed image's fixed interactive removal route.
 It obtains new native consent and a fixed UAC handoff before it executes the

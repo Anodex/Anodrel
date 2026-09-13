@@ -20,6 +20,8 @@ $FixtureRoot = [IO.Path]::GetFullPath((Join-Path $LocalData 'Anodrel\LocalUpdate
 $InitialInstaller = Join-Path $FixtureRoot 'AnodrelDevelopmentLocalUpdateFixtureInstaller.exe'
 $PublicationRoot = Join-Path $FixtureRoot 'publication'
 $CandidateInstaller = Join-Path $PublicationRoot 'releases\0.1.1\installer.exe'
+$RecoveryRoot = Join-Path $FixtureRoot 'retirement'
+$RecoveryInstaller = Join-Path $RecoveryRoot 'AnodrelDevelopmentLocalUpdateFixtureRetirement.exe'
 $CatalogueJson = Join-Path $FixtureRoot 'candidate\catalogue.json'
 $CatalogueSignature = Join-Path $PublicationRoot 'stable.p7s'
 $ApplicationId = 'org.anodrel.local-update-fixture'
@@ -64,6 +66,19 @@ function Get-FixtureTool {
     return $path
 }
 
+function Get-FixtureReleaseTools {
+    return @{
+        Provisioning = Get-FixtureTool -Name 'anodrel-product-provisioning'
+        Child = Get-FixtureTool -Name 'anodrel-product-fixture'
+        Launcher = Get-FixtureTool -Name 'anodrel-windows-host'
+        Installer = Get-FixtureTool -Name 'anodrel-windows-installer'
+        Bundle = Get-FixtureTool -Name 'anodrel-release-bundle-tool'
+        Manifest = Get-FixtureTool -Name 'anodrel-release-manifest'
+        Image = Get-FixtureTool -Name 'anodrel-release-image'
+        Sign = Get-FixtureTool -Name 'anodrel-release-sign'
+    }
+}
+
 function Find-PublisherCertificate {
     $certificates = @(Get-ChildItem 'Cert:\CurrentUser\My' | Where-Object {
         $_.Subject -eq $CertificateSubject -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date).AddDays(1)
@@ -78,6 +93,16 @@ function Find-PublisherCertificate {
         -KeyUsage DigitalSignature -KeyAlgorithm RSA -KeyLength 3072 -Provider $CertificateProvider `
         -KeySpec Signature -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddMonths(6)
     return @{ Certificate = $certificate; Created = $true }
+}
+
+function Find-ExistingPublisherCertificate {
+    $certificates = @(Get-ChildItem 'Cert:\CurrentUser\My' | Where-Object {
+        $_.Subject -eq $CertificateSubject -and $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date).AddDays(1)
+    })
+    if ($certificates.Count -ne 1) {
+        throw 'The local update fixture publisher certificate is missing or ambiguous. It was not selected during signed cleanup recovery.'
+    }
+    return $certificates[0]
 }
 
 function Find-TlsCertificate {
@@ -146,18 +171,41 @@ function Assert-FixturePolicyAbsent {
 
 function Retire-FixtureCleanupCache {
     if (-not (Test-Path -LiteralPath $InstalledRoot)) { return }
-    if (-not (Test-Path -LiteralPath $CandidateInstaller -PathType Leaf)) {
-        throw 'The local update fixture cleanup cache remains but its prepared signed candidate is unavailable.'
+    if (Test-Path -LiteralPath $RecoveryRoot) {
+        throw 'The fixed local update fixture recovery output already exists. It was not reused.'
     }
-    $signature = Get-AuthenticodeSignature -LiteralPath $CandidateInstaller
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -ne $CertificateSubject) {
-        throw 'The prepared local update fixture candidate signature is invalid. Fixture trust was not removed.'
-    }
-    Invoke-LocalUpdateFixtureNative -FilePath $CandidateInstaller -Arguments @('cleanup-cache') `
+    Invoke-FixtureBuild -Packages @(
+        'anodrel-product-fixture', 'anodrel-product-provisioning', 'anodrel-windows-host',
+        'anodrel-windows-installer-shell', 'anodrel-windows-installer', 'anodrel-release-bundle-tool',
+        'anodrel-release-manifest', 'anodrel-release-image', 'anodrel-release-sign'
+    )
+    $publisher = Find-ExistingPublisherCertificate
+    $fingerprint = Get-LocalUpdateFixtureCertificateFingerprint -Certificate $publisher
+    New-LocalUpdateFixtureRelease -Tools (Get-FixtureReleaseTools) -ReleaseRoot $RecoveryRoot `
+        -Version '{ "major": 0, "minor": 1, "patch": 1 }' -PublisherFingerprint $fingerprint `
+        -PublisherCertificate $publisher -InstallerOutput $RecoveryInstaller
+    Invoke-LocalUpdateFixtureNative -FilePath $RecoveryInstaller -Arguments @('cleanup-cache') `
         -FailureMessage 'The local update fixture cleanup cache could not be retired. Close every Anodrel removal-result dialog and retry.'
+    Remove-FixtureMaintenanceRoot
     if (Test-Path -LiteralPath $InstalledRoot) {
         throw 'The local update fixture package or cleanup cache remains after signed retirement. Fixture trust was not removed.'
     }
+}
+
+function Remove-FixtureMaintenanceRoot {
+    if (-not (Test-Path -LiteralPath $InstalledRoot)) { return }
+    $expected = [IO.Path]::GetFullPath((Join-Path $ProgramFiles "Anodrel\Applications\$ApplicationId"))
+    $root = Get-Item -LiteralPath $InstalledRoot -Force
+    if ($InstalledRoot -ne $expected -or -not $root.PSIsContainer -or ($root.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'The fixed local update fixture installation root is unsafe. It was not removed.'
+    }
+    $entries = @(Get-ChildItem -LiteralPath $InstalledRoot -Force)
+    if ($entries.Count -ne 1 -or $entries[0].Name -ne '.anodrel-maintenance.lock' -or $entries[0].PSIsContainer `
+        -or ($entries[0].Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'The local update fixture package or cleanup cache remains after signed retirement. Fixture trust was not removed.'
+    }
+    Remove-Item -LiteralPath $entries[0].FullName -Force
+    Remove-Item -LiteralPath $InstalledRoot -Force
 }
 
 function Remove-FixtureOutput {
@@ -233,16 +281,7 @@ $publisherTrust = @()
 $tlsTrust = @()
 $endpointConfigured = $false
 try {
-    $tools = @{
-        Provisioning = Get-FixtureTool -Name 'anodrel-product-provisioning'
-        Child = Get-FixtureTool -Name 'anodrel-product-fixture'
-        Launcher = Get-FixtureTool -Name 'anodrel-windows-host'
-        Installer = Get-FixtureTool -Name 'anodrel-windows-installer'
-        Bundle = Get-FixtureTool -Name 'anodrel-release-bundle-tool'
-        Manifest = Get-FixtureTool -Name 'anodrel-release-manifest'
-        Image = Get-FixtureTool -Name 'anodrel-release-image'
-        Sign = Get-FixtureTool -Name 'anodrel-release-sign'
-    }
+    $tools = Get-FixtureReleaseTools
     $publisherState = Find-PublisherCertificate
     $publisher = $publisherState.Certificate
     $publisherTrust = @(Add-CertificateTrust -Certificate $publisher -StoreNames @('Root', 'TrustedPublisher'))
