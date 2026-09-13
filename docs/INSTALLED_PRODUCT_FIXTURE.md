@@ -195,6 +195,25 @@ brand icon, and fixed
 product-launch argument. The title-bar-close, uninstall, cleanup-handoff, and
 recovery checks remain open.
 
+On 2026-09-12, a second fresh fixture exercised the branded registration and
+removal route on the development machine. The read-only verifier reported
+`Status: verified` and proved that **Anodrel Product Fixture** targets the
+verified launcher, uses the selected package root as its working directory,
+passes `--product-launch org.anodrel.product-fixture`, and uses
+`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Anodrel\Anodrel.ico`
+at index `0`. Windows Start search visibly displayed the Anodrel mark for that
+entry, and launching the registered Shell Link started the verified host and
+fixture child.
+
+The signed normal removal route then completed. Before a Windows restart, the
+elevated fixture-removal command retired its local output and development trust;
+a final read-only machine audit found no selected record, package, shortcut,
+installer process, or fixture development certificate. The shared
+`Anodrel.ico` remained by design because another Anodrel Start-menu entry may
+use it. This records the positive verifier, visible icon, removal, and
+no-restart cleanup postconditions; title-bar-close, recovery, cancellation,
+busy-application, and interrupted-cleanup checks remain separate evidence.
+
 ## Removal
 
 First, remove the installed fixture from a normal PowerShell session. The
