@@ -264,16 +264,30 @@ image, unexpected cache contents, or locked package stops the operation without
 removing trust. Successful helper cleanup permits preparing and installing the
 same fixture again immediately, without restarting Windows.
 
-### No-restart acceptance still required
+### Recorded no-restart acceptance
 
-Use a freshly signed build with the helper, not an old installed binary. Record
-install, launch/close, native removal consent/UAC, final helper success, absent
-package/registration/shortcut, cache retirement, and immediate same-version
-reinstall without a reboot. Separately test cancellation, a busy application,
-interrupted cleanup and refusal of altered cache content. Automated executable
-lifetime tests passed on Windows; this signed joined path is not yet recorded
-as accepted. Do not remove trust to simulate a signature failure on an installed
-fixture; use a disposable development environment for negative trust tests.
+On 2026-09-12, the isolated fixture completed the signed no-restart route on
+the development machine. A first preparation and normal installation passed
+`verify-installed-product-fixture.ps1 -NoRestartAcceptance`; normal signed
+removal then passed `verify-no-restart-fixture-removal.ps1` before a restart.
+Elevated `-Remove` retired its helper cache, local output, and development
+trust. A second fresh preparation then installed the same `0.1.0` fixture
+immediately and passed the installed-fixture verifier again. A final normal
+removal, removal verifier, and elevated cleanup all succeeded without a
+restart.
+
+The final audit found the versioned package directory absent, no selected
+record, Installed Apps registration, Start-menu shortcut, local fixture output,
+installer process, or development certificate. The empty application-identity
+parent and its maintenance lock may remain; neither is a selected package and
+the documented cleanup contract deliberately does not delete it by an
+unverified path. This automated process and postcondition evidence does not
+claim to have observed the native consent, UAC, or helper dialog.
+
+Cancellation, a busy application, interrupted cleanup, and refusal of altered
+cache content remain separate negative checks. Do not remove trust to simulate
+a signature failure on an installed fixture; use a disposable development
+environment for negative trust tests.
 
 For this fixed fixture, that package directory is the selected version path:
 `C:\Program Files\Anodrel\Applications\org.anodrel.product-fixture\0.1.0`.
