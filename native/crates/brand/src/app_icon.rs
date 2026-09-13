@@ -131,10 +131,7 @@ mod tests {
         assert_eq!(&ico[..6], &[0, 0, 1, 0, SIZES.len() as u8, 0]);
         let mut previous_end = 6 + SIZES.len() * 16;
         for (entry, size) in ico[6..6 + SIZES.len() * 16].chunks_exact(16).zip(SIZES) {
-            assert_eq!(
-                u32::from_le_bytes(entry[8..12].try_into().unwrap()) > 40,
-                true
-            );
+            assert!(u32::from_le_bytes(entry[8..12].try_into().unwrap()) > 40);
             let offset = u32::from_le_bytes(entry[12..16].try_into().unwrap()) as usize;
             assert_eq!(offset, previous_end);
             assert_eq!(
