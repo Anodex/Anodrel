@@ -119,10 +119,13 @@ mod tests {
 
     #[test]
     fn icon_plate_and_mark_share_the_window_icon_appearance() {
-        let canvas = render(64);
-        assert_eq!(canvas.pixel(0, 0).alpha, 0);
-        assert_eq!(canvas.pixel(32, 32).alpha, 255);
-        assert_ne!(canvas.pixel(32, 40), palette::BACKDROP);
+        for size in SIZES {
+            let canvas = render(size);
+            assert!(canvas.pixel(0, 0).alpha < 255);
+            let center = (size / 2) as i32;
+            assert_eq!(canvas.pixel(center, center).alpha, 255);
+        }
+        assert_ne!(render(64).pixel(32, 40), palette::BACKDROP);
     }
 
     #[test]
@@ -131,7 +134,12 @@ mod tests {
         assert_eq!(&ico[..6], &[0, 0, 1, 0, SIZES.len() as u8, 0]);
         let mut previous_end = 6 + SIZES.len() * 16;
         for (entry, size) in ico[6..6 + SIZES.len() * 16].chunks_exact(16).zip(SIZES) {
-            assert!(u32::from_le_bytes(entry[8..12].try_into().unwrap()) > 40);
+            assert_eq!(&entry[..4], &[(size % 256) as u8, (size % 256) as u8, 0, 0]);
+            assert_eq!(u16::from_le_bytes(entry[4..6].try_into().unwrap()), 1);
+            assert_eq!(u16::from_le_bytes(entry[6..8].try_into().unwrap()), 32);
+            let image_bytes = u32::from_le_bytes(entry[8..12].try_into().unwrap()) as usize;
+            let mask_bytes = (size.div_ceil(32) * 4 * size) as usize;
+            assert_eq!(image_bytes, 40 + (size * size * 4) as usize + mask_bytes);
             let offset = u32::from_le_bytes(entry[12..16].try_into().unwrap()) as usize;
             assert_eq!(offset, previous_end);
             assert_eq!(
@@ -142,7 +150,23 @@ mod tests {
                 u32::from_le_bytes(ico[offset + 4..offset + 8].try_into().unwrap()),
                 size
             );
-            previous_end += u32::from_le_bytes(entry[8..12].try_into().unwrap()) as usize;
+            assert_eq!(
+                u32::from_le_bytes(ico[offset + 8..offset + 12].try_into().unwrap()),
+                size * 2
+            );
+            assert_eq!(
+                u16::from_le_bytes(ico[offset + 12..offset + 14].try_into().unwrap()),
+                1
+            );
+            assert_eq!(
+                u16::from_le_bytes(ico[offset + 14..offset + 16].try_into().unwrap()),
+                32
+            );
+            assert_eq!(
+                u32::from_le_bytes(ico[offset + 20..offset + 24].try_into().unwrap()),
+                (size * size * 4)
+            );
+            previous_end += image_bytes;
         }
         assert_eq!(previous_end, ico.len());
     }

@@ -34,12 +34,23 @@ pub(super) fn replace(directory: &Path) -> Result<PathBuf, ShortcutWriteError> {
 mod tests {
     use super::replace;
     use crate::test_support::TestDirectory;
+    use anodrel_brand::app_icon;
 
     #[test]
     fn writes_the_fixed_brand_icon_as_an_ordinary_file() {
         let directory = TestDirectory::new("shortcut-icon");
         let icon = replace(directory.path()).expect("the fixed icon persists");
         assert_eq!(icon.file_name().unwrap(), "Anodrel.ico");
-        assert!(std::fs::metadata(icon).unwrap().len() > 256);
+        let expected = app_icon::windows_ico();
+        assert_eq!(std::fs::read(&icon).unwrap(), expected);
+
+        let replacement = replace(directory.path()).expect("the icon replaces atomically");
+        assert_eq!(replacement, icon);
+        assert_eq!(std::fs::read(&icon).unwrap(), app_icon::windows_ico());
+        let files = std::fs::read_dir(directory.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>();
+        assert_eq!(files, [std::ffi::OsString::from("Anodrel.ico")]);
     }
 }
