@@ -15,6 +15,20 @@ fn rejects_a_trusted_record_for_a_different_policy_key_identity() {
 }
 
 #[test]
+fn retained_policy_inspection_does_not_reopen_an_absent_package() {
+    let fixture = fixture();
+    let record = fs::read_to_string(&fixture.record_path).expect("record is read");
+    let package_root = fixture.package_root.clone();
+    fixture.remove();
+
+    let retained = InstalledApplication::inspect_retained_policy_record(&record, APPLICATION_ID)
+        .expect("the retained policy record remains syntactically inspectable");
+    assert_eq!(retained.application_id(), APPLICATION_ID);
+    assert_eq!(retained.package_root(), package_root);
+    assert!(retained.matches_publisher([0xA5; 32]));
+}
+
+#[test]
 fn rejects_a_record_that_disagrees_with_the_package_identity() {
     let fixture = fixture();
     let contents = fs::read_to_string(&fixture.record_path).expect("record is read");

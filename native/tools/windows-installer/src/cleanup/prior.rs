@@ -1,10 +1,14 @@
 //! Verified removal of the one retained rollback package after uninstall.
 
-use std::path::Path;
+use std::{io::ErrorKind, path::Path};
 
-use anodrel_windows_policy::{PolicyStoreError, load_previous_installed_application};
+use anodrel_application::InstalledApplication;
+use anodrel_windows_policy::{
+    PolicyStoreError, load_previous_installed_application, read_previous_installed_record,
+};
 use anodrel_windows_signature::verify_embedded_signature;
 
+use crate::uninstall::remove_verified_prior_uninstall_policy;
 use crate::{PackageVersion, recovery::raw::remove_normal_tree};
 
 use super::CleanupError;
@@ -20,22 +24,36 @@ pub(super) fn remove_verified_prior(
     publisher: [u8; 32],
     current_version: PackageVersion,
 ) -> Result<(), CleanupError> {
-    let prior = match load_previous_installed_application(application_id) {
-        Ok(prior) => prior,
+    let record = match read_previous_installed_record(application_id) {
+        Ok(record) => record,
         Err(PolicyStoreError::RecordNotFound) => return Ok(()),
         Err(_) => return Err(CleanupError::Verification),
     };
+    let prior = InstalledApplication::inspect_retained_policy_record(&record, application_id)
+        .map_err(|_| CleanupError::Verification)?;
     let prior_version =
         direct_version(root, prior.package_root()).ok_or(CleanupError::Verification)?;
-    if prior_version >= current_version {
+    if prior.application_id() != application_id
+        || prior_version >= current_version
+        || !prior.matches_publisher(publisher)
+    {
         return Err(CleanupError::Verification);
     }
-    let signer = verify_embedded_signature(prior.executable_path())
-        .map_err(|_| CleanupError::Verification)?;
-    if !prior.matches_publisher(signer.as_bytes()) || signer.as_bytes() != publisher {
-        return Err(CleanupError::Verification);
+    match std::fs::symlink_metadata(prior.package_root()) {
+        Ok(_) => {
+            let prior = load_previous_installed_application(application_id)
+                .map_err(|_| CleanupError::Verification)?;
+            let signer = verify_embedded_signature(prior.executable_path())
+                .map_err(|_| CleanupError::Verification)?;
+            if !prior.matches_publisher(signer.as_bytes()) || signer.as_bytes() != publisher {
+                return Err(CleanupError::Verification);
+            }
+            remove_normal_tree(prior.package_root()).map_err(|_| CleanupError::Package)?;
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(_) => return Err(CleanupError::Package),
     }
-    remove_normal_tree(prior.package_root()).map_err(|_| CleanupError::Package)
+    remove_verified_prior_uninstall_policy(application_id).map_err(|_| CleanupError::Policy)
 }
 
 fn direct_version(root: &Path, package_root: &Path) -> Option<PackageVersion> {

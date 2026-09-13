@@ -171,9 +171,7 @@ function Assert-FixturePolicyAbsent {
 
 function Retire-FixtureCleanupCache {
     if (-not (Test-Path -LiteralPath $InstalledRoot)) { return }
-    if (Test-Path -LiteralPath $RecoveryRoot) {
-        throw 'The fixed local update fixture recovery output already exists. It was not reused.'
-    }
+    Remove-FixtureRecoveryOutput
     Invoke-FixtureBuild -Packages @(
         'anodrel-product-fixture', 'anodrel-product-provisioning', 'anodrel-windows-host',
         'anodrel-windows-installer-shell', 'anodrel-windows-installer', 'anodrel-release-bundle-tool',
@@ -190,6 +188,22 @@ function Retire-FixtureCleanupCache {
     if (Test-Path -LiteralPath $InstalledRoot) {
         throw 'The local update fixture package or cleanup cache remains after signed retirement. Fixture trust was not removed.'
     }
+}
+
+function Remove-FixtureRecoveryOutput {
+    if (-not (Test-Path -LiteralPath $RecoveryRoot)) { return }
+    $expected = [IO.Path]::GetFullPath((Join-Path $FixtureRoot 'retirement'))
+    $item = Get-Item -LiteralPath $RecoveryRoot -Force
+    if ($RecoveryRoot -ne $expected -or -not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'The fixed local update fixture recovery output is unsafe. It was not removed.'
+    }
+    $nestedReparsePoint = Get-ChildItem -LiteralPath $RecoveryRoot -Force -Recurse |
+        Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 } |
+        Select-Object -First 1
+    if ($null -ne $nestedReparsePoint) {
+        throw 'The fixed local update fixture recovery output contains a reparse point. It was not removed.'
+    }
+    Remove-Item -LiteralPath $RecoveryRoot -Recurse -Force
 }
 
 function Remove-FixtureMaintenanceRoot {

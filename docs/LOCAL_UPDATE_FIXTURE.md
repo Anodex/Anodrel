@@ -73,6 +73,13 @@ selected policy nor a live package, and it fails closed rather than removing
 trust while recovery remains incomplete. The retirement image is private
 fixture output, never installed or published.
 
+If an earlier cleanup was interrupted after producing that private retirement
+output, `-Remove` first refuses reparse points and removes only that exact
+fixture-local `retirement` directory. It then builds a fresh signed retirement
+image rather than reusing partial output. This cannot select a package, cache,
+certificate, endpoint, or user path, and it does not remove the protected
+Program Files helper cache itself. See [Decision 0224](decisions/0224-local-update-cleanup-regenerates-interrupted-recovery-output.md).
+
 ## Acceptance sequence
 
 ~~~text
@@ -166,6 +173,22 @@ artifacts. No Windows restart is required by this fresh fixture route:
 Set-Location -LiteralPath 'C:\Users\Owner\Desktop\Platform X'
 .\scripts\prepare-local-update-fixture.ps1 -Remove
 ~~~
+
+### Recorded machine acceptance
+
+On 2026-09-13, the fixed local fixture prepared and verified its 0.1.0 initial
+release, 0.1.1 candidate, localhost TLS binding, and signed CMS catalogue. The
+normal initial installer completed, the first-party server bound only the fixed
+loopback endpoint, and the no-argument acceptance runner selected 0.1.1. The
+read-only verifier then proved the selected 0.1.1 release, package, Installed
+Apps registration, and Start-menu entry. Signed removal and elevated cleanup
+retired the selected and retained packages, `record` and `previous` policy
+values, helper cache, fixture output, publisher and TLS certificates, TLS
+bindings, and URL reservation without a Windows restart.
+
+This is machine-state and signed-route evidence only. It does not claim that a
+person observed the declined confirmation, accepted confirmation, UAC prompt,
+or final native result; those remain required visible desktop acceptance.
 
 ## Exclusions
 

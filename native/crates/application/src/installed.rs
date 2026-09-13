@@ -73,6 +73,37 @@ pub struct InstalledApplication {
     product_launcher: Option<launcher::ProductLauncher>,
 }
 
+/// A parsed private rollback record whose package is no longer assumed to exist.
+///
+/// This type exposes only the facts required to retire a previously verified
+/// package after selected policy is absent. It cannot launch an executable,
+/// grant capabilities, or create host session policy.
+pub struct RetainedPolicyRecord {
+    application_id: String,
+    package_root: PathBuf,
+    publisher_fingerprint: PublisherFingerprint,
+}
+
+impl RetainedPolicyRecord {
+    /// Returns the fixed application identity carried by the retained record.
+    #[must_use]
+    pub fn application_id(&self) -> &str {
+        &self.application_id
+    }
+
+    /// Returns the uncanonicalized package path for fixed-root comparison only.
+    #[must_use]
+    pub fn package_root(&self) -> &Path {
+        &self.package_root
+    }
+
+    /// Compares the retained publisher with an already verified signed image.
+    #[must_use]
+    pub fn matches_publisher(&self, actual: [u8; 32]) -> bool {
+        self.publisher_fingerprint.0 == actual
+    }
+}
+
 impl InstalledApplication {
     /// Loads a record selected from a host-controlled policy root and verifies
     /// the package and executable facts it names.
@@ -112,6 +143,33 @@ impl InstalledApplication {
         }
         let record = record::parse(record)?;
         validate_record(record, None, Some(expected_application_id))
+    }
+
+    /// Parses a retained installer-only record without reopening its package.
+    ///
+    /// A caller must independently prove the fixed machine root, direct
+    /// canonical version, and current signed publisher before it can use this
+    /// result to retire an already absent rollback package and its record.
+    pub fn inspect_retained_policy_record(
+        record: &str,
+        expected_application_id: &str,
+    ) -> Result<RetainedPolicyRecord, InstalledApplicationError> {
+        if !manifest::is_valid_application_id(expected_application_id) {
+            return Err(InstalledApplicationError::InvalidRecord);
+        }
+        let record = record::parse(record)?;
+        if record.application_id != expected_application_id {
+            return Err(InstalledApplicationError::ApplicationIdentityMismatch);
+        }
+        let package_root = PathBuf::from(record.package_root);
+        if !package_root.is_absolute() {
+            return Err(InstalledApplicationError::InvalidPackageRoot);
+        }
+        Ok(RetainedPolicyRecord {
+            application_id: record.application_id,
+            package_root,
+            publisher_fingerprint: PublisherFingerprint(record.publisher_fingerprint),
+        })
     }
 
     /// Returns the package identity that exactly matched the installed record.

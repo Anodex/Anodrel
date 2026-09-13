@@ -225,6 +225,17 @@ pub fn remove_verified_uninstall_policy(
     Ok(PolicyRemovedUninstallTarget { target })
 }
 
+/// Removes the fixed retained rollback record after its package was verified
+/// and retired by the signed cleanup route.
+///
+/// The caller supplies only the signed current release identity. This function
+/// cannot select another value name, policy location, package, or release.
+pub(crate) fn remove_verified_prior_uninstall_policy(
+    application_id: &str,
+) -> Result<(), UninstallPolicyRemovalError> {
+    raw::remove_previous_record(application_id)
+}
+
 mod raw {
     use super::UninstallPolicyRemovalError;
     type HKey = isize;
@@ -234,6 +245,8 @@ mod raw {
     const ERROR_SUCCESS: i32 = 0;
     const ERROR_ACCESS_DENIED: i32 = 5;
     const POLICY_PREFIX: &str = "Software\\Anodrel\\Applications\\";
+    const PREVIOUS_VALUE_NAME: &str = "previous";
+    const RECORD_VALUE_NAME: &str = "record";
     #[link(name = "Advapi32")]
     unsafe extern "system" {
         fn RegOpenKeyExW(
@@ -247,6 +260,17 @@ mod raw {
         fn RegCloseKey(key: HKey) -> i32;
     }
     pub(super) fn remove_record(application_id: &str) -> Result<(), UninstallPolicyRemovalError> {
+        remove_value(application_id, RECORD_VALUE_NAME)
+    }
+    pub(super) fn remove_previous_record(
+        application_id: &str,
+    ) -> Result<(), UninstallPolicyRemovalError> {
+        remove_value(application_id, PREVIOUS_VALUE_NAME)
+    }
+    fn remove_value(
+        application_id: &str,
+        value_name: &str,
+    ) -> Result<(), UninstallPolicyRemovalError> {
         let path = wide(&format!("{POLICY_PREFIX}{application_id}"));
         let mut key = 0_isize;
         // SAFETY: The fixed path is NUL terminated and `key` is one HKEY output slot.
@@ -263,7 +287,7 @@ mod raw {
             return Err(error(opened));
         }
         let guard = Key(key);
-        let value = wide("record");
+        let value = wide(value_name);
         // SAFETY: The guard owns the fixed machine key and value is NUL terminated.
         let status = unsafe { RegDeleteValueW(guard.0, value.as_ptr()) };
         (status == ERROR_SUCCESS).then_some(()).ok_or(error(status))

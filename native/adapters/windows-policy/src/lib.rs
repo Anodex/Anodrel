@@ -51,6 +51,19 @@ pub fn load_previous_installed_application(
         .map_err(PolicyStoreError::Record)
 }
 
+/// Reads one retained installer-only record without attempting package access.
+///
+/// This is available only for a signed installer cleanup that has already
+/// selected the fixed identity. It does not launch, grant policy, or validate
+/// a package; callers must treat the returned record as untrusted until they
+/// apply their own fixed-root and signed-publisher checks.
+pub fn read_previous_installed_record(application_id: &str) -> Result<String, PolicyStoreError> {
+    if !is_valid_application_id(application_id) {
+        return Err(PolicyStoreError::InvalidApplicationId);
+    }
+    raw::read_previous_record(application_id)
+}
+
 /// Loads machine policy and creates the policy for one authenticated host session.
 ///
 /// Both the installed record and its capability grants are selected only from

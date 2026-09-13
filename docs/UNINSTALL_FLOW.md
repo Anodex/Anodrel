@@ -56,7 +56,11 @@ before retiring that cache. An empty protected commit marker permits that same
 signed recovery route to finish an interrupted package deletion with absent
 policy. After that selected package is gone, it can retire only the one lower
 package named by the validated private rollback record; it never scans version
-directories. Unknown files, invalid signatures, links, active helpers and
+directories. Once that lower package is retired, the same fixed private
+`previous` value is removed. A later retry may inspect a syntactically valid
+absent-package record only to prove its signed identity, direct lower version,
+and publisher before deleting that fixed value; it never uses it to select a
+path for deletion. Unknown files, invalid signatures, links, active helpers and
 invalid policy fail closed. See Decisions 0219 and 0222 for the exact protocol
 and retirement rules.
 
