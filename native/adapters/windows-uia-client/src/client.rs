@@ -19,7 +19,7 @@ pub use events::{
 };
 pub use geometry::UiAutomationRect;
 pub use model::{UiAutomationElement, UiAutomationNode, UiAutomationValue};
-pub use patterns::UiAutomationInvocation;
+pub use patterns::{UiAutomationInvocation, UiAutomationScrollItem};
 
 use tree::{
     TreeView, optional_element, text_property_from_raw, walker_child, walker_from,
@@ -190,6 +190,15 @@ impl UiAutomationClient {
         element: &UiAutomationElement,
     ) -> Result<bool, UiAutomationError> {
         self.boolean_property(element, raw::UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID)
+    }
+
+    /// Reads whether Windows currently publishes this element as off-screen.
+    ///
+    /// The result is used only by a fixed host ScrollItem probe before and
+    /// after one host-selected Windows request. Applications cannot request
+    /// this visibility readback or receive it through Anodrel.
+    pub fn is_offscreen(&self, element: &UiAutomationElement) -> Result<bool, UiAutomationError> {
+        self.boolean_property(element, raw::UIA_IS_OFFSCREEN_PROPERTY_ID)
     }
 
     /// Returns the element's direct raw-view children in published sibling order.

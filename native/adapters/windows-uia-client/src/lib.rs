@@ -16,6 +16,6 @@ mod raw;
 pub use client::{
     UiAutomationClient, UiAutomationElement, UiAutomationError, UiAutomationFocusSubscription,
     UiAutomationInvocation, UiAutomationLiveStatusSubscription, UiAutomationNode, UiAutomationRect,
-    UiAutomationStructureSubscription, UiAutomationValue,
+    UiAutomationScrollItem, UiAutomationStructureSubscription, UiAutomationValue,
 };
 pub use com::ComApartment;

@@ -21,11 +21,13 @@ mod tests {
     use super::{
         AutomationVtable, ElementVtable, IID_I_UI_AUTOMATION_EVENT_HANDLER,
         IID_I_UI_AUTOMATION_FOCUS_CHANGED_EVENT_HANDLER, IID_I_UI_AUTOMATION_INVOKE_PATTERN,
+        IID_I_UI_AUTOMATION_SCROLL_ITEM_PATTERN,
         IID_I_UI_AUTOMATION_STRUCTURE_CHANGED_EVENT_HANDLER, IID_I_UI_AUTOMATION_VALUE_PATTERN,
         InvokePatternVtable, Point, Rect, STRUCTURE_CHANGE_CHILDREN_INVALIDATED,
-        TREE_SCOPE_ELEMENT, TREE_SCOPE_SUBTREE, UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID,
-        UIA_INVOKE_PATTERN_ID, UIA_LIVE_REGION_CHANGED_EVENT_ID, UIA_VALUE_PATTERN_ID, VT_BOOL,
-        ValuePatternVtable, Variant,
+        ScrollItemPatternVtable, TREE_SCOPE_ELEMENT, TREE_SCOPE_SUBTREE,
+        UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, UIA_INVOKE_PATTERN_ID, UIA_IS_OFFSCREEN_PROPERTY_ID,
+        UIA_LIVE_REGION_CHANGED_EVENT_ID, UIA_SCROLL_ITEM_PATTERN_ID, UIA_VALUE_PATTERN_ID,
+        VT_BOOL, ValuePatternVtable, Variant,
     };
 
     #[test]
@@ -94,9 +96,15 @@ mod tests {
             core::mem::size_of::<InvokePatternVtable>(),
             4 * core::mem::size_of::<*const core::ffi::c_void>()
         );
+        assert_eq!(
+            core::mem::size_of::<ScrollItemPatternVtable>(),
+            4 * core::mem::size_of::<*const core::ffi::c_void>()
+        );
         assert_eq!(UIA_INVOKE_PATTERN_ID, 10_000);
         assert_eq!(UIA_VALUE_PATTERN_ID, 10_002);
+        assert_eq!(UIA_SCROLL_ITEM_PATTERN_ID, 10_017);
         assert_eq!(UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID, 30_008);
+        assert_eq!(UIA_IS_OFFSCREEN_PROPERTY_ID, 30_022);
         assert_eq!(VT_BOOL, 11);
         assert_eq!(TREE_SCOPE_ELEMENT, 1);
         assert_eq!(TREE_SCOPE_SUBTREE, 7);
@@ -134,6 +142,11 @@ mod tests {
         assert_eq!(
             IID_I_UI_AUTOMATION_VALUE_PATTERN.data4,
             [0x9d, 0x2d, 0x64, 0x05, 0x37, 0xab, 0x39, 0xe9]
+        );
+        assert_eq!(IID_I_UI_AUTOMATION_SCROLL_ITEM_PATTERN.data1, 0xb488_300f);
+        assert_eq!(
+            IID_I_UI_AUTOMATION_SCROLL_ITEM_PATTERN.data4,
+            [0x9c, 0x29, 0xbb, 0x59, 0x5e, 0x36, 0x45, 0xef]
         );
     }
 

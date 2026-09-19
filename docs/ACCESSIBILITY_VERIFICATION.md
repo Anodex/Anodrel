@@ -6,6 +6,8 @@
 control-view, fixed-geometry, fixed-Value-pattern, and non-Invoke-pattern
 check for the UI Lab.
 `--uia-focus-probe` separately verifies its fixed UI Automation focus route.
+`--uia-scroll-item-probe` separately verifies one fixed off-screen UI Lab item
+through Windows' standard ScrollItem pattern and a fresh visible publication.
 `--uia-focus-event-probe` separately verifies one fixed outbound focus-change
 event route.
 `--uia-invoke-probe` proves one compiled authenticated button through its
@@ -26,7 +28,7 @@ highlight verification. See `docs/UI_AUTOMATION_PROBE.md`,
 
 ### Repeatable direct UI Automation suite
 
-Run all seven fixed direct Windows UI Automation diagnostics from one release
+Run all eight fixed direct Windows UI Automation diagnostics from one release
 build with:
 
 ~~~powershell
@@ -35,19 +37,20 @@ build with:
 
 Or double-click `start-uia-probes.bat` in the repository root. It builds the
 host and its four fixed first-party diagnostic children once, verifies the
-locked native graph is first-party, runs the property, focus, focus-event,
-Invoke, window-controls, structure-event, and live-status-event probes in order, and closes each
-temporary window before starting the next. It needs an interactive Windows
+locked native graph is first-party, runs the property, focus, ScrollItem,
+focus-event, Invoke, window-controls, structure-event, and live-status-event
+probes in order, and closes each temporary window before starting the next. It
+needs an interactive Windows
 desktop but changes no certificate trust, installation, machine policy,
 application package, network state, or persistent user state.
 
-A successful suite confirms only the seven fixed direct-client contracts below.
+A successful suite confirms only the eight fixed direct-client contracts below.
 It does not prove Narrator speech or Inspect-highlight correctness, so the
 manual checks remain required for release acceptance.
 
 The suite was most recently re-run on 2026-09-19 against the release build:
-property, focus, focus-event, Invoke, window-controls, structure-event, and
-live-status-event probes all passed. This records repeatable Windows-client
+property, focus, ScrollItem, focus-event, Invoke, window-controls,
+structure-event, and live-status-event probes all passed. This records repeatable Windows-client
 evidence only; it is not a substitute for the manual checks below.
 
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
@@ -307,8 +310,13 @@ application event may occur. Repeat for an already visible item (successful
 with no movement) and for an item inside a nested viewport (no outer item
 pattern).
 
-This check is **pending**. It verifies real Windows tree navigation and spoken
-scroll behavior; the focused tests do not substitute for it.
+The fixed `--uia-scroll-item-probe` now passes against the release build. It
+proves a compiled off-screen UI Lab descendant has `IsOffscreen=true`, an empty
+rectangle, no Invoke pattern, then becomes visible through the real Windows
+`ScrollIntoView` call and a fresh provider. It cannot prove a person-visible
+highlight, Narrator navigation or speech, the authenticated v2 session route,
+already-visible no-op behavior, or nested refusal. Those manual checks remain
+**pending**.
 
 ### Inspect cross-check before hierarchy
 

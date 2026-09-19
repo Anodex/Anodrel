@@ -1,7 +1,8 @@
 # Anodrel Windows UI Automation scroll-item contract
 
-**Status:** Implemented and covered by focused portable, provider, and
-Windows-host tests. Manual Narrator and Inspect verification remains required.
+**Status:** Implemented and covered by focused portable, provider, Windows-host,
+and fixed direct Windows-client checks. Manual Narrator and Inspect verification
+remains required.
 
 ## Purpose
 
@@ -103,6 +104,12 @@ Automated coverage must prove:
   timed-out cases fail closed or use the documented alignment; and
 - the owner changes the same retained scroll state used by pointer, wheel, and
   keyboard scrolling.
+
+`--uia-scroll-item-probe` adds a release-build direct Windows-client check for
+one compiled off-screen UI Lab descendant. It confirms an empty rectangle,
+`IsOffscreen=true`, no Invoke pattern, a successful real `ScrollIntoView`, and
+a fresh visible, still non-Invoke publication. It accepts no application data
+and does not test a person-visible highlight or spoken output.
 
 After automated checks pass, Narrator and Inspect or Accessibility Insights
 must verify that an off-screen item appears in the tree, exposes

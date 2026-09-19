@@ -160,6 +160,11 @@ pub(crate) struct InvokePattern {
     pub(crate) vtable: *const InvokePatternVtable,
 }
 
+#[repr(C)]
+pub(crate) struct ScrollItemPattern {
+    pub(crate) vtable: *const ScrollItemPatternVtable,
+}
+
 /// The complete `IUIAutomationInvokePatternVtbl`.
 #[repr(C)]
 pub(crate) struct InvokePatternVtable {
@@ -167,6 +172,15 @@ pub(crate) struct InvokePatternVtable {
     pub(crate) add_ref: *const c_void,
     pub(crate) release: *const c_void,
     pub(crate) invoke: unsafe extern "system" fn(*mut InvokePattern) -> Hresult,
+}
+
+/// The complete `IUIAutomationScrollItemPatternVtbl`.
+#[repr(C)]
+pub(crate) struct ScrollItemPatternVtable {
+    pub(crate) query_interface: *const c_void,
+    pub(crate) add_ref: *const c_void,
+    pub(crate) release: *const c_void,
+    pub(crate) scroll_into_view: unsafe extern "system" fn(*mut ScrollItemPattern) -> Hresult,
 }
 
 /// The prefix through cached read-only state of the client-side

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0227: ScrollItem UI Automation probing remains host-only.
+
 - 0226: Window-controls UI Automation probing remains host-only.
 
 - 0225: Windows reference readiness is distinct from public distribution.

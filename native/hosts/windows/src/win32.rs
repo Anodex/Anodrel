@@ -55,6 +55,7 @@ mod ui_session_view;
 mod uia_focus_event_probe;
 mod uia_focus_probe;
 mod uia_property_probe;
+mod uia_scroll_item_probe;
 mod window_group_lab;
 
 use std::{io, ptr, sync::OnceLock, time::Instant};
@@ -106,6 +107,7 @@ pub use session_launch::{run_authenticated_ui_session, run_ui_session};
 pub(crate) use taskbar_progress_probe::run as run_taskbar_progress_probe;
 pub use uia_focus_event_probe::run as run_uia_focus_event_probe;
 pub use uia_focus_probe::run as run_uia_focus_probe;
+pub use uia_scroll_item_probe::run as run_uia_scroll_item_probe;
 
 mod raw;
 

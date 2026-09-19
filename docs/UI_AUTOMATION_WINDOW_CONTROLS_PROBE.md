@@ -34,7 +34,7 @@ remain documented manual Windows checks.
 
 ## Running it
 
-Run the complete seven-probe suite from the repository root:
+Run the complete eight-probe suite from the repository root:
 
 ~~~powershell
 .\scripts\verify-windows-accessibility.ps1
@@ -42,7 +42,7 @@ Run the complete seven-probe suite from the repository root:
 
 The suite builds the fixed first-party child, opens only temporary host-owned
 windows, and creates no trust, package, installer, network, or persistent user
-state. On 2026-09-19, this probe and the six existing direct UI Automation
+state. On 2026-09-19, this probe and the other seven direct UI Automation
 probes passed against the release build.
 
 ## Boundary

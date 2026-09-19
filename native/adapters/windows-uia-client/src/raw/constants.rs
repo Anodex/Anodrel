@@ -16,9 +16,11 @@ pub(crate) const UIA_CONTROL_TYPE_PROPERTY_ID: i32 = 30_003;
 pub(crate) const UIA_NAME_PROPERTY_ID: i32 = 30_005;
 pub(crate) const UIA_HAS_KEYBOARD_FOCUS_PROPERTY_ID: i32 = 30_008;
 pub(crate) const UIA_AUTOMATION_ID_PROPERTY_ID: i32 = 30_011;
+pub(crate) const UIA_IS_OFFSCREEN_PROPERTY_ID: i32 = 30_022;
 pub(crate) const UIA_LIVE_REGION_CHANGED_EVENT_ID: i32 = 20_024;
 pub(crate) const UIA_INVOKE_PATTERN_ID: i32 = 10_000;
 pub(crate) const UIA_VALUE_PATTERN_ID: i32 = 10_002;
+pub(crate) const UIA_SCROLL_ITEM_PATTERN_ID: i32 = 10_017;
 pub(crate) const TREE_SCOPE_ELEMENT: i32 = 1;
 pub(crate) const TREE_SCOPE_SUBTREE: i32 = 7;
 pub(crate) const STRUCTURE_CHANGE_CHILDREN_INVALIDATED: i32 = 2;
@@ -90,6 +92,15 @@ pub(crate) const IID_I_UI_AUTOMATION_INVOKE_PATTERN: Guid = Guid::new(
     0x8ea6,
     0x46d5,
     [0x9c, 0x73, 0x64, 0x99, 0x64, 0x2d, 0x30, 0x59],
+);
+
+/// The client-side `IUIAutomationScrollItemPattern` interface from
+/// `UIAutomationClient.h`.
+pub(crate) const IID_I_UI_AUTOMATION_SCROLL_ITEM_PATTERN: Guid = Guid::new(
+    0xb488_300f,
+    0xd015,
+    0x4f19,
+    [0x9c, 0x29, 0xbb, 0x59, 0x5e, 0x36, 0x45, 0xef],
 );
 
 #[repr(C)]

@@ -1,4 +1,4 @@
-//! Client-side Value and Invoke pattern access for fixed host diagnostics.
+//! Client-side Value, Invoke, and ScrollItem access for fixed host diagnostics.
 //!
 //! These COM calls stay separate from tree and property traversal because they
 //! have different ownership rules: a pattern interface is optional and the
@@ -32,6 +32,34 @@ impl UiAutomationInvocation {
         let result = unsafe {
             let vtable = (*self.pattern.as_ptr()).vtable;
             ((*vtable).invoke)(self.pattern.as_ptr())
+        };
+        if succeeded(result) {
+            Ok(())
+        } else {
+            Err(UiAutomationError::Query(result))
+        }
+    }
+}
+
+/// One client-side ScrollItem interface prepared for a fixed host diagnostic.
+///
+/// It owns the interface Windows returned for one fixed off-screen element and
+/// consumes itself on one `ScrollIntoView` request. No application, protocol,
+/// or SDK caller can select the element, observe retained scroll state, or
+/// receive the outcome.
+pub struct UiAutomationScrollItem {
+    pattern: Com<raw::ScrollItemPattern>,
+}
+
+impl UiAutomationScrollItem {
+    /// Requests that Windows reveal the already-selected item exactly once.
+    pub fn scroll_into_view(self) -> Result<(), UiAutomationError> {
+        // SAFETY: this guard owns the exact client-side ScrollItem interface
+        // Windows returned, and the vtable slot is the documented
+        // `IUIAutomationScrollItemPattern::ScrollIntoView` member.
+        let result = unsafe {
+            let vtable = (*self.pattern.as_ptr()).vtable;
+            ((*vtable).scroll_into_view)(self.pattern.as_ptr())
         };
         if succeeded(result) {
             Ok(())
@@ -82,6 +110,26 @@ impl UiAutomationClient {
         optional_pattern(result, pattern)
     }
 
+    pub(super) fn scroll_item_pattern(
+        &self,
+        element: &UiAutomationElement,
+    ) -> Result<Option<Com<raw::ScrollItemPattern>>, UiAutomationError> {
+        let mut pattern: *mut c_void = core::ptr::null_mut();
+        // SAFETY: the element is live, both identifiers are fixed Windows SDK
+        // values, and `pattern` is writable output storage for the client-side
+        // ScrollItem pattern interface.
+        let result = unsafe {
+            let vtable = (*element.raw.as_ptr()).vtable;
+            ((*vtable).current_pattern_as)(
+                element.raw.as_ptr(),
+                raw::UIA_SCROLL_ITEM_PATTERN_ID,
+                &raw::IID_I_UI_AUTOMATION_SCROLL_ITEM_PATTERN,
+                &mut pattern,
+            )
+        };
+        optional_pattern(result, pattern)
+    }
+
     /// Obtains the one standard Invoke interface for a fixed diagnostic node.
     ///
     /// Holding the returned interface lets a short-lived event diagnostic arm
@@ -95,6 +143,21 @@ impl UiAutomationClient {
             return Err(UiAutomationError::UnexpectedTree);
         };
         Ok(UiAutomationInvocation { pattern })
+    }
+
+    /// Obtains the one ScrollItem interface for a fixed diagnostic node.
+    ///
+    /// Holding the returned interface does not expose a scroll target or
+    /// position to Anodrel applications. The caller owns the compiled target
+    /// and uses the interface once before discarding it.
+    pub fn prepare_scroll_item(
+        &self,
+        element: &UiAutomationElement,
+    ) -> Result<UiAutomationScrollItem, UiAutomationError> {
+        let Some(pattern) = self.scroll_item_pattern(element)? else {
+            return Err(UiAutomationError::UnexpectedTree);
+        };
+        Ok(UiAutomationScrollItem { pattern })
     }
 }
 

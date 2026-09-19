@@ -283,6 +283,9 @@ pub(crate) fn run(arguments: Vec<String>, started: Instant) -> Result<(), Box<dy
     if arguments.as_slice() == ["--uia-focus-probe"] {
         return win32::run_uia_focus_probe().map_err(Into::into);
     }
+    if arguments.as_slice() == ["--uia-scroll-item-probe"] {
+        return win32::run_uia_scroll_item_probe().map_err(Into::into);
+    }
     if arguments.as_slice() == ["--uia-focus-event-probe"] {
         return win32::run_uia_focus_event_probe().map_err(Into::into);
     }

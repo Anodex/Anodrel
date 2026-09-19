@@ -416,8 +416,9 @@ the pointer/wheel/keyboard scrollbar state. It has no event, application
 callback, position readback, or horizontal/nested target. See
 `docs/UI_AUTOMATION_SCROLL.md`.
 
-**Slice 11 — host-owned scroll-item reveal. Implemented; manual scrolling and
-item-reveal check pending.** Every bounded descendant whose nearest scroll
+**Slice 11 — host-owned scroll-item reveal. Implemented; one fixed direct
+Windows client probe and host checks pass, while manual scrolling and
+screen-reader item-reveal checks remain pending.** Every bounded descendant whose nearest scroll
 ancestor is the selected first visible overflowing group exposes
 `IScrollItemProvider`; an off-screen element therefore remains navigable with
 an empty rectangle and `IsOffscreen=true`. `ScrollIntoView` returns through the
@@ -426,7 +427,9 @@ current layout before it adjusts the retained offset. It has no alignment,
 focus, action, value, event, application callback, position readback, or nested
 route. The unit and host checks prove off-screen tree retention, interface and
 pattern gates, nested refusal, nearest-edge geometry, timeout safety, and reuse
-of the existing scroll state. See `docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
+of the existing scroll state. The direct client proves the fixed compiled
+off-screen item is revealed by the real Windows pattern without becoming
+invokable. See `docs/UI_AUTOMATION_SCROLL_ITEMS.md`.
 
 **Slice 12 — semantic live status. Implemented; manual announcement check
 pending.** A visible changed `Status` in an established authenticated v3

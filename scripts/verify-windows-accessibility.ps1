@@ -4,10 +4,10 @@ Runs Anodrel's fixed direct Windows UI Automation acceptance probes.
 
 .DESCRIPTION
 Builds the Windows host and four compiled first-party probe children, then
-runs the fixed property, focus, focus-event, Invoke, window-controls,
-structure-event, and live-status-event diagnostics. It verifies the locked native graph is
-first-party before building. Each probe creates and closes only its own temporary
-host window.
+runs the fixed property, focus, scroll-item, focus-event, Invoke,
+window-controls, structure-event, and live-status-event diagnostics. It
+verifies the locked native graph is first-party before building. Each probe
+creates and closes only its own temporary host window.
 
 This script needs an interactive Windows desktop. It creates no certificate,
 trust entry, installer, machine policy, network request, application package,
@@ -87,6 +87,7 @@ try {
 
     Invoke-AccessibilityProbe -Label 'UI Automation property probe' -HostArguments @('--uia-property-probe')
     Invoke-AccessibilityProbe -Label 'UI Automation focus probe' -HostArguments @('--uia-focus-probe')
+    Invoke-AccessibilityProbe -Label 'UI Automation ScrollItem probe' -HostArguments @('--uia-scroll-item-probe')
     Invoke-AccessibilityProbe -Label 'UI Automation focus-event probe' -HostArguments @('--uia-focus-event-probe')
     Invoke-AccessibilityProbe -Label 'UI Automation Invoke probe' -HostArguments @('--uia-invoke-probe', $invokeClient)
     Invoke-AccessibilityProbe -Label 'UI Automation window-controls probe' -HostArguments @('--uia-window-controls-probe', $windowControlsClient)

@@ -56,7 +56,7 @@ Runs the complete non-interactive Windows reference-evidence set: formatting,
 TypeScript and native ownership, strict native lint, source-size, documentation links,
 whitespace, the native workspace tests, the reference frame budget, and the
 sample host startup report. `-IncludeIdleReport` adds the fixed 30-second
-static-window measurement. `-IncludeAccessibilityReport` adds the seven direct
+static-window measurement. `-IncludeAccessibilityReport` adds the eight direct
 Windows UI Automation probes, which need an interactive desktop and each open
 and close a temporary host-owned window. Neither option creates trust,
 installation, network, or persistent application state. The verifier cannot
@@ -73,14 +73,14 @@ PowerShell so double-clicked batch entry points stay covered.
 Double-click `start-windows-release-evidence.bat` from the repository root to
 run that full reference-candidate command without entering its options manually.
 It needs an interactive Windows desktop and opens the one 30-second idle window
-followed by the six temporary accessibility-probe windows.
+followed by the eight temporary accessibility-probe windows.
 
 ## verify-windows-accessibility.ps1
 
-Builds the exact Windows host and three fixed first-party diagnostic children,
-then runs the property, focus, focus-event, Invoke, window-controls,
-structure-event, and live-status-event UI Automation probes in sequence. It verifies the locked
-native graph is first-party before building, opens only temporary host-owned
+Builds the exact Windows host and four fixed first-party diagnostic children,
+then runs the property, focus, ScrollItem, focus-event, Invoke, window-controls,
+structure-event, and live-status-event UI Automation probes in sequence. It
+verifies the locked native graph is first-party before building, opens only temporary host-owned
 diagnostic windows, and needs an interactive Windows desktop; it creates no
 trust, installation, network, package, or persistent user state. It supplements,
 but does not replace, manual Narrator and Inspect acceptance.
