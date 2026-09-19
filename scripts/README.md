@@ -52,9 +52,9 @@ as well as newer PowerShell releases.
 
 ## verify-windows-release.ps1
 
-Runs the complete non-interactive Windows release evidence set: formatting,
+Runs the complete non-interactive Windows reference-evidence set: formatting,
 TypeScript and native ownership, strict native lint, source-size, documentation links,
-whitespace, the native workspace tests, the release-only frame budget, and the
+whitespace, the native workspace tests, the reference frame budget, and the
 sample host startup report. `-IncludeIdleReport` adds the fixed 30-second
 static-window measurement. `-IncludeAccessibilityReport` adds the six direct
 Windows UI Automation probes, which need an interactive desktop and each open
@@ -71,7 +71,7 @@ PowerShell so double-clicked batch entry points stay covered.
 ~~~
 
 Double-click `start-windows-release-evidence.bat` from the repository root to
-run that full release-candidate command without entering its options manually.
+run that full reference-candidate command without entering its options manually.
 It needs an interactive Windows desktop and opens the one 30-second idle window
 followed by the six temporary accessibility-probe windows.
 

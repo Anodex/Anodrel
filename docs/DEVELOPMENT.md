@@ -280,14 +280,14 @@ executable is still being read from disk.
 See `docs/PERFORMANCE.md` for what the figures exclude and what has to be true
 before either is compared with another runtime.
 
-For one repeatable non-interactive Windows release-evidence pass, run:
+For one repeatable non-interactive Windows reference-evidence pass, run:
 
 ~~~text
 .\scripts\verify-windows-release.ps1
 ~~~
 
 It runs formatting, native ownership, strict native lint, source and
-documentation checks, the complete native workspace suite, the release frame
+documentation checks, the complete native workspace suite, the reference frame
 budget, and the sample startup report. It does not create trust or installation
 state and cannot replace the documented native desktop and signed-fixture
 acceptance checks. It also runs the TypeScript ownership guard through the
@@ -301,9 +301,9 @@ To rerun the six fixed direct Windows UI Automation diagnostics together, use:
 
 It creates brief host-owned diagnostic windows but no trust, installation,
 network, package, or persistent user state. The manual Narrator and Inspect
-checks in `docs/ACCESSIBILITY_VERIFICATION.md` remain separate release evidence.
+checks in `docs/ACCESSIBILITY_VERIFICATION.md` remain separate reference evidence.
 
-For the full repeatable release-candidate evidence set, including the static
+For the full repeatable reference-candidate evidence set, including the static
 idle window and the six direct UI Automation probes, double-click
 `start-windows-release-evidence.bat` in the repository root. It runs the same
 explicit command below and needs an interactive desktop:

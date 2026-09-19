@@ -2,15 +2,15 @@
 
 This is the detailed delivery map for Anodrel's native-host phase. The
 [roadmap](../../ROADMAP.md) establishes ordering; the
-[Windows release plan](../WINDOWS_RELEASE.md) is authoritative for the current
-Windows release gates.
+[Windows reference plan](../WINDOWS_RELEASE.md) is authoritative for the
+current Windows reference-readiness gates.
 
 ## Scope
 
 Phase 2 establishes a direct native host without a webview or bundled browser
 runtime. Windows is the reference implementation. Linux has only the limited
 development foundation described below, and macOS work is not started until the
-Windows release gates close.
+Windows reference-readiness gates close.
 
 All public application authority crosses the versioned protocol. The host owns
 native windows, process lifecycle, UI-thread work, operating-system handles,
@@ -82,7 +82,7 @@ quality and performance probe. A second local fixed-label comparison now
 measures current GDI and owned coverage geometry without promoting the owned
 route to a visible painter.
 
-Release-only frame, startup, idle, transport, and renderer measurements are
+Reference-readiness frame, startup, idle, transport, and renderer measurements are
 maintained under [Performance](../PERFORMANCE.md). On 2026-09-12, the current
 frame guard recorded 6.271 ms average and 7.902 ms worst sustained frame time
 against a 16 ms interval; that is a regression guard, not an application
@@ -96,12 +96,11 @@ through direct Windows APIs, privately stage content, publish fixed machine
 policy, register a Start-menu launcher and Apps & features entry, recover,
 uninstall, and apply a verified newer signed image.
 
-The remaining work requires product authority and real-machine evidence:
-production certificate identity and custody, timestamp and endpoint operation,
-signed fixture install/update/recovery acceptance, and the first application's
-justified UI breadth. See [Windows release readiness](../WINDOWS_RELEASE.md),
-[Windows installer](../WINDOWS_INSTALLER.md), and
-[product updates](../PRODUCT_UPDATES.md).
+The remaining reference work requires real-machine evidence and the first
+application's justified UI breadth. Public certificate identity and custody,
+timestamping, and endpoint operation are separate optional distribution work.
+See [Windows reference readiness](../WINDOWS_RELEASE.md),
+[Windows installer](../WINDOWS_INSTALLER.md), and [product updates](../PRODUCT_UPDATES.md).
 
 ## Linux and macOS boundary
 
@@ -113,7 +112,7 @@ provider.
 
 macOS native-host implementation has not begun. Both platforms remain paused by
 the Windows-first delivery decision. Portable work is allowed only where it
-directly closes a Windows release gate.
+directly closes a Windows reference-readiness gate.
 
 ## Acceptance standard
 
