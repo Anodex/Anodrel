@@ -12,28 +12,31 @@ explicit permissions, and versioned local IPC—without shipping a browser runti
 - A modular native foundation built on platform APIs rather than a bundled
   browser engine, webview, or Node.js runtime.
 
-It is not an application, an Anodex source mirror, or a finished Electron
-replacement. Anodex is planned as its first consumer but remains an independent
-project until Anodrel has a stable contract and a shipped reference host.
+It is not an application, an Anodex source mirror, or a feature-for-feature
+Electron replacement. It is intended to remain open source, give Anodex a
+native-first host, and serve other applications through stable contracts and
+separate repositories.
 
 ## Current position
 
 **Phase:** Foundation implementation
 
-Windows is Anodrel's reference platform and is about 72% through its release
-goal. The broader Windows, Linux, and macOS programme is about 30% complete.
-Linux has development foundations but no application host or product path;
-macOS has not begun. Both wait for the Windows reference release.
+Windows is Anodrel's reference platform. Its readiness is tracked by evidence,
+not a percentage: the host must be genuinely usable for local development
+before application-host work begins on Linux or macOS. Linux has development
+foundations but no application host or product path; macOS has not begun.
 
 The Windows foundation already includes authenticated local transport, direct
 native windows, semantic UI documents, native services, owned rendering,
 accessibility, and owned installer/update foundations. The principal remaining
-release work is signed end-to-end acceptance, production certificate custody,
-release operation, and the reusable controls justified by the first real app.
+reference-readiness work is visible native acceptance and the reusable controls
+justified by the first real app. Public certificate custody and a hosted
+distribution operation are separate optional distribution work, not blockers
+for the open-source platform.
 
-For the detailed current state, evidence, and open release gates, see
+For the detailed current state, evidence, and open reference-readiness gates, see
 [Foundation status](docs/FOUNDATION_STATUS.md) and
-[Windows release readiness](docs/WINDOWS_RELEASE.md).
+[Windows reference readiness](docs/WINDOWS_RELEASE.md).
 
 ## Design principles
 
@@ -104,11 +107,11 @@ product package, or machine-policy change.
 
 - [Roadmap](ROADMAP.md) — delivery order and platform milestones.
 - [Foundation status](docs/FOUNDATION_STATUS.md) — current implementation and
-  remaining Windows release work.
+  remaining Windows reference-readiness work.
 - [Architecture](docs/ARCHITECTURE.md) — layer boundaries and responsibilities.
 - [Protocol](docs/PROTOCOL.md) — public compatibility and security rules.
-- [Windows release readiness](docs/WINDOWS_RELEASE.md) — release gates,
-  evidence, and decisions that need product authority.
+- [Windows reference readiness](docs/WINDOWS_RELEASE.md) — reference gates,
+  evidence, and separate optional distribution work.
 - [Development](docs/DEVELOPMENT.md) — local setup and verification sequence.
 - [Performance](docs/PERFORMANCE.md) — measurable performance policy.
 - [Accessibility](docs/ACCESSIBILITY.md) — Windows UI Automation boundary.

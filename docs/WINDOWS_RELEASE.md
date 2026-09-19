@@ -1,40 +1,47 @@
-# Windows release readiness
+# Windows reference readiness
 
 **Status:** Windows is Anodrel's reference platform. This document defines the
-remaining release gates; it does not describe Linux or macOS work.
+remaining reference-readiness gates; it does not describe Linux or macOS work.
 
 ## Purpose
 
-"Windows complete" means a user can install, trust, run, use, update, and
-remove an Anodrel application with the same discipline that protects the
-development host today. It does **not** mean feature-for-feature Electron
-parity, nor that every possible desktop application is already expressible.
+"Windows reference ready" means a developer can build, run, exercise, and
+locally package an Anodrel application through the documented direct Windows
+host with repeatable security, performance, and native-interaction evidence.
+It does **not** mean feature-for-feature Electron parity, every possible
+desktop application, a commercially distributed Windows product, or a public
+certificate authority.
 
-The estimate is currently **about 72%** of that Windows release goal. The host,
-private transport, package validation, native UI foundation, direct Windows
-services, performance guard, accessibility provider, and Apps & features
-registration/removal path are substantial working foundations. The remaining
-work is concentrated in distribution, production identity, update trust, manual
-desktop proof, and application-surface breadth rather than in a missing window
-or transport base.
+No aggregate percentage is claimed. The host, private transport, package
+validation, native UI foundation, direct Windows services, performance guard,
+accessibility provider, and local installer/update fixtures are substantial
+working foundations. The remaining readiness work is manual desktop proof and
+application-surface breadth rather than a missing window or transport base.
 
-## Release gates
+The signed development fixture is sufficient to exercise local installation,
+Start-menu registration, Apps & features registration, update, recovery, and
+removal. Public signing identity, timestamping, key custody, a hosted update
+endpoint, and commercial release operations are optional distribution work and
+do not block this platform milestone.
+
+## Reference-readiness gates
 
 | Gate | State | Current evidence | Required to close it |
 | --- | --- | --- | --- |
-| Native host and private child session | Built | Direct Win32 host, authenticated named pipe, CNG invitation, single-instance behaviour, group shutdown, and product-session coordinator. | Repeat the joined fixture check as part of each release candidate. |
-| Controlled package and executable launch | Built for development | Canonical containment, content digest, locked executable revalidation, Authenticode verification, external installed record, and a separately verified Start-menu launcher route are implemented. | Adopt a production identity and prove the installed signed launcher path. |
+| Native host and private child session | Built | Direct Win32 host, authenticated named pipe, CNG invitation, single-instance behaviour, group shutdown, and product-session coordinator. | Repeat the joined fixture check whenever the host or session boundary changes. |
+| Controlled package and executable launch | Built for development | Canonical containment, content digest, locked executable revalidation, Authenticode verification, external installed record, and a separately verified Start-menu launcher route are implemented. | Keep the local signed-fixture verifier passing when this boundary changes. |
 | Native application UI | In progress | Owned layout, input, menus, scrolling, text entry, high-contrast palette, and multiple windows are directly rendered by the Windows host. Portable owned font, glyph, and bounded pair-kerning run foundations exist; fixed local diagnostics prove one selected GDI face through the owned parser, run, cache, compositor, and metric report under existing bounds, but the current GDI text painter remains active. | Expand only the reusable controls and behaviours required by the first real application; test each as a bounded host capability. |
 | Accessibility | In progress | The UI Automation provider supports reading, navigation, hit testing, focus, Invoke, Value, structure, live-status, and scroll boundaries; all six fixed direct acceptance probes passed against the release build on 2026-09-09. | Complete every documented manual Narrator and Inspect check for the current provider, then add further patterns only when a real UI requires them. |
-| Performance | Guarded | On 2026-09-12, the release-only frame guard measured 6.271 ms average and 7.902 ms worst sustained frame against a 16 ms interval; a fixed static-window report measures this process's 30-second idle CPU and memory. | Keep the release guard, startup report, idle report, and equivalent real-application measurements in each release candidate. |
+| Performance | Guarded | On 2026-09-12, the reference frame guard measured 6.271 ms average and 7.902 ms worst sustained frame against a 16 ms interval; a fixed static-window report measures this process's 30-second idle CPU and memory. | Keep the frame guard, startup report, idle report, and equivalent real-application measurements when host or rendering behaviour changes. |
 | Product fixture | Primary path demonstrated | A first-party child and launcher fixture exercises machine record, dual-signature verification, child bootstrap, session UI, and shutdown. On 2026-09-07, its signed record verified and an operator completed the visible primary session action on the development machine. | Run and record its failure and removal paths on the release machine; the installed-fixture procedure remains separate. |
-| Signed distribution and installation | Development primary path accepted | The owned tools author bounded bundles, validate and embed strict release manifests, sign one fresh checked image through direct Windows APIs and an explicit current-user certificate, verify current-image Authenticode, privately stage, match extracted signers, promote without overwrite, publish fixed policy, register Start menu and Installed apps, recover, and remove through native consent and direct elevation—without an installer framework. On 2026-09-11, an operator prepared the signed development fixture, installed it through the native consent/UAC route, launched it through its Start-menu entry, completed its visible product-session action, and passed the read-only signed-release, direct Installed Apps key, and Start-menu target verifier. On 2026-09-12, a fresh fixture also visibly showed the host-owned Anodrel Start-menu icon, passed the exact launcher/link verifier, and completed removal and no-restart cleanup postconditions before its development trust was removed. The isolated no-restart fixture then proved immediate same-version reinstall after verified removal and cleanup, all without a Windows restart. | Choose certificate custody and timestamp policy; record title-bar-close, recovery, cancellation, busy-application, and interrupted-cleanup proof for the development fixture; then complete production release verification. |
-| Updates | Foundation in progress | A current signed candidate must match the selected installed publisher and be strictly newer; a no-argument transaction refreshes that decision, retains one fixed prior record, and a separately verified fixed command can restore it. A signed release can declare one fixed catalogue source; direct Windows CMS verifies one exact publisher; the direct downloader can stream a preflight-eligible image into one fresh hash-verified private file; a product window's fixed native system-menu action reaches consent, bounded signed-byte caption/taskbar progress, UAC, and postcondition proof off its UI thread, then presents restart-needed completion only after policy proof. On 2026-09-13, the fixed local signed fixture selected and verified 0.1.1 from 0.1.0 through its localhost CMS catalogue, then retired both versions, cache, policy, endpoint configuration, and development trust without a restart. | Define production endpoint operation, key rotation, automatic-restart policy, visible signed-fixture acceptance, and production release verification after distribution identity is chosen. |
-| Release documentation and templates | Development-complete | Native SDK, templates, package tool, Startup Lab, diagnostics, and contract documents are maintained in the repository. | Publish installation, upgrade, recovery, and support documentation with the production package design. |
+| Local distribution and installation | Development primary path accepted | The owned tools author bounded bundles, validate and embed strict release manifests, sign one fresh checked image through direct Windows APIs and an explicit current-user certificate, verify current-image Authenticode, privately stage, match extracted signers, promote without overwrite, publish fixed policy, register Start menu and Installed apps, recover, and remove through native consent and direct elevation—without an installer framework. On 2026-09-11, an operator prepared the signed development fixture, installed it through the native consent/UAC route, launched it through its Start-menu entry, completed its visible product-session action, and passed the read-only signed-release, direct Installed Apps key, and Start-menu target verifier. On 2026-09-12, a fresh fixture also visibly showed the host-owned Anodrel Start-menu icon, passed the exact launcher/link verifier, and completed removal and no-restart cleanup postconditions before its development trust was removed. The isolated no-restart fixture then proved immediate same-version reinstall after verified removal and cleanup, all without a Windows restart. | Record title-bar-close, recovery, cancellation, busy-application, and interrupted-cleanup proof for the development fixture. |
+| Updates | Development foundation | A current signed candidate must match the selected installed publisher and be strictly newer; a no-argument transaction refreshes that decision, retains one fixed prior record, and a separately verified fixed command can restore it. A signed release can declare one fixed catalogue source; direct Windows CMS verifies one exact publisher; the direct downloader can stream a preflight-eligible image into one fresh hash-verified private file; a product window's fixed native system-menu action reaches consent, bounded signed-byte caption/taskbar progress, UAC, and postcondition proof off its UI thread, then presents restart-needed completion only after policy proof. On 2026-09-13, the fixed local signed fixture selected and verified 0.1.1 from 0.1.0 through its localhost CMS catalogue, then retired both versions, cache, policy, endpoint configuration, and development trust without a restart. | Record visible signed-fixture acceptance. A public endpoint, key rotation, and automatic-restart policy are optional distribution work. |
+| Documentation and templates | Development-complete | Native SDK, templates, package tool, Startup Lab, diagnostics, and contract documents are maintained in the repository. | Keep local installation, upgrade, recovery, and support documentation current as the development package evolves. |
 
-## Decisions that need product authority
+## Optional distribution decisions
 
-The next two gates cannot be completed honestly by code alone:
+The following work is deliberately outside reference readiness and needs a
+product/legal decision before it can be represented as a public distribution:
 
 1. **Production signing identity.** Choose the certificate issuer, who holds the
    private key, and how renewal or loss is handled. A development certificate is
@@ -44,15 +51,17 @@ The next two gates cannot be completed honestly by code alone:
    release procedure, and any stable package identity still need product
    authority.
 
-Those choices determine the update trust model, so updating must follow them.
-The platform will not create machine trust or select a certificate authority on
-an operator's behalf.
+Those choices determine a public update trust model. The local development
+fixtures retain their explicit temporary-trust boundaries, and the platform
+will not select a certificate authority on an operator's behalf. An explicit
+open-source license also remains necessary to state public reuse rights; this
+document does not choose one.
 
 ## Required desktop proof
 
 Automated checks protect contracts but cannot prove every Windows desktop
-interaction. Before a Windows release, run and record the relevant procedures
-in `docs/DEVELOPMENT.md` and the feature documents:
+interaction. Before declaring the Windows reference host ready, run and record
+the relevant procedures in `docs/DEVELOPMENT.md` and the feature documents:
 
 - native menu bar, click, shortcut, and semantic event delivery;
 - pointer-originated context menu;
@@ -74,15 +83,16 @@ cannot observe.
 `scripts/verify-windows-release.ps1` runs the repeatable non-interactive
 evidence set: formatting, the native ownership guard, strict native lint, source
 and documentation guards, the native workspace suite, release frame budget, and
-sample startup report. For a release candidate, run it with `-IncludeIdleReport` to add the
-fixed 30-second static-window idle measurement. That opt-in opens one diagnostic
+sample startup report. For a reference candidate, run it with
+`-IncludeIdleReport` to add the fixed 30-second static-window idle measurement.
+That opt-in opens one diagnostic
 window but performs no trust, installation, network, or application interaction;
 it does not replace any manual item above. Add `-IncludeAccessibilityReport` to
 run the six fixed direct Windows UI Automation probes after the non-interactive
 checks. That opt-in needs an interactive desktop and opens one temporary
 host-owned diagnostic window per probe; it is repeatable direct-client evidence,
 not a substitute for the manual Narrator and Inspect checks above.
-`start-windows-release-evidence.bat` runs both release-candidate opt-ins from
+`start-windows-release-evidence.bat` runs both reference-candidate opt-ins from
 the repository root for an interactive Windows desktop.
 
 ## Windows-first sequence
@@ -91,16 +101,14 @@ the repository root for an interactive Windows desktop.
    results without widening application authority.
 2. Implement only the Windows UI and service capabilities required by the first
    real Anodrel application, with a protocol contract and decision record first.
-3. Resolve production signing, packaging, installation, and update decisions;
-   then implement and test that distribution path.
-4. Ship a Windows reference release and retain its performance, memory, startup,
+3. Record a Windows reference-ready result with performance, memory, startup,
    security, and accessibility evidence.
-5. Port the completed contracts to Linux, then macOS, without treating their
-   foundation labs as equivalent to the Windows release.
+4. Port the completed contracts to Linux, then macOS, without treating their
+   foundation labs as equivalent to the Windows reference host.
 
 Portable work is allowed during this phase only when it directly closes one of
-the Windows gates above. This preserves a clear reference implementation rather
-than three partially complete platforms.
+the Windows readiness gates above. This preserves a clear reference
+implementation rather than three partially complete platforms.
 
 ## Related documents
 

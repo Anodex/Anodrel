@@ -13,6 +13,10 @@ Each record should include:
 
 Current records (newest first):
 
+- 0225: Windows reference readiness is distinct from public distribution.
+
+- 0224: Local update cleanup regenerates interrupted recovery output.
+
 - 0223: Start-menu icons are host-owned brand assets.
 
 - 0222: Uninstall retirement cleans one verified rollback package.

@@ -6,14 +6,14 @@ stable before Anodex or another application depends on it.
 ## Delivery order
 
 Windows is the reference platform. It must meet its
-[release gates](docs/WINDOWS_RELEASE.md) before new Linux-specific or
-macOS-specific feature work begins. Portable work may continue only when it
-directly closes a Windows release gate.
+[reference-readiness gates](docs/WINDOWS_RELEASE.md) before new Linux-specific
+or macOS-specific application-host work begins. Portable work may continue
+only when it directly closes a Windows reference-readiness gate.
 
 This sequence prevents three partial desktop hosts from being mistaken for a
 finished platform:
 
-1. Finish and ship a credible Windows reference release.
+1. Finish a genuinely usable Windows reference host for local development.
 2. Port its proven contracts to Linux.
 3. Port those contracts to macOS.
 
@@ -63,11 +63,10 @@ foundations. Its release work remains in progress, rather than being declared
 complete based on development diagnostics alone.
 
 See [Phase 2: Native host](docs/roadmap/NATIVE_HOST.md) for the detailed
-implementation map. See [Windows release readiness](docs/WINDOWS_RELEASE.md)
-for the exact release gates, current evidence, manual desktop proof, and
-production decisions.
+implementation map. See [Windows reference readiness](docs/WINDOWS_RELEASE.md)
+for the exact reference gates, current evidence, and manual desktop proof.
 
-### Current Windows release focus
+### Current Windows reference focus
 
 - No-restart uninstall helper, private handshake, maintenance exclusion and
   signed cache recovery are implemented. Real Windows executable-lifetime and
@@ -77,8 +76,9 @@ production decisions.
 - Run and record the signed development fixture install, launcher, update,
   recovery, and cleanup paths when an operator explicitly authorizes the
   temporary machine-trust change.
-- Select production certificate custody, renewal, timestamp, and release
-  operation; then prove the production distribution path.
+- Keep the existing development signing fixture reproducible. Production
+  certificate custody, timestamping, and hosted distribution remain optional
+  work and do not block reference-host readiness.
 - Add reusable UI or service capability only when the first real application
   establishes the need and its contract can remain narrow.
 
@@ -88,7 +88,7 @@ Linux has limited direct development foundations—private transport,
 invited-child delivery, bounded state and crash stores, and a fixed Wayland
 diagnostic—but no application host, product identity, installation, updates, or
 accessibility provider. macOS implementation has not begun. Both wait for the
-Windows reference release.
+Windows reference host.
 
 ## Phase 3 — Reusable SDK and tooling
 
@@ -113,7 +113,7 @@ and non-Windows hosts remain distinct release work.
 
 Phase 4, Phase 5, and deliberately deferred product work are maintained in
 [Future roadmap](docs/roadmap/FUTURE.md). They are not current delivery work
-until the Windows release gates above close.
+until the Windows reference-readiness gates above close.
 
 ## How work enters the roadmap
 

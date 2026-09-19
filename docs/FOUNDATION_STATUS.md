@@ -1,20 +1,22 @@
 # Foundation status
 
 This page is the concise, maintained picture of Anodrel's implemented
-foundation. The [Windows release plan](WINDOWS_RELEASE.md) remains the source
-of truth for release gates; the [roadmap](../ROADMAP.md) records delivery order.
+foundation. The [Windows reference plan](WINDOWS_RELEASE.md) remains the source
+of truth for readiness gates; the [roadmap](../ROADMAP.md) records delivery
+order.
 
 ## Position
 
-Anodrel is in foundation implementation. Windows is the reference platform and
-is about 72% through its release goal. The wider Windows, Linux, and macOS
-programme is about 30% complete. Linux desktop work and macOS work remain
-paused until the Windows reference release closes its gates.
+Anodrel is in foundation implementation. Windows is the reference platform.
+No aggregate completion percentage is claimed: each reference-readiness gate
+needs its own evidence. Linux application-host work and macOS work remain
+paused until the Windows reference host closes its gates.
 
-The project is a native-first application platform, not an Electron clone or an
-application. It supplies a documented, versioned boundary between application
-code and direct operating-system services without shipping a browser engine,
-webview, Node.js runtime, or copied Anodex source.
+The project is a native-first application platform intended to remain open
+source, not an Electron clone or an application. It supplies a documented,
+versioned boundary between application code and direct operating-system
+services without shipping a browser engine, webview, Node.js runtime, or copied
+Anodex source. Anodex is its intended first consumer, not a source dependency.
 
 ## Working Windows foundation
 
@@ -60,7 +62,7 @@ accessibility-provider state. The exact current boundaries live in the protocol
 and feature documents, especially [UI](UI.md), [UI sessions](UI_SESSIONS.md),
 [window lifecycle](WINDOW_LIFECYCLE.md), and [accessibility](ACCESSIBILITY.md).
 
-## Release foundation
+## Development distribution foundation
 
 Anodrel owns its Windows release path. It can author bounded release bundles,
 derive strict manifests, embed them in a fresh image, sign a current checked
@@ -79,25 +81,31 @@ A fixed development fixture exercises the joined verified child, launcher, and
 native-session design. A separate installed development fixture prepares the
 full signed installer chain. They are test harnesses, not a production identity
 or product release. Running either positive path changes machine trust and
-therefore remains an explicit operator action.
+therefore remains an explicit operator action. Public certificate custody,
+timestamping, and hosted releases are optional distribution work; they do not
+block the open-source platform's Windows reference readiness.
 
 ## Evidence and remaining work
 
-Release-only automated evidence currently includes a 2026-09-12 local frame
+Reference-readiness automated evidence currently includes a 2026-09-12 local frame
 measurement of 6.271 ms average and 7.902 ms worst sustained frame time against
 a 16 ms interval, startup reporting,
 an idle-window report, native workspace tests, and contract coverage. These are
 guards, not a substitute for visible Windows behavior.
 
-The remaining Windows work is concentrated in:
+The remaining Windows reference work is concentrated in:
 
 1. manual Windows desktop acceptance—native menus, pickers, window behavior,
    screen-reader interactions, tray/notification behavior, and signed fixture
    flows;
-2. production signing identity, certificate custody, renewal, timestamping, and
-   the release operation, all of which require product authority; and
-3. first-application requirements that justify additional reusable UI controls
+2. first-application requirements that justify additional reusable UI controls
    or platform capabilities.
+
+Production signing identity, certificate custody, renewal, timestamping, and a
+hosted release operation remain separate optional distribution work. The
+repository must still declare an explicit open-source license before it can
+state the legal reuse terms; that legal choice is not a host-implementation
+gate.
 
 The project does not claim feature-for-feature Electron parity. It is building a
 smaller, direct, security-conscious native platform with only capabilities that
@@ -105,7 +113,7 @@ have a defined owner, contract, and verification path.
 
 ## Related documents
 
-- [Windows release readiness](WINDOWS_RELEASE.md)
+- [Windows reference readiness](WINDOWS_RELEASE.md)
 - [Performance plan](PERFORMANCE.md)
 - [Architecture](ARCHITECTURE.md)
 - [Protocol](PROTOCOL.md)
