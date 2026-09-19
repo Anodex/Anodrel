@@ -4,6 +4,9 @@
 
 **Date:** 2026-08-24
 
+**Amendment:** Decision 0228 adds one fixed private rejected write assertion;
+it does not add a writable UI Automation or application route.
+
 ## Context
 
 Decision 0071 defines a read-only `IValueProvider` for a visible Anodrel field.

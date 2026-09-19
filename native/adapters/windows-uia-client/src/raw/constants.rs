@@ -6,6 +6,7 @@ pub(crate) const S_OK: Hresult = 0;
 pub(crate) const E_NOINTERFACE: Hresult = -2_147_467_262;
 pub(crate) const E_POINTER: Hresult = -2_147_467_261;
 pub(crate) const E_FAIL: Hresult = -2_147_467_259;
+pub(crate) const UIA_E_INVALIDOPERATION: Hresult = -2_146_233_079;
 pub(crate) const COINIT_MULTITHREADED: u32 = 0;
 pub(crate) const CLSCTX_INPROC_SERVER: u32 = 1;
 pub(crate) const VT_I4: u16 = 3;

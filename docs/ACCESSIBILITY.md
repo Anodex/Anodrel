@@ -375,12 +375,14 @@ provider returns the matching child from `GetFocus` and sets
 `HasKeyboardFocus` only on that element, using one immutable snapshot of the
 host's existing layout-validated focus (Decision 0070).
 
-**Slice 6 — read-only field values. Implemented; fixed Windows probe passed;
-manual value check pending.** A matching visible `Edit` exposes
+**Slice 6 — read-only field values. Implemented; fixed Windows probe passes
+both read and rejection checks; manual value check pending.** A matching visible `Edit` exposes
 `IValueProvider`, returns its copied host value, and is read-only to automation
 (Decision 0071). The fixed UI Lab probe confirms that through Windows'
-client-side `IUIAutomationValuePattern` (Decision 0108). It has no `SetValue`,
-caret, selection, text range, or value-change event.
+client-side `IUIAutomationValuePattern`: its private empty-BSTR setter call is
+rejected as `UIA_E_INVALIDOPERATION`, and a second read remains unchanged
+(Decisions 0108 and 0228). It has no application-visible `SetValue`, caret,
+selection, text range, or value-change event.
 
 **Slice 7 — bounded focus control. Implemented; manual focus-control check
 pending.** A visible enabled field or button can request focus through

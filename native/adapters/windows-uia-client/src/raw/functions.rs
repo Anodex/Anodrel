@@ -22,6 +22,7 @@ unsafe extern "system" {
 #[link(name = "oleaut32")]
 unsafe extern "system" {
     pub(crate) fn VariantClear(value: *mut Variant) -> Hresult;
+    pub(crate) fn SysAllocStringLen(value: *const u16, length: u32) -> *mut u16;
     pub(crate) fn SysStringLen(value: *const u16) -> u32;
     pub(crate) fn SysFreeString(value: *mut u16);
 }

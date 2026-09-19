@@ -168,6 +168,15 @@ fn verify_value_pattern(
     client: &UiAutomationClient,
     element: &UiAutomationElement,
 ) -> Result<(), UiAutomationError> {
+    verify_read_only_empty_value(client, element)?;
+    client.value_write_is_rejected(element)?;
+    verify_read_only_empty_value(client, element)
+}
+
+fn verify_read_only_empty_value(
+    client: &UiAutomationClient,
+    element: &UiAutomationElement,
+) -> Result<(), UiAutomationError> {
     let Some(value) = client.read_value_pattern(element)? else {
         return Err(UiAutomationError::UnexpectedTree);
     };

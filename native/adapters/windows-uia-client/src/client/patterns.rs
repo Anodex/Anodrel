@@ -159,6 +159,33 @@ impl UiAutomationClient {
         };
         Ok(UiAutomationScrollItem { pattern })
     }
+
+    /// Confirms that one fixed UI Automation value write is rejected.
+    ///
+    /// The supplied value is one private empty BSTR, never an application or
+    /// operator value. This exists only to prove that Anodrel's documented
+    /// read-only field boundary reaches a real Windows client.
+    pub fn value_write_is_rejected(
+        &self,
+        element: &UiAutomationElement,
+    ) -> Result<(), UiAutomationError> {
+        let Some(pattern) = self.value_pattern(element)? else {
+            return Err(UiAutomationError::UnexpectedTree);
+        };
+        let value = OwnedBstr::empty()?;
+        // SAFETY: this client owns the live Value interface and passes one
+        // private empty BSTR. The standard client must reject the read-only
+        // operation before it can become an application write route.
+        let result = unsafe {
+            let vtable = (*pattern.as_ptr()).vtable;
+            ((*vtable).set_value)(pattern.as_ptr(), value.0)
+        };
+        if result == raw::UIA_E_INVALIDOPERATION {
+            Ok(())
+        } else {
+            Err(UiAutomationError::Query(result))
+        }
+    }
 }
 
 fn optional_pattern<T>(
@@ -178,6 +205,17 @@ fn optional_pattern<T>(
 struct OwnedBstr(*mut u16);
 
 impl OwnedBstr {
+    fn empty() -> Result<Self, UiAutomationError> {
+        // SAFETY: an empty BSTR has no source units, and the returned pointer
+        // transfers exclusively into this guard on success.
+        let value = unsafe { raw::SysAllocStringLen(core::ptr::null(), 0) };
+        if value.is_null() {
+            Err(UiAutomationError::Query(raw::E_FAIL))
+        } else {
+            Ok(Self(value))
+        }
+    }
+
     fn decode(&self) -> Result<String, UiAutomationError> {
         if self.0.is_null() {
             return Ok(String::new());

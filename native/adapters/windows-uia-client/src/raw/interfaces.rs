@@ -190,7 +190,7 @@ pub(crate) struct ValuePatternVtable {
     pub(crate) query_interface: *const c_void,
     pub(crate) add_ref: *const c_void,
     pub(crate) release: *const c_void,
-    pub(crate) set_value: *const c_void,
+    pub(crate) set_value: unsafe extern "system" fn(*mut ValuePattern, *const u16) -> Hresult,
     pub(crate) current_value:
         unsafe extern "system" fn(*mut ValuePattern, *mut *mut u16) -> Hresult,
     pub(crate) current_is_read_only:

@@ -88,9 +88,9 @@ block the open-source platform's Windows reference readiness.
 ## Evidence and remaining work
 
 Reference-readiness automated evidence includes a 2026-09-19 local frame
-measurement of 6.354 ms average and 8.058 ms worst sustained frame time against
-a 16 ms interval. The same run reported 1.655 ms startup checks, 0.052091% CPU
-over one 29.995-second static-window sample, and all eight direct UI Automation
+measurement of 6.368 ms average and 8.085 ms worst sustained frame time against
+a 16 ms interval. The same run reported 1.728 ms startup checks, 0.000000% CPU
+over one 29.993-second static-window sample, and all eight direct UI Automation
 probes passing. Native workspace tests and contract coverage also passed. These
 are guards, not a substitute for visible Windows behavior.
 

@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0228: Fixed Value write rejection stays host-only.
+
 - 0227: ScrollItem UI Automation probing remains host-only.
 
 - 0226: Window-controls UI Automation probing remains host-only.

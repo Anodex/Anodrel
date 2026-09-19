@@ -267,8 +267,9 @@ impl UiAutomationClient {
 
     /// Reads the one standard Value pattern allowed by this diagnostic adapter.
     ///
-    /// A missing pattern is normal for non-Edit elements. This method never
-    /// calls the pattern's `SetValue` member and accepts no value to write.
+    /// A missing pattern is normal for non-Edit elements. This read method
+    /// accepts no value to write; the separate fixed rejection diagnostic uses
+    /// one private empty BSTR and exposes no write capability.
     pub fn read_value_pattern(
         &self,
         element: &UiAutomationElement,

@@ -74,23 +74,27 @@ product window or accepting a caller-selected coordinate.
 
 For that one fixed field, the probe also obtained Windows' client-side
 `IUIAutomationValuePattern` for the provider-side read-only Value pattern. It
-confirmed the compiled empty initial value and `IsReadOnly = true`; the returned
-`BSTR` was copied and released inside the private worker. This establishes the
-real client/provider pattern bridge without reading a person's text.
+confirmed the compiled empty initial value and `IsReadOnly = true`, made one
+private empty-BSTR `SetValue` call that Windows rejected as
+`UIA_E_INVALIDOPERATION`, then confirmed a second read stayed empty and
+read-only. The `BSTR` values were private-worker copies that were released
+before close. This establishes the real client/provider read and rejection
+boundary without reading a person's text or letting automation write.
 
 The probe also queries each fixed Anodrel semantic node only for the presence
 of the standard Invoke pattern. Every query must return no interface: UI Lab
 buttons are local diagnostics, not authenticated application actions. It does
 not obtain an Invoke-method interface or call an action.
 
-It intentionally did **not** call any interactive pattern, look up focus, or
-register an event handler. Its only field-text read is the compiled empty Value
-check described above. Arbitrary geometry, visible highlight placement, and
-interactive behavior remain distinct acceptance concerns. Re-run it with the
-command in `docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact
-property/tree boundary, including control-view navigation, the fixed hit-test
-target, and the UI Lab's lack of an application Invoke route, not spoken output
-or visual highlight geometry.
+It intentionally did **not** call Invoke, focus, scroll, or register an event
+handler. Its only attempted write is the fixed rejected Value call described
+above; its only field-text reads are the compiled empty checks. Arbitrary
+geometry, visible highlight placement, and interactive behavior remain distinct
+acceptance concerns. Re-run it with the command in
+`docs/UI_AUTOMATION_PROBE.md`; a pass proves this exact property/tree boundary,
+including control-view navigation, the fixed hit-test target, and the UI Lab's
+lack of an application Invoke route, not spoken output or visual highlight
+geometry.
 
 ### Automated UI Lab focus acceptance
 
@@ -410,8 +414,10 @@ character locally, refresh Inspect, and confirm a fresh provider reports the
 new text without any value-change event. Repeat on a disabled field when one is
 present: its visible value may be read, but `IsEnabled` must remain false.
 
-This check is currently **pending**. It proves a screen reader can read what a
-person entered without making UI Automation a writer or exposing typing to the
-application.
+The fixed property probe now separately proves the initial compiled field is
+read-only to a real Windows client: one private empty-BSTR `SetValue` attempt
+returns `UIA_E_INVALIDOPERATION`, and a second read remains empty. It cannot
+prove a person-entered value, visible rendering, disabled-field behavior, or
+screen-reader speech, so this broader manual check remains **pending**.
 
 See `docs/UI.md`, Decision 0026, and Decision 0063.
