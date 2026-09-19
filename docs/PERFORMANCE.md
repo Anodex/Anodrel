@@ -321,9 +321,9 @@ latency, and neither transport workload may be presented as rendering
 performance. Each mode needs an equivalent workload and recorded environment
 before a cross-runtime comparison is published.
 
-### Current local release evidence
+### Historical local reference evidence
 
-On 2026-09-12, the release tools ran on the development machine's Windows
+On 2026-09-12, the reference tools ran on the development machine's Windows
 x86_64 target with 24 logical processors available to the process. This is a
 local regression record, not a hardware-normalized baseline or a comparison to
 another runtime.
@@ -341,6 +341,23 @@ native window, presentation, and the platform blit. The pipe rows include the
 owned named pipe, frame codec, authenticated transport, and core handler, but
 exclude pipe creation, connection, authentication, warmup, and close. Preserve
 the raw JSON report with OS build and power mode before making a comparison.
+
+### Latest local reference-evidence run
+
+On 2026-09-19, `verify-windows-release.ps1 -IncludeIdleReport
+-IncludeAccessibilityReport` passed its complete automated suite. Its raw host
+records were collected after the run's build and test work, so they are a local
+regression record rather than a cold-start or cross-runtime comparison.
+
+| Workload | Result |
+| --- | --- |
+| Sustained Startup Lab frame guard | 6.303 ms mean; 8.073 ms worst, within the 16 ms interval. |
+| Host startup checks | 1.614 ms; 11,788,288-byte working set; 1,916,928-byte private bytes. |
+| Static host window | 30.020 seconds; 0.000% CPU; 17,522,688-byte working set; 4,165,632-byte private bytes. |
+| Direct UI Automation probes | Property, focus, focus event, Invoke, structure event, and live-status event passed. |
+
+The zero CPU reading means the process accumulated no measurable user or kernel
+CPU time during that one Windows sample; it is not a universal idle claim.
 
 ## Renderer workload
 

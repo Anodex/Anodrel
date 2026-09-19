@@ -87,11 +87,12 @@ block the open-source platform's Windows reference readiness.
 
 ## Evidence and remaining work
 
-Reference-readiness automated evidence currently includes a 2026-09-12 local frame
-measurement of 6.271 ms average and 7.902 ms worst sustained frame time against
-a 16 ms interval, startup reporting,
-an idle-window report, native workspace tests, and contract coverage. These are
-guards, not a substitute for visible Windows behavior.
+Reference-readiness automated evidence includes a 2026-09-19 local frame
+measurement of 6.303 ms average and 8.073 ms worst sustained frame time against
+a 16 ms interval. The same run reported 1.614 ms startup checks, 0.000% CPU
+over one 30.020-second static-window sample, and all six direct UI Automation
+probes passing. Native workspace tests and contract coverage also passed. These
+are guards, not a substitute for visible Windows behavior.
 
 The remaining Windows reference work is concentrated in:
 

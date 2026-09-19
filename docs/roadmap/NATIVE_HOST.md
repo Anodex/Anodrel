@@ -82,10 +82,10 @@ quality and performance probe. A second local fixed-label comparison now
 measures current GDI and owned coverage geometry without promoting the owned
 route to a visible painter.
 
-Reference-readiness frame, startup, idle, transport, and renderer measurements are
-maintained under [Performance](../PERFORMANCE.md). On 2026-09-12, the current
-frame guard recorded 6.271 ms average and 7.902 ms worst sustained frame time
-against a 16 ms interval; that is a regression guard, not an application
+Reference-readiness frame, startup, idle, transport, and renderer measurements
+are maintained under [Performance](../PERFORMANCE.md). On 2026-09-19, the
+current frame guard recorded 6.303 ms average and 8.073 ms worst sustained frame
+time against a 16 ms interval; that is a regression guard, not an application
 comparison claim.
 
 ### Distribution and updates
