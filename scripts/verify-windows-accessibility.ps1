@@ -3,9 +3,9 @@
 Runs Anodrel's fixed direct Windows UI Automation acceptance probes.
 
 .DESCRIPTION
-Builds the Windows host and the three compiled first-party probe children, then
-runs the fixed property, focus, focus-event, Invoke, structure-event, and
-live-status-event diagnostics. It verifies the locked native graph is
+Builds the Windows host and four compiled first-party probe children, then
+runs the fixed property, focus, focus-event, Invoke, window-controls,
+structure-event, and live-status-event diagnostics. It verifies the locked native graph is
 first-party before building. Each probe creates and closes only its own temporary
 host window.
 
@@ -65,6 +65,7 @@ try {
         'build', '--release', '--locked', '--manifest-path', $nativeManifest,
         '-p', 'anodrel-windows-host',
         '-p', 'anodrel-native-ui-client-sample',
+        '-p', 'anodrel-native-window-controls-client',
         '-p', 'anodrel-native-structure-event-client',
         '-p', 'anodrel-native-live-status-event-client'
     )
@@ -75,9 +76,10 @@ try {
     $releaseDirectory = Join-Path $metadata.target_directory 'release'
     $hostExecutable = Join-Path $releaseDirectory 'anodrel-windows-host.exe'
     $invokeClient = Join-Path $releaseDirectory 'anodrel-native-ui-client-sample.exe'
+    $windowControlsClient = Join-Path $releaseDirectory 'anodrel-native-window-controls-client.exe'
     $structureClient = Join-Path $releaseDirectory 'anodrel-native-structure-event-client.exe'
     $liveStatusClient = Join-Path $releaseDirectory 'anodrel-native-live-status-event-client.exe'
-    foreach ($path in @($hostExecutable, $invokeClient, $structureClient, $liveStatusClient)) {
+    foreach ($path in @($hostExecutable, $invokeClient, $windowControlsClient, $structureClient, $liveStatusClient)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "The expected accessibility probe executable was not built: $path"
         }
@@ -87,6 +89,7 @@ try {
     Invoke-AccessibilityProbe -Label 'UI Automation focus probe' -HostArguments @('--uia-focus-probe')
     Invoke-AccessibilityProbe -Label 'UI Automation focus-event probe' -HostArguments @('--uia-focus-event-probe')
     Invoke-AccessibilityProbe -Label 'UI Automation Invoke probe' -HostArguments @('--uia-invoke-probe', $invokeClient)
+    Invoke-AccessibilityProbe -Label 'UI Automation window-controls probe' -HostArguments @('--uia-window-controls-probe', $windowControlsClient)
     Invoke-AccessibilityProbe -Label 'UI Automation structure-event probe' -HostArguments @('--uia-structure-event-probe', $structureClient)
     Invoke-AccessibilityProbe -Label 'UI Automation live-status-event probe' -HostArguments @('--uia-live-status-event-probe', $liveStatusClient)
 }

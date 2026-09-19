@@ -13,6 +13,8 @@ Each record should include:
 
 Current records (newest first):
 
+- 0226: Window-controls UI Automation probing remains host-only.
+
 - 0225: Windows reference readiness is distinct from public distribution.
 
 - 0224: Local update cleanup regenerates interrupted recovery output.

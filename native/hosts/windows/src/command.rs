@@ -12,7 +12,7 @@ use crate::{
     native_multi_window_template, native_network_probe, native_notification_template, native_probe,
     native_scroll_window_template, native_template, native_tray_template, native_ui_probe,
     native_window_controls_template, product, sample, startup, uia_invoke_probe,
-    uia_live_status_event_probe, uia_structure_event_probe, win32,
+    uia_live_status_event_probe, uia_structure_event_probe, uia_window_controls_probe, win32,
 };
 
 macro_rules! one_argument_command {
@@ -70,6 +70,11 @@ pub(crate) fn run(arguments: Vec<String>, started: Instant) -> Result<(), Box<dy
     );
     one_argument_command!(arguments, "--native-ui-sample-client", native_ui_probe::run);
     one_argument_command!(arguments, "--uia-invoke-probe", uia_invoke_probe::run);
+    one_argument_command!(
+        arguments,
+        "--uia-window-controls-probe",
+        uia_window_controls_probe::run
+    );
     one_argument_command!(
         arguments,
         "--uia-structure-event-probe",

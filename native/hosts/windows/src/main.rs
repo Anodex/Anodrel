@@ -24,6 +24,7 @@ mod startup;
 mod uia_invoke_probe;
 mod uia_live_status_event_probe;
 mod uia_structure_event_probe;
+mod uia_window_controls_probe;
 mod win32;
 
 use std::{env, error::Error, time::Instant};

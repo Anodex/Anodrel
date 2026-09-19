@@ -293,7 +293,7 @@ state and cannot replace the documented native desktop and signed-fixture
 acceptance checks. It also runs the TypeScript ownership guard through the
 inbox Windows PowerShell used by the repository's double-clickable batch files.
 
-To rerun the six fixed direct Windows UI Automation diagnostics together, use:
+To rerun the seven fixed direct Windows UI Automation diagnostics together, use:
 
 ~~~text
 .\scripts\verify-windows-accessibility.ps1
@@ -304,7 +304,7 @@ network, package, or persistent user state. The manual Narrator and Inspect
 checks in `docs/ACCESSIBILITY_VERIFICATION.md` remain separate reference evidence.
 
 For the full repeatable reference-candidate evidence set, including the static
-idle window and the six direct UI Automation probes, double-click
+idle window and the seven direct UI Automation probes, double-click
 `start-windows-release-evidence.bat` in the repository root. It runs the same
 explicit command below and needs an interactive desktop:
 

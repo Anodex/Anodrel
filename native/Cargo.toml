@@ -106,6 +106,7 @@ members = [
   "tools/linux-session-window-lab",
   "tools/native-network-client-sample",
   "tools/native-ui-client-sample",
+  "tools/native-window-controls-client",
   "tools/native-structure-event-client",
   "tools/native-live-status-event-client",
 ]

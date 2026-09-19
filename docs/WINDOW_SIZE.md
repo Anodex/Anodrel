@@ -81,9 +81,11 @@ Portable, core, policy, and contract tests cover exact payload shape,
 logical bounds, independent grant and record version, unavailable/busy mapping,
 timeout clearing, and session isolation. The Windows adapter has pure
 logical-to-physical conversion tests plus host tests for its per-view bridge.
-Manual Windows verification must demonstrate the requested client area at
-100% and non-100% display scaling, no position or activation change, and safe
-refusal while Anodrel fullscreen is active.
+The fixed UI Automation window-controls probe additionally observes one changed
+window rectangle after the fixed size request. Manual Windows verification must
+still demonstrate the requested client area at 100% and non-100% display
+scaling, no position or activation change, and safe refusal while Anodrel
+fullscreen is active.
 
 ## Deferred work
 

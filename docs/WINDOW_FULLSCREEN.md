@@ -81,8 +81,9 @@ stale success.
 Unit, protocol, policy, and host tests must prove the exact closed payload,
 independent grant and record version, unavailable/busy mapping, timeout
 clearing, idempotent restore model, and that one UI-session view cannot take
-another view's request. Direct Windows verification must demonstrate entry,
-return to the original framed placement, and use of the monitor that contained
+another view's request. The fixed UI Automation window-controls probe
+additionally observes entry and return to the same framed rectangle. Direct
+Windows verification must still demonstrate use of the monitor that contained
 the session window on a multi-monitor desktop.
 
 ## Deferred work

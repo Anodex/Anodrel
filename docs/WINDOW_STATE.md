@@ -90,9 +90,11 @@ timeout. Windows-host tests prove only the associated session view can take or
 complete a command and that every portable value maps to its documented User32
 command.
 
-The remaining manual Windows verification runs an authenticated development
-session, observes minimise, maximise, and restore, then closes it normally; no
-other host window may change. `docs/DEVELOPMENT_DIAGNOSTICS.md` gives the exact command.
+The fixed UI Automation window-controls probe additionally observes maximise
+and restore in one authenticated development session. The remaining manual
+Windows verification observes minimise, maximise, and restore, then closes the
+session normally; no other host window may change.
+`docs/DEVELOPMENT_DIAGNOSTICS.md` gives the exact command.
 
 ## Compatibility
 

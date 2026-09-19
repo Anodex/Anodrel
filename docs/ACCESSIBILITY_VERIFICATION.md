@@ -10,6 +10,8 @@ check for the UI Lab.
 event route.
 `--uia-invoke-probe` proves one compiled authenticated button through its
 normal semantic-event and session-close path.
+`--uia-window-controls-probe` proves one compiled authenticated session through
+its fixed title, size, maximise/restore, fullscreen/windowed, and close path.
 `--uia-structure-event-probe` proves one compiled authenticated document
 replacement through its fixed outbound structure event and normal child-close
 path. They complement the manual
@@ -18,12 +20,13 @@ highlight verification. See `docs/UI_AUTOMATION_PROBE.md`,
 `docs/UI_AUTOMATION_FOCUS_PROBE.md`,
 `docs/UI_AUTOMATION_FOCUS_EVENT_PROBE.md`,
 `docs/UI_AUTOMATION_INVOKE_PROBE.md`,
+`docs/UI_AUTOMATION_WINDOW_CONTROLS_PROBE.md`,
 `docs/UI_AUTOMATION_STRUCTURE_EVENT_PROBE.md`, and Decisions 0106 through
 0114.
 
 ### Repeatable direct UI Automation suite
 
-Run all six fixed direct Windows UI Automation diagnostics from one release
+Run all seven fixed direct Windows UI Automation diagnostics from one release
 build with:
 
 ~~~powershell
@@ -31,21 +34,21 @@ build with:
 ~~~
 
 Or double-click `start-uia-probes.bat` in the repository root. It builds the
-host and its three fixed first-party diagnostic children once, verifies the
+host and its four fixed first-party diagnostic children once, verifies the
 locked native graph is first-party, runs the property, focus, focus-event,
-Invoke, structure-event, and live-status-event probes in order, and closes each
+Invoke, window-controls, structure-event, and live-status-event probes in order, and closes each
 temporary window before starting the next. It needs an interactive Windows
 desktop but changes no certificate trust, installation, machine policy,
 application package, network state, or persistent user state.
 
-A successful suite confirms only the six fixed direct-client contracts below.
+A successful suite confirms only the seven fixed direct-client contracts below.
 It does not prove Narrator speech or Inspect-highlight correctness, so the
 manual checks remain required for release acceptance.
 
-The suite was most recently re-run on 2026-09-09 against the release build:
-property, focus, focus-event, Invoke, structure-event, and live-status-event
-probes all passed. This records repeatable Windows-client evidence only; it is
-not a substitute for the manual checks below.
+The suite was most recently re-run on 2026-09-19 against the release build:
+property, focus, focus-event, Invoke, window-controls, structure-event, and
+live-status-event probes all passed. This records repeatable Windows-client
+evidence only; it is not a substitute for the manual checks below.
 
 ### Automated UI Lab property/tree/geometry/Value-pattern/non-Invoke acceptance
 

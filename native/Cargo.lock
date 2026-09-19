@@ -371,6 +371,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "anodrel-native-window-controls-client"
+version = "0.1.0"
+dependencies = [
+ "anodrel-ui-document",
+ "anodrel-windows-ui-sdk",
+]
+
+[[package]]
 name = "anodrel-network"
 version = "0.1.0"
 
