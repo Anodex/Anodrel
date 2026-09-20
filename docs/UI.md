@@ -196,7 +196,8 @@ validated `UiDocument` to draw a responsive native screen. Its raised action
 group, text prominence, and emphasized action come from the document's
 semantic appearance roles; the renderer does not infer them from element IDs.
 Hovering and clicking an action exercises the same layout hit test and displays
-its semantic element ID. Tab and Shift+Tab exercise the portable focus order
+only its semantic element ID in the fixed one-line diagnostic status slot. Tab
+and Shift+Tab exercise the portable focus order
 with a visible focus ring; a focused field receives text editing on the host UI
 thread, while Enter activates only a focused semantic action. The host-owned Lab
 also places its compiled v1 fixture inside an in-memory scroll viewport and

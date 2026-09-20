@@ -43,6 +43,59 @@ fn hit_testing_tracks_the_scaled_layout() {
 }
 
 #[test]
+fn initial_scroll_viewport_keeps_the_primary_controls_visible() {
+    let lab = UiLab::new();
+    let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+
+    for element in [
+        "ui.lab.field",
+        "ui.lab.inspect",
+        "ui.lab.hit-test",
+        "ui.lab.report",
+    ] {
+        assert!(
+            layout.bounds(&id(element)).is_some(),
+            "initial scroll viewport should expose {element}"
+        );
+    }
+}
+
+#[test]
+fn fixed_action_identifiers_fit_the_compiled_status_slot() {
+    let lab = UiLab::new();
+    let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+    let status_bounds = layout
+        .bounds(&id("ui.lab.status"))
+        .expect("compiled status is visible");
+    let mut action_ids = vec![
+        "ui.lab.inspect".to_owned(),
+        "ui.lab.hit-test".to_owned(),
+        "ui.lab.report".to_owned(),
+    ];
+    action_ids.extend((1..=9).map(|index| format!("ui.lab.scroll.exercise-{index}")));
+
+    for action_id in action_ids {
+        let status = TextSpec::new(action_id, 14, WEIGHT_REGULAR);
+        assert!(
+            text::width(&status) <= status_bounds.width(),
+            "fixed action ID must fit the one-line status slot"
+        );
+    }
+}
+
+#[test]
+fn action_status_reports_only_its_semantic_identifier() {
+    let mut lab = UiLab::new();
+    lab.last_action = Some(id("ui.lab.hit-test"));
+
+    assert_eq!(
+        status_text(&lab).as_deref(),
+        Some("ui.lab.hit-test"),
+        "the local diagnostic should expose only the semantic event payload"
+    );
+}
+
+#[test]
 fn invocation_changes_only_the_host_owned_status() {
     let mut lab = UiLab::new();
     let layout = lab.document.layout(

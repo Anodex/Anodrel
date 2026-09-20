@@ -36,6 +36,27 @@ fn draws_visible_content_without_a_web_surface() {
     assert!(changed > 1_000, "UI Lab drew too little content");
 }
 
+#[test]
+fn scroll_viewport_composites_the_initial_action_controls() {
+    let lab = UiLab::new();
+    let layout = lab.layout(BASE_WIDTH, BASE_HEIGHT);
+    let bounds = layout
+        .bounds(&id("ui.lab.hit-test"))
+        .expect("initial action is visible");
+    let mut canvas = Canvas::new(BASE_WIDTH as u32, BASE_HEIGHT as u32);
+
+    draw(&mut canvas, &lab);
+
+    assert_eq!(
+        canvas.pixel(
+            (bounds.left + 8.0) as i32,
+            ((bounds.top + bounds.bottom) / 2.0) as i32,
+        ),
+        palette::ACCENT_SHELL,
+        "the scroll layer should composite the primary action fill"
+    );
+}
+
 fn changed_pixels(canvas: &Canvas) -> usize {
     (0..canvas.height())
         .flat_map(|y| (0..canvas.width()).map(move |x| (x as i32, y as i32)))

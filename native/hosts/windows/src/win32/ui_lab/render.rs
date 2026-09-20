@@ -169,6 +169,10 @@ pub(super) fn status_text(lab: &UiLab) -> Option<String> {
     lab.status_target.as_ref()?;
     Some(lab.last_action.as_ref().map_or_else(
         || "Latest semantic event: none".to_owned(),
-        |id| format!("Latest semantic event: {id} (no native operation)"),
+        // The layout reserves one line for its compiled status. The fixed lab
+        // therefore reports the semantic identifier alone after an action,
+        // which is both the complete event payload and guaranteed to stay in
+        // the existing bounded status slot.
+        |id| id.as_str().to_owned(),
     ))
 }

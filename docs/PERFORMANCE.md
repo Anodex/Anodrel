@@ -351,9 +351,9 @@ regression record rather than a cold-start or cross-runtime comparison.
 
 | Workload | Result |
 | --- | --- |
-| Sustained Startup Lab frame guard | 6.368 ms mean; 8.085 ms worst, within the 16 ms interval. |
-| Host startup checks | 1.728 ms; 11,853,824-byte working set; 1,892,352-byte private bytes. |
-| Static host window | 29.993 seconds; 0.000000% CPU; 17,625,088-byte working set; 4,194,304-byte private bytes. |
+| Sustained Startup Lab frame guard | 6.634 ms mean; 8.436 ms worst, within the 16 ms interval. |
+| Host startup checks | 1.874 ms; 11,788,288-byte working set; 1,900,544-byte private bytes. |
+| Static host window | 30.016 seconds; 1.093142% CPU; 23,465,984-byte working set; 4,743,168-byte private bytes. |
 | Direct UI Automation probes | Property, focus, ScrollItem, focus event, Invoke, window-controls, structure event, and live-status event passed. |
 
 The CPU reading is one process-local user-plus-kernel sample; it is not a
