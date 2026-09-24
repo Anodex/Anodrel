@@ -74,9 +74,10 @@ Automated tests exercise actual Windows mapped-image locking, process exit,
 immediate version-directory reuse, busy-file retry, anonymous-pipe deadlines,
 invalid frames, maintenance exclusion and unsigned-image rejection. They use
 isolated temporary directories, not machine policy or certificate trust.
-Signed install -> remove -> cache retirement -> immediate reinstall, native
-consent/UAC, cancellation and interrupted signed recovery still require the
-installed-fixture acceptance run; unit tests do not establish those outcomes.
+Signed install -> remove -> cache retirement -> immediate reinstall,
+native-consent/UAC, and cancellation have visible installed-fixture evidence.
+Interrupted signed recovery still requires a separate installed-fixture
+acceptance run; unit tests do not establish any of those desktop outcomes.
 
 ## Exclusions
 

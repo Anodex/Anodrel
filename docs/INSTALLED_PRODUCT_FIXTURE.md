@@ -214,6 +214,14 @@ use it. This records the positive verifier, visible icon, removal, and
 no-restart cleanup postconditions; title-bar-close, recovery, cancellation,
 busy-application, and interrupted-cleanup checks remain separate evidence.
 
+On 2026-09-23, a fresh verified installed fixture exercised the negative
+normal-user removal path. Its native **Anodrel removal** confirmation was
+dismissed with the fixed **No** mnemonic. The normal-user uninstaller exited
+and `verify-installed-product-fixture.ps1` still passed, proving cancellation
+left the selected package, machine record, Installed Apps entry, Start-menu
+shortcut, and verified launch route intact. Busy-application, interrupted-
+cleanup, recovery, and altered-cache checks remain separate evidence.
+
 ## Removal
 
 First, remove the installed fixture from a normal PowerShell session. The
