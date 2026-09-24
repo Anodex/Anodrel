@@ -222,6 +222,12 @@ left the selected package, machine record, Installed Apps entry, Start-menu
 shortcut, and verified launch route intact. Busy-application, interrupted-
 cleanup, recovery, and altered-cache checks remain separate evidence.
 
+On the same date, the registered fixture launch was closed with Windows'
+standard `Alt+F4` close command. Both the verified host and its fixture child
+exited promptly, and the installed-fixture verifier still passed afterward.
+This is close-lifecycle evidence only: a pointer activation of the native
+title-bar Close button remains a separate visible desktop check.
+
 ## Removal
 
 First, remove the installed fixture from a normal PowerShell session. The
