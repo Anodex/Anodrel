@@ -211,8 +211,8 @@ a final read-only machine audit found no selected record, package, shortcut,
 installer process, or fixture development certificate. The shared
 `Anodrel.ico` remained by design because another Anodrel Start-menu entry may
 use it. This records the positive verifier, visible icon, removal, and
-no-restart cleanup postconditions; title-bar-close, recovery, cancellation,
-busy-application, and interrupted-cleanup checks remain separate evidence.
+no-restart cleanup postconditions; recovery, cancellation, busy-application,
+and interrupted-cleanup checks remain separate evidence.
 
 On 2026-09-23, a fresh verified installed fixture exercised the negative
 normal-user removal path. Its native **Anodrel removal** confirmation was
@@ -225,8 +225,12 @@ cleanup, recovery, and altered-cache checks remain separate evidence.
 On the same date, the registered fixture launch was closed with Windows'
 standard `Alt+F4` close command. Both the verified host and its fixture child
 exited promptly, and the installed-fixture verifier still passed afterward.
-This is close-lifecycle evidence only: a pointer activation of the native
-title-bar Close button remains a separate visible desktop check.
+
+On 2026-09-24, a visible pointer click on that same native title-bar **Close**
+button closed the registered fixture window. Both the verified host and child
+exited, and `verify-installed-product-fixture.ps1` still passed. This closes
+the title-bar-close acceptance check; busy-application, interrupted-cleanup,
+recovery, and altered-cache checks remain separate evidence.
 
 ## Removal
 
