@@ -15,6 +15,47 @@ const CHILD_TIMEOUT_MILLISECONDS: u32 = 10_000;
 const DEVELOPMENT_STOP_CODE: u32 = 0xA11D;
 const HOST_NAME: &str = "anodrel-windows-host";
 
+/// Starts one host-owned watcher that turns a child exit into the existing
+/// coalescing session-close request. The watcher observes no child output or
+/// identity and never exposes an exit result to application code.
+fn watch_child_exit(
+    child: anodrel_windows_bootstrap::LaunchedProcess,
+    stop: anodrel_windows_pipe::PipeStopSignal,
+    close: SessionCloseSignal,
+) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new()
+        .name("anodrel-development-child-exit".to_owned())
+        .spawn(move || {
+            request_close_after_child_exit(
+                || child.wait_for_exit(u32::MAX),
+                || stop.request_stop(),
+                close,
+            );
+        })
+}
+
+fn request_close_after_child_exit(
+    wait_for_exit: impl FnOnce() -> io::Result<u32>,
+    request_stop: impl FnOnce(),
+    close: SessionCloseSignal,
+) {
+    let _ = wait_for_exit();
+    request_stop();
+    close.request();
+}
+
+fn stop_child_watcher(
+    child: &anodrel_windows_bootstrap::LaunchedProcess,
+    stop: &anodrel_windows_pipe::PipeStopSignal,
+    close: &SessionCloseSignal,
+    watcher: thread::JoinHandle<()>,
+) {
+    close.request();
+    stop.request_stop();
+    let _ = child.terminate(DEVELOPMENT_STOP_CODE);
+    let _ = watcher.join();
+}
+
 /// Runs one explicitly selected compiled child through a host-owned UI session.
 ///
 /// The executable is unverified development code by design. Its output is
@@ -181,9 +222,19 @@ where
     let stop = server.stop_signal();
     let bootstrap = invitation.bootstrap_invitation()?;
     let worker = thread::spawn(move || server.serve_one());
+    let host_close = ui.close.clone();
     let child = match launch(&command, &bootstrap) {
         Ok(child) => child,
         Err(error) => {
+            stop.request_stop();
+            let _ = worker.join();
+            return Err(error.into());
+        }
+    };
+    let child_watcher = match watch_child_exit(child.clone(), stop.clone(), host_close.clone()) {
+        Ok(watcher) => watcher,
+        Err(error) => {
+            let _ = child.terminate(DEVELOPMENT_STOP_CODE);
             stop.request_stop();
             let _ = worker.join();
             return Err(error.into());
@@ -225,15 +276,13 @@ where
         }
     };
     if let Err(error) = window_result {
-        let _ = child.terminate(DEVELOPMENT_STOP_CODE);
-        stop.request_stop();
+        stop_child_watcher(&child, &stop, &host_close, child_watcher);
         let _ = worker.join();
         return Err(error.into());
     }
 
     if let Err(error) = after_closed() {
-        let _ = child.terminate(DEVELOPMENT_STOP_CODE);
-        stop.request_stop();
+        stop_child_watcher(&child, &stop, &host_close, child_watcher);
         let _ = worker.join();
         return Err(error.into());
     }
@@ -241,23 +290,63 @@ where
     let exit_code = match child.wait_for_exit(CHILD_TIMEOUT_MILLISECONDS) {
         Ok(exit_code) => exit_code,
         Err(error) => {
-            let _ = child.terminate(DEVELOPMENT_STOP_CODE);
-            stop.request_stop();
+            stop_child_watcher(&child, &stop, &host_close, child_watcher);
             let _ = worker.join();
             return Err(error.into());
         }
     };
     if exit_code != 0 {
         stop.request_stop();
+        let _ = child_watcher.join();
         let _ = worker.join();
         return Err(io::Error::other(format!(
             "compiled native UI development session failed at safe stage {exit_code}"
         ))
         .into());
     }
+    let _ = child_watcher.join();
     worker
         .join()
         .map_err(|_| io::Error::other("native UI development session pipe worker panicked"))??;
     println!("{}", config.completion_message);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    use super::*;
+
+    #[test]
+    fn child_exit_requests_the_host_owned_close_signal() {
+        let close = SessionCloseSignal::default();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop = Arc::clone(&stop_requested);
+        request_close_after_child_exit(
+            || Ok(0),
+            move || stop.store(true, Ordering::Release),
+            close.clone(),
+        );
+        assert!(stop_requested.load(Ordering::Acquire));
+        assert!(close.take());
+        assert!(!close.take());
+    }
+
+    #[test]
+    fn child_wait_failure_still_requests_the_host_owned_close_signal() {
+        let close = SessionCloseSignal::default();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop = Arc::clone(&stop_requested);
+        request_close_after_child_exit(
+            || Err(io::Error::other("test child wait failure")),
+            move || stop.store(true, Ordering::Release),
+            close.clone(),
+        );
+        assert!(stop_requested.load(Ordering::Acquire));
+        assert!(close.take());
+    }
 }

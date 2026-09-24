@@ -9,17 +9,21 @@
 mod command_line;
 mod raw;
 
-use std::{fmt, io};
+use std::{fmt, io, sync::Arc};
 
 use anodrel_bootstrap::BootstrapInvitation;
 
 pub use command_line::{BootstrapCommand, CommandError};
 
-/// A launched child process. Dropping this value closes the process handle but
-/// deliberately does not terminate the child; lifecycle policy belongs above
-/// this narrow bootstrap adapter.
+/// A launched child process.
+///
+/// Clones share one owned process handle so a host lifecycle may wait for an
+/// exit while retaining its own fixed termination route. Dropping every clone
+/// closes the handle but deliberately does not terminate the child; lifecycle
+/// policy belongs above this narrow bootstrap adapter.
+#[derive(Clone)]
 pub struct LaunchedProcess {
-    handle: raw::OwnedHandle,
+    handle: Arc<raw::OwnedHandle>,
 }
 
 impl LaunchedProcess {
@@ -56,8 +60,12 @@ pub fn launch(
         .encode()
         .map_err(BootstrapLaunchError::Invitation)?;
     let command_line = command.command_line();
-    let result = raw::launch_with_bootstrap(command.program(), &command_line, &frame)
-        .map(|handle| LaunchedProcess { handle });
+    let result =
+        raw::launch_with_bootstrap(command.program(), &command_line, &frame).map(|handle| {
+            LaunchedProcess {
+                handle: Arc::new(handle),
+            }
+        });
     frame.fill(0);
     result.map_err(BootstrapLaunchError::Io)
 }

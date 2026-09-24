@@ -117,8 +117,10 @@ and grants its one authenticated session only:
 
 It never accepts project-supplied grants. The host owns the window title,
 mailboxes, semantic hit testing, process handle, pipe worker, and cleanup. A
-child exits early, closes its session, or times out only through the host's
-bounded lifecycle; it cannot leave a worker or child running in the background.
+host-owned child-exit watcher stops the private pipe worker and converts an
+early child exit into the same coalescing session-close route as an accepted
+close request. A child cannot leave a waiting window, worker, or child running
+in the background.
 
 ## Compatibility and verification
 
